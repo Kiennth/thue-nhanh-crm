@@ -13,14 +13,16 @@ export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance";
 
 export type TaskType =
-  | "tiep_nhan_bao_gia"
+  | "tiep_nhan_yeu_cau"
+  | "bao_gia"
   | "chot_don"
-  | "ky_hop_dong"
+  | "ky_hop_dong_thu_coc"
   | "chuan_bi"
-  | "giao_hang"
-  | "van_hanh"
+  | "giao_hang_ban_giao"
+  | "van_hanh_xu_ly_su_co"
   | "thu_hoi"
-  | "nhap_kho";
+  | "nghiem_thu"
+  | "nhap_kho_bao_tri";
 
 export interface Database {
   public: {
