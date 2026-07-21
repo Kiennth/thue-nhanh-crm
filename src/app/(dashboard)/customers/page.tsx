@@ -1,5 +1,6 @@
 import { Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -11,6 +12,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
+
+const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 
 export default async function CustomersPage() {
   const supabase = await createClient();
@@ -37,6 +40,7 @@ export default async function CustomersPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Tên</TableHead>
+            <TableHead>Loại</TableHead>
             <TableHead>Điện thoại</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Ghi chú</TableHead>
@@ -47,6 +51,9 @@ export default async function CustomersPage() {
           {customers?.map((customer) => (
             <TableRow key={customer.id}>
               <TableCell className="font-medium">{customer.name}</TableCell>
+              <TableCell>
+                <Badge variant="secondary">{CUSTOMER_TYPE_LABELS[customer.customer_type]}</Badge>
+              </TableCell>
               <TableCell>{customer.phone ?? "—"}</TableCell>
               <TableCell>{customer.email ?? "—"}</TableCell>
               <TableCell className="max-w-64 truncate">{customer.notes ?? "—"}</TableCell>
@@ -68,7 +75,7 @@ export default async function CustomersPage() {
           ))}
           {!customers?.length && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Chưa có khách hàng nào.
               </TableCell>
             </TableRow>

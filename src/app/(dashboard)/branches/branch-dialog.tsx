@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { createBranch, updateBranch } from "@/lib/actions/branches";
 
 interface BranchDialogProps {
-  trigger: React.ReactNode;
+  trigger: React.ReactElement;
   branch?: {
     id: string;
     name: string;
@@ -50,7 +50,7 @@ export function BranchDialog({ trigger, branch }: BranchDialogProps) {
         if (next) setError(null);
       }}
     >
-      <DialogTrigger render={<span />}>{trigger}</DialogTrigger>
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
           <DialogHeader>

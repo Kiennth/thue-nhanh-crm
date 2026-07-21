@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
+import { InviteHashHandler } from "./invite-hash-handler";
 
 export default function LoginPage() {
   return (
@@ -9,7 +10,9 @@ export default function LoginPage() {
           <CardTitle>Đăng nhập</CardTitle>
         </CardHeader>
         <CardContent>
-          <LoginForm />
+          <InviteHashHandler>
+            <LoginForm />
+          </InviteHashHandler>
         </CardContent>
       </Card>
     </div>

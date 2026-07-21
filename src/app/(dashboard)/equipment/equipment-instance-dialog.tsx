@@ -19,32 +19,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createEmployee, updateEmployee } from "@/lib/actions/employees";
-import { ROLE_LABELS } from "@/lib/roles";
-import type { UserRole } from "@/types/database";
+import { createEquipmentInstance, updateEquipmentInstance } from "@/lib/actions/equipment";
+import { EQUIPMENT_INSTANCE_STATUS_LABELS } from "@/lib/equipment-labels";
+import type { EquipmentInstanceStatus } from "@/types/database";
 
 interface Branch {
   id: string;
   name: string;
 }
 
-interface EmployeeDialogProps {
+interface EquipmentInstanceDialogProps {
   trigger: React.ReactElement;
+  equipmentTypeId: string;
   branches: Branch[];
-  employee?: {
+  instance?: {
     id: string;
-    name: string;
-    email: string | null;
-    department: string | null;
+    identifier_code: string;
     branch_id: string | null;
-    base_salary: number;
-    role: UserRole;
+    status: EquipmentInstanceStatus;
+    condition_notes: string | null;
   };
 }
 
-const ROLE_OPTIONS: UserRole[] = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"];
-
-export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogProps) {
+export function EquipmentInstanceDialog({
+  trigger,
+  equipmentTypeId,
+  branches,
+  instance,
+}: EquipmentInstanceDialogProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -52,9 +54,9 @@ export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogPr
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result = employee
-        ? await updateEmployee(employee.id, undefined, formData)
-        : await createEmployee(undefined, formData);
+      const result = instance
+        ? await updateEquipmentInstance(instance.id, undefined, formData)
+        : await createEquipmentInstance(undefined, formData);
 
       if (result && "error" in result) {
         setError(result.error);
@@ -75,39 +77,25 @@ export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogPr
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
+          <input type="hidden" name="equipment_type_id" value={equipmentTypeId} />
           <DialogHeader>
-            <DialogTitle>{employee ? "Sửa nhân viên" : "Thêm nhân viên"}</DialogTitle>
+            <DialogTitle>{instance ? "Sửa sản phẩm" : "Thêm sản phẩm"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Tên</Label>
-            <Input id="name" name="name" defaultValue={employee?.name} required />
-          </div>
-
-          {employee ? (
-            <div className="space-y-2">
-              <Label>Email đăng nhập</Label>
-              <p className="text-sm text-muted-foreground">{employee.email}</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="email">Email (gửi lời mời đăng nhập)</Label>
-              <Input id="email" name="email" type="email" required />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="department">Phòng ban</Label>
+            <Label htmlFor="identifier_code">Mã định danh</Label>
             <Input
-              id="department"
-              name="department"
-              defaultValue={employee?.department ?? ""}
+              id="identifier_code"
+              name="identifier_code"
+              placeholder="VD: biển số, số serial"
+              defaultValue={instance?.identifier_code}
+              required
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="branch_id">Chi nhánh</Label>
-            <Select name="branch_id" defaultValue={employee?.branch_id ?? undefined}>
+            <Select name="branch_id" defaultValue={instance?.branch_id ?? undefined}>
               <SelectTrigger id="branch_id" className="w-full">
                 <SelectValue placeholder="Chọn chi nhánh">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
@@ -124,32 +112,28 @@ export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="base_salary">Lương cứng (VNĐ)</Label>
-            <Input
-              id="base_salary"
-              name="base_salary"
-              type="number"
-              min={0}
-              step={1000}
-              defaultValue={employee?.base_salary ?? 0}
-              required
-            />
+            <Label htmlFor="status">Trạng thái</Label>
+            <Select name="status" defaultValue={instance?.status ?? "available"}>
+              <SelectTrigger id="status" className="w-full">
+                <SelectValue>
+                  {(value: EquipmentInstanceStatus) => EQUIPMENT_INSTANCE_STATUS_LABELS[value]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="available">Sẵn có</SelectItem>
+                <SelectItem value="rented">Đang cho thuê</SelectItem>
+                <SelectItem value="maintenance">Bảo trì</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Vai trò</Label>
-            <Select name="role" defaultValue={employee?.role ?? "ky_thuat_sales"}>
-              <SelectTrigger id="role" className="w-full">
-                <SelectValue>{(value: UserRole) => ROLE_LABELS[value]}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {ROLE_OPTIONS.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {ROLE_LABELS[role]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="condition_notes">Ghi chú tình trạng</Label>
+            <Input
+              id="condition_notes"
+              name="condition_notes"
+              defaultValue={instance?.condition_notes ?? ""}
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

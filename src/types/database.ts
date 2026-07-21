@@ -4,6 +4,14 @@
 
 export type UserRole = "admin" | "ke_toan" | "ky_thuat_sales" | "quan_ly_chi_nhanh";
 
+export type CustomerType = "individual" | "company";
+
+export type ProductType = "rental" | "sale" | "service";
+export type TrackingType = "individual" | "quantity";
+export type PricingMethod = "flat_fee" | "pricing_structure";
+export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
+export type EquipmentInstanceStatus = "available" | "rented" | "maintenance";
+
 export type TaskType =
   | "tiep_nhan_bao_gia"
   | "chot_don"
@@ -70,6 +78,9 @@ export interface Database {
           phone: string | null;
           email: string | null;
           notes: string | null;
+          customer_type: CustomerType;
+          tax_code: string | null;
+          address: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -79,6 +90,9 @@ export interface Database {
           phone?: string | null;
           email?: string | null;
           notes?: string | null;
+          customer_type?: CustomerType;
+          tax_code?: string | null;
+          address?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["customers"]["Insert"]>;
         Relationships: [];
@@ -87,18 +101,81 @@ export interface Database {
         Row: {
           id: string;
           name: string;
-          branch_id: string;
-          rental_price_per_day: number;
+          product_type: ProductType;
+          tracking_type: TrackingType | null;
+          pricing_method: PricingMethod | null;
+          price: number;
+          rental_period_unit: RentalPeriodUnit | null;
+          pricing_template_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           name: string;
-          branch_id: string;
-          rental_price_per_day: number;
+          product_type?: ProductType;
+          tracking_type?: TrackingType | null;
+          pricing_method?: PricingMethod | null;
+          price: number;
+          rental_period_unit?: RentalPeriodUnit | null;
+          pricing_template_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
+        Relationships: [];
+      };
+      pricing_templates: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["pricing_templates"]["Insert"]>;
+        Relationships: [];
+      };
+      pricing_template_tiers: {
+        Row: {
+          id: string;
+          template_id: string;
+          min_duration: number;
+          duration_unit: RentalPeriodUnit;
+          discount_percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          min_duration: number;
+          duration_unit: RentalPeriodUnit;
+          discount_percentage: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["pricing_template_tiers"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_instances: {
+        Row: {
+          id: string;
+          equipment_type_id: string;
+          identifier_code: string;
+          branch_id: string | null;
+          status: EquipmentInstanceStatus;
+          condition_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_type_id: string;
+          identifier_code: string;
+          branch_id?: string | null;
+          status?: EquipmentInstanceStatus;
+          condition_notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_instances"]["Insert"]>;
         Relationships: [];
       };
       equipment_units: {
@@ -106,8 +183,6 @@ export interface Database {
           id: string;
           equipment_type_id: string;
           brand_model: string;
-          quantity_total: number;
-          quantity_available: number;
           condition_notes: string | null;
           created_at: string;
           updated_at: string;
@@ -116,11 +191,52 @@ export interface Database {
           id?: string;
           equipment_type_id: string;
           brand_model: string;
-          quantity_total?: number;
-          quantity_available?: number;
           condition_notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_units"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_stock: {
+        Row: {
+          id: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity_total: number;
+          quantity_available: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity_total?: number;
+          quantity_available?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_stock"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_transfers: {
+        Row: {
+          id: string;
+          equipment_unit_id: string;
+          from_branch_id: string;
+          to_branch_id: string;
+          quantity: number;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_unit_id: string;
+          from_branch_id: string;
+          to_branch_id: string;
+          quantity: number;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_transfers"]["Insert"]>;
         Relationships: [];
       };
     };
@@ -149,6 +265,16 @@ export interface Database {
       is_employee: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      transfer_equipment_stock: {
+        Args: {
+          p_equipment_unit_id: string;
+          p_from_branch_id: string;
+          p_to_branch_id: string;
+          p_quantity: number;
+          p_note?: string | null;
+        };
+        Returns: void;
       };
     };
   };

@@ -12,23 +12,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createEquipmentUnit, updateEquipmentUnit } from "@/lib/actions/equipment";
+import { createPricingTemplate } from "@/lib/actions/equipment";
 
-interface EquipmentUnitDialogProps {
-  trigger: React.ReactElement;
-  equipmentTypeId: string;
-  unit?: {
-    id: string;
-    brand_model: string;
-    condition_notes: string | null;
-  };
-}
-
-export function EquipmentUnitDialog({
-  trigger,
-  equipmentTypeId,
-  unit,
-}: EquipmentUnitDialogProps) {
+export function PricingTemplateDialog({ trigger }: { trigger: React.ReactElement }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -36,10 +22,7 @@ export function EquipmentUnitDialog({
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result = unit
-        ? await updateEquipmentUnit(unit.id, undefined, formData)
-        : await createEquipmentUnit(undefined, formData);
-
+      const result = await createPricingTemplate(undefined, formData);
       if (result && "error" in result) {
         setError(result.error);
       } else {
@@ -59,28 +42,17 @@ export function EquipmentUnitDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="equipment_type_id" value={equipmentTypeId} />
           <DialogHeader>
-            <DialogTitle>{unit ? "Sửa biến thể" : "Thêm biến thể"}</DialogTitle>
+            <DialogTitle>Thêm bảng giá mẫu</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="brand_model">Hãng / model</Label>
+            <Label htmlFor="name">Tên bảng giá</Label>
             <Input
-              id="brand_model"
-              name="brand_model"
-              defaultValue={unit?.brand_model}
-              placeholder="VD: Samsung"
+              id="name"
+              name="name"
+              placeholder="VD: Giá thuê dài hạn"
               required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="condition_notes">Ghi chú tình trạng</Label>
-            <Input
-              id="condition_notes"
-              name="condition_notes"
-              defaultValue={unit?.condition_notes ?? ""}
             />
           </div>
 

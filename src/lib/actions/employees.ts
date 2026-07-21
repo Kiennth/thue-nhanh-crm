@@ -47,9 +47,10 @@ export async function createEmployee(
   const { email, branch_id, ...rest } = parsed.data;
   const admin = createAdminClient();
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     email,
-    { redirectTo: "/set-password" },
+    { redirectTo: `${siteUrl}/login` },
   );
 
   if (inviteError || !invited.user) {

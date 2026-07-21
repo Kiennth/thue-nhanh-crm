@@ -12,6 +12,9 @@ const CustomerSchema = z.object({
   phone: z.string().trim().optional(),
   email: z.string().trim().email({ message: "Email không hợp lệ." }).optional().or(z.literal("")),
   notes: z.string().trim().optional(),
+  customer_type: z.enum(["individual", "company"]),
+  tax_code: z.string().trim().optional(),
+  address: z.string().trim().optional(),
 });
 
 export type ActionState = { error: string } | { success: true } | undefined;
@@ -27,6 +30,9 @@ export async function createCustomer(
     phone: formData.get("phone") || undefined,
     email: formData.get("email") || "",
     notes: formData.get("notes") || undefined,
+    customer_type: formData.get("customer_type"),
+    tax_code: formData.get("tax_code") || undefined,
+    address: formData.get("address") || undefined,
   });
 
   if (!parsed.success) {
@@ -59,6 +65,9 @@ export async function updateCustomer(
     phone: formData.get("phone") || undefined,
     email: formData.get("email") || "",
     notes: formData.get("notes") || undefined,
+    customer_type: formData.get("customer_type"),
+    tax_code: formData.get("tax_code") || undefined,
+    address: formData.get("address") || undefined,
   });
 
   if (!parsed.success) {

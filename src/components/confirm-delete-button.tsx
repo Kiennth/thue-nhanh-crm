@@ -5,14 +5,20 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function ConfirmDeleteButton({
+// `action` phải là reference Server Action gốc (import trực tiếp), KHÔNG
+// bọc trong arrow function ở component cha (Server Component) — closure tự
+// tạo không serialize được qua ranh giới RSC, chỉ Server Action reference
+// thật mới được.
+export function ConfirmDeleteButton<T>({
   confirmMessage,
   successMessage,
-  onDelete,
+  action,
+  actionArg,
 }: {
   confirmMessage: string;
   successMessage: string;
-  onDelete: () => Promise<void>;
+  action: (arg: T) => Promise<void>;
+  actionArg: T;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -21,7 +27,7 @@ export function ConfirmDeleteButton({
 
     startTransition(async () => {
       try {
-        await onDelete();
+        await action(actionArg);
         toast.success(successMessage);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra.");
