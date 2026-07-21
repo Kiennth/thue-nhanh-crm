@@ -241,6 +241,141 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["equipment_transfers"]["Insert"]>;
         Relationships: [];
       };
+      orders: {
+        Row: {
+          id: string;
+          order_code: string;
+          branch_id: string;
+          customer_id: string;
+          order_date: string;
+          total_value: number;
+          status: TaskType;
+          completed_at: string | null;
+          rental_start_at: string | null;
+          rental_end_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_code: string;
+          branch_id: string;
+          customer_id: string;
+          order_date?: string;
+          total_value?: number;
+          status?: TaskType;
+          completed_at?: string | null;
+          rental_start_at?: string | null;
+          rental_end_at?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
+        Relationships: [];
+      };
+      order_equipment: {
+        Row: {
+          id: string;
+          order_id: string;
+          equipment_type_id: string;
+          equipment_unit_id: string | null;
+          equipment_instance_id: string | null;
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          equipment_type_id: string;
+          equipment_unit_id?: string | null;
+          equipment_instance_id?: string | null;
+          quantity?: number;
+          unit_price?: number;
+          line_total?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;
+        Relationships: [];
+      };
+      order_tasks: {
+        Row: {
+          id: string;
+          order_id: string;
+          task_type: TaskType;
+          employee_id: string | null;
+          completed_date: string | null;
+          note: string | null;
+          has_issue: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          task_type: TaskType;
+          employee_id?: string | null;
+          completed_date?: string | null;
+          note?: string | null;
+          has_issue?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["order_tasks"]["Insert"]>;
+        Relationships: [];
+      };
+      commission_tiers: {
+        Row: {
+          id: string;
+          branch_id: string;
+          tier_number: number;
+          min_value: number;
+          max_value: number | null;
+          percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          branch_id: string;
+          tier_number: number;
+          min_value: number;
+          max_value?: number | null;
+          percentage: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["commission_tiers"]["Insert"]>;
+        Relationships: [];
+      };
+      task_weights: {
+        Row: {
+          id: string;
+          task_type: TaskType;
+          weight_percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_type: TaskType;
+          weight_percentage: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["task_weights"]["Insert"]>;
+        Relationships: [];
+      };
+      bonus_tiers: {
+        Row: {
+          id: string;
+          branch_id: string;
+          tier_number: number;
+          threshold_amount: number;
+          bonus_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          branch_id: string;
+          tier_number: number;
+          threshold_amount: number;
+          bonus_amount: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["bonus_tiers"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       employees_public: {
