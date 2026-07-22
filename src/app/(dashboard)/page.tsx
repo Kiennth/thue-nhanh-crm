@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RevenueBarList, formatCount } from "@/components/revenue-bar-list";
+import { RevenueBarList, formatCount, formatPercent } from "@/components/revenue-bar-list";
 import { PeriodPicker } from "@/components/period-picker";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
@@ -103,6 +103,11 @@ export default async function DashboardHomePage({
     .filter((r) => r.report.revenue > 0)
     .slice(0, 5);
 
+  const topMargin = rows
+    .filter((r) => r.report.roi !== null)
+    .sort((a, b) => (b.report.roi ?? 0) - (a.report.roi ?? 0))
+    .slice(0, 5);
+
   return (
     <div className="space-y-6">
       <div>
@@ -165,7 +170,7 @@ export default async function DashboardHomePage({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Cho thuê nhiều nhất</CardTitle>
@@ -185,6 +190,18 @@ export default async function DashboardHomePage({
           <CardContent>
             <RevenueBarList
               points={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
+              labelWidthClassName="w-32"
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tỉ suất lợi nhuận cao nhất</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RevenueBarList
+              points={topMargin.map((r) => ({ label: r.type.name, value: (r.report.roi ?? 0) * 100 }))}
+              formatValue={formatPercent}
               labelWidthClassName="w-32"
             />
           </CardContent>

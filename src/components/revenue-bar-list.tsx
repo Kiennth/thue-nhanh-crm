@@ -13,6 +13,10 @@ export function formatCount(value: number): string {
   return `${currencyFormatter.format(value)} lượt`;
 }
 
+export function formatPercent(value: number): string {
+  return `${value.toFixed(0)}%`;
+}
+
 export function RevenueBarList({
   points,
   formatValue = formatCurrency,
@@ -22,7 +26,7 @@ export function RevenueBarList({
   formatValue?: (value: number) => string;
   labelWidthClassName?: string;
 }) {
-  const max = Math.max(1, ...points.map((p) => p.value));
+  const max = Math.max(1, ...points.map((p) => Math.abs(p.value)));
 
   return (
     <div className="space-y-2">
@@ -33,11 +37,15 @@ export function RevenueBarList({
           </span>
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${(p.value / max) * 100}%` }}
+              className={`h-full rounded-full ${p.value < 0 ? "bg-destructive" : "bg-primary"}`}
+              style={{ width: `${(Math.abs(p.value) / max) * 100}%` }}
             />
           </div>
-          <span className="w-24 shrink-0 text-right tabular-nums">{formatValue(p.value)}</span>
+          <span
+            className={`w-24 shrink-0 text-right tabular-nums ${p.value < 0 ? "text-destructive" : ""}`}
+          >
+            {formatValue(p.value)}
+          </span>
         </div>
       ))}
       {!points.length && <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>}
