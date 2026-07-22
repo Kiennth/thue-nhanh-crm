@@ -56,17 +56,18 @@ export function OrderTaskRow({
   const isDone = !!task?.completed_date;
   // Remount với dữ liệu mới sau mỗi lần lưu thành công — tránh lệch trạng
   // thái giữa input uncontrolled và dữ liệu thật (React tự reset form sau
-  // khi action chạy xong, làm checkbox mất đồng bộ nếu không remount).
-  const rowKey = `${task?.employee_id ?? ""}-${task?.completed_date ?? ""}-${task?.has_issue ?? false}-${task?.note ?? ""}`;
+  // khi action chạy xong).
+  const rowKey = `${task?.employee_id ?? ""}-${task?.completed_date ?? ""}-${task?.note ?? ""}`;
 
   return (
     <form
       key={rowKey}
       action={handleSubmit}
-      className="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto] items-center gap-2 border-b py-2 last:border-b-0"
+      className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 border-b py-2 last:border-b-0"
     >
       <input type="hidden" name="order_id" value={orderId} />
       <input type="hidden" name="task_type" value={taskType} />
+      <input type="hidden" name="completed" value="on" />
 
       <div className="flex items-center gap-2">
         <span className={isDone ? "font-medium" : ""}>{label}</span>
@@ -75,7 +76,7 @@ export function OrderTaskRow({
         )}
       </div>
 
-      <Select name="employee_id" defaultValue={task?.employee_id ?? undefined}>
+      <Select name="employee_id" defaultValue={task?.employee_id ?? undefined} disabled={isDone}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Người phụ trách">
             {(value: string) => employees.find((e) => e.id === value)?.name}
@@ -90,34 +91,17 @@ export function OrderTaskRow({
         </SelectContent>
       </Select>
 
-      <Input name="note" placeholder="Ghi chú" defaultValue={task?.note ?? ""} />
+      <Input name="note" placeholder="Ghi chú" defaultValue={task?.note ?? ""} disabled={isDone} />
 
-      <label className="flex items-center gap-1 text-sm whitespace-nowrap">
-        <input
-          type="checkbox"
-          name="has_issue"
-          defaultChecked={!!task?.has_issue}
-          className="size-4 rounded border-input"
-        />
-        Sự cố
-      </label>
+      {isDone ? (
+        <span className="text-sm whitespace-nowrap text-muted-foreground">✓ Hoàn thành</span>
+      ) : (
+        <Button type="submit" size="sm" disabled={pending || !canComplete}>
+          {pending ? "..." : "Hoàn thành"}
+        </Button>
+      )}
 
-      <label className="flex items-center gap-1 text-sm whitespace-nowrap">
-        <input
-          type="checkbox"
-          name="completed"
-          defaultChecked={isDone}
-          disabled={!canComplete && !isDone}
-          className="size-4 rounded border-input"
-        />
-        Hoàn thành
-      </label>
-
-      <Button type="submit" variant="outline" size="sm" disabled={pending}>
-        {pending ? "..." : "Lưu"}
-      </Button>
-
-      {error && <p className="col-span-6 text-sm text-destructive">{error}</p>}
+      {error && <p className="col-span-4 text-sm text-destructive">{error}</p>}
     </form>
   );
 }
