@@ -53,22 +53,42 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
 
         {perf.tiers.length > 0 && (
           <div className="space-y-2">
-            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{
-                  width: `${Math.min(100, maxThreshold > 0 ? (perf.totalCommission / maxThreshold) * 100 : 0)}%`,
-                }}
-              />
+            <div className="relative pt-1 pb-9">
+              <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: `${Math.min(100, maxThreshold > 0 ? (perf.totalCommission / maxThreshold) * 100 : 0)}%`,
+                  }}
+                />
+                {perf.tiers.map((tier) => (
+                  <div
+                    key={tier.tierNumber}
+                    className={`absolute top-0 h-3 w-0.5 ${tier.achieved ? "bg-primary-foreground/60" : "bg-border"}`}
+                    style={{
+                      left: `${maxThreshold > 0 ? (tier.thresholdAmount / maxThreshold) * 100 : 0}%`,
+                    }}
+                  />
+                ))}
+              </div>
               {perf.tiers.map((tier) => (
                 <div
                   key={tier.tierNumber}
-                  className={`absolute top-0 h-3 w-0.5 ${tier.achieved ? "bg-primary-foreground/60" : "bg-border"}`}
+                  className="absolute top-5 -translate-x-full text-right"
                   style={{
                     left: `${maxThreshold > 0 ? (tier.thresholdAmount / maxThreshold) * 100 : 0}%`,
                   }}
-                  title={`Bậc ${tier.tierNumber}: ${currencyFormatter.format(tier.thresholdAmount)}đ → thưởng ${currencyFormatter.format(tier.bonusAmount)}đ`}
-                />
+                >
+                  <p
+                    className={`text-xs font-medium ${tier.achieved ? "text-primary" : "text-muted-foreground"}`}
+                  >
+                    {tier.achieved ? "✓ " : ""}
+                    {currencyFormatter.format(tier.thresholdAmount)}đ
+                  </p>
+                  <p className={`text-xs ${tier.achieved ? "text-primary" : "text-muted-foreground"}`}>
+                    🏁 +{currencyFormatter.format(tier.bonusAmount)}đ
+                  </p>
+                </div>
               ))}
             </div>
             <p className="text-sm text-muted-foreground">
