@@ -11,6 +11,8 @@ import {
   todayParts,
 } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
+import { computeMyPerformance } from "@/lib/my-performance";
+import { MyPerformanceCard } from "./my-performance-card";
 
 export default async function DashboardHomePage({
   searchParams,
@@ -89,6 +91,8 @@ export default async function DashboardHomePage({
     .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
     .slice(0, 5);
 
+  const myPerformance = employee ? await computeMyPerformance(employee.id, employee.branch_id) : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -97,6 +101,8 @@ export default async function DashboardHomePage({
           Xin chào, {employee?.name} ({employee ? ROLE_LABELS[employee.role] : ""})
         </p>
       </div>
+
+      {myPerformance && <MyPerformanceCard perf={myPerformance} />}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map((stat) => (
