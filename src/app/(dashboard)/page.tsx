@@ -14,7 +14,7 @@ import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import { MyPerformanceCard } from "./my-performance-card";
-import { OrdersToHandleCard } from "./orders-to-handle-card";
+import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
 
 export default async function DashboardHomePage({
   searchParams,
@@ -35,7 +35,9 @@ export default async function DashboardHomePage({
   if (employee?.role === "ky_thuat_sales") {
     const [myPerformance, ordersToHandle] = await Promise.all([
       computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
-      employee.branch_id ? getOrdersToHandle(employee.branch_id, defaults.day) : Promise.resolve([]),
+      employee.branch_id
+        ? getOrdersToHandle(employee.branch_id)
+        : Promise.resolve({ upcomingDeliveries: [], pendingCollections: [] }),
     ]);
 
     return (
@@ -48,7 +50,10 @@ export default async function DashboardHomePage({
         </div>
 
         <MyPerformanceCard perf={myPerformance} />
-        <OrdersToHandleCard orders={ordersToHandle} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
+          <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
+        </div>
       </div>
     );
   }
