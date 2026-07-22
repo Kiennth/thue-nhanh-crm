@@ -35,7 +35,6 @@ interface EmployeeDialogProps {
     id: string;
     name: string;
     email: string | null;
-    department: string | null;
     branch_id: string | null;
     base_salary: number;
     role: UserRole;
@@ -95,15 +94,6 @@ export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogPr
               <Input id="email" name="email" type="email" required />
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="department">Phòng ban</Label>
-            <Input
-              id="department"
-              name="department"
-              defaultValue={employee?.department ?? ""}
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="branch_id">Chi nhánh</Label>

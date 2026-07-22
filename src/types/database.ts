@@ -49,7 +49,6 @@ export interface Database {
         Row: {
           id: string;
           name: string;
-          department: string | null;
           branch_id: string | null;
           base_salary: number;
           role: UserRole;
@@ -62,7 +61,6 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
-          department?: string | null;
           branch_id?: string | null;
           base_salary?: number;
           role?: UserRole;
@@ -442,7 +440,6 @@ export interface Database {
         Row: {
           id: string;
           name: string;
-          department: string | null;
           branch_id: string | null;
           role: UserRole;
           is_active: boolean;

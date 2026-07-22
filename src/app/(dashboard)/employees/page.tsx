@@ -52,7 +52,6 @@ export default async function EmployeesPage() {
           <TableRow>
             <TableHead>Tên</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>Phòng ban</TableHead>
             <TableHead>Chi nhánh</TableHead>
             <TableHead>Vai trò</TableHead>
             {isHr && <TableHead>Lương cứng</TableHead>}
@@ -65,7 +64,6 @@ export default async function EmployeesPage() {
             <TableRow key={emp.id}>
               <TableCell className="font-medium">{emp.name}</TableCell>
               <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
-              <TableCell>{emp.department ?? "—"}</TableCell>
               <TableCell>
                 {emp.branch_id ? (branchNameById.get(emp.branch_id) ?? "—") : "—"}
               </TableCell>
@@ -103,7 +101,7 @@ export default async function EmployeesPage() {
           ))}
           {!employees?.length && (
             <TableRow>
-              <TableCell colSpan={isHr ? 8 : 6} className="text-center text-muted-foreground">
+              <TableCell colSpan={isHr ? 7 : 5} className="text-center text-muted-foreground">
                 Chưa có nhân viên nào.
               </TableCell>
             </TableRow>

@@ -10,7 +10,6 @@ const HR_ROLES = ["admin", "ke_toan"] as const;
 
 const employeeShape = {
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
-  department: z.string().trim().optional(),
   branch_id: z.string().uuid().optional().or(z.literal("")),
   base_salary: z.coerce.number().min(0, { message: "Lương cứng không được âm." }),
   role: z.enum(["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"]),
@@ -33,7 +32,6 @@ export async function createEmployee(
 
   const parsed = CreateEmployeeSchema.safeParse({
     name: formData.get("name"),
-    department: formData.get("department") || undefined,
     branch_id: formData.get("branch_id") || "",
     base_salary: formData.get("base_salary"),
     role: formData.get("role"),
@@ -84,7 +82,6 @@ export async function updateEmployee(
 
   const parsed = UpdateEmployeeSchema.safeParse({
     name: formData.get("name"),
-    department: formData.get("department") || undefined,
     branch_id: formData.get("branch_id") || "",
     base_salary: formData.get("base_salary"),
     role: formData.get("role"),
