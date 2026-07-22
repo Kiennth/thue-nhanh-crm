@@ -1,13 +1,39 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueBarList, formatCount } from "@/components/revenue-bar-list";
+import { PeriodPicker } from "@/components/period-picker";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { revenueByDay, revenueByWeek, revenueByMonth } from "@/lib/dashboard-reports";
+import { revenueForDay, revenueForMonth, revenueForYear } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 
-export default async function DashboardHomePage() {
+const currencyFormatter = new Intl.NumberFormat("vi-VN");
+
+function formatDayLabel(day: string) {
+  const [y, m, d] = day.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function todayParts() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return { day: `${y}-${m}-${d}`, month: `${y}-${m}`, year: `${y}` };
+}
+
+export default async function DashboardHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ day?: string; month?: string; year?: string }>;
+}) {
+  const params = await searchParams;
+  const defaults = todayParts();
+  const day = params.day || defaults.day;
+  const month = params.month || defaults.month;
+  const year = params.year || defaults.year;
+
   const supabase = await createClient();
   const [
     employee,
@@ -45,11 +71,14 @@ export default async function DashboardHomePage() {
     { label: "Loại thiết bị", count: equipmentTypes.count ?? 0, href: "/equipment" },
   ];
 
-  const now = new Date();
   const orderList = orders ?? [];
-  const dayPoints = revenueByDay(orderList, now, 14);
-  const weekPoints = revenueByWeek(orderList, now, 8);
-  const monthPoints = revenueByMonth(orderList, now, 6);
+  const dayRevenue = revenueForDay(orderList, day);
+  const monthRevenue = revenueForMonth(orderList, month);
+  const yearRevenue = revenueForYear(orderList, year);
+
+  const isToday = day === defaults.day;
+  const isThisMonth = month === defaults.month;
+  const isThisYear = year === defaults.year;
 
   const typeList = types ?? [];
   const reports = computeEquipmentTypeReports(
@@ -102,27 +131,36 @@ export default async function DashboardHomePage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Doanh thu theo ngày (14 ngày qua)</CardTitle>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">
+              {isToday ? "Doanh thu hôm nay" : `Doanh thu ngày ${formatDayLabel(day)}`}
+            </CardTitle>
+            <PeriodPicker paramName="day" type="date" value={day} label="Chọn ngày" />
           </CardHeader>
           <CardContent>
-            <RevenueBarList points={dayPoints} />
+            <p className="text-3xl font-semibold">{currencyFormatter.format(dayRevenue)}đ</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Doanh thu theo tuần (8 tuần qua)</CardTitle>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">
+              {isThisMonth ? "Doanh thu tháng này" : `Doanh thu tháng ${month.split("-")[1]}/${month.split("-")[0]}`}
+            </CardTitle>
+            <PeriodPicker paramName="month" type="month" value={month} label="Chọn tháng" />
           </CardHeader>
           <CardContent>
-            <RevenueBarList points={weekPoints} />
+            <p className="text-3xl font-semibold">{currencyFormatter.format(monthRevenue)}đ</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Doanh thu theo tháng (6 tháng qua)</CardTitle>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">
+              {isThisYear ? "Doanh thu năm nay" : `Doanh thu năm ${year}`}
+            </CardTitle>
+            <PeriodPicker paramName="year" type="number" value={year} label="Chọn năm" />
           </CardHeader>
           <CardContent>
-            <RevenueBarList points={monthPoints} />
+            <p className="text-3xl font-semibold">{currencyFormatter.format(yearRevenue)}đ</p>
           </CardContent>
         </Card>
       </div>

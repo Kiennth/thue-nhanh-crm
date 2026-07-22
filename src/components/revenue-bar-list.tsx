@@ -1,4 +1,7 @@
-import type { RevenuePoint } from "@/lib/dashboard-reports";
+export interface RevenuePoint {
+  label: string;
+  value: number;
+}
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 
