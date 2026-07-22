@@ -102,9 +102,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
 
-  // Cảnh báo thiếu hàng: tổng số lượng các dòng theo cùng 1 biến thể trong
-  // đơn so với số lượng sẵn có tại chi nhánh của đơn — KHÔNG chặn lưu đơn,
-  // chỉ hiện thông báo để admin/sếp biết mà xử lý nhập/mua/điều chuyển thêm.
+  // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
+  // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
+  // nhánh này (không chỉ riêng đơn đang xem) — hệ thống chưa có cơ chế đặt
+  // trước/khoá kho theo đơn, đây chỉ là con số tổng hợp để biết mà lên kế
+  // hoạch xử lý (mua thêm/điều chuyển), KHÔNG chặn lưu đơn.
   const availableByUnit = new Map(
     (equipmentStock ?? [])
       .filter((s) => s.branch_id === order.branch_id)
@@ -118,17 +120,64 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       (demandByUnit.get(line.equipment_unit_id) ?? 0) + line.quantity,
     );
   }
+
+  const relevantUnitIds = [...demandByUnit.keys()];
+  let reservationLines: { order_id: string; equipment_unit_id: string | null; quantity: number }[] =
+    [];
+  let reservationOrders: {
+    id: string;
+    order_code: string;
+    branch_id: string;
+    completed_at: string | null;
+  }[] = [];
+  if (relevantUnitIds.length > 0) {
+    const { data: oeRows } = await supabase
+      .from("order_equipment")
+      .select("order_id, equipment_unit_id, quantity")
+      .in("equipment_unit_id", relevantUnitIds);
+    reservationLines = oeRows ?? [];
+
+    const orderIds = [...new Set(reservationLines.map((r) => r.order_id))];
+    const { data: ordersRows } = await supabase
+      .from("orders")
+      .select("id, order_code, branch_id, completed_at")
+      .in("id", orderIds);
+    reservationOrders = ordersRows ?? [];
+  }
+  const reservationOrderById = new Map(reservationOrders.map((o) => [o.id, o]));
+
+  // Nhu cầu đang mở (chưa hoàn tất) theo từng biến thể, tại đúng chi nhánh
+  // của đơn — gồm cả đơn đang xem.
+  const activeDemandByUnit = new Map<string, { orderId: string; orderCode: string; quantity: number }[]>();
+  for (const row of reservationLines) {
+    if (!row.equipment_unit_id) continue;
+    const ord = reservationOrderById.get(row.order_id);
+    if (!ord || ord.branch_id !== order.branch_id || ord.completed_at) continue;
+    const list = activeDemandByUnit.get(row.equipment_unit_id) ?? [];
+    list.push({ orderId: row.order_id, orderCode: ord.order_code, quantity: row.quantity });
+    activeDemandByUnit.set(row.equipment_unit_id, list);
+  }
+
   const stockShortages = [...demandByUnit.entries()]
-    .map(([unitId, demand]) => {
+    .map(([unitId, thisOrderDemand]) => {
       const unit = equipmentUnitById.get(unitId);
       const type = unit ? equipmentTypeById.get(unit.equipment_type_id) : undefined;
       const available = availableByUnit.get(unitId) ?? 0;
+      const entries = activeDemandByUnit.get(unitId) ?? [];
+      const totalDemand = entries.reduce((sum, e) => sum + e.quantity, 0);
+      const otherOrderTotals = new Map<string, number>();
+      for (const e of entries) {
+        if (e.orderId === order.id) continue;
+        otherOrderTotals.set(e.orderCode, (otherOrderTotals.get(e.orderCode) ?? 0) + e.quantity);
+      }
       return {
         unitId,
         label: `${type?.name ?? "—"} (${unit?.brand_model ?? "—"})`,
-        demand,
+        thisOrderDemand,
+        totalDemand,
         available,
-        shortage: demand - available,
+        shortage: totalDemand - available,
+        otherOrders: [...otherOrderTotals.entries()],
       };
     })
     .filter((s) => s.shortage > 0);
@@ -269,10 +318,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           {stockShortages.length > 0 && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               <p className="font-medium">⚠ Thiếu hàng tại {branchNameById.get(order.branch_id) ?? "chi nhánh"}</p>
-              <ul className="mt-1 list-inside list-disc space-y-0.5">
+              <ul className="mt-1 list-inside list-disc space-y-1">
                 {stockShortages.map((s) => (
                   <li key={s.unitId}>
-                    {s.label}: đơn cần {s.demand}, kho còn {s.available} — thiếu {s.shortage}
+                    {s.label}: đơn này cần {s.thisOrderDemand}. Tổng nhu cầu các đơn chưa hoàn tất:{" "}
+                    {s.totalDemand}, kho có {s.available} — thiếu {s.shortage}.
+                    {s.otherOrders.length > 0 && (
+                      <span className="block text-xs text-destructive/80">
+                        Đơn khác đang giữ:{" "}
+                        {s.otherOrders.map(([code, qty]) => `${code} (${qty})`).join(", ")}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
