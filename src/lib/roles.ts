@@ -20,6 +20,11 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
   },
   {
+    href: "/branches/compare",
+    label: "So sánh chi nhánh",
+    roles: ["admin", "ke_toan"],
+  },
+  {
     href: "/employees",
     label: "Nhân viên",
     roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
