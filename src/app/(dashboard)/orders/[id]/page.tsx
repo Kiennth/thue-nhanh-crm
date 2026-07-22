@@ -15,7 +15,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
-import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE, VAT_RATE } from "@/lib/order-labels";
 import {
   findCommissionRate,
   computeOrderCommissionFund,
@@ -26,6 +26,7 @@ import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
+import { OrderLinePriceForm } from "./order-line-price-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import CloseOrderButton from "./close-order-button";
 
@@ -92,6 +93,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     ? findCommissionRate(commissionTiers ?? [], order.branch_id, order.total_value)
     : 0;
   const commissionFund = canManage ? computeOrderCommissionFund(order.total_value, commissionRate) : 0;
+
+  // Giá trong đơn (total_value) chưa gồm VAT — chỉ cộng thêm để hiển thị số
+  // tổng phải thu của khách, không dùng số đã gồm VAT để tính khoán.
+  const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
+  const grandTotal = order.total_value + vatAmount;
 
   return (
     <div className="space-y-4">
@@ -191,7 +197,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     <TableCell className="font-medium">{type?.name ?? "—"}</TableCell>
                     <TableCell>{detail ?? "—"}</TableCell>
                     <TableCell>{line.quantity}</TableCell>
-                    <TableCell>{currencyFormatter.format(line.unit_price)}đ</TableCell>
+                    <TableCell>
+                      {canManage ? (
+                        <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
+                      ) : (
+                        `${currencyFormatter.format(line.unit_price)}đ`
+                      )}
+                    </TableCell>
                     <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
                     <TableCell>
                       <ConfirmDeleteButton
@@ -213,6 +225,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
             </TableBody>
           </Table>
+
+          <div className="flex flex-col items-end gap-1 border-t pt-3 text-sm">
+            <div className="flex w-64 justify-between">
+              <span className="text-muted-foreground">Tạm tính (chưa VAT)</span>
+              <span>{currencyFormatter.format(order.total_value)}đ</span>
+            </div>
+            <div className="flex w-64 justify-between">
+              <span className="text-muted-foreground">VAT ({VAT_RATE * 100}%)</span>
+              <span>{currencyFormatter.format(vatAmount)}đ</span>
+            </div>
+            <div className="flex w-64 justify-between font-medium">
+              <span>Tổng cộng (đã gồm VAT)</span>
+              <span>{currencyFormatter.format(grandTotal)}đ</span>
+            </div>
+          </div>
 
           {canManage && <OrderTotalForm orderId={order.id} totalValue={order.total_value} />}
         </CardContent>

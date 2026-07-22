@@ -10,6 +10,11 @@ import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 
 const ALL_ROLES = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"] as const;
 const DELETE_ROLES = ["admin", "ke_toan"] as const;
+const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 export type ActionState = { error: string } | { success: true } | undefined;
 
@@ -86,12 +91,16 @@ const OrderTotalOverrideSchema = z.object({
   total_value: z.coerce.number().min(0, { message: "Doanh số không được âm." }),
 });
 
+// Sửa tay doanh số = đặt lại tổng giá trị đơn mong muốn. Khoản chênh lệch so
+// với tổng hiện tại (số tiền giảm/tăng) được phân bổ ĐỀU vào các dòng hàng
+// CHO THUÊ (không đụng vào dòng dịch vụ hoặc bán hàng) — orders.total_value
+// sau đó tự khớp lại nhờ trigger recalc_order_total.
 export async function overrideOrderTotal(
   id: string,
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
+  await requireRole([...MANAGE_ROLES]);
 
   const parsed = OrderTotalOverrideSchema.safeParse({ total_value: formData.get("total_value") });
   if (!parsed.success) {
@@ -99,16 +108,104 @@ export async function overrideOrderTotal(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("orders")
-    .update({ total_value: parsed.data.total_value })
-    .eq("id", id);
 
-  if (error) {
-    return { error: "Không thể sửa doanh số: " + error.message };
+  const { data: lines } = await supabase
+    .from("order_equipment")
+    .select("id, quantity, line_total, equipment_type_id")
+    .eq("order_id", id);
+  const lineList = lines ?? [];
+
+  if (!lineList.length) {
+    return { error: "Đơn chưa có dòng hàng nào để phân bổ." };
+  }
+
+  const typeIds = [...new Set(lineList.map((l) => l.equipment_type_id))];
+  const { data: types } = await supabase
+    .from("equipment_types")
+    .select("id, product_type")
+    .in("id", typeIds);
+  const productTypeById = new Map((types ?? []).map((t) => [t.id, t.product_type]));
+
+  const currentSum = round2(lineList.reduce((sum, l) => sum + l.line_total, 0));
+  const diff = round2(currentSum - parsed.data.total_value);
+
+  if (diff === 0) {
+    return { success: true };
+  }
+
+  const eligible = lineList.filter((l) => productTypeById.get(l.equipment_type_id) === "rental");
+  if (!eligible.length) {
+    return { error: "Không có dòng hàng cho thuê nào để phân bổ (không trừ vào dịch vụ/bán hàng)." };
+  }
+
+  const shareBase = Math.round(diff / eligible.length);
+  let allocated = 0;
+  const updates = eligible.map((line, index) => {
+    const isLast = index === eligible.length - 1;
+    const share = isLast ? diff - allocated : shareBase;
+    allocated += share;
+    return { line, newLineTotal: round2(line.line_total - share) };
+  });
+
+  if (updates.some((u) => u.newLineTotal < 0)) {
+    return { error: "Số tiền giảm giá vượt quá tổng giá trị các dòng cho thuê." };
+  }
+
+  for (const { line, newLineTotal } of updates) {
+    const newUnitPrice = round2(newLineTotal / line.quantity);
+    const { error } = await supabase
+      .from("order_equipment")
+      .update({ unit_price: newUnitPrice, line_total: newLineTotal })
+      .eq("id", line.id);
+    if (error) {
+      return { error: "Không thể phân bổ giảm giá: " + error.message };
+    }
   }
 
   revalidatePath(`/orders/${id}`);
+  return { success: true };
+}
+
+const OrderLinePriceSchema = z.object({
+  unit_price: z.coerce.number().min(0, { message: "Đơn giá không được âm." }),
+});
+
+// Sửa thẳng đơn giá 1 dòng hàng (VD: giảm giá riêng cho khách). line_total =
+// unit_price * quantity — orders.total_value tự khớp lại nhờ trigger.
+export async function updateOrderEquipmentLinePrice(
+  lineId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = OrderLinePriceSchema.safeParse({ unit_price: formData.get("unit_price") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: line, error: lineError } = await supabase
+    .from("order_equipment")
+    .select("order_id, quantity")
+    .eq("id", lineId)
+    .single();
+
+  if (lineError || !line) {
+    return { error: "Không tìm thấy dòng hàng." };
+  }
+
+  const lineTotal = round2(parsed.data.unit_price * line.quantity);
+  const { error } = await supabase
+    .from("order_equipment")
+    .update({ unit_price: parsed.data.unit_price, line_total: lineTotal })
+    .eq("id", lineId);
+
+  if (error) {
+    return { error: "Không thể sửa đơn giá: " + error.message };
+  }
+
+  revalidatePath(`/orders/${line.order_id}`);
   return { success: true };
 }
 

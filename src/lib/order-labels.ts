@@ -1,5 +1,9 @@
 import type { TaskType } from "@/types/database";
 
+// Giá trong đơn (unit_price/line_total/total_value) đều CHƯA gồm VAT — 8% là
+// mức thuế GTGT hiện hành áp dụng cho dịch vụ cho thuê thiết bị.
+export const VAT_RATE = 0.08;
+
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   tiep_nhan_yeu_cau: "Tiếp nhận yêu cầu",
   bao_gia: "Báo giá",
