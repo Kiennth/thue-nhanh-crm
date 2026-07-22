@@ -15,7 +15,13 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
-import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE, VAT_RATE } from "@/lib/order-labels";
+import { deleteOrderPayment } from "@/lib/actions/order-payments";
+import {
+  PAYMENT_METHOD_LABELS,
+  TASK_TYPE_LABELS,
+  TASK_TYPE_SEQUENCE,
+  VAT_RATE,
+} from "@/lib/order-labels";
 import {
   findCommissionRate,
   computeOrderCommissionFund,
@@ -33,6 +39,7 @@ import CloseOrderButton from "./close-order-button";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
 import { ReopenOrderButton } from "./reopen-order-button";
+import { OrderPaymentDialog } from "./order-payment-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -45,6 +52,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: order },
     { data: lines },
     { data: tasks },
+    { data: payments },
     { data: branches },
     { data: customers },
     { data: employees },
@@ -59,6 +67,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("created_at"),
     supabase.from("order_tasks").select("*").eq("order_id", id),
+    supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("id, name").order("name"),
     supabase.from("employees_public").select("id, name").order("name"),
@@ -104,6 +113,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // tổng phải thu của khách, không dùng số đã gồm VAT để tính khoán.
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
+
+  const paymentList = payments ?? [];
+  const totalPaid = paymentList.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = Math.max(0, grandTotal - totalPaid);
+  const paymentStatus =
+    totalPaid <= 0 ? "Chưa thanh toán" : remaining <= 0 ? "Đã thanh toán đủ" : "Thanh toán một phần";
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -394,6 +409,82 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </div>
 
           {canManage && <OrderTotalForm orderId={order.id} totalValue={order.total_value} />}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base">Thanh toán</CardTitle>
+          <OrderPaymentDialog
+            orderId={order.id}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Plus className="size-4" />
+                Thêm thanh toán
+              </Button>
+            }
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Cần thanh toán</p>
+              <p className="font-medium">{currencyFormatter.format(grandTotal)}đ</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Đã thanh toán</p>
+              <p className="font-medium">{currencyFormatter.format(totalPaid)}đ</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Còn lại</p>
+              <p className="font-medium">{currencyFormatter.format(remaining)}đ</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Trạng thái</p>
+              <Badge variant={remaining <= 0 ? "default" : totalPaid > 0 ? "outline" : "secondary"}>
+                {paymentStatus}
+              </Badge>
+            </div>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ngày</TableHead>
+                <TableHead>Hình thức</TableHead>
+                <TableHead>Số tiền</TableHead>
+                <TableHead>Ghi chú</TableHead>
+                <TableHead className="w-16"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentList.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell>{payment.paid_at}</TableCell>
+                  <TableCell>{PAYMENT_METHOD_LABELS[payment.method]}</TableCell>
+                  <TableCell>{currencyFormatter.format(payment.amount)}đ</TableCell>
+                  <TableCell className="text-muted-foreground">{payment.note ?? "—"}</TableCell>
+                  <TableCell>
+                    {canManage && (
+                      <ConfirmDeleteButton
+                        confirmMessage="Xoá lần thanh toán này?"
+                        successMessage="Đã xoá thanh toán."
+                        action={deleteOrderPayment}
+                        actionArg={payment.id}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!paymentList.length && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    Chưa có thanh toán nào.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

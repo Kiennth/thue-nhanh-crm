@@ -11,6 +11,7 @@ export type TrackingType = "individual" | "quantity";
 export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
+export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" | "khac";
 
 export type TaskType =
   | "tiep_nhan_yeu_cau"
@@ -377,6 +378,29 @@ export interface Database {
           has_issue?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["order_tasks"]["Insert"]>;
+        Relationships: [];
+      };
+      order_payments: {
+        Row: {
+          id: string;
+          order_id: string;
+          amount: number;
+          method: PaymentMethod;
+          paid_at: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          amount: number;
+          method: PaymentMethod;
+          paid_at?: string;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["order_payments"]["Insert"]>;
         Relationships: [];
       };
       commission_tiers: {

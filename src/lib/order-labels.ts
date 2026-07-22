@@ -1,4 +1,4 @@
-import type { TaskType } from "@/types/database";
+import type { PaymentMethod, TaskType } from "@/types/database";
 
 // Giá trong đơn (unit_price/line_total/total_value) đều CHƯA gồm VAT — 8% là
 // mức thuế GTGT hiện hành áp dụng cho dịch vụ cho thuê thiết bị.
@@ -31,6 +31,22 @@ export const TASK_TYPE_SEQUENCE = [
   "nghiem_thu",
   "nhap_kho_bao_tri",
 ] as const satisfies readonly TaskType[];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  tien_mat: "Tiền mặt",
+  chuyen_khoan: "Chuyển khoản",
+  the: "Thẻ",
+  vi_dien_tu: "Ví điện tử",
+  khac: "Khác",
+};
+
+export const PAYMENT_METHOD_OPTIONS = [
+  "tien_mat",
+  "chuyen_khoan",
+  "the",
+  "vi_dien_tu",
+  "khac",
+] as const satisfies readonly PaymentMethod[];
 
 // Trạng thái hiển thị/lọc cho danh sách đơn hàng — "completed"/"cancelled" là
 // 2 mốc kết thúc (orders.completed_at / cancelled_at), các giá trị còn lại là
