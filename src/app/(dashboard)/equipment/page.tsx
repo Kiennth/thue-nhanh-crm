@@ -22,9 +22,11 @@ import {
 } from "@/lib/actions/equipment";
 import {
   EQUIPMENT_INSTANCE_STATUS_LABELS,
+  EQUIPMENT_SORT_OPTIONS,
   PRODUCT_TYPE_LABELS,
   RENTAL_PERIOD_UNIT_LABELS,
   TRACKING_TYPE_LABELS,
+  type EquipmentSort,
 } from "@/lib/equipment-labels";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
 import { EquipmentUnitDialog } from "./equipment-unit-dialog";
@@ -36,6 +38,7 @@ import { EquipmentPurchaseDialog } from "./equipment-purchase-dialog";
 import { EquipmentDisposalDialog } from "./equipment-disposal-dialog";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
+import { EquipmentSortSelect } from "./equipment-sort-select";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -48,8 +51,34 @@ const INSTANCE_STATUS_VARIANT = {
   disposed: "outline",
 } as const;
 
-export default async function EquipmentPage() {
+function isEquipmentSort(value: string): value is EquipmentSort {
+  return (EQUIPMENT_SORT_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
+
+export default async function EquipmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
+  const { sort } = await searchParams;
+  const activeSort: EquipmentSort = sort && isEquipmentSort(sort) ? sort : "name_asc";
+
   const supabase = await createClient();
+  let typesQuery = supabase.from("equipment_types").select("*");
+  if (activeSort === "price_desc") {
+    typesQuery = typesQuery.order("price", { ascending: false });
+  } else if (activeSort === "price_asc") {
+    typesQuery = typesQuery.order("price", { ascending: true });
+  } else if (activeSort === "updated_desc") {
+    typesQuery = typesQuery.order("updated_at", { ascending: false });
+  } else if (activeSort === "updated_asc") {
+    typesQuery = typesQuery.order("updated_at", { ascending: true });
+  } else if (activeSort === "name_desc") {
+    typesQuery = typesQuery.order("name", { ascending: false });
+  } else {
+    typesQuery = typesQuery.order("name", { ascending: true });
+  }
+
   const [
     { data: types },
     { data: units },
@@ -61,7 +90,7 @@ export default async function EquipmentPage() {
     { data: tiers },
     employee,
   ] = await Promise.all([
-    supabase.from("equipment_types").select("*").order("name"),
+    typesQuery,
     supabase.from("equipment_units").select("*").order("brand_model"),
     supabase.from("equipment_stock").select("*"),
     supabase.from("equipment_instances").select("*").order("identifier_code"),
@@ -117,17 +146,20 @@ export default async function EquipmentPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
-        {canManage && (
-          <EquipmentTypeDialog
-            templates={templateList}
-            trigger={
-              <Button>
-                <Plus className="size-4" />
-                Thêm hàng hoá
-              </Button>
-            }
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <EquipmentSortSelect value={activeSort} />
+          {canManage && (
+            <EquipmentTypeDialog
+              templates={templateList}
+              trigger={
+                <Button>
+                  <Plus className="size-4" />
+                  Thêm hàng hoá
+                </Button>
+              }
+            />
+          )}
+        </div>
       </div>
 
       {canManage && (

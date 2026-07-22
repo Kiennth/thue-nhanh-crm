@@ -36,3 +36,14 @@ export const EQUIPMENT_INSTANCE_STATUS_LABELS: Record<EquipmentInstanceStatus, s
   maintenance: "Bảo trì",
   disposed: "Đã thanh lý",
 };
+
+export const EQUIPMENT_SORT_OPTIONS = [
+  { value: "name_asc", label: "Tên (A-Z)" },
+  { value: "name_desc", label: "Tên (Z-A)" },
+  { value: "price_desc", label: "Giá thuê (cao-thấp)" },
+  { value: "price_asc", label: "Giá thuê (thấp-cao)" },
+  { value: "updated_desc", label: "Mới cập nhật trước" },
+  { value: "updated_asc", label: "Cũ nhất trước" },
+] as const;
+
+export type EquipmentSort = (typeof EQUIPMENT_SORT_OPTIONS)[number]["value"];
