@@ -30,6 +30,8 @@ import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import CloseOrderButton from "./close-order-button";
+import { CancelOrderButton } from "./cancel-order-button";
+import { DuplicateOrderButton } from "./duplicate-order-button";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -129,6 +131,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     order_code: string;
     branch_id: string;
     completed_at: string | null;
+    cancelled_at: string | null;
+    rental_start_at: string | null;
+    rental_end_at: string | null;
   }[] = [];
   if (relevantUnitIds.length > 0) {
     const { data: oeRows } = await supabase
@@ -140,19 +145,47 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     const orderIds = [...new Set(reservationLines.map((r) => r.order_id))];
     const { data: ordersRows } = await supabase
       .from("orders")
-      .select("id, order_code, branch_id, completed_at")
+      .select("id, order_code, branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at")
       .in("id", orderIds);
     reservationOrders = ordersRows ?? [];
   }
   const reservationOrderById = new Map(reservationOrders.map((o) => [o.id, o]));
 
-  // Nhu cầu đang mở (chưa hoàn tất) theo từng biến thể, tại đúng chi nhánh
-  // của đơn — gồm cả đơn đang xem.
+  // Hai khung thời gian thuê giao nhau (mở, không tính đơn nối đuôi sát giờ).
+  function rentalOverlaps(
+    aStart: string | null,
+    aEnd: string | null,
+    bStart: string | null,
+    bEnd: string | null,
+  ) {
+    if (!aStart || !aEnd || !bStart || !bEnd) return false;
+    return new Date(aStart) < new Date(bEnd) && new Date(bStart) < new Date(aEnd);
+  }
+
+  // Nhu cầu đang mở (chưa hoàn tất/chưa huỷ) theo từng biến thể, tại đúng chi
+  // nhánh của đơn — gồm cả đơn đang xem. Với hàng cho thuê (product_type =
+  // rental), chỉ tính là "giữ chỗ" nếu khung thời gian thuê của đơn kia giao
+  // với khung thời gian của đơn đang xem — hàng cho thuê ở hai khung giờ khác
+  // nhau không thật sự tranh chấp kho. Hàng bán/dịch vụ vẫn tính gộp không
+  // phân biệt thời gian vì tiêu hao kho vĩnh viễn.
   const activeDemandByUnit = new Map<string, { orderId: string; orderCode: string; quantity: number }[]>();
   for (const row of reservationLines) {
     if (!row.equipment_unit_id) continue;
     const ord = reservationOrderById.get(row.order_id);
-    if (!ord || ord.branch_id !== order.branch_id || ord.completed_at) continue;
+    if (!ord || ord.branch_id !== order.branch_id || ord.completed_at || ord.cancelled_at) continue;
+
+    const unit = equipmentUnitById.get(row.equipment_unit_id);
+    const type = unit ? equipmentTypeById.get(unit.equipment_type_id) : undefined;
+    if (type?.product_type === "rental" && ord.id !== order.id) {
+      const overlaps = rentalOverlaps(
+        order.rental_start_at,
+        order.rental_end_at,
+        ord.rental_start_at,
+        ord.rental_end_at,
+      );
+      if (!overlaps) continue;
+    }
+
     const list = activeDemandByUnit.get(row.equipment_unit_id) ?? [];
     list.push({ orderId: row.order_id, orderCode: ord.order_code, quantity: row.quantity });
     activeDemandByUnit.set(row.equipment_unit_id, list);
@@ -187,7 +220,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold">{order.order_code}</h1>
-          {order.completed_at ? (
+          {order.cancelled_at ? (
+            <Badge variant="destructive">Đã huỷ</Badge>
+          ) : order.completed_at ? (
             <Badge>Hoàn tất</Badge>
           ) : (
             <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
@@ -200,7 +235,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             order={order}
             trigger={<Button variant="outline">Sửa</Button>}
           />
-          {!order.completed_at && <CloseOrderButton orderId={order.id} disabled={!allDone} />}
+          <DuplicateOrderButton orderId={order.id} />
+          {!order.completed_at && !order.cancelled_at && (
+            <>
+              <CloseOrderButton orderId={order.id} disabled={!allDone} />
+              <CancelOrderButton orderId={order.id} />
+            </>
+          )}
         </div>
       </div>
 

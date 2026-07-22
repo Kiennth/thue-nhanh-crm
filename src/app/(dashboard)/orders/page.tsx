@@ -14,17 +14,43 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrder } from "@/lib/actions/orders";
-import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import type { TaskType } from "@/types/database";
 import { OrderDialog } from "./order-dialog";
+import { OrderStatusFilter } from "./order-status-filter";
 
 const DELETE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 const dateFormatter = new Intl.DateTimeFormat("vi-VN");
 
-export default async function OrdersPage() {
+function isTaskType(value: string): value is TaskType {
+  return (TASK_TYPE_SEQUENCE as readonly string[]).includes(value);
+}
+
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
+  const activeStatus = status ?? "all";
+
   const supabase = await createClient();
+
+  let ordersQuery = supabase.from("orders").select("*").order("order_date", { ascending: false });
+  if (activeStatus === "completed") {
+    ordersQuery = ordersQuery.not("completed_at", "is", null);
+  } else if (activeStatus === "cancelled") {
+    ordersQuery = ordersQuery.not("cancelled_at", "is", null);
+  } else if (isTaskType(activeStatus)) {
+    ordersQuery = ordersQuery
+      .eq("status", activeStatus)
+      .is("completed_at", null)
+      .is("cancelled_at", null);
+  }
+
   const [{ data: orders }, { data: branches }, { data: customers }, employee] = await Promise.all([
-    supabase.from("orders").select("*").order("order_date", { ascending: false }),
+    ordersQuery,
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("id, name").order("name"),
     getCurrentEmployee(),
@@ -52,6 +78,8 @@ export default async function OrdersPage() {
         />
       </div>
 
+      <OrderStatusFilter value={activeStatus} />
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -77,7 +105,9 @@ export default async function OrdersPage() {
               <TableCell>{dateFormatter.format(new Date(order.order_date))}</TableCell>
               <TableCell>{currencyFormatter.format(order.total_value)}đ</TableCell>
               <TableCell>
-                {order.completed_at ? (
+                {order.cancelled_at ? (
+                  <Badge variant="destructive">Đã huỷ</Badge>
+                ) : order.completed_at ? (
                   <Badge>Hoàn tất</Badge>
                 ) : (
                   <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
@@ -98,7 +128,7 @@ export default async function OrdersPage() {
           {!orders?.length && (
             <TableRow>
               <TableCell colSpan={canDelete ? 7 : 6} className="text-center text-muted-foreground">
-                Chưa có đơn hàng nào.
+                Không có đơn hàng nào khớp bộ lọc.
               </TableCell>
             </TableRow>
           )}

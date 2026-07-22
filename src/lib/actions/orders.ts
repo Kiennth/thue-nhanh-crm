@@ -343,6 +343,104 @@ export async function closeOrder(id: string) {
   revalidatePath(`/orders/${id}`);
 }
 
+// Huỷ đơn — mốc kết thúc riêng, loại trừ với "Hoàn tất" (DB check
+// orders_not_completed_and_cancelled). Không tính khoán, không xoá dữ liệu.
+export async function cancelOrder(id: string) {
+  await requireRole([...ALL_ROLES]);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ cancelled_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error("Không thể huỷ đơn: " + error.message);
+  }
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${id}`);
+}
+
+function generateOrderCode(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const rand = String(Math.floor(Math.random() * 900) + 100);
+  return `DH${y}${m}${d}-${rand}`;
+}
+
+// Nhân bản đơn — tạo đơn mới (nháp, 0/10 khâu, chưa hoàn tất/huỷ) copy chi
+// nhánh/khách hàng/thời gian thuê + toàn bộ dòng hàng (đúng số lượng & đơn
+// giá cũ, không tính lại) từ đơn gốc. Giữ lại thời gian thuê cũ vì DB bắt
+// buộc đơn phải có thời gian thuê mới thêm được dòng cho thuê — nhân viên
+// chỉnh lại ngày giờ thực tế ngay sau khi tạo (giá dòng cho thuê tự tính lại
+// theo thời gian mới lúc đó).
+export async function duplicateOrder(id: string): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
+
+  const supabase = await createClient();
+  const { data: source, error: sourceError } = await supabase
+    .from("orders")
+    .select("branch_id, customer_id, rental_start_at, rental_end_at")
+    .eq("id", id)
+    .single();
+
+  if (sourceError || !source) {
+    return { error: "Không tìm thấy đơn gốc." };
+  }
+
+  const { data: sourceLines, error: linesError } = await supabase
+    .from("order_equipment")
+    .select(
+      "equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
+    )
+    .eq("order_id", id);
+
+  if (linesError) {
+    return { error: "Không đọc được dòng hàng gốc: " + linesError.message };
+  }
+
+  const today = new Date();
+  const { data: newOrder, error: insertError } = await supabase
+    .from("orders")
+    .insert({
+      order_code: generateOrderCode(today),
+      branch_id: source.branch_id,
+      customer_id: source.customer_id,
+      order_date: today.toISOString().slice(0, 10),
+      rental_start_at: source.rental_start_at,
+      rental_end_at: source.rental_end_at,
+      created_by: employee.id,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newOrder) {
+    return { error: "Không thể tạo đơn nháp: " + (insertError?.message ?? "") };
+  }
+
+  if (sourceLines?.length) {
+    const { error: copyError } = await supabase.from("order_equipment").insert(
+      sourceLines.map((line) => ({
+        order_id: newOrder.id,
+        equipment_type_id: line.equipment_type_id,
+        equipment_unit_id: line.equipment_unit_id,
+        equipment_instance_id: line.equipment_instance_id,
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+        line_total: line.line_total,
+      })),
+    );
+    if (copyError) {
+      return { error: "Đã tạo đơn nháp nhưng copy dòng hàng lỗi: " + copyError.message };
+    }
+  }
+
+  revalidatePath("/orders");
+  redirect(`/orders/${newOrder.id}`);
+}
+
 // ---------------------------------------------------------------------------
 // order_equipment — dòng thiết bị/sản phẩm trong đơn. Server Action tự tra
 // equipment_types (+ bảng giá mẫu nếu có) để tính unit_price/line_total —

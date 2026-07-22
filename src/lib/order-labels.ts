@@ -31,3 +31,13 @@ export const TASK_TYPE_SEQUENCE = [
   "nghiem_thu",
   "nhap_kho_bao_tri",
 ] as const satisfies readonly TaskType[];
+
+// Trạng thái hiển thị/lọc cho danh sách đơn hàng — "completed"/"cancelled" là
+// 2 mốc kết thúc (orders.completed_at / cancelled_at), các giá trị còn lại là
+// khâu hiện tại (orders.status) khi đơn chưa kết thúc.
+export const ORDER_STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "Tất cả trạng thái" },
+  ...TASK_TYPE_SEQUENCE.map((t) => ({ value: t as string, label: TASK_TYPE_LABELS[t] })),
+  { value: "completed", label: "Hoàn tất" },
+  { value: "cancelled", label: "Đã huỷ" },
+];

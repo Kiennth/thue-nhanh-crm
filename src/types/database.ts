@@ -309,6 +309,7 @@ export interface Database {
           total_value: number;
           status: TaskType;
           completed_at: string | null;
+          cancelled_at: string | null;
           rental_start_at: string | null;
           rental_end_at: string | null;
           created_by: string | null;
@@ -324,6 +325,7 @@ export interface Database {
           total_value?: number;
           status?: TaskType;
           completed_at?: string | null;
+          cancelled_at?: string | null;
           rental_start_at?: string | null;
           rental_end_at?: string | null;
           created_by?: string | null;
