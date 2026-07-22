@@ -32,12 +32,12 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/customers",
     label: "Khách hàng",
-    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
   },
   {
     href: "/equipment",
     label: "Thiết bị",
-    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
   },
   {
     href: "/orders",
@@ -57,6 +57,6 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/payroll",
     label: "Bảng lương",
-    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
   },
 ];
