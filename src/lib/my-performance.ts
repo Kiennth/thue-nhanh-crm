@@ -26,8 +26,10 @@ export interface BonusTierProgress {
 
 export interface MyPerformance {
   month: string;
+  baseSalary: number;
   totalCommission: number;
   bonus: number;
+  totalIncome: number;
   completedTaskCount: number;
   tiers: BonusTierProgress[];
   currentTierIndex: number;
@@ -41,6 +43,7 @@ export interface MyPerformance {
 export async function computeMyPerformance(
   employeeId: string,
   branchId: string | null,
+  baseSalary: number,
 ): Promise<MyPerformance> {
   const { start, end, label } = currentMonthRange();
   const admin = createAdminClient();
@@ -101,8 +104,10 @@ export async function computeMyPerformance(
 
   return {
     month: label,
+    baseSalary,
     totalCommission,
     bonus,
+    totalIncome: baseSalary + totalCommission + bonus,
     completedTaskCount: taskList.length,
     tiers: tierList,
     currentTierIndex,

@@ -34,7 +34,7 @@ export default async function DashboardHomePage({
   // việc của quản lý/kế toán).
   if (employee?.role === "ky_thuat_sales") {
     const [myPerformance, ordersToHandle] = await Promise.all([
-      computeMyPerformance(employee.id, employee.branch_id),
+      computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
       employee.branch_id ? getOrdersToHandle(employee.branch_id, defaults.day) : Promise.resolve([]),
     ]);
 
@@ -117,7 +117,9 @@ export default async function DashboardHomePage({
     .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
     .slice(0, 5);
 
-  const myPerformance = employee ? await computeMyPerformance(employee.id, employee.branch_id) : null;
+  const myPerformance = employee
+    ? await computeMyPerformance(employee.id, employee.branch_id, employee.base_salary)
+    : null;
 
   return (
     <div className="space-y-6">

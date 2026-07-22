@@ -19,11 +19,15 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Trophy className="size-4 text-primary" />
-          Khoán của bạn — Tháng {formatMonthLabel(perf.month)}
+          Thu nhập của bạn — Tháng {formatMonthLabel(perf.month)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div>
+            <p className="text-xs text-muted-foreground">Lương cứng</p>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.baseSalary)}đ</p>
+          </div>
           <div>
             <p className="text-xs text-muted-foreground">Tổng khoán</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.totalCommission)}đ</p>
@@ -35,10 +39,8 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Tổng cộng</p>
-            <p className="text-2xl font-semibold">
-              {currencyFormatter.format(perf.totalCommission + perf.bonus)}đ
-            </p>
+            <p className="text-xs text-muted-foreground">Tổng thu nhập</p>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.totalIncome)}đ</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Khâu đã hoàn thành</p>

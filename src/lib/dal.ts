@@ -9,6 +9,7 @@ export interface CurrentEmployee {
   name: string;
   role: UserRole;
   branch_id: string | null;
+  base_salary: number;
 }
 
 // cache() gộp nhiều lần gọi trong cùng 1 lượt render thành 1 query.
@@ -23,7 +24,7 @@ export const getCurrentEmployee = cache(
 
     const { data } = await supabase
       .from("employees")
-      .select("id, name, role, branch_id")
+      .select("id, name, role, branch_id, base_salary")
       .eq("user_id", user.id)
       .single();
 
