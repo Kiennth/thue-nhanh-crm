@@ -12,7 +12,9 @@ import {
 } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
+import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import { MyPerformanceCard } from "./my-performance-card";
+import { OrdersToHandleCard } from "./orders-to-handle-card";
 
 export default async function DashboardHomePage({
   searchParams,
@@ -25,9 +27,34 @@ export default async function DashboardHomePage({
   const month = params.month || defaults.month;
   const year = params.year || defaults.year;
 
+  const employee = await getCurrentEmployee();
+
+  // Trang chủ của nhân viên kỹ thuật/sales chỉ tập trung vào hiệu suất cá
+  // nhân và việc cần làm — không cần report toàn công ty/chi nhánh (đó là
+  // việc của quản lý/kế toán).
+  if (employee?.role === "ky_thuat_sales") {
+    const [myPerformance, ordersToHandle] = await Promise.all([
+      computeMyPerformance(employee.id, employee.branch_id),
+      employee.branch_id ? getOrdersToHandle(employee.branch_id, defaults.day) : Promise.resolve([]),
+    ]);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Trang chủ</h1>
+          <p className="text-sm text-muted-foreground">
+            Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
+          </p>
+        </div>
+
+        <MyPerformanceCard perf={myPerformance} />
+        <OrdersToHandleCard orders={ordersToHandle} />
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const [
-    employee,
     branches,
     customers,
     equipmentTypes,
@@ -40,7 +67,6 @@ export default async function DashboardHomePage({
     { data: stock },
     { data: orderLines },
   ] = await Promise.all([
-    getCurrentEmployee(),
     supabase.from("branches").select("*", { count: "exact", head: true }),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
