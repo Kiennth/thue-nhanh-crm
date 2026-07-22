@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,11 @@ export default async function BranchesPage() {
         <TableBody>
           {branches?.map((branch) => (
             <TableRow key={branch.id}>
-              <TableCell className="font-medium">{branch.name}</TableCell>
+              <TableCell className="font-medium">
+                <Link href={`/branches/${branch.id}`} className="hover:underline">
+                  {branch.name}
+                </Link>
+              </TableCell>
               <TableCell>{branch.min_wage_region ?? "—"}</TableCell>
               <TableCell>
                 <Badge variant={branch.is_active ? "default" : "secondary"}>

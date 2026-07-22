@@ -1,8 +1,6 @@
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { notFound } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
-import { ROLE_LABELS } from "@/lib/roles";
-import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import {
   revenueForDay,
@@ -12,23 +10,26 @@ import {
 } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 
-export default async function DashboardHomePage({
+// Dashboard riêng của 1 chi nhánh — giống trang chủ nhưng mọi số liệu (doanh
+// thu, lượt thuê, giá vốn, thanh lý, tồn kho) đều lọc theo chi nhánh này.
+export default async function BranchDashboardPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ id: string }>;
   searchParams: Promise<{ day?: string; month?: string; year?: string }>;
 }) {
-  const params = await searchParams;
+  const { id } = await params;
+  const sp = await searchParams;
   const defaults = todayParts();
-  const day = params.day || defaults.day;
-  const month = params.month || defaults.month;
-  const year = params.year || defaults.year;
+  const day = sp.day || defaults.day;
+  const month = sp.month || defaults.month;
+  const year = sp.year || defaults.year;
 
   const supabase = await createClient();
+
   const [
-    employee,
-    branches,
-    customers,
-    equipmentTypes,
+    { data: branch },
     { data: orders },
     { data: types },
     { data: units },
@@ -36,31 +37,42 @@ export default async function DashboardHomePage({
     { data: purchases },
     { data: disposals },
     { data: stock },
-    { data: orderLines },
   ] = await Promise.all([
-    getCurrentEmployee(),
-    supabase.from("branches").select("*", { count: "exact", head: true }),
-    supabase.from("customers").select("*", { count: "exact", head: true }),
-    supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("order_date, total_value"),
+    supabase.from("branches").select("*").eq("id", id).single(),
+    supabase.from("orders").select("id, order_date, total_value").eq("branch_id", id),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
       .from("equipment_instances")
-      .select("equipment_type_id, purchase_price, disposal_price, status"),
-    supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
-    supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-    supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-    supabase.from("order_equipment").select("equipment_type_id, line_total"),
+      .select("equipment_type_id, purchase_price, disposal_price, status")
+      .eq("branch_id", id),
+    supabase
+      .from("equipment_purchases")
+      .select("equipment_unit_id, quantity, unit_cost")
+      .eq("branch_id", id),
+    supabase
+      .from("equipment_disposals")
+      .select("equipment_unit_id, quantity, unit_price")
+      .eq("branch_id", id),
+    supabase
+      .from("equipment_stock")
+      .select("equipment_unit_id, quantity_total")
+      .eq("branch_id", id),
   ]);
 
-  const stats = [
-    { label: "Chi nhánh", count: branches.count ?? 0, href: "/branches" },
-    { label: "Khách hàng", count: customers.count ?? 0, href: "/customers" },
-    { label: "Loại thiết bị", count: equipmentTypes.count ?? 0, href: "/equipment" },
-  ];
+  if (!branch) {
+    notFound();
+  }
 
   const orderList = orders ?? [];
+  const orderIds = orderList.map((o) => o.id);
+  const { data: orderLines } = orderIds.length
+    ? await supabase
+        .from("order_equipment")
+        .select("equipment_type_id, line_total")
+        .in("order_id", orderIds)
+    : { data: [] };
+
   const typeList = types ?? [];
   const reports = computeEquipmentTypeReports(
     typeList,
@@ -91,28 +103,11 @@ export default async function DashboardHomePage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Trang chủ</h1>
-        <p className="text-sm text-muted-foreground">
-          Xin chào, {employee?.name} ({employee ? ROLE_LABELS[employee.role] : ""})
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {stats.map((stat) => (
-          <Link key={stat.href} href={stat.href}>
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardHeader>
-                <CardTitle className="text-sm font-normal text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-semibold">{stat.count}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-semibold">{branch.name}</h1>
+        <Badge variant={branch.is_active ? "default" : "secondary"}>
+          {branch.is_active ? "Hoạt động" : "Ngừng"}
+        </Badge>
       </div>
 
       <PeriodRevenueCards
