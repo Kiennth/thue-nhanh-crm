@@ -10,11 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueBarList } from "@/components/revenue-bar-list";
 import { PeriodPicker } from "@/components/period-picker";
 import { formatDayLabel } from "@/components/dashboard-cards";
-import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/dal";
-import { revenueForDay, revenueForMonth, revenueForYear, todayParts } from "@/lib/dashboard-reports";
+import { revenueForDay, revenueForMonth, revenueForYear } from "@/lib/dashboard-reports";
 
-const VIEW_ROLES = ["admin", "ke_toan"] as const;
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 
 function formatPercentShare(value: number, total: number) {
@@ -22,30 +19,27 @@ function formatPercentShare(value: number, total: number) {
   return `${((value / total) * 100).toFixed(0)}%`;
 }
 
-export default async function BranchCompareReportPage({
-  searchParams,
+export function BranchComparisonSection({
+  branches,
+  orders,
+  day,
+  month,
+  year,
+  isToday,
+  isThisMonth,
+  isThisYear,
 }: {
-  searchParams: Promise<{ day?: string; month?: string; year?: string }>;
+  branches: { id: string; name: string }[];
+  orders: { branch_id: string; order_date: string; total_value: number }[];
+  day: string;
+  month: string;
+  year: string;
+  isToday: boolean;
+  isThisMonth: boolean;
+  isThisYear: boolean;
 }) {
-  await requireRole([...VIEW_ROLES]);
-
-  const params = await searchParams;
-  const defaults = todayParts();
-  const day = params.day || defaults.day;
-  const month = params.month || defaults.month;
-  const year = params.year || defaults.year;
-
-  const supabase = await createClient();
-  const [{ data: branches }, { data: orders }] = await Promise.all([
-    supabase.from("branches").select("id, name").order("name"),
-    supabase.from("orders").select("branch_id, order_date, total_value"),
-  ]);
-
-  const branchList = branches ?? [];
-  const orderList = orders ?? [];
-
-  const rows = branchList.map((branch) => {
-    const branchOrders = orderList.filter((o) => o.branch_id === branch.id);
+  const rows = branches.map((branch) => {
+    const branchOrders = orders.filter((o) => o.branch_id === branch.id);
     return {
       branch,
       day: revenueForDay(branchOrders, day),
@@ -60,28 +54,15 @@ export default async function BranchCompareReportPage({
     year: rows.reduce((sum, r) => sum + r.year, 0),
   };
 
-  const dayPoints = [...rows]
-    .sort((a, b) => b.day - a.day)
-    .map((r) => ({ label: r.branch.name, value: r.day }));
+  const dayPoints = [...rows].sort((a, b) => b.day - a.day).map((r) => ({ label: r.branch.name, value: r.day }));
   const monthPoints = [...rows]
     .sort((a, b) => b.month - a.month)
     .map((r) => ({ label: r.branch.name, value: r.month }));
-  const yearPoints = [...rows]
-    .sort((a, b) => b.year - a.year)
-    .map((r) => ({ label: r.branch.name, value: r.year }));
-
-  const isToday = day === defaults.day;
-  const isThisMonth = month === defaults.month;
-  const isThisYear = year === defaults.year;
+  const yearPoints = [...rows].sort((a, b) => b.year - a.year).map((r) => ({ label: r.branch.name, value: r.year }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">So sánh chi nhánh</h1>
-        <p className="text-sm text-muted-foreground">
-          Tương quan doanh số giữa các chi nhánh theo ngày/tháng/năm bất kì.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">So sánh chi nhánh</h2>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
@@ -94,7 +75,7 @@ export default async function BranchCompareReportPage({
           <CardContent className="space-y-3">
             <RevenueBarList points={dayPoints} labelWidthClassName="w-24" />
             <p className="text-xs text-muted-foreground">
-              Tổng 3 chi nhánh: {currencyFormatter.format(totals.day)}đ
+              Tổng các chi nhánh: {currencyFormatter.format(totals.day)}đ
             </p>
           </CardContent>
         </Card>
@@ -110,7 +91,7 @@ export default async function BranchCompareReportPage({
           <CardContent className="space-y-3">
             <RevenueBarList points={monthPoints} labelWidthClassName="w-24" />
             <p className="text-xs text-muted-foreground">
-              Tổng 3 chi nhánh: {currencyFormatter.format(totals.month)}đ
+              Tổng các chi nhánh: {currencyFormatter.format(totals.month)}đ
             </p>
           </CardContent>
         </Card>
@@ -124,7 +105,7 @@ export default async function BranchCompareReportPage({
           <CardContent className="space-y-3">
             <RevenueBarList points={yearPoints} labelWidthClassName="w-24" />
             <p className="text-xs text-muted-foreground">
-              Tổng 3 chi nhánh: {currencyFormatter.format(totals.year)}đ
+              Tổng các chi nhánh: {currencyFormatter.format(totals.year)}đ
             </p>
           </CardContent>
         </Card>

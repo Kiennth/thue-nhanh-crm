@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
+import { BranchComparisonSection } from "@/components/branch-comparison";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -59,8 +60,10 @@ export default async function DashboardHomePage({
   }
 
   const supabase = await createClient();
+  const canCompareBranches = employee?.role === "admin" || employee?.role === "ke_toan";
   const [
     branches,
+    branchList,
     customers,
     equipmentTypes,
     { data: orders },
@@ -73,9 +76,10 @@ export default async function DashboardHomePage({
     { data: orderLines },
   ] = await Promise.all([
     supabase.from("branches").select("*", { count: "exact", head: true }),
+    supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("order_date, total_value"),
+    supabase.from("orders").select("branch_id, order_date, total_value"),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
@@ -174,6 +178,19 @@ export default async function DashboardHomePage({
           value: (r.report.profitRatio ?? 0) * 100,
         }))}
       />
+
+      {canCompareBranches && (
+        <BranchComparisonSection
+          branches={branchList.data ?? []}
+          orders={orderList}
+          day={day}
+          month={month}
+          year={year}
+          isToday={day === defaults.day}
+          isThisMonth={month === defaults.month}
+          isThisYear={year === defaults.year}
+        />
+      )}
     </div>
   );
 }
