@@ -104,8 +104,8 @@ export default async function DashboardHomePage({
     .slice(0, 5);
 
   const topMargin = rows
-    .filter((r) => r.report.roi !== null)
-    .sort((a, b) => (b.report.roi ?? 0) - (a.report.roi ?? 0))
+    .filter((r) => r.report.profitRatio !== null)
+    .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
     .slice(0, 5);
 
   return (
@@ -200,7 +200,7 @@ export default async function DashboardHomePage({
           </CardHeader>
           <CardContent>
             <RevenueBarList
-              points={topMargin.map((r) => ({ label: r.type.name, value: (r.report.roi ?? 0) * 100 }))}
+              points={topMargin.map((r) => ({ label: r.type.name, value: (r.report.profitRatio ?? 0) * 100 }))}
               formatValue={formatPercent}
               labelWidthClassName="w-32"
             />

@@ -60,8 +60,8 @@ export default async function EquipmentReportsPage() {
     .sort((a, b) => b.report.rentalCount - a.report.rentalCount);
 
   const profitRows = [...rows].sort((a, b) => {
-    const roiA = a.report.roi ?? -Infinity;
-    const roiB = b.report.roi ?? -Infinity;
+    const roiA = a.report.profitRatio ?? -Infinity;
+    const roiB = b.report.profitRatio ?? -Infinity;
     return roiB - roiA;
   });
 
@@ -162,8 +162,9 @@ export default async function EquipmentReportsPage() {
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-xs text-muted-foreground">
-            Lợi nhuận = Doanh thu (cho thuê/bán) + Tiền thu thanh lý − Giá vốn mua vào. ROI = Lợi
-            nhuận / Giá vốn.
+            Lợi nhuận = Doanh thu (cho thuê/bán) + Tiền thu thanh lý − Giá vốn mua vào. Tỉ suất lợi
+            nhuận = (Doanh thu + Tiền thu thanh lý) / Giá vốn — chưa trừ giá vốn nên luôn ≥ 0%
+            (100% = đã hoà vốn, trên 100% = đã có lãi).
           </p>
           <Table>
             <TableHeader>
@@ -173,7 +174,7 @@ export default async function EquipmentReportsPage() {
                 <TableHead>Doanh thu</TableHead>
                 <TableHead>Thu thanh lý</TableHead>
                 <TableHead>Lợi nhuận</TableHead>
-                <TableHead>ROI</TableHead>
+                <TableHead>Tỉ suất lợi nhuận</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,7 +187,9 @@ export default async function EquipmentReportsPage() {
                   <TableCell className={report.profit < 0 ? "text-destructive" : ""}>
                     {currencyFormatter.format(report.profit)}đ
                   </TableCell>
-                  <TableCell>{report.roi === null ? "—" : `${(report.roi * 100).toFixed(0)}%`}</TableCell>
+                  <TableCell>
+                    {report.profitRatio === null ? "—" : `${(report.profitRatio * 100).toFixed(0)}%`}
+                  </TableCell>
                 </TableRow>
               ))}
               {!profitRows.length && (

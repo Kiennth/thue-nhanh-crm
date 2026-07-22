@@ -37,7 +37,10 @@ export interface EquipmentTypeReport {
   rentalCount: number;
   currentInventoryValue: number;
   profit: number;
-  roi: number | null;
+  // Tỉ suất lợi nhuận = tổng tiền đã thu về (doanh thu + thanh lý) / tiền đã
+  // bỏ ra mua — KHÔNG trừ giá vốn, nên luôn >= 0 (0% = chưa thu lại đồng nào,
+  // 100% = đã hoà vốn, >100% = đã có lãi). null nếu chưa có giá vốn.
+  profitRatio: number | null;
 }
 
 // Giá vốn bình quân gia quyền theo các lần mua.
@@ -57,7 +60,8 @@ export function computeWeightedAverageCost(
 //   - rentalCount: số lượt xuất hiện trong đơn hàng (đo mức độ "cho thuê nhiều")
 //   - currentInventoryValue: giá trị tồn kho hiện tại (số lượng còn giữ x giá vốn)
 //   - profit = revenue + disposalProceeds - purchaseCost
-//   - roi = profit / purchaseCost (null nếu chưa có giá vốn)
+//   - profitRatio = (revenue + disposalProceeds) / purchaseCost (không trừ giá
+//     vốn nên luôn >= 0 — null nếu chưa có giá vốn)
 export function computeEquipmentTypeReports(
   types: { id: string; product_type: ProductType }[],
   units: { id: string; equipment_type_id: string }[],
@@ -140,7 +144,7 @@ export function computeEquipmentTypeReports(
     const revenue = revenueByType.get(type.id) ?? 0;
     const rentalCount = countByType.get(type.id) ?? 0;
     const profit = revenue + disposalProceeds - purchaseCost;
-    const roi = purchaseCost > 0 ? profit / purchaseCost : null;
+    const profitRatio = purchaseCost > 0 ? (revenue + disposalProceeds) / purchaseCost : null;
 
     result.set(type.id, {
       equipmentTypeId: type.id,
@@ -150,7 +154,7 @@ export function computeEquipmentTypeReports(
       rentalCount,
       currentInventoryValue,
       profit,
-      roi,
+      profitRatio,
     });
   }
 
