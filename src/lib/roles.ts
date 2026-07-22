@@ -40,6 +40,11 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
   },
   {
+    href: "/equipment/reports",
+    label: "Báo cáo thiết bị",
+    roles: ["admin", "ke_toan"],
+  },
+  {
     href: "/commission",
     label: "Chính sách khoán",
     roles: ["admin", "ke_toan"],

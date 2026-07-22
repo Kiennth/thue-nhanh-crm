@@ -365,6 +365,8 @@ const EquipmentInstanceSchema = z.object({
   branch_id: z.string().uuid().optional(),
   status: z.enum(["available", "rented", "maintenance"]),
   condition_notes: z.string().trim().optional(),
+  purchase_price: z.coerce.number().min(0, { message: "Giá mua không được âm." }).optional(),
+  purchase_date: z.string().optional(),
 });
 
 function parseEquipmentInstanceForm(formData: FormData) {
@@ -374,6 +376,8 @@ function parseEquipmentInstanceForm(formData: FormData) {
     branch_id: formData.get("branch_id") || undefined,
     status: formData.get("status"),
     condition_notes: formData.get("condition_notes") || undefined,
+    purchase_price: formData.get("purchase_price") || undefined,
+    purchase_date: formData.get("purchase_date") || undefined,
   });
 }
 
@@ -436,6 +440,139 @@ export async function deleteEquipmentInstance(id: string) {
   }
 
   revalidatePath("/equipment");
+}
+
+const DisposeEquipmentInstanceSchema = z.object({
+  disposal_price: z.coerce.number().min(0, { message: "Giá bán không được âm." }),
+  disposal_date: z.string().min(1, { message: "Vui lòng chọn ngày thanh lý." }),
+});
+
+export async function disposeEquipmentInstance(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = DisposeEquipmentInstanceSchema.safeParse({
+    disposal_price: formData.get("disposal_price"),
+    disposal_date: formData.get("disposal_date"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("equipment_instances")
+    .update({ status: "disposed", ...parsed.data })
+    .eq("id", id);
+
+  if (error) {
+    return { error: "Không thể thanh lý sản phẩm: " + error.message };
+  }
+
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// equipment_purchases / equipment_disposals — mua hàng (nhập kho có giá vốn)
+// và bán/thanh lý cho biến thể theo dõi số lượng (equipment_units). Gọi qua
+// RPC để cộng/trừ tồn kho và ghi lịch sử atomic, giống transfer_equipment_stock.
+// ---------------------------------------------------------------------------
+
+const EquipmentPurchaseSchema = z.object({
+  equipment_unit_id: z.string().uuid(),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  quantity: z.coerce.number().int().min(1, { message: "Số lượng mua phải lớn hơn 0." }),
+  unit_cost: z.coerce.number().min(0, { message: "Giá mua không được âm." }),
+  purchase_date: z.string().min(1, { message: "Vui lòng chọn ngày mua." }),
+  note: z.string().trim().optional(),
+});
+
+export async function createEquipmentPurchase(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = EquipmentPurchaseSchema.safeParse({
+    equipment_unit_id: formData.get("equipment_unit_id"),
+    branch_id: formData.get("branch_id"),
+    quantity: formData.get("quantity"),
+    unit_cost: formData.get("unit_cost"),
+    purchase_date: formData.get("purchase_date"),
+    note: formData.get("note") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_equipment_purchase", {
+    p_equipment_unit_id: parsed.data.equipment_unit_id,
+    p_branch_id: parsed.data.branch_id,
+    p_quantity: parsed.data.quantity,
+    p_unit_cost: parsed.data.unit_cost,
+    p_purchase_date: parsed.data.purchase_date,
+    p_note: parsed.data.note ?? null,
+  });
+
+  if (error) {
+    return { error: "Không thể ghi nhận mua hàng: " + error.message };
+  }
+
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
+const EquipmentDisposalSchema = z.object({
+  equipment_unit_id: z.string().uuid(),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  quantity: z.coerce.number().int().min(1, { message: "Số lượng bán phải lớn hơn 0." }),
+  unit_price: z.coerce.number().min(0, { message: "Giá bán không được âm." }),
+  disposal_date: z.string().min(1, { message: "Vui lòng chọn ngày bán." }),
+  note: z.string().trim().optional(),
+});
+
+export async function createEquipmentDisposal(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = EquipmentDisposalSchema.safeParse({
+    equipment_unit_id: formData.get("equipment_unit_id"),
+    branch_id: formData.get("branch_id"),
+    quantity: formData.get("quantity"),
+    unit_price: formData.get("unit_price"),
+    disposal_date: formData.get("disposal_date"),
+    note: formData.get("note") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_equipment_disposal", {
+    p_equipment_unit_id: parsed.data.equipment_unit_id,
+    p_branch_id: parsed.data.branch_id,
+    p_quantity: parsed.data.quantity,
+    p_unit_price: parsed.data.unit_price,
+    p_disposal_date: parsed.data.disposal_date,
+    p_note: parsed.data.note ?? null,
+  });
+
+  if (error) {
+    return { error: "Không thể ghi nhận bán/thanh lý: " + error.message };
+  }
+
+  revalidatePath("/equipment");
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

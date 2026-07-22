@@ -10,7 +10,7 @@ export type ProductType = "rental" | "sale" | "service";
 export type TrackingType = "individual" | "quantity";
 export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
-export type EquipmentInstanceStatus = "available" | "rented" | "maintenance";
+export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
 
 export type TaskType =
   | "tiep_nhan_yeu_cau"
@@ -166,6 +166,10 @@ export interface Database {
           branch_id: string | null;
           status: EquipmentInstanceStatus;
           condition_notes: string | null;
+          purchase_price: number | null;
+          purchase_date: string | null;
+          disposal_price: number | null;
+          disposal_date: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -176,6 +180,10 @@ export interface Database {
           branch_id?: string | null;
           status?: EquipmentInstanceStatus;
           condition_notes?: string | null;
+          purchase_price?: number | null;
+          purchase_date?: string | null;
+          disposal_price?: number | null;
+          disposal_date?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_instances"]["Insert"]>;
         Relationships: [];
@@ -239,6 +247,56 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_transfers"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_purchases: {
+        Row: {
+          id: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity: number;
+          unit_cost: number;
+          purchase_date: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity: number;
+          unit_cost: number;
+          purchase_date?: string;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_purchases"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_disposals: {
+        Row: {
+          id: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity: number;
+          unit_price: number;
+          disposal_date: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_unit_id: string;
+          branch_id: string;
+          quantity: number;
+          unit_price: number;
+          disposal_date?: string;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_disposals"]["Insert"]>;
         Relationships: [];
       };
       orders: {
@@ -409,6 +467,28 @@ export interface Database {
           p_from_branch_id: string;
           p_to_branch_id: string;
           p_quantity: number;
+          p_note?: string | null;
+        };
+        Returns: void;
+      };
+      record_equipment_purchase: {
+        Args: {
+          p_equipment_unit_id: string;
+          p_branch_id: string;
+          p_quantity: number;
+          p_unit_cost: number;
+          p_purchase_date: string;
+          p_note?: string | null;
+        };
+        Returns: void;
+      };
+      record_equipment_disposal: {
+        Args: {
+          p_equipment_unit_id: string;
+          p_branch_id: string;
+          p_quantity: number;
+          p_unit_price: number;
+          p_disposal_date: string;
           p_note?: string | null;
         };
         Returns: void;

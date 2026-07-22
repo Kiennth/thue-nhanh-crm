@@ -34,4 +34,5 @@ export const EQUIPMENT_INSTANCE_STATUS_LABELS: Record<EquipmentInstanceStatus, s
   available: "Sẵn có",
   rented: "Đang cho thuê",
   maintenance: "Bảo trì",
+  disposed: "Đã thanh lý",
 };

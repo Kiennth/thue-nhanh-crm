@@ -38,6 +38,8 @@ interface EquipmentInstanceDialogProps {
     branch_id: string | null;
     status: EquipmentInstanceStatus;
     condition_notes: string | null;
+    purchase_price: number | null;
+    purchase_date: string | null;
   };
 }
 
@@ -134,6 +136,29 @@ export function EquipmentInstanceDialog({
               name="condition_notes"
               defaultValue={instance?.condition_notes ?? ""}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="purchase_price">Giá mua</Label>
+              <Input
+                id="purchase_price"
+                name="purchase_price"
+                type="number"
+                min={0}
+                step={1000}
+                defaultValue={instance?.purchase_price ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="purchase_date">Ngày mua</Label>
+              <Input
+                id="purchase_date"
+                name="purchase_date"
+                type="date"
+                defaultValue={instance?.purchase_date ?? ""}
+              />
+            </div>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

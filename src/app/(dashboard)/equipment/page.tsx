@@ -1,4 +1,4 @@
-import { Plus, Pencil, ArrowLeftRight, ListTree } from "lucide-react";
+import { Plus, Pencil, ArrowLeftRight, ListTree, ShoppingCart, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,9 @@ import { EquipmentUnitDialog } from "./equipment-unit-dialog";
 import { EquipmentStockDialog } from "./equipment-stock-dialog";
 import { TransferStockDialog } from "./transfer-stock-dialog";
 import { EquipmentInstanceDialog } from "./equipment-instance-dialog";
+import { EquipmentInstanceDisposeDialog } from "./equipment-instance-dispose-dialog";
+import { EquipmentPurchaseDialog } from "./equipment-purchase-dialog";
+import { EquipmentDisposalDialog } from "./equipment-disposal-dialog";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 
@@ -42,6 +45,7 @@ const INSTANCE_STATUS_VARIANT = {
   available: "default",
   rented: "secondary",
   maintenance: "destructive",
+  disposed: "outline",
 } as const;
 
 export default async function EquipmentPage() {
@@ -368,6 +372,26 @@ export default async function EquipmentPage() {
                                   </Button>
                                 }
                               />
+                              <EquipmentPurchaseDialog
+                                equipmentUnitId={unit.id}
+                                branches={branchList}
+                                trigger={
+                                  <Button variant="outline" size="sm">
+                                    <ShoppingCart className="size-4" />
+                                    Mua hàng
+                                  </Button>
+                                }
+                              />
+                              <EquipmentDisposalDialog
+                                equipmentUnitId={unit.id}
+                                branches={branchList}
+                                trigger={
+                                  <Button variant="outline" size="sm">
+                                    <Banknote className="size-4" />
+                                    Bán/thanh lý
+                                  </Button>
+                                }
+                              />
                             </div>
                           )}
                         </div>
@@ -433,6 +457,18 @@ export default async function EquipmentPage() {
                                         </Button>
                                       }
                                     />
+                                    {inst.status !== "disposed" && (
+                                      <EquipmentInstanceDisposeDialog
+                                        instanceId={inst.id}
+                                        identifierCode={inst.identifier_code}
+                                        trigger={
+                                          <Button variant="ghost" size="icon-sm">
+                                            <Banknote className="size-4" />
+                                            <span className="sr-only">Thanh lý</span>
+                                          </Button>
+                                        }
+                                      />
+                                    )}
                                     <ConfirmDeleteButton
                                       confirmMessage={`Xoá sản phẩm "${inst.identifier_code}"?`}
                                       successMessage="Đã xoá sản phẩm."
