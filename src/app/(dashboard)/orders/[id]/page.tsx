@@ -27,6 +27,7 @@ import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
+import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import CloseOrderButton from "./close-order-button";
 
@@ -47,6 +48,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: equipmentTypes },
     { data: equipmentUnits },
     { data: equipmentInstances },
+    { data: equipmentStock },
     { data: commissionTiers },
     { data: taskWeights },
     employee,
@@ -65,6 +67,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase
       .from("equipment_instances")
       .select("id, equipment_type_id, identifier_code, status"),
+    supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_available"),
     supabase.from("commission_tiers").select("*"),
     supabase.from("task_weights").select("*"),
     getCurrentEmployee(),
@@ -98,6 +101,37 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // tổng phải thu của khách, không dùng số đã gồm VAT để tính khoán.
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
+
+  // Cảnh báo thiếu hàng: tổng số lượng các dòng theo cùng 1 biến thể trong
+  // đơn so với số lượng sẵn có tại chi nhánh của đơn — KHÔNG chặn lưu đơn,
+  // chỉ hiện thông báo để admin/sếp biết mà xử lý nhập/mua/điều chuyển thêm.
+  const availableByUnit = new Map(
+    (equipmentStock ?? [])
+      .filter((s) => s.branch_id === order.branch_id)
+      .map((s) => [s.equipment_unit_id, s.quantity_available]),
+  );
+  const demandByUnit = new Map<string, number>();
+  for (const line of lines ?? []) {
+    if (!line.equipment_unit_id) continue;
+    demandByUnit.set(
+      line.equipment_unit_id,
+      (demandByUnit.get(line.equipment_unit_id) ?? 0) + line.quantity,
+    );
+  }
+  const stockShortages = [...demandByUnit.entries()]
+    .map(([unitId, demand]) => {
+      const unit = equipmentUnitById.get(unitId);
+      const type = unit ? equipmentTypeById.get(unit.equipment_type_id) : undefined;
+      const available = availableByUnit.get(unitId) ?? 0;
+      return {
+        unitId,
+        label: `${type?.name ?? "—"} (${unit?.brand_model ?? "—"})`,
+        demand,
+        available,
+        shortage: demand - available,
+      };
+    })
+    .filter((s) => s.shortage > 0);
 
   return (
     <div className="space-y-4">
@@ -196,7 +230,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <TableRow key={line.id}>
                     <TableCell className="font-medium">{type?.name ?? "—"}</TableCell>
                     <TableCell>{detail ?? "—"}</TableCell>
-                    <TableCell>{line.quantity}</TableCell>
+                    <TableCell>
+                      {canManage && !line.equipment_instance_id ? (
+                        <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
+                      ) : (
+                        line.quantity
+                      )}
+                    </TableCell>
                     <TableCell>
                       {canManage ? (
                         <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
@@ -225,6 +265,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
             </TableBody>
           </Table>
+
+          {stockShortages.length > 0 && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="font-medium">⚠ Thiếu hàng tại {branchNameById.get(order.branch_id) ?? "chi nhánh"}</p>
+              <ul className="mt-1 list-inside list-disc space-y-0.5">
+                {stockShortages.map((s) => (
+                  <li key={s.unitId}>
+                    {s.label}: đơn cần {s.demand}, kho còn {s.available} — thiếu {s.shortage}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="flex flex-col items-end gap-1 border-t pt-3 text-sm">
             <div className="flex w-64 justify-between">

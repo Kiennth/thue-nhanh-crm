@@ -166,6 +166,55 @@ export async function overrideOrderTotal(
   return { success: true };
 }
 
+const OrderLineQuantitySchema = z.object({
+  quantity: z.coerce.number().int().min(1, { message: "Số lượng phải lớn hơn 0." }),
+});
+
+// Sửa số lượng 1 dòng hàng (chỉ áp dụng dòng theo số lượng — hàng theo dõi
+// riêng lẻ (equipment_instance_id) luôn cố định số lượng 1, DB đã ràng buộc
+// bằng trigger check_order_equipment_line). line_total = quantity * unit_price
+// hiện tại — orders.total_value tự khớp lại nhờ trigger recalc_order_total.
+export async function updateOrderEquipmentLineQuantity(
+  lineId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = OrderLineQuantitySchema.safeParse({ quantity: formData.get("quantity") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: line, error: lineError } = await supabase
+    .from("order_equipment")
+    .select("order_id, unit_price, equipment_instance_id")
+    .eq("id", lineId)
+    .single();
+
+  if (lineError || !line) {
+    return { error: "Không tìm thấy dòng hàng." };
+  }
+
+  if (line.equipment_instance_id) {
+    return { error: "Hàng theo dõi riêng lẻ (từng sản phẩm) luôn có số lượng 1, không thể sửa." };
+  }
+
+  const lineTotal = round2(parsed.data.quantity * line.unit_price);
+  const { error } = await supabase
+    .from("order_equipment")
+    .update({ quantity: parsed.data.quantity, line_total: lineTotal })
+    .eq("id", lineId);
+
+  if (error) {
+    return { error: "Không thể sửa số lượng: " + error.message };
+  }
+
+  revalidatePath(`/orders/${line.order_id}`);
+  return { success: true };
+}
+
 const OrderLinePriceSchema = z.object({
   unit_price: z.coerce.number().min(0, { message: "Đơn giá không được âm." }),
 });
