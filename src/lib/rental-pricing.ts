@@ -38,13 +38,67 @@ export function hoursBetween(startAt: string, endAt: string): number {
   return (end - start) / 3_600_000;
 }
 
+// Số giờ khoan trễ trước khi tính thêm 1 ngày — quy định công ty: 1 ngày thuê =
+// 24h kể từ lúc nhận, trễ quá 2 tiếng mới tính sang ngày kế tiếp (trễ <= 2 tiếng
+// vẫn tính là ngày đang thuê).
+const DAY_GRACE_HOURS = 2;
+
+function computeDayCount(hours: number): number {
+  const fullDays = Math.floor(hours / 24);
+  const remainderHours = hours - fullDays * 24;
+  const days = remainderHours > DAY_GRACE_HOURS ? fullDays + 1 : fullDays;
+  return Math.max(1, days);
+}
+
 export function computeRentalDurationInUnit(
   rentalStartAt: string,
   rentalEndAt: string,
   rentalPeriodUnit: RentalPeriodUnit,
 ): number {
   const hours = hoursBetween(rentalStartAt, rentalEndAt);
+  if (rentalPeriodUnit === "day") {
+    return computeDayCount(hours);
+  }
   return Math.max(1, Math.ceil(hours / PERIOD_LENGTH_IN_HOURS[rentalPeriodUnit]));
+}
+
+// Các gói thuê có sẵn để chọn nhanh (thời gian kết thúc tự tính = bắt đầu +
+// số giờ của gói). Gói theo ngày dùng đúng bội số 24h — quy đổi "ngày" hiển
+// thị vẫn tuân theo computeRentalDurationInUnit (grace 2 tiếng) khi tính giá.
+export interface RentalPresetOption {
+  key: string;
+  label: string;
+  hours: number;
+}
+
+export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
+  { key: "3h", label: "3 giờ", hours: 3 },
+  { key: "6h", label: "6 giờ", hours: 6 },
+  { key: "9h", label: "9 giờ", hours: 9 },
+  { key: "1d", label: "1 ngày", hours: 24 * 1 },
+  { key: "2d", label: "2 ngày", hours: 24 * 2 },
+  { key: "3d", label: "3 ngày", hours: 24 * 3 },
+  { key: "4d", label: "4 ngày", hours: 24 * 4 },
+  { key: "5d", label: "5 ngày", hours: 24 * 5 },
+  { key: "6d", label: "6 ngày", hours: 24 * 6 },
+  { key: "7d", label: "7 ngày", hours: 24 * 7 },
+  { key: "14d", label: "14 ngày", hours: 24 * 14 },
+  { key: "30d", label: "30 ngày", hours: 24 * 30 },
+];
+
+// Mặc định thời gian bắt đầu thuê khi tạo mới = hiện tại + 1 tiếng, làm tròn
+// lên giờ chẵn gần nhất (đủ thời gian làm hồ sơ thủ tục trước khi giao hàng).
+export function defaultRentalStart(now: Date): Date {
+  const plusOneHour = new Date(now.getTime() + 3_600_000);
+  const needsRoundUp =
+    plusOneHour.getMinutes() !== 0 ||
+    plusOneHour.getSeconds() !== 0 ||
+    plusOneHour.getMilliseconds() !== 0;
+  plusOneHour.setMinutes(0, 0, 0);
+  if (needsRoundUp) {
+    plusOneHour.setHours(plusOneHour.getHours() + 1);
+  }
+  return plusOneHour;
 }
 
 // Bậc giảm giá áp dụng = bậc có min_duration lớn nhất mà vẫn <= số đơn vị thời
