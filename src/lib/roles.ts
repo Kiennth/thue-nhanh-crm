@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/employees",
     label: "Nhân viên",
-    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
   },
   {
     href: "/customers",
