@@ -158,17 +158,19 @@ export default async function DashboardHomePage({
         ))}
       </div>
 
-      <PeriodRevenueCards
-        day={day}
-        month={month}
-        year={year}
-        isToday={day === defaults.day}
-        isThisMonth={month === defaults.month}
-        isThisYear={year === defaults.year}
-        dayRevenue={revenueForDay(orderList, day)}
-        monthRevenue={revenueForMonth(orderList, month)}
-        yearRevenue={revenueForYear(orderList, year)}
-      />
+      {!canCompareBranches && (
+        <PeriodRevenueCards
+          day={day}
+          month={month}
+          year={year}
+          isToday={day === defaults.day}
+          isThisMonth={month === defaults.month}
+          isThisYear={year === defaults.year}
+          dayRevenue={revenueForDay(orderList, day)}
+          monthRevenue={revenueForMonth(orderList, month)}
+          yearRevenue={revenueForYear(orderList, year)}
+        />
+      )}
 
       <ProductHighlightCards
         mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}

@@ -73,10 +73,8 @@ export function BranchComparisonSection({
             <PeriodPicker paramName="day" type="date" value={day} label="Chọn ngày" />
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-3xl font-semibold">{currencyFormatter.format(totals.day)}đ</p>
             <RevenueBarList points={dayPoints} labelWidthClassName="w-24" />
-            <p className="text-xs text-muted-foreground">
-              Tổng các chi nhánh: {currencyFormatter.format(totals.day)}đ
-            </p>
           </CardContent>
         </Card>
         <Card>
@@ -89,10 +87,8 @@ export function BranchComparisonSection({
             <PeriodPicker paramName="month" type="month" value={month} label="Chọn tháng" />
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-3xl font-semibold">{currencyFormatter.format(totals.month)}đ</p>
             <RevenueBarList points={monthPoints} labelWidthClassName="w-24" />
-            <p className="text-xs text-muted-foreground">
-              Tổng các chi nhánh: {currencyFormatter.format(totals.month)}đ
-            </p>
           </CardContent>
         </Card>
         <Card>
@@ -103,10 +99,8 @@ export function BranchComparisonSection({
             <PeriodPicker paramName="year" type="number" value={year} label="Chọn năm" />
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-3xl font-semibold">{currencyFormatter.format(totals.year)}đ</p>
             <RevenueBarList points={yearPoints} labelWidthClassName="w-24" />
-            <p className="text-xs text-muted-foreground">
-              Tổng các chi nhánh: {currencyFormatter.format(totals.year)}đ
-            </p>
           </CardContent>
         </Card>
       </div>
