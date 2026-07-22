@@ -32,6 +32,7 @@ import { RentalPeriodForm } from "./rental-period-form";
 import CloseOrderButton from "./close-order-button";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
+import { ReopenOrderButton } from "./reopen-order-button";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -242,6 +243,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <CancelOrderButton orderId={order.id} />
             </>
           )}
+          {order.completed_at && canManage && <ReopenOrderButton orderId={order.id} />}
         </div>
       </div>
 

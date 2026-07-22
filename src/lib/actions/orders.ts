@@ -343,6 +343,38 @@ export async function closeOrder(id: string) {
   revalidatePath(`/orders/${id}`);
 }
 
+// Mở lại đơn đã hoàn tất — chỉ Admin/Kế toán. Đưa status về đúng khâu hiện
+// tại theo order_tasks (khâu sớm nhất chưa hoàn thành, hoặc khâu cuối nếu đã
+// xong hết) thay vì dựa vào giá trị status cũ — vì trigger sync_order_status
+// chỉ cập nhật khi completed_at is null nên status có thể bị "đứng hình" từ
+// lúc đóng đơn.
+export async function reopenOrder(id: string): Promise<ActionState> {
+  await requireRole(["admin", "ke_toan"]);
+
+  const supabase = await createClient();
+  const { data: tasks } = await supabase
+    .from("order_tasks")
+    .select("task_type, completed_date")
+    .eq("order_id", id);
+
+  const doneSet = new Set((tasks ?? []).filter((t) => t.completed_date).map((t) => t.task_type));
+  const nextStatus =
+    TASK_TYPE_SEQUENCE.find((t) => !doneSet.has(t)) ?? TASK_TYPE_SEQUENCE[TASK_TYPE_SEQUENCE.length - 1];
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ completed_at: null, status: nextStatus })
+    .eq("id", id);
+
+  if (error) {
+    return { error: "Không thể mở lại đơn: " + error.message };
+  }
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${id}`);
+  return { success: true };
+}
+
 // Huỷ đơn — mốc kết thúc riêng, loại trừ với "Hoàn tất" (DB check
 // orders_not_completed_and_cancelled). Không tính khoán, không xoá dữ liệu.
 export async function cancelOrder(id: string) {
