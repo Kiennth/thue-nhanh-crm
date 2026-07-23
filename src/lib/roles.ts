@@ -13,12 +13,16 @@ export interface NavItem {
   roles: UserRole[];
 }
 
+// Chi nhánh không nằm trong nav chính — CRUD tần suất thấp, đặt ở footer
+// sidebar (xem SETTINGS_LINK trong app-sidebar.tsx) để nav chính chỉ còn
+// những mục dùng liên tục.
+export const SETTINGS_LINK: NavItem = {
+  href: "/branches",
+  label: "Chi nhánh",
+  roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+};
+
 export const NAV_ITEMS: NavItem[] = [
-  {
-    href: "/branches",
-    label: "Chi nhánh",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
-  },
   {
     href: "/employees",
     label: "Nhân viên",
