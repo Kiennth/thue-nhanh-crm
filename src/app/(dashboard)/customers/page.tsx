@@ -12,18 +12,22 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
+import { CustomerReportSection } from "./customer-report-section";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 
 export default async function CustomersPage() {
   const supabase = await createClient();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [{ data: customers }, { data: orders }, { data: payments }] = await Promise.all([
+    supabase.from("customers").select("*").order("created_at", { ascending: false }),
+    supabase.from("orders").select("id, customer_id, total_value, order_date, cancelled_at"),
+    supabase.from("order_payments").select("order_id, amount"),
+  ]);
+
+  const customerList = customers ?? [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Khách hàng</h1>
         <CustomerDialog
@@ -35,6 +39,12 @@ export default async function CustomersPage() {
           }
         />
       </div>
+
+      <CustomerReportSection
+        customers={customerList}
+        orders={orders ?? []}
+        payments={payments ?? []}
+      />
 
       <Table>
         <TableHeader>
@@ -48,7 +58,7 @@ export default async function CustomersPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {customers?.map((customer) => (
+          {customerList.map((customer) => (
             <TableRow key={customer.id}>
               <TableCell className="font-medium">{customer.name}</TableCell>
               <TableCell>
@@ -73,7 +83,7 @@ export default async function CustomersPage() {
               </TableCell>
             </TableRow>
           ))}
-          {!customers?.length && (
+          {!customerList.length && (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Chưa có khách hàng nào.
