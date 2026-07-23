@@ -1,4 +1,13 @@
-import { Plus, Pencil, ArrowLeftRight, ListTree, ShoppingCart, Banknote, Radio } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  ArrowLeftRight,
+  ListTree,
+  ShoppingCart,
+  Banknote,
+  Radio,
+  ImageOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +48,7 @@ import { EquipmentDisposalDialog } from "./equipment-disposal-dialog";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 import { EquipmentSortSelect } from "./equipment-sort-select";
+import { EquipmentSearchInput } from "./equipment-search-input";
 import { RfidTagDialog } from "./rfid-tag-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
@@ -59,13 +69,17 @@ function isEquipmentSort(value: string): value is EquipmentSort {
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; search?: string }>;
 }) {
-  const { sort } = await searchParams;
+  const { sort, search } = await searchParams;
   const activeSort: EquipmentSort = sort && isEquipmentSort(sort) ? sort : "name_asc";
+  const activeSearch = search?.trim() ?? "";
 
   const supabase = await createClient();
   let typesQuery = supabase.from("equipment_types").select("*");
+  if (activeSearch) {
+    typesQuery = typesQuery.ilike("name", `%${activeSearch}%`);
+  }
   if (activeSort === "price_desc") {
     typesQuery = typesQuery.order("price", { ascending: false });
   } else if (activeSort === "price_asc") {
@@ -90,6 +104,7 @@ export default async function EquipmentPage({
     { data: templates },
     { data: tiers },
     { data: rfidTags },
+    { data: allTypeNames },
     employee,
   ] = await Promise.all([
     typesQuery,
@@ -105,6 +120,9 @@ export default async function EquipmentPage({
     supabase.from("pricing_templates").select("*").order("name"),
     supabase.from("pricing_template_tiers").select("*").order("min_duration"),
     supabase.from("rfid_tags").select("id, tag_code, equipment_unit_id, equipment_instance_id"),
+    // Không lọc theo search — lịch sử chuyển kho luôn cần tên đúng dù danh
+    // sách hàng hoá phía trên đang bị thu hẹp bởi ô tìm kiếm.
+    supabase.from("equipment_types").select("id, name"),
     getCurrentEmployee(),
   ]);
 
@@ -143,7 +161,7 @@ export default async function EquipmentPage({
   }
 
   const unitById = new Map((units ?? []).map((u) => [u.id, u]));
-  const typeById = new Map((types ?? []).map((t) => [t.id, t]));
+  const typeById = new Map((allTypeNames ?? []).map((t) => [t.id, t]));
 
   const rfidTagsByUnit = new Map<string, NonNullable<typeof rfidTags>>();
   const rfidTagsByInstance = new Map<string, NonNullable<typeof rfidTags>>();
@@ -164,6 +182,7 @@ export default async function EquipmentPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
         <div className="flex items-center gap-2">
+          <EquipmentSearchInput key={activeSearch} value={activeSearch} />
           <EquipmentSortSelect value={activeSort} />
           {canManage && (
             <EquipmentTypeDialog
@@ -271,15 +290,29 @@ export default async function EquipmentPage({
           return (
             <Card key={type.id}>
               <CardHeader className="flex-row items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <CardTitle>{type.name}</CardTitle>
-                    <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
-                    {type.tracking_type && (
-                      <Badge variant="outline">{TRACKING_TYPE_LABELS[type.tracking_type]}</Badge>
-                    )}
+                <div className="flex items-start gap-3">
+                  {type.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={type.image_url}
+                      alt=""
+                      className="size-12 shrink-0 rounded-lg border object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
+                      <ImageOff className="size-5" />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CardTitle>{type.name}</CardTitle>
+                      <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
+                      {type.tracking_type && (
+                        <Badge variant="outline">{TRACKING_TYPE_LABELS[type.tracking_type]}</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{priceLine}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{priceLine}</p>
                 </div>
                 {canManage && (
                   <div className="flex items-center gap-1">

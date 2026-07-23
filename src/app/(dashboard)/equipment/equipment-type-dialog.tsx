@@ -19,7 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createEquipmentType, updateEquipmentType } from "@/lib/actions/equipment";
+import {
+  createEquipmentType,
+  removeEquipmentTypeImage,
+  updateEquipmentType,
+} from "@/lib/actions/equipment";
 import {
   PRICING_METHOD_LABELS,
   PRODUCT_TYPE_LABELS,
@@ -51,6 +55,7 @@ interface EquipmentTypeDialogProps {
     rental_period_unit: RentalPeriodUnit | null;
     pricing_template_id: string | null;
     deposit_amount: number;
+    image_url: string | null;
   };
 }
 
@@ -75,6 +80,9 @@ export function EquipmentTypeDialog({
   const [pricingMethod, setPricingMethod] = useState<PricingMethod>(
     equipmentType?.pricing_method ?? "flat_fee",
   );
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    equipmentType?.image_url ?? null,
+  );
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -88,6 +96,14 @@ export function EquipmentTypeDialog({
       } else {
         setOpen(false);
       }
+    });
+  }
+
+  function handleRemoveImage() {
+    if (!equipmentType) return;
+    startTransition(async () => {
+      await removeEquipmentTypeImage(equipmentType.id);
+      setImagePreview(null);
     });
   }
 
@@ -115,6 +131,39 @@ export function EquipmentTypeDialog({
               placeholder="VD: TV 43inch 4K"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="image">Ảnh đại diện</Label>
+            {imagePreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imagePreview}
+                alt=""
+                className="h-24 w-24 rounded-lg border object-cover"
+              />
+            )}
+            <Input
+              id="image"
+              name="image"
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setImagePreview(URL.createObjectURL(file));
+              }}
+            />
+            {isEdit && equipmentType?.image_url && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleRemoveImage}
+                disabled={pending}
+              >
+                Xoá ảnh
+              </Button>
+            )}
           </div>
 
           <div className="space-y-2">

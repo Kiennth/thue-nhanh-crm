@@ -7,10 +7,42 @@ import { requireRole } from "@/lib/dal";
 import type { Database } from "@/types/database";
 
 type EquipmentTypeInsert = Database["public"]["Tables"]["equipment_types"]["Insert"];
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const MANAGE_ROLES = ["admin", "ke_toan"] as const;
 
 export type ActionState = { error: string } | { success: true } | undefined;
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+// Ảnh đại diện thiết bị — upload lên Supabase Storage bucket public
+// "equipment-images", lưu public URL vào equipment_types.image_url. Chỉ xử
+// lý khi form thực sự có file mới (input file trống vẫn gửi 1 File rỗng).
+async function uploadEquipmentImageIfPresent(
+  supabase: SupabaseServerClient,
+  equipmentTypeId: string,
+  formData: FormData,
+): Promise<{ imageUrl?: string; error?: string }> {
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return {};
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { error: "Ảnh không được vượt quá 5MB." };
+  }
+
+  const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+  const path = `${equipmentTypeId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("equipment-images")
+    .upload(path, file, { contentType: file.type || undefined });
+
+  if (error) {
+    return { error: "Không thể tải ảnh lên: " + error.message };
+  }
+
+  const { data } = supabase.storage.from("equipment-images").getPublicUrl(path);
+  return { imageUrl: data.publicUrl };
+}
 
 // ---------------------------------------------------------------------------
 // equipment_types — phân loại rental/sale/service, rental thì thêm tracking
@@ -115,12 +147,26 @@ export async function createEquipmentType(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("equipment_types")
-    .insert(normalizeEquipmentType(parsed.data));
+    .insert(normalizeEquipmentType(parsed.data))
+    .select("id")
+    .single();
 
-  if (error) {
-    return { error: "Không thể tạo loại hàng hoá: " + error.message };
+  if (error || !inserted) {
+    return { error: "Không thể tạo loại hàng hoá: " + (error?.message ?? "") };
+  }
+
+  const { imageUrl, error: imageError } = await uploadEquipmentImageIfPresent(
+    supabase,
+    inserted.id,
+    formData,
+  );
+  if (imageError) {
+    return { error: imageError };
+  }
+  if (imageUrl) {
+    await supabase.from("equipment_types").update({ image_url: imageUrl }).eq("id", inserted.id);
   }
 
   revalidatePath("/equipment");
@@ -140,9 +186,19 @@ export async function updateEquipmentType(
   }
 
   const supabase = await createClient();
+
+  const { imageUrl, error: imageError } = await uploadEquipmentImageIfPresent(
+    supabase,
+    id,
+    formData,
+  );
+  if (imageError) {
+    return { error: imageError };
+  }
+
   const { error } = await supabase
     .from("equipment_types")
-    .update(normalizeEquipmentType(parsed.data))
+    .update({ ...normalizeEquipmentType(parsed.data), ...(imageUrl ? { image_url: imageUrl } : {}) })
     .eq("id", id);
 
   if (error) {
@@ -151,6 +207,19 @@ export async function updateEquipmentType(
 
   revalidatePath("/equipment");
   return { success: true };
+}
+
+export async function removeEquipmentTypeImage(id: string) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment_types").update({ image_url: null }).eq("id", id);
+
+  if (error) {
+    throw new Error("Không thể xoá ảnh: " + error.message);
+  }
+
+  revalidatePath("/equipment");
 }
 
 export async function deleteEquipmentType(id: string) {
