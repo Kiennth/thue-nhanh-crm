@@ -37,6 +37,7 @@ function OrderCountdownList({
             <div className="flex items-center gap-2">
               <span className="font-medium">{order.orderCode}</span>
               <span className="text-muted-foreground">{order.customerName}</span>
+              <span className="text-xs text-muted-foreground">· {order.branchName}</span>
             </div>
             <div className="flex flex-col items-end">
               <CountdownTimer targetDate={order.actionDate} />
@@ -63,9 +64,9 @@ export function UpcomingDeliveriesCard({ orders }: { orders: OrderToHandle[] }) 
 export function PendingCollectionsCard({ orders }: { orders: OrderToHandle[] }) {
   return (
     <OrderCountdownList
-      title="Đơn hàng cần thu hồi"
+      title="Đơn hàng sắp về"
       icon={PackageCheck}
-      emptyMessage="Không có đơn nào cần thu hồi sắp tới."
+      emptyMessage="Không có đơn nào sắp về."
       orders={orders}
     />
   );

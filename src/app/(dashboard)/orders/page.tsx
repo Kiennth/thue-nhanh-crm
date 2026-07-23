@@ -15,9 +15,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import type { TaskType } from "@/types/database";
 import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
+import { UpcomingDeliveriesCard, PendingCollectionsCard } from "../orders-to-handle-card";
 
 const DELETE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -49,12 +51,15 @@ export default async function OrdersPage({
       .is("cancelled_at", null);
   }
 
-  const [{ data: orders }, { data: branches }, { data: customers }, employee] = await Promise.all([
-    ordersQuery,
-    supabase.from("branches").select("id, name").order("name"),
-    supabase.from("customers").select("id, name").order("name"),
-    getCurrentEmployee(),
-  ]);
+  const employee = await getCurrentEmployee();
+
+  const [{ data: orders }, { data: branches }, { data: customers }, ordersToHandle] =
+    await Promise.all([
+      ordersQuery,
+      supabase.from("branches").select("id, name").order("name"),
+      supabase.from("customers").select("id, name").order("name"),
+      getOrdersToHandle(employee?.branch_id ?? null),
+    ]);
 
   const canDelete = !!employee && DELETE_ROLES.includes(employee.role);
   const branchList = branches ?? [];
@@ -76,6 +81,11 @@ export default async function OrdersPage({
             </Button>
           }
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
+        <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
       </div>
 
       <OrderStatusFilter value={activeStatus} />
