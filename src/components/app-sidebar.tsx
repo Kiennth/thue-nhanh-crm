@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,15 +15,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { NAV_ITEMS, ROLE_LABELS, SETTINGS_LINK } from "@/lib/roles";
+import { NAV_ITEMS, ROLE_LABELS, SETTINGS_ITEMS } from "@/lib/roles";
 import { logout } from "@/lib/actions/auth";
 import type { CurrentEmployee } from "@/lib/dal";
 
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
   const items = NAV_ITEMS.filter((item) => item.roles.includes(employee.role));
-  const showSettingsLink = SETTINGS_LINK.roles.includes(employee.role);
+  const settingsItems = SETTINGS_ITEMS.filter((item) => item.roles.includes(employee.role));
 
   return (
     <Sidebar>
@@ -61,13 +67,27 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
           <p className="font-medium">{employee.name}</p>
           <p className="text-muted-foreground">{ROLE_LABELS[employee.role]}</p>
         </div>
-        {showSettingsLink && (
-          <Link
-            href={SETTINGS_LINK.href}
-            className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          >
-            {SETTINGS_LINK.label}
-          </Link>
+        {settingsItems.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="size-3" />
+                  Cài đặt
+                </button>
+              }
+            />
+            <DropdownMenuContent align="start" side="top">
+              {settingsItems.map((item) => (
+                <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>
+                  {item.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         <form action={logout}>
           <Button variant="outline" size="sm" className="w-full justify-start" type="submit">
