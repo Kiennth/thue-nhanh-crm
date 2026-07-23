@@ -208,15 +208,6 @@ export default async function DashboardHomePage({
         />
       )}
 
-      <ProductHighlightCards
-        mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
-        flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
-        topMargin={topMargin.map((r) => ({
-          label: r.type.name,
-          value: (r.report.profitRatio ?? 0) * 100,
-        }))}
-      />
-
       {canCompareBranches && (
         <BranchComparisonSection
           branches={branchList.data ?? []}
@@ -229,6 +220,15 @@ export default async function DashboardHomePage({
           isThisYear={year === defaults.year}
         />
       )}
+
+      <ProductHighlightCards
+        mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
+        flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
+        topMargin={topMargin.map((r) => ({
+          label: r.type.name,
+          value: (r.report.profitRatio ?? 0) * 100,
+        }))}
+      />
     </div>
   );
 }
