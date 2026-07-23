@@ -26,6 +26,7 @@ const EquipmentTypeSchema = z
     price: z.coerce.number().min(0, { message: "Giá không được âm." }),
     rental_period_unit: z.enum(["hour", "day", "week", "month", "year"]).optional(),
     pricing_template_id: z.string().uuid().optional(),
+    deposit_amount: z.coerce.number().min(0, { message: "Tiền cọc không được âm." }).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.product_type !== "rental") return;
@@ -72,6 +73,7 @@ function normalizeEquipmentType(
       pricing_method: null,
       rental_period_unit: null,
       pricing_template_id: null,
+      deposit_amount: 0,
     };
   }
 
@@ -84,6 +86,7 @@ function normalizeEquipmentType(
     rental_period_unit: data.rental_period_unit ?? null,
     pricing_template_id:
       data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
+    deposit_amount: data.deposit_amount ?? 0,
   };
 }
 
@@ -96,6 +99,7 @@ function parseEquipmentTypeForm(formData: FormData) {
     price: formData.get("price"),
     rental_period_unit: formData.get("rental_period_unit") || undefined,
     pricing_template_id: formData.get("pricing_template_id") || undefined,
+    deposit_amount: formData.get("deposit_amount") || undefined,
   });
 }
 

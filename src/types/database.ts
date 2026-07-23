@@ -108,6 +108,7 @@ export interface Database {
           price: number;
           rental_period_unit: RentalPeriodUnit | null;
           pricing_template_id: string | null;
+          deposit_amount: number;
           created_at: string;
           updated_at: string;
         };
@@ -120,6 +121,7 @@ export interface Database {
           price: number;
           rental_period_unit?: RentalPeriodUnit | null;
           pricing_template_id?: string | null;
+          deposit_amount?: number;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];

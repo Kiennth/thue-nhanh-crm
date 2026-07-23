@@ -50,6 +50,7 @@ interface EquipmentTypeDialogProps {
     price: number;
     rental_period_unit: RentalPeriodUnit | null;
     pricing_template_id: string | null;
+    deposit_amount: number;
   };
 }
 
@@ -212,6 +213,21 @@ export function EquipmentTypeDialog({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deposit_amount">Tiền cọc / đơn vị</Label>
+                <Input
+                  id="deposit_amount"
+                  name="deposit_amount"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  defaultValue={equipmentType?.deposit_amount ?? 0}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Thu cùng đơn (không tính VAT), hoàn lại sau khi nghiệm thu. Để 0 nếu không thu cọc.
+                </p>
               </div>
 
               <div className="space-y-2">

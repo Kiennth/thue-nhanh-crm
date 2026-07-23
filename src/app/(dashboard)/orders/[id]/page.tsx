@@ -73,7 +73,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("employees_public").select("id, name").order("name"),
     supabase
       .from("equipment_types")
-      .select("id, name, product_type, tracking_type, pricing_method, price")
+      .select("id, name, product_type, tracking_type, pricing_method, price, deposit_amount")
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
     supabase
@@ -119,6 +119,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const remaining = Math.max(0, grandTotal - totalPaid);
   const paymentStatus =
     totalPaid <= 0 ? "Chưa thanh toán" : remaining <= 0 ? "Đã thanh toán đủ" : "Thanh toán một phần";
+
+  // Tiền cọc = tổng (số lượng x cọc/đơn vị) của các dòng hàng CHO THUÊ trong
+  // đơn, làm tròn đến triệu cho gọn — không tính VAT, thu cùng lúc với đơn,
+  // hoàn lại sau khi nghiệm thu (khâu "Nghiệm thu").
+  const rawDeposit = (lines ?? []).reduce((sum, line) => {
+    const type = equipmentTypeById.get(line.equipment_type_id);
+    if (type?.product_type !== "rental") return sum;
+    return sum + (type.deposit_amount ?? 0) * line.quantity;
+  }, 0);
+  const totalDeposit = Math.round(rawDeposit / 1_000_000) * 1_000_000;
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -487,6 +497,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Table>
         </CardContent>
       </Card>
+
+      {totalDeposit > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tiền cọc</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(totalDeposit)}đ</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Thu cùng lúc với đơn (không tính VAT), hoàn lại cho khách sau khi hoàn thành khâu
+              Nghiệm thu.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {canManage && (
         <Card>

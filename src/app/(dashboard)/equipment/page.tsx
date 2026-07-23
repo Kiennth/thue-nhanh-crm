@@ -245,6 +245,9 @@ export default async function EquipmentPage({
               ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}` +
                 (type.pricing_method === "pricing_structure"
                   ? ` · bảng giá: ${templateNameById.get(type.pricing_template_id ?? "") ?? "—"}`
+                  : "") +
+                (type.deposit_amount > 0
+                  ? ` · cọc: ${currencyFormatter.format(type.deposit_amount)}đ`
                   : "")
               : `${currencyFormatter.format(type.price)}đ`;
 
