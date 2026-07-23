@@ -16,9 +16,15 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
+import {
+  computeDateRange,
+  DATE_RANGE_PRESET_OPTIONS,
+  type DateRangePreset,
+} from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
 import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
+import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "../orders-to-handle-card";
 
 const DELETE_ROLES = ["admin", "ke_toan"];
@@ -29,13 +35,19 @@ function isTaskType(value: string): value is TaskType {
   return (TASK_TYPE_SEQUENCE as readonly string[]).includes(value);
 }
 
+function isDateRangePreset(value: string): value is DateRangePreset {
+  return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
+
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; range?: string; from?: string; to?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, range, from, to } = await searchParams;
   const activeStatus = status ?? "all";
+  const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
+  const dateRange = computeDateRange(activeRange, new Date(), { from, to });
 
   const supabase = await createClient();
 
@@ -49,6 +61,9 @@ export default async function OrdersPage({
       .eq("status", activeStatus)
       .is("completed_at", null)
       .is("cancelled_at", null);
+  }
+  if (dateRange) {
+    ordersQuery = ordersQuery.gte("order_date", dateRange.start).lte("order_date", dateRange.end);
   }
 
   const employee = await getCurrentEmployee();
@@ -88,7 +103,10 @@ export default async function OrdersPage({
         <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
       </div>
 
-      <OrderStatusFilter value={activeStatus} />
+      <div className="flex flex-wrap items-center gap-2">
+        <OrderStatusFilter value={activeStatus} />
+        <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
+      </div>
 
       <Table>
         <TableHeader>
