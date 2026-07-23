@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
 import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
+import { RfidScanDialog } from "./rfid-scan-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -542,16 +543,36 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               const task = taskByType.get(taskType);
               const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
 
+              const scanType =
+                taskType === "giao_hang_ban_giao" ? "giao_hang" : taskType === "thu_hoi" ? "thu_hoi" : null;
+
               return (
                 <div key={taskType}>
-                  <OrderTaskRow
-                    orderId={order.id}
-                    taskType={taskType}
-                    label={TASK_TYPE_LABELS[taskType]}
-                    employees={employeeList}
-                    task={task}
-                    canComplete={canComplete}
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <OrderTaskRow
+                        orderId={order.id}
+                        taskType={taskType}
+                        label={TASK_TYPE_LABELS[taskType]}
+                        employees={employeeList}
+                        task={task}
+                        canComplete={canComplete}
+                      />
+                    </div>
+                    {scanType && !task?.completed_date && (
+                      <RfidScanDialog
+                        orderId={order.id}
+                        branchId={order.branch_id}
+                        scanType={scanType}
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            <Radio className="size-4" />
+                            Quét RFID
+                          </Button>
+                        }
+                      />
+                    )}
+                  </div>
                   {canManage && task?.employee_id && (
                     <p className="pb-1 text-xs text-muted-foreground">
                       {employeeNameById.get(task.employee_id) ?? "—"} · {weight}% ={" "}

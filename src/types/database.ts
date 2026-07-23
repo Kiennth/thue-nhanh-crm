@@ -12,6 +12,8 @@ export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
 export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" | "khac";
+export type RfidTagStatus = "in_stock" | "with_customer";
+export type RfidScanType = "giao_hang" | "thu_hoi";
 
 export type TaskType =
   | "tiep_nhan_yeu_cau"
@@ -458,6 +460,51 @@ export interface Database {
           bonus_amount: number;
         };
         Update: Partial<Database["public"]["Tables"]["bonus_tiers"]["Insert"]>;
+        Relationships: [];
+      };
+      rfid_tags: {
+        Row: {
+          id: string;
+          tag_code: string;
+          equipment_type_id: string;
+          equipment_unit_id: string | null;
+          equipment_instance_id: string | null;
+          branch_id: string | null;
+          status: RfidTagStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tag_code: string;
+          equipment_type_id: string;
+          equipment_unit_id?: string | null;
+          equipment_instance_id?: string | null;
+          branch_id?: string | null;
+          status?: RfidTagStatus;
+        };
+        Update: Partial<Database["public"]["Tables"]["rfid_tags"]["Insert"]>;
+        Relationships: [];
+      };
+      rfid_scan_log: {
+        Row: {
+          id: string;
+          tag_id: string;
+          scan_type: RfidScanType;
+          order_id: string | null;
+          branch_id: string;
+          employee_id: string | null;
+          scanned_at: string;
+        };
+        Insert: {
+          id?: string;
+          tag_id: string;
+          scan_type: RfidScanType;
+          order_id?: string | null;
+          branch_id: string;
+          employee_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["rfid_scan_log"]["Insert"]>;
         Relationships: [];
       };
     };

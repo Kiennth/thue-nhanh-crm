@@ -1,4 +1,4 @@
-import { Plus, Pencil, ArrowLeftRight, ListTree, ShoppingCart, Banknote } from "lucide-react";
+import { Plus, Pencil, ArrowLeftRight, ListTree, ShoppingCart, Banknote, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,7 @@ import { EquipmentDisposalDialog } from "./equipment-disposal-dialog";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 import { EquipmentSortSelect } from "./equipment-sort-select";
+import { RfidTagDialog } from "./rfid-tag-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -88,6 +89,7 @@ export default async function EquipmentPage({
     { data: transfers },
     { data: templates },
     { data: tiers },
+    { data: rfidTags },
     employee,
   ] = await Promise.all([
     typesQuery,
@@ -102,6 +104,7 @@ export default async function EquipmentPage({
       .limit(20),
     supabase.from("pricing_templates").select("*").order("name"),
     supabase.from("pricing_template_tiers").select("*").order("min_duration"),
+    supabase.from("rfid_tags").select("id, tag_code, equipment_unit_id, equipment_instance_id"),
     getCurrentEmployee(),
   ]);
 
@@ -141,6 +144,20 @@ export default async function EquipmentPage({
 
   const unitById = new Map((units ?? []).map((u) => [u.id, u]));
   const typeById = new Map((types ?? []).map((t) => [t.id, t]));
+
+  const rfidTagsByUnit = new Map<string, NonNullable<typeof rfidTags>>();
+  const rfidTagsByInstance = new Map<string, NonNullable<typeof rfidTags>>();
+  for (const tag of rfidTags ?? []) {
+    if (tag.equipment_unit_id) {
+      const list = rfidTagsByUnit.get(tag.equipment_unit_id) ?? [];
+      list.push(tag);
+      rfidTagsByUnit.set(tag.equipment_unit_id, list);
+    } else if (tag.equipment_instance_id) {
+      const list = rfidTagsByInstance.get(tag.equipment_instance_id) ?? [];
+      list.push(tag);
+      rfidTagsByInstance.set(tag.equipment_instance_id, list);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -297,6 +314,7 @@ export default async function EquipmentPage({
                   {showUnitsBlock &&
                     typeUnits.map((unit) => {
                       const unitStock = stockByUnit.get(unit.id) ?? [];
+                      const unitTags = rfidTagsByUnit.get(unit.id) ?? [];
                       return (
                         <div key={unit.id} className="rounded-lg border p-3">
                           <div className="flex items-start justify-between">
@@ -310,6 +328,18 @@ export default async function EquipmentPage({
                             </div>
                             {canManage && (
                               <div className="flex items-center gap-1">
+                                <RfidTagDialog
+                                  label={unit.brand_model}
+                                  equipmentTypeId={type.id}
+                                  equipmentUnitId={unit.id}
+                                  tags={unitTags}
+                                  trigger={
+                                    <Button variant="ghost" size="icon-sm">
+                                      <Radio className="size-4" />
+                                      <span className="sr-only">Tag RFID ({unitTags.length})</span>
+                                    </Button>
+                                  }
+                                />
                                 <EquipmentUnitDialog
                                   equipmentTypeId={type.id}
                                   unit={unit}
@@ -464,7 +494,9 @@ export default async function EquipmentPage({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {typeInstances.map((inst) => (
+                          {typeInstances.map((inst) => {
+                            const instTags = rfidTagsByInstance.get(inst.id) ?? [];
+                            return (
                             <TableRow key={inst.id}>
                               <TableCell className="font-medium">
                                 {inst.identifier_code}
@@ -481,6 +513,20 @@ export default async function EquipmentPage({
                               {canManage && (
                                 <TableCell>
                                   <div className="flex items-center gap-1">
+                                    <RfidTagDialog
+                                      label={inst.identifier_code}
+                                      equipmentTypeId={type.id}
+                                      equipmentInstanceId={inst.id}
+                                      tags={instTags}
+                                      trigger={
+                                        <Button variant="ghost" size="icon-sm">
+                                          <Radio className="size-4" />
+                                          <span className="sr-only">
+                                            Tag RFID ({instTags.length})
+                                          </span>
+                                        </Button>
+                                      }
+                                    />
                                     <EquipmentInstanceDialog
                                       equipmentTypeId={type.id}
                                       branches={branchList}
@@ -514,7 +560,8 @@ export default async function EquipmentPage({
                                 </TableCell>
                               )}
                             </TableRow>
-                          ))}
+                            );
+                          })}
                           {!typeInstances.length && (
                             <TableRow>
                               <TableCell
