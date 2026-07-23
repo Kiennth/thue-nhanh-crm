@@ -16,11 +16,20 @@ import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import { MyPerformanceCard } from "./my-performance-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
+import { OrdersListSection } from "./orders/orders-list-section";
 
 export default async function DashboardHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ day?: string; month?: string; year?: string }>;
+  searchParams: Promise<{
+    day?: string;
+    month?: string;
+    year?: string;
+    status?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   const params = await searchParams;
   const defaults = todayParts();
@@ -30,9 +39,10 @@ export default async function DashboardHomePage({
 
   const employee = await getCurrentEmployee();
 
-  // Trang chủ của nhân viên kỹ thuật/sales chỉ tập trung vào hiệu suất cá
-  // nhân và việc cần làm — không cần report toàn công ty/chi nhánh (đó là
-  // việc của quản lý/kế toán).
+  // Trang chủ của nhân viên kỹ thuật/sales gộp luôn phần đơn hàng vào đây —
+  // chỉ cần 1 điểm dừng chân duy nhất, không cần chuyển qua trang /orders
+  // riêng. Không cần report toàn công ty/chi nhánh (đó là việc của quản
+  // lý/kế toán).
   if (employee?.role === "ky_thuat_sales") {
     const [myPerformance, ordersToHandle] = await Promise.all([
       computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
@@ -55,12 +65,22 @@ export default async function DashboardHomePage({
           <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
           <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
         </div>
+
+        <OrdersListSection
+          status={params.status}
+          range={params.range}
+          from={params.from}
+          to={params.to}
+          branchId={employee.branch_id}
+          canDelete={false}
+        />
       </div>
     );
   }
 
   const supabase = await createClient();
   const canCompareBranches = employee?.role === "admin" || employee?.role === "ke_toan";
+  const canDeleteOrders = canCompareBranches;
   const [
     branches,
     branchList,
@@ -74,6 +94,7 @@ export default async function DashboardHomePage({
     { data: disposals },
     { data: stock },
     { data: orderLines },
+    ordersToHandle,
   ] = await Promise.all([
     supabase.from("branches").select("*", { count: "exact", head: true }),
     supabase.from("branches").select("id, name").order("name"),
@@ -89,6 +110,7 @@ export default async function DashboardHomePage({
     supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
     supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
     supabase.from("order_equipment").select("equipment_type_id, line_total"),
+    getOrdersToHandle(null),
   ]);
 
   const stats = [
@@ -140,6 +162,20 @@ export default async function DashboardHomePage({
       </div>
 
       {myPerformance && <MyPerformanceCard perf={myPerformance} />}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
+        <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
+      </div>
+
+      <OrdersListSection
+        status={params.status}
+        range={params.range}
+        from={params.from}
+        to={params.to}
+        branchId={null}
+        canDelete={canDeleteOrders}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map((stat) => (
