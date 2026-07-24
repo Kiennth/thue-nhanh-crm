@@ -9,9 +9,16 @@ interface PaginationControlsProps {
   totalPages: number;
   totalCount: number;
   itemLabel: string;
+  paramName?: string;
 }
 
-export function PaginationControls({ page, totalPages, totalCount, itemLabel }: PaginationControlsProps) {
+export function PaginationControls({
+  page,
+  totalPages,
+  totalCount,
+  itemLabel,
+  paramName = "page",
+}: PaginationControlsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -19,9 +26,9 @@ export function PaginationControls({ page, totalPages, totalCount, itemLabel }: 
   function goToPage(next: number) {
     const params = new URLSearchParams(searchParams.toString());
     if (next <= 1) {
-      params.delete("page");
+      params.delete(paramName);
     } else {
-      params.set("page", String(next));
+      params.set(paramName, String(next));
     }
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
