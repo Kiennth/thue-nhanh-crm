@@ -33,7 +33,8 @@ interface OrderDialogProps {
   order?: {
     id: string;
     order_code: string;
-    branch_id: string;
+    pickup_branch_id: string;
+    return_branch_id: string;
     customer_id: string;
     customer_name: string;
     order_date: string;
@@ -92,10 +93,28 @@ export function OrderDialog({ trigger, branches, order }: OrderDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="branch_id">Chi nhánh</Label>
-            <Select name="branch_id" defaultValue={order?.branch_id}>
-              <SelectTrigger id="branch_id" className="w-full">
+            <Label htmlFor="pickup_branch_id">Chi nhánh giao</Label>
+            <Select name="pickup_branch_id" defaultValue={order?.pickup_branch_id}>
+              <SelectTrigger id="pickup_branch_id" className="w-full">
                 <SelectValue placeholder="Chọn chi nhánh">
+                  {(value: string) => branches.find((b) => b.id === value)?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="return_branch_id">Chi nhánh thu hồi</Label>
+            <Select name="return_branch_id" defaultValue={order?.return_branch_id}>
+              <SelectTrigger id="return_branch_id" className="w-full">
+                <SelectValue placeholder="Giống chi nhánh giao">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
                 </SelectValue>
               </SelectTrigger>

@@ -67,14 +67,14 @@ export async function computeMyPerformance(
   const taskList = tasks ?? [];
   const orderIds = [...new Set(taskList.map((t) => t.order_id))];
   const { data: orders } = orderIds.length
-    ? await admin.from("orders").select("id, total_value, branch_id").in("id", orderIds)
+    ? await admin.from("orders").select("id, total_value, pickup_branch_id").in("id", orderIds)
     : { data: [] };
   const orderById = new Map((orders ?? []).map((o) => [o.id, o]));
 
   const totalCommission = taskList.reduce((sum, t) => {
     const order = orderById.get(t.order_id);
     if (!order) return sum;
-    const rate = findCommissionRate(commissionTiers ?? [], order.branch_id, order.total_value);
+    const rate = findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, order.total_value);
     const fund = computeOrderCommissionFund(order.total_value, rate);
     const weight = findTaskWeight(taskWeights ?? [], t.task_type);
     return sum + computeTaskCommission(fund, weight);

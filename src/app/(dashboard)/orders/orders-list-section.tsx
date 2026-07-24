@@ -61,7 +61,8 @@ export async function OrdersListSection({
 
   let ordersQuery = supabase.from("orders").select("*").order("order_date", { ascending: false });
   if (branchId) {
-    ordersQuery = ordersQuery.eq("branch_id", branchId);
+    // Đơn liên quan tới chi nhánh mình: hoặc giao tại đây, hoặc thu hồi về đây.
+    ordersQuery = ordersQuery.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
   }
   if (activeStatus === "completed") {
     ordersQuery = ordersQuery.not("completed_at", "is", null);
@@ -135,7 +136,11 @@ export async function OrdersListSection({
                   {order.order_code}
                 </Link>
               </TableCell>
-              <TableCell>{branchNameById.get(order.branch_id) ?? "—"}</TableCell>
+              <TableCell>
+                {branchNameById.get(order.pickup_branch_id) ?? "—"}
+                {order.return_branch_id !== order.pickup_branch_id &&
+                  ` → ${branchNameById.get(order.return_branch_id) ?? "—"}`}
+              </TableCell>
               <TableCell>{customerNameById.get(order.customer_id) ?? "—"}</TableCell>
               <TableCell>{dateFormatter.format(new Date(order.order_date))}</TableCell>
               <TableCell>{currencyFormatter.format(order.total_value)}đ</TableCell>

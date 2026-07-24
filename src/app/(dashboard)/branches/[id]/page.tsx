@@ -39,7 +39,7 @@ export default async function BranchDashboardPage({
     { data: stock },
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
-    supabase.from("orders").select("id, order_date, total_value").eq("branch_id", id),
+    supabase.from("orders").select("id, order_date, total_value").eq("pickup_branch_id", id),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase

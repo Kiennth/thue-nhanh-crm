@@ -111,7 +111,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const allDone = doneCount === TASK_TYPE_SEQUENCE.length;
 
   const commissionRate = canManage
-    ? findCommissionRate(commissionTiers ?? [], order.branch_id, order.total_value)
+    ? findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, order.total_value)
     : 0;
   const commissionFund = canManage ? computeOrderCommissionFund(order.total_value, commissionRate) : 0;
 
@@ -146,7 +146,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // hoạch xử lý (mua thêm/điều chuyển), KHÔNG chặn lưu đơn.
   const availableByUnit = new Map(
     (equipmentStock ?? [])
-      .filter((s) => s.branch_id === order.branch_id)
+      .filter((s) => s.branch_id === order.pickup_branch_id)
       .map((s) => [s.equipment_unit_id, s.quantity_available]),
   );
   const demandByUnit = new Map<string, number>();
@@ -164,7 +164,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   let reservationOrders: {
     id: string;
     order_code: string;
-    branch_id: string;
+    pickup_branch_id: string;
     completed_at: string | null;
     cancelled_at: string | null;
     rental_start_at: string | null;
@@ -180,7 +180,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     const orderIds = [...new Set(reservationLines.map((r) => r.order_id))];
     const { data: ordersRows } = await supabase
       .from("orders")
-      .select("id, order_code, branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at")
+      .select("id, order_code, pickup_branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at")
       .in("id", orderIds);
     reservationOrders = ordersRows ?? [];
   }
@@ -207,7 +207,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   for (const row of reservationLines) {
     if (!row.equipment_unit_id) continue;
     const ord = reservationOrderById.get(row.order_id);
-    if (!ord || ord.branch_id !== order.branch_id || ord.completed_at || ord.cancelled_at) continue;
+    if (!ord || ord.pickup_branch_id !== order.pickup_branch_id || ord.completed_at || ord.cancelled_at)
+      continue;
 
     const unit = equipmentUnitById.get(row.equipment_unit_id);
     const type = unit ? equipmentTypeById.get(unit.equipment_type_id) : undefined;
@@ -284,7 +285,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <CardContent className="grid grid-cols-2 gap-4 pt-6 sm:grid-cols-4">
           <div>
             <p className="text-xs text-muted-foreground">Chi nhánh</p>
-            <p className="font-medium">{branchNameById.get(order.branch_id) ?? "—"}</p>
+            <p className="font-medium">{branchNameById.get(order.pickup_branch_id) ?? "—"}</p>
+            {order.return_branch_id !== order.pickup_branch_id && (
+              <p className="text-xs text-muted-foreground">
+                Thu hồi tại: {branchNameById.get(order.return_branch_id) ?? "—"}
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Khách hàng</p>
@@ -393,7 +399,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
           {stockShortages.length > 0 && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              <p className="font-medium">⚠ Thiếu hàng tại {branchNameById.get(order.branch_id) ?? "chi nhánh"}</p>
+              <p className="font-medium">⚠ Thiếu hàng tại {branchNameById.get(order.pickup_branch_id) ?? "chi nhánh"}</p>
               <ul className="mt-1 list-inside list-disc space-y-1">
                 {stockShortages.map((s) => (
                   <li key={s.unitId}>
@@ -576,7 +582,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     {scanType && !task?.completed_date && (
                       <RfidScanDialog
                         orderId={order.id}
-                        branchId={order.branch_id}
+                        branchId={
+                          scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
+                        }
                         scanType={scanType}
                         trigger={
                           <Button variant="outline" size="sm">

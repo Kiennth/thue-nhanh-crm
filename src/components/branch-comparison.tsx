@@ -30,7 +30,8 @@ export function BranchComparisonSection({
   isThisYear,
 }: {
   branches: { id: string; name: string }[];
-  orders: { branch_id: string; order_date: string; total_value: number }[];
+  // Doanh thu ghi nhận theo chi nhánh giao (chi nhánh "sở hữu" đơn).
+  orders: { pickup_branch_id: string; order_date: string; total_value: number }[];
   day: string;
   month: string;
   year: string;
@@ -39,7 +40,7 @@ export function BranchComparisonSection({
   isThisYear: boolean;
 }) {
   const rows = branches.map((branch) => {
-    const branchOrders = orders.filter((o) => o.branch_id === branch.id);
+    const branchOrders = orders.filter((o) => o.pickup_branch_id === branch.id);
     return {
       branch,
       day: revenueForDay(branchOrders, day),

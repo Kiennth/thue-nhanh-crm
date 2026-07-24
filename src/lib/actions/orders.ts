@@ -24,17 +24,25 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 // orders
 // ---------------------------------------------------------------------------
 
-const OrderSchema = z.object({
-  order_code: z.string().trim().min(1, { message: "Mã đơn không được để trống." }),
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
-  customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
-  order_date: z.string().min(1, { message: "Vui lòng chọn ngày." }),
-});
+const OrderSchema = z
+  .object({
+    order_code: z.string().trim().min(1, { message: "Mã đơn không được để trống." }),
+    pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh giao." }),
+    // Bỏ trống = thu hồi tại chính chi nhánh giao (tình huống phổ biến).
+    return_branch_id: z.string().uuid().optional(),
+    customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
+    order_date: z.string().min(1, { message: "Vui lòng chọn ngày." }),
+  })
+  .transform((data) => ({
+    ...data,
+    return_branch_id: data.return_branch_id ?? data.pickup_branch_id,
+  }));
 
 function parseOrderForm(formData: FormData) {
   return OrderSchema.safeParse({
     order_code: formData.get("order_code"),
-    branch_id: formData.get("branch_id"),
+    pickup_branch_id: formData.get("pickup_branch_id"),
+    return_branch_id: formData.get("return_branch_id") || undefined,
     customer_id: formData.get("customer_id"),
     order_date: formData.get("order_date"),
   });
@@ -414,7 +422,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const supabase = await createClient();
   const { data: source, error: sourceError } = await supabase
     .from("orders")
-    .select("branch_id, customer_id, rental_start_at, rental_end_at")
+    .select("pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at")
     .eq("id", id)
     .single();
 
@@ -438,7 +446,8 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
     .from("orders")
     .insert({
       order_code: generateOrderCode(today),
-      branch_id: source.branch_id,
+      pickup_branch_id: source.pickup_branch_id,
+      return_branch_id: source.return_branch_id,
       customer_id: source.customer_id,
       order_date: today.toISOString().slice(0, 10),
       rental_start_at: source.rental_start_at,
@@ -671,6 +680,13 @@ export async function upsertOrderTask(
 
   if (error) {
     return { error: "Không thể cập nhật khâu: " + error.message };
+  }
+
+  // Hoàn thành khâu nhập kho mà đơn thu hồi về chi nhánh khác chi nhánh giao
+  // thì tự động chuyển kho về nơi thu hồi. Function tự no-op khi 2 chi nhánh
+  // trùng nhau hoặc đã chuyển rồi; lỗi chuyển kho không chặn việc lưu khâu.
+  if (parsed.data.completed && parsed.data.task_type === "nhap_kho_bao_tri") {
+    await supabase.rpc("transfer_order_return_stock", { p_order_id: parsed.data.order_id });
   }
 
   revalidatePath(`/orders/${parsed.data.order_id}`);

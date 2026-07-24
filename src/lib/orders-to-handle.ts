@@ -32,18 +32,22 @@ function statusIndex(status: TaskType) {
 // nào đã/chưa xong mà không cần join order_tasks.
 //
 // branchId = null nghĩa là không lọc theo chi nhánh (dùng cho Admin/Kế toán —
-// xem tất cả kho); branchId cụ thể chỉ trả về đơn của đúng chi nhánh đó (nhân
-// viên kỹ thuật/quản lý chi nhánh — chỉ thấy kho mình).
+// xem tất cả kho); branchId cụ thể chỉ trả về việc của đúng chi nhánh đó (nhân
+// viên kỹ thuật/quản lý chi nhánh — chỉ thấy kho mình): đơn GIAO tại chi nhánh
+// mình vào danh sách sắp giao, đơn THU HỒI về chi nhánh mình vào danh sách cần
+// thu hồi — 2 chi nhánh của đơn có thể khác nhau.
 export async function getOrdersToHandle(branchId: string | null): Promise<OrdersToHandleResult> {
   const supabase = await createClient();
 
   let query = supabase
     .from("orders")
-    .select("id, order_code, customer_id, branch_id, status, rental_start_at, rental_end_at")
+    .select(
+      "id, order_code, customer_id, pickup_branch_id, return_branch_id, status, rental_start_at, rental_end_at",
+    )
     .is("completed_at", null)
     .is("cancelled_at", null);
   if (branchId) {
-    query = query.eq("branch_id", branchId);
+    query = query.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
   }
   const { data: orders } = await query;
 
@@ -51,7 +55,7 @@ export async function getOrdersToHandle(branchId: string | null): Promise<Orders
   if (!orderList.length) return { upcomingDeliveries: [], pendingCollections: [] };
 
   const customerIds = [...new Set(orderList.map((o) => o.customer_id))];
-  const branchIds = [...new Set(orderList.map((o) => o.branch_id))];
+  const branchIds = [...new Set(orderList.flatMap((o) => [o.pickup_branch_id, o.return_branch_id]))];
   const [{ data: customers }, { data: branches }] = await Promise.all([
     supabase.from("customers").select("id, name").in("id", customerIds),
     supabase.from("branches").select("id, name").in("id", branchIds),
@@ -68,15 +72,32 @@ export async function getOrdersToHandle(branchId: string | null): Promise<Orders
       id: order.id,
       orderCode: order.order_code,
       customerName: customerNameById.get(order.customer_id) ?? "—",
-      branchName: branchNameById.get(order.branch_id) ?? "—",
     };
 
-    if (idx > CHOT_DON_INDEX && idx <= GIAO_HANG_INDEX && order.rental_start_at) {
-      upcomingDeliveries.push({ ...base, actionDate: order.rental_start_at });
+    if (
+      idx > CHOT_DON_INDEX &&
+      idx <= GIAO_HANG_INDEX &&
+      order.rental_start_at &&
+      (!branchId || order.pickup_branch_id === branchId)
+    ) {
+      upcomingDeliveries.push({
+        ...base,
+        branchName: branchNameById.get(order.pickup_branch_id) ?? "—",
+        actionDate: order.rental_start_at,
+      });
     }
 
-    if (idx > VAN_HANH_INDEX && idx <= THU_HOI_INDEX && order.rental_end_at) {
-      pendingCollections.push({ ...base, actionDate: order.rental_end_at });
+    if (
+      idx > VAN_HANH_INDEX &&
+      idx <= THU_HOI_INDEX &&
+      order.rental_end_at &&
+      (!branchId || order.return_branch_id === branchId)
+    ) {
+      pendingCollections.push({
+        ...base,
+        branchName: branchNameById.get(order.return_branch_id) ?? "—",
+        actionDate: order.rental_end_at,
+      });
     }
   }
 

@@ -339,7 +339,8 @@ export interface Database {
         Row: {
           id: string;
           order_code: string;
-          branch_id: string;
+          pickup_branch_id: string;
+          return_branch_id: string;
           customer_id: string;
           order_date: string;
           total_value: number;
@@ -348,6 +349,7 @@ export interface Database {
           cancelled_at: string | null;
           rental_start_at: string | null;
           rental_end_at: string | null;
+          return_stock_transferred_at: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -355,7 +357,8 @@ export interface Database {
         Insert: {
           id?: string;
           order_code: string;
-          branch_id: string;
+          pickup_branch_id: string;
+          return_branch_id: string;
           customer_id: string;
           order_date?: string;
           total_value?: number;
@@ -364,6 +367,7 @@ export interface Database {
           cancelled_at?: string | null;
           rental_start_at?: string | null;
           rental_end_at?: string | null;
+          return_stock_transferred_at?: string | null;
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
@@ -573,6 +577,12 @@ export interface Database {
           p_to_branch_id: string;
           p_quantity: number;
           p_note?: string | null;
+        };
+        Returns: void;
+      };
+      transfer_order_return_stock: {
+        Args: {
+          p_order_id: string;
         };
         Returns: void;
       };

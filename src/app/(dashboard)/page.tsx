@@ -100,7 +100,7 @@ export default async function DashboardHomePage({
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("branch_id, order_date, total_value"),
+    supabase.from("orders").select("pickup_branch_id, order_date, total_value"),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
