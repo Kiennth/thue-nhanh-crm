@@ -403,7 +403,9 @@ export default async function EquipmentPage({
                               <TableRow>
                                 <TableHead>Chi nhánh</TableHead>
                                 <TableHead>Tổng</TableHead>
-                                <TableHead>Sẵn có</TableHead>
+                                <TableHead>Trong kho</TableHead>
+                                <TableHead>Ở khách</TableHead>
+                                <TableHead>Bảo trì</TableHead>
                                 {canManage && <TableHead className="w-20"></TableHead>}
                               </TableRow>
                             </TableHeader>
@@ -414,7 +416,9 @@ export default async function EquipmentPage({
                                     {branchNameById.get(row.branch_id) ?? "—"}
                                   </TableCell>
                                   <TableCell>{row.quantity_total}</TableCell>
-                                  <TableCell>{row.quantity_available}</TableCell>
+                                  <TableCell>{row.quantity_in_stock}</TableCell>
+                                  <TableCell>{row.quantity_picked_up}</TableCell>
+                                  <TableCell>{row.quantity_downtime}</TableCell>
                                   {canManage && (
                                     <TableCell>
                                       <div className="flex items-center gap-1">
@@ -443,7 +447,7 @@ export default async function EquipmentPage({
                               {!unitStock.length && (
                                 <TableRow>
                                   <TableCell
-                                    colSpan={canManage ? 4 : 3}
+                                    colSpan={canManage ? 6 : 5}
                                     className="text-center text-muted-foreground"
                                   >
                                     Chưa có tồn kho ở chi nhánh nào.

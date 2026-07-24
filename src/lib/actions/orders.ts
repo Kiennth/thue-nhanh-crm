@@ -398,6 +398,19 @@ export async function cancelOrder(id: string) {
     throw new Error("Không thể huỷ đơn: " + error.message);
   }
 
+  // Huỷ đơn ĐÃ giao hàng: trả hàng của đơn về "trong kho" tại chi nhánh thu
+  // hồi để tồn kho không kẹt ở trạng thái "ở khách". Chỉ gọi khi đơn đã giao
+  // thật — đơn chưa giao mà gọi return sẽ dời nhầm vị trí/trạng thái sản phẩm
+  // riêng lẻ chưa từng rời kho.
+  const { data: cancelled } = await supabase
+    .from("orders")
+    .select("delivery_stock_moved_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (cancelled?.delivery_stock_moved_at) {
+    await supabase.rpc("return_order_stock", { p_order_id: id });
+  }
+
   revalidatePath("/orders");
   revalidatePath(`/orders/${id}`);
 }
@@ -682,11 +695,17 @@ export async function upsertOrderTask(
     return { error: "Không thể cập nhật khâu: " + error.message };
   }
 
-  // Hoàn thành khâu nhập kho mà đơn thu hồi về chi nhánh khác chi nhánh giao
-  // thì tự động chuyển kho về nơi thu hồi. Function tự no-op khi 2 chi nhánh
-  // trùng nhau hoặc đã chuyển rồi; lỗi chuyển kho không chặn việc lưu khâu.
+  // Tồn kho phản ánh vật lý theo khâu: hoàn thành Giao hàng & bàn giao thì
+  // chuyển hàng của đơn từ "trong kho" sang "ở khách" (sản phẩm riêng lẻ sang
+  // Đang cho thuê); hoàn thành Nhập kho & bảo trì thì trả về "trong kho" tại
+  // chi nhánh thu hồi (kèm chuyển kho + lịch sử nếu khác chi nhánh giao). Cả
+  // 2 function đều idempotent qua timestamp trên orders — khâu bị mở lại rồi
+  // hoàn thành lại không cộng/trừ kho lần nữa.
+  if (parsed.data.completed && parsed.data.task_type === "giao_hang_ban_giao") {
+    await supabase.rpc("deliver_order_stock", { p_order_id: parsed.data.order_id });
+  }
   if (parsed.data.completed && parsed.data.task_type === "nhap_kho_bao_tri") {
-    await supabase.rpc("transfer_order_return_stock", { p_order_id: parsed.data.order_id });
+    await supabase.rpc("return_order_stock", { p_order_id: parsed.data.order_id });
   }
 
   revalidatePath(`/orders/${parsed.data.order_id}`);

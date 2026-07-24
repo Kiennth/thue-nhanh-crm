@@ -32,8 +32,9 @@ interface EquipmentStockDialogProps {
   branches: Branch[];
   stock?: {
     branch_id: string;
-    quantity_total: number;
-    quantity_available: number;
+    quantity_in_stock: number;
+    quantity_picked_up: number;
+    quantity_downtime: number;
   };
 }
 
@@ -105,30 +106,46 @@ export function EquipmentStockDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="quantity_total">Tổng số lượng</Label>
+              <Label htmlFor="quantity_in_stock">Trong kho</Label>
               <Input
-                id="quantity_total"
-                name="quantity_total"
+                id="quantity_in_stock"
+                name="quantity_in_stock"
                 type="number"
                 min={0}
-                defaultValue={stock?.quantity_total ?? 0}
+                defaultValue={stock?.quantity_in_stock ?? 0}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quantity_available">Số lượng sẵn có</Label>
+              <Label htmlFor="quantity_picked_up">Đang ở khách</Label>
               <Input
-                id="quantity_available"
-                name="quantity_available"
+                id="quantity_picked_up"
+                name="quantity_picked_up"
                 type="number"
                 min={0}
-                defaultValue={stock?.quantity_available ?? 0}
+                defaultValue={stock?.quantity_picked_up ?? 0}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity_downtime">Bảo trì</Label>
+              <Input
+                id="quantity_downtime"
+                name="quantity_downtime"
+                type="number"
+                min={0}
+                defaultValue={stock?.quantity_downtime ?? 0}
                 required
               />
             </div>
           </div>
+
+          <p className="text-sm text-muted-foreground">
+            Ô &quot;Đang ở khách&quot; do hệ thống tự cập nhật theo khâu giao/thu hồi của đơn hàng —
+            chỉ sửa tay khi cần đối chiếu lại số liệu.
+          </p>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

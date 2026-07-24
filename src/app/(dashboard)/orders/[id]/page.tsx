@@ -78,7 +78,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase
       .from("equipment_instances")
       .select("id, equipment_type_id, identifier_code, status"),
-    supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_available"),
+    supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
     supabase.from("commission_tiers").select("*"),
     supabase.from("task_weights").select("*"),
     getCurrentEmployee(),
@@ -147,7 +147,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const availableByUnit = new Map(
     (equipmentStock ?? [])
       .filter((s) => s.branch_id === order.pickup_branch_id)
-      .map((s) => [s.equipment_unit_id, s.quantity_available]),
+      .map((s) => [s.equipment_unit_id, s.quantity_in_stock]),
   );
   const demandByUnit = new Map<string, number>();
   for (const line of lines ?? []) {
@@ -169,6 +169,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     cancelled_at: string | null;
     rental_start_at: string | null;
     rental_end_at: string | null;
+    delivery_stock_moved_at: string | null;
   }[] = [];
   if (relevantUnitIds.length > 0) {
     const { data: oeRows } = await supabase
@@ -180,7 +181,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     const orderIds = [...new Set(reservationLines.map((r) => r.order_id))];
     const { data: ordersRows } = await supabase
       .from("orders")
-      .select("id, order_code, pickup_branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at")
+      .select(
+        "id, order_code, pickup_branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at, delivery_stock_moved_at",
+      )
       .in("id", orderIds);
     reservationOrders = ordersRows ?? [];
   }
@@ -198,16 +201,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   // Nhu cầu đang mở (chưa hoàn tất/chưa huỷ) theo từng biến thể, tại đúng chi
-  // nhánh của đơn — gồm cả đơn đang xem. Với hàng cho thuê (product_type =
-  // rental), chỉ tính là "giữ chỗ" nếu khung thời gian thuê của đơn kia giao
-  // với khung thời gian của đơn đang xem — hàng cho thuê ở hai khung giờ khác
-  // nhau không thật sự tranh chấp kho. Hàng bán/dịch vụ vẫn tính gộp không
-  // phân biệt thời gian vì tiêu hao kho vĩnh viễn.
+  // nhánh của đơn — gồm cả đơn đang xem. Đơn ĐÃ giao hàng
+  // (delivery_stock_moved_at) không tính nữa: hàng của nó đã bị trừ vật lý
+  // khỏi "trong kho" rồi, tính thêm là đếm đôi. Với hàng cho thuê
+  // (product_type = rental), chỉ tính là "giữ chỗ" nếu khung thời gian thuê
+  // của đơn kia giao với khung thời gian của đơn đang xem — hàng cho thuê ở
+  // hai khung giờ khác nhau không thật sự tranh chấp kho. Hàng bán/dịch vụ
+  // vẫn tính gộp không phân biệt thời gian vì tiêu hao kho vĩnh viễn.
   const activeDemandByUnit = new Map<string, { orderId: string; orderCode: string; quantity: number }[]>();
   for (const row of reservationLines) {
     if (!row.equipment_unit_id) continue;
     const ord = reservationOrderById.get(row.order_id);
-    if (!ord || ord.pickup_branch_id !== order.pickup_branch_id || ord.completed_at || ord.cancelled_at)
+    if (
+      !ord ||
+      ord.pickup_branch_id !== order.pickup_branch_id ||
+      ord.completed_at ||
+      ord.cancelled_at ||
+      ord.delivery_stock_moved_at
+    )
       continue;
 
     const unit = equipmentUnitById.get(row.equipment_unit_id);
@@ -403,8 +414,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <ul className="mt-1 list-inside list-disc space-y-1">
                 {stockShortages.map((s) => (
                   <li key={s.unitId}>
-                    {s.label}: đơn này cần {s.thisOrderDemand}. Tổng nhu cầu các đơn chưa hoàn tất:{" "}
-                    {s.totalDemand}, kho có {s.available} — thiếu {s.shortage}.
+                    {s.label}: đơn này cần {s.thisOrderDemand}. Tổng nhu cầu các đơn chưa giao:{" "}
+                    {s.totalDemand}, trong kho còn {s.available} — thiếu {s.shortage}.
                     {s.otherOrders.length > 0 && (
                       <span className="block text-xs text-destructive/80">
                         Đơn khác đang giữ:{" "}

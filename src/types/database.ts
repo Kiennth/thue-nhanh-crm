@@ -247,8 +247,11 @@ export interface Database {
           id: string;
           equipment_unit_id: string;
           branch_id: string;
+          quantity_in_stock: number;
+          quantity_picked_up: number;
+          quantity_downtime: number;
+          // Cột generated = tổng 3 trạng thái, chỉ đọc.
           quantity_total: number;
-          quantity_available: number;
           created_at: string;
           updated_at: string;
         };
@@ -256,8 +259,9 @@ export interface Database {
           id?: string;
           equipment_unit_id: string;
           branch_id: string;
-          quantity_total?: number;
-          quantity_available?: number;
+          quantity_in_stock?: number;
+          quantity_picked_up?: number;
+          quantity_downtime?: number;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_stock"]["Insert"]>;
         Relationships: [];
@@ -349,6 +353,7 @@ export interface Database {
           cancelled_at: string | null;
           rental_start_at: string | null;
           rental_end_at: string | null;
+          delivery_stock_moved_at: string | null;
           return_stock_transferred_at: string | null;
           created_by: string | null;
           created_at: string;
@@ -367,6 +372,7 @@ export interface Database {
           cancelled_at?: string | null;
           rental_start_at?: string | null;
           rental_end_at?: string | null;
+          delivery_stock_moved_at?: string | null;
           return_stock_transferred_at?: string | null;
           created_by?: string | null;
         };
@@ -580,7 +586,13 @@ export interface Database {
         };
         Returns: void;
       };
-      transfer_order_return_stock: {
+      deliver_order_stock: {
+        Args: {
+          p_order_id: string;
+        };
+        Returns: void;
+      };
+      return_order_stock: {
         Args: {
           p_order_id: string;
         };
