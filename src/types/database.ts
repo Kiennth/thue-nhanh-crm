@@ -398,7 +398,8 @@ export interface Database {
         Row: {
           id: string;
           order_id: string;
-          equipment_type_id: string;
+          equipment_type_id: string | null;
+          custom_name: string | null;
           equipment_unit_id: string | null;
           equipment_instance_id: string | null;
           quantity: number;
@@ -409,7 +410,8 @@ export interface Database {
         Insert: {
           id?: string;
           order_id: string;
-          equipment_type_id: string;
+          equipment_type_id?: string | null;
+          custom_name?: string | null;
           equipment_unit_id?: string | null;
           equipment_instance_id?: string | null;
           quantity?: number;

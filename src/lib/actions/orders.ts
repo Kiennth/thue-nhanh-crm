@@ -127,7 +127,7 @@ export async function overrideOrderTotal(
     return { error: "Đơn chưa có dòng hàng nào để phân bổ." };
   }
 
-  const typeIds = [...new Set(lineList.map((l) => l.equipment_type_id))];
+  const typeIds = [...new Set(lineList.map((l) => l.equipment_type_id).filter((tid): tid is string => tid !== null))];
   const { data: types } = await supabase
     .from("equipment_types")
     .select("id, product_type")
@@ -141,7 +141,9 @@ export async function overrideOrderTotal(
     return { success: true };
   }
 
-  const eligible = lineList.filter((l) => productTypeById.get(l.equipment_type_id) === "rental");
+  const eligible = lineList.filter(
+    (l) => l.equipment_type_id !== null && productTypeById.get(l.equipment_type_id) === "rental",
+  );
   if (!eligible.length) {
     return { error: "Không có dòng hàng cho thuê nào để phân bổ (không trừ vào dịch vụ/bán hàng)." };
   }
@@ -302,6 +304,8 @@ export async function updateOrderRentalPeriod(
     .eq("order_id", id);
 
   for (const line of lines ?? []) {
+    if (!line.equipment_type_id) continue; // dòng tự do — giá do người nhập tự gõ, không tính lại
+
     const { equipmentType, computed } = await computeLineForEquipmentType(
       supabase,
       line.equipment_type_id,
@@ -446,7 +450,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
+      "equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
     )
     .eq("order_id", id);
 
@@ -479,6 +483,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       sourceLines.map((line) => ({
         order_id: newOrder.id,
         equipment_type_id: line.equipment_type_id,
+        custom_name: line.custom_name,
         equipment_unit_id: line.equipment_unit_id,
         equipment_instance_id: line.equipment_instance_id,
         quantity: line.quantity,
@@ -596,6 +601,53 @@ export async function addOrderEquipmentLine(
     quantity: parsed.data.quantity,
     unit_price: computed.unitPrice,
     line_total: computed.lineTotal,
+  });
+
+  if (error) {
+    return { error: "Không thể thêm dòng hàng: " + error.message };
+  }
+
+  revalidatePath(`/orders/${parsed.data.order_id}`);
+  return { success: true };
+}
+
+const CustomOrderLineSchema = z.object({
+  order_id: z.string().uuid(),
+  custom_name: z.string().trim().min(1, { message: "Vui lòng nhập tên." }),
+  quantity: z.coerce.number().int().min(1, { message: "Số lượng phải lớn hơn 0." }),
+  unit_price: z.coerce.number().min(0, { message: "Đơn giá không được âm." }),
+});
+
+// Dòng hàng "tự do" — không gắn equipment_type, dùng cho phụ phí/khoản phát
+// sinh không đáng tạo hẳn 1 SKU trong danh mục. Không tra giá catalog, giá do
+// người nhập tự gõ tay.
+export async function addCustomOrderLine(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+
+  const parsed = CustomOrderLineSchema.safeParse({
+    order_id: formData.get("order_id"),
+    custom_name: formData.get("custom_name"),
+    quantity: formData.get("quantity"),
+    unit_price: formData.get("unit_price"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("order_equipment").insert({
+    order_id: parsed.data.order_id,
+    equipment_type_id: null,
+    custom_name: parsed.data.custom_name,
+    equipment_unit_id: null,
+    equipment_instance_id: null,
+    quantity: parsed.data.quantity,
+    unit_price: parsed.data.unit_price,
+    line_total: round2(parsed.data.unit_price * parsed.data.quantity),
   });
 
   if (error) {

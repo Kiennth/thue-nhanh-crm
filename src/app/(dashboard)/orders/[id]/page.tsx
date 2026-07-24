@@ -131,7 +131,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // thiết có thể được giảm còn 50% hoặc miễn cọc), làm tròn đến triệu cho
   // gọn — không tính VAT, thu cùng lúc với đơn, hoàn lại sau khi nghiệm thu.
   const rawDeposit = (lines ?? []).reduce((sum, line) => {
-    const type = equipmentTypeById.get(line.equipment_type_id);
+    const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
     if (type?.product_type !== "rental") return sum;
     return sum + (type.deposit_amount ?? 0) * line.quantity;
   }, 0);
@@ -362,7 +362,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </TableHeader>
             <TableBody>
               {lines?.map((line) => {
-                const type = equipmentTypeById.get(line.equipment_type_id);
+                const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
                 const detail = line.equipment_unit_id
                   ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
                   : line.equipment_instance_id
@@ -370,7 +370,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     : "—";
                 return (
                   <TableRow key={line.id}>
-                    <TableCell className="font-medium">{type?.name ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{type?.name ?? line.custom_name ?? "—"}</TableCell>
                     <TableCell>{detail ?? "—"}</TableCell>
                     <TableCell>
                       {canManage && !line.equipment_instance_id ? (

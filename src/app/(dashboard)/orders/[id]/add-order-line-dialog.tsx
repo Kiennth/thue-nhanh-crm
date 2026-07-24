@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addOrderEquipmentLine } from "@/lib/actions/orders";
+import { addCustomOrderLine, addOrderEquipmentLine } from "@/lib/actions/orders";
 import type { ProductType, TrackingType } from "@/types/database";
 
 interface EquipmentTypeOption {
@@ -59,6 +59,7 @@ export function AddOrderLineDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [mode, setMode] = useState<"catalog" | "custom">("catalog");
   const [equipmentTypeId, setEquipmentTypeId] = useState<string>("");
   const [unitId, setUnitId] = useState<string>("");
   const [instanceId, setInstanceId] = useState<string>("");
@@ -84,7 +85,10 @@ export function AddOrderLineDialog({
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result = await addOrderEquipmentLine(undefined, formData);
+      const result =
+        mode === "custom"
+          ? await addCustomOrderLine(undefined, formData)
+          : await addOrderEquipmentLine(undefined, formData);
       if (result && "error" in result) {
         setError(result.error);
       } else {
@@ -110,6 +114,57 @@ export function AddOrderLineDialog({
           <DialogTitle>Thêm dòng hàng</DialogTitle>
         </DialogHeader>
 
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={mode === "catalog" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setMode("catalog");
+              setError(null);
+            }}
+          >
+            Từ danh mục
+          </Button>
+          <Button
+            type="button"
+            variant={mode === "custom" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setMode("custom");
+              setError(null);
+            }}
+          >
+            Dòng tự do
+          </Button>
+        </div>
+
+        {mode === "custom" ? (
+          <form ref={formRef} action={handleSubmit} className="space-y-4">
+            <input type="hidden" name="order_id" value={orderId} />
+
+            <div className="space-y-2">
+              <Label htmlFor="custom_name">Tên</Label>
+              <Input id="custom_name" name="custom_name" placeholder="Vd: Phí sạc pin, phí gửi xe..." required />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom_quantity">Số lượng</Label>
+              <Input id="custom_quantity" name="quantity" type="number" min={1} defaultValue={1} required />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom_unit_price">Đơn giá (đ)</Label>
+              <Input id="custom_unit_price" name="unit_price" type="number" min={0} step={1000} defaultValue={0} required />
+            </div>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <Button type="submit" disabled={pending}>
+              {pending ? "Đang thêm..." : "Thêm dòng hàng"}
+            </Button>
+          </form>
+        ) : (
         <form ref={formRef} action={handleSubmit} className="space-y-4">
           <input type="hidden" name="order_id" value={orderId} />
 
@@ -217,6 +272,7 @@ export function AddOrderLineDialog({
             {pending ? "Đang thêm..." : "Thêm dòng hàng"}
           </Button>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

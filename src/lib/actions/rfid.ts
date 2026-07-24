@@ -171,7 +171,7 @@ export async function recordRfidScanBatch(
         ? `unit:${line.equipment_unit_id}`
         : `instance:${line.equipment_instance_id}`;
       return {
-        label: typeNameById.get(line.equipment_type_id) ?? "—",
+        label: (line.equipment_type_id && typeNameById.get(line.equipment_type_id)) ?? "—",
         expected: line.quantity,
         scanned: scannedCountByKey.get(key) ?? 0,
       };

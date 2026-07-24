@@ -18,7 +18,7 @@ export interface StockInput {
 }
 
 export interface OrderLineInput {
-  equipment_type_id: string;
+  equipment_type_id: string | null;
   line_total: number;
 }
 
@@ -109,6 +109,7 @@ export function computeEquipmentTypeReports(
   const revenueByType = new Map<string, number>();
   const countByType = new Map<string, number>();
   for (const line of orderLines) {
+    if (!line.equipment_type_id) continue; // dòng tự do — không gắn loại hàng, không tính vào báo cáo theo loại
     revenueByType.set(line.equipment_type_id, (revenueByType.get(line.equipment_type_id) ?? 0) + line.line_total);
     countByType.set(line.equipment_type_id, (countByType.get(line.equipment_type_id) ?? 0) + 1);
   }
