@@ -32,6 +32,11 @@ export const SETTINGS_ITEMS: NavItem[] = [
     label: "Chính sách khoán",
     roles: ["admin", "ke_toan"],
   },
+  {
+    href: "/activity",
+    label: "Nhật ký hoạt động",
+    roles: ["admin", "ke_toan"],
+  },
 ];
 
 export const NAV_ITEMS: NavItem[] = [
