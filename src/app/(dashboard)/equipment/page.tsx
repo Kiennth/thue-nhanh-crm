@@ -48,7 +48,7 @@ import { EquipmentDisposalDialog } from "./equipment-disposal-dialog";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 import { EquipmentSortSelect } from "./equipment-sort-select";
-import { EquipmentSearchInput } from "./equipment-search-input";
+import { SearchInput } from "@/components/search-input";
 import { RfidTagDialog } from "./rfid-tag-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
@@ -182,7 +182,12 @@ export default async function EquipmentPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
         <div className="flex items-center gap-2">
-          <EquipmentSearchInput key={activeSearch} value={activeSearch} />
+          <SearchInput
+            key={activeSearch}
+            paramName="search"
+            placeholder="Tìm theo tên hàng hoá..."
+            value={activeSearch}
+          />
           <EquipmentSortSelect value={activeSort} />
           {canManage && (
             <EquipmentTypeDialog
