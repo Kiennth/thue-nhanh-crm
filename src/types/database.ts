@@ -84,6 +84,7 @@ export interface Database {
           customer_type: CustomerType;
           tax_code: string | null;
           address: string | null;
+          deposit_percentage: number;
           created_at: string;
           updated_at: string;
         };
@@ -96,6 +97,7 @@ export interface Database {
           customer_type?: CustomerType;
           tax_code?: string | null;
           address?: string | null;
+          deposit_percentage?: number;
         };
         Update: Partial<Database["public"]["Tables"]["customers"]["Insert"]>;
         Relationships: [];

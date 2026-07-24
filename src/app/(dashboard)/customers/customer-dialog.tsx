@@ -27,6 +27,12 @@ const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
   company: "Công ty",
 };
 
+const DEPOSIT_PERCENTAGE_LABELS: Record<string, string> = {
+  "100": "100% (mặc định)",
+  "50": "50%",
+  "0": "0% — khách thân thiết, miễn cọc",
+};
+
 interface CustomerDialogProps {
   trigger: React.ReactElement;
   customer?: {
@@ -38,6 +44,7 @@ interface CustomerDialogProps {
     customer_type: CustomerType;
     tax_code: string | null;
     address: string | null;
+    deposit_percentage: number;
   };
 }
 
@@ -124,6 +131,23 @@ export function CustomerDialog({ trigger, customer }: CustomerDialogProps) {
               placeholder="Địa chỉ xuất hoá đơn"
               defaultValue={customer?.address ?? ""}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="deposit_percentage">Tiền cọc</Label>
+            <Select
+              name="deposit_percentage"
+              defaultValue={String(customer?.deposit_percentage ?? 100)}
+            >
+              <SelectTrigger id="deposit_percentage" className="w-full">
+                <SelectValue>{(value: string) => DEPOSIT_PERCENTAGE_LABELS[value]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="100">100% (mặc định)</SelectItem>
+                <SelectItem value="50">50%</SelectItem>
+                <SelectItem value="0">0% — khách thân thiết, miễn cọc</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

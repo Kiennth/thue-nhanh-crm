@@ -20,13 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createOrder, updateOrder } from "@/lib/actions/orders";
+import { CustomerCombobox } from "./customer-combobox";
 
 interface BranchOption {
-  id: string;
-  name: string;
-}
-
-interface CustomerOption {
   id: string;
   name: string;
 }
@@ -34,12 +30,12 @@ interface CustomerOption {
 interface OrderDialogProps {
   trigger: React.ReactElement;
   branches: BranchOption[];
-  customers: CustomerOption[];
   order?: {
     id: string;
     order_code: string;
     branch_id: string;
     customer_id: string;
+    customer_name: string;
     order_date: string;
   };
 }
@@ -53,7 +49,7 @@ function generateOrderCode() {
   return `DH${y}${m}${d}-${rand}`;
 }
 
-export function OrderDialog({ trigger, branches, customers, order }: OrderDialogProps) {
+export function OrderDialog({ trigger, branches, order }: OrderDialogProps) {
   const isEdit = !!order;
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,20 +111,10 @@ export function OrderDialog({ trigger, branches, customers, order }: OrderDialog
 
           <div className="space-y-2">
             <Label htmlFor="customer_id">Khách hàng</Label>
-            <Select name="customer_id" defaultValue={order?.customer_id}>
-              <SelectTrigger id="customer_id" className="w-full">
-                <SelectValue placeholder="Chọn khách hàng">
-                  {(value: string) => customers.find((c) => c.id === value)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CustomerCombobox
+              name="customer_id"
+              defaultCustomer={order ? { id: order.customer_id, name: order.customer_name } : undefined}
+            />
           </div>
 
           <div className="space-y-2">

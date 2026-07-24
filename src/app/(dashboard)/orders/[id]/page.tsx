@@ -55,7 +55,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: tasks },
     { data: payments },
     { data: branches },
-    { data: customers },
     { data: employees },
     { data: equipmentTypes },
     { data: equipmentUnits },
@@ -70,7 +69,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("order_tasks").select("*").eq("order_id", id),
     supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
     supabase.from("branches").select("id, name").order("name"),
-    supabase.from("customers").select("id, name").order("name"),
     supabase.from("employees_public").select("id, name").order("name"),
     supabase
       .from("equipment_types")
@@ -90,12 +88,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     notFound();
   }
 
+  // Danh sách customers ở trên bị Supabase giới hạn 1.000 dòng (nay có hơn
+  // 5.800 khách hàng) nên không đảm bảo chứa đúng khách của đơn này — luôn
+  // tra thẳng theo customer_id để tên/tỉ lệ cọc hiển thị đúng bất kể thứ tự.
+  const { data: orderCustomer } = await supabase
+    .from("customers")
+    .select("id, name, deposit_percentage")
+    .eq("id", order.customer_id)
+    .maybeSingle();
+
   const canManage = !!employee && MANAGE_ROLES.includes(employee.role);
   const branchList = branches ?? [];
-  const customerList = customers ?? [];
   const employeeList = employees ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
-  const customerNameById = new Map(customerList.map((c) => [c.id, c.name]));
   const employeeNameById = new Map(employeeList.map((e) => [e.id, e.name]));
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
@@ -122,14 +127,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     totalPaid <= 0 ? "Chưa thanh toán" : remaining <= 0 ? "Đã thanh toán đủ" : "Thanh toán một phần";
 
   // Tiền cọc = tổng (số lượng x cọc/đơn vị) của các dòng hàng CHO THUÊ trong
-  // đơn, làm tròn đến triệu cho gọn — không tính VAT, thu cùng lúc với đơn,
-  // hoàn lại sau khi nghiệm thu (khâu "Nghiệm thu").
+  // đơn, nhân với tỉ lệ cọc riêng của khách hàng (mặc định 100%, khách thân
+  // thiết có thể được giảm còn 50% hoặc miễn cọc), làm tròn đến triệu cho
+  // gọn — không tính VAT, thu cùng lúc với đơn, hoàn lại sau khi nghiệm thu.
   const rawDeposit = (lines ?? []).reduce((sum, line) => {
     const type = equipmentTypeById.get(line.equipment_type_id);
     if (type?.product_type !== "rental") return sum;
     return sum + (type.deposit_amount ?? 0) * line.quantity;
   }, 0);
-  const totalDeposit = Math.round(rawDeposit / 1_000_000) * 1_000_000;
+  const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
+  const totalDeposit =
+    Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -258,8 +266,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <div className="flex items-center gap-2">
           <OrderDialog
             branches={branchList}
-            customers={customerList}
-            order={order}
+            order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
             trigger={<Button variant="outline">Sửa</Button>}
           />
           <DuplicateOrderButton orderId={order.id} />
@@ -281,7 +288,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Khách hàng</p>
-            <p className="font-medium">{customerNameById.get(order.customer_id) ?? "—"}</p>
+            <p className="font-medium">{orderCustomer?.name ?? "—"}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Ngày</p>
@@ -499,14 +506,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </CardContent>
       </Card>
 
-      {totalDeposit > 0 && (
+      {rawDeposit > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Tiền cọc</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(totalDeposit)}đ</p>
+            {customerDepositPercentage <= 0 ? (
+              <p className="text-2xl font-semibold">Miễn cọc</p>
+            ) : (
+              <p className="text-2xl font-semibold">{currencyFormatter.format(totalDeposit)}đ</p>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
+              {customerDepositPercentage < 100 && (
+                <>Khách hàng được áp tỉ lệ cọc {customerDepositPercentage}%. </>
+              )}
               Thu cùng lúc với đơn (không tính VAT), hoàn lại cho khách sau khi hoàn thành khâu
               Nghiệm thu.
             </p>

@@ -15,6 +15,9 @@ const CustomerSchema = z.object({
   customer_type: z.enum(["individual", "company"]),
   tax_code: z.string().trim().optional(),
   address: z.string().trim().optional(),
+  deposit_percentage: z.coerce.number().refine((v) => [0, 50, 100].includes(v), {
+    message: "Tỉ lệ tiền cọc chỉ được 0%, 50% hoặc 100%.",
+  }),
 });
 
 export type ActionState = { error: string } | { success: true } | undefined;
@@ -33,6 +36,7 @@ export async function createCustomer(
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
     address: formData.get("address") || undefined,
+    deposit_percentage: formData.get("deposit_percentage") || 100,
   });
 
   if (!parsed.success) {
@@ -68,6 +72,7 @@ export async function updateCustomer(
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
     address: formData.get("address") || undefined,
+    deposit_percentage: formData.get("deposit_percentage") || 100,
   });
 
   if (!parsed.success) {
@@ -87,6 +92,26 @@ export async function updateCustomer(
 
   revalidatePath("/customers");
   return { success: true };
+}
+
+// Tìm khách hàng theo tên/SĐT — dùng cho ô chọn khách hàng dạng combobox khi
+// tạo/sửa đơn hàng. Không dùng select("*") toàn bộ khách hàng ở đây vì
+// Supabase giới hạn 1.000 dòng mỗi query (bảng này hiện có hơn 5.800 dòng).
+export async function searchCustomers(query: string): Promise<{ id: string; name: string }[]> {
+  await requireRole([...ALL_ROLES]);
+
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("customers")
+    .select("id, name")
+    .or(`name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%`)
+    .order("name")
+    .limit(20);
+
+  return data ?? [];
 }
 
 export async function deleteCustomer(id: string) {

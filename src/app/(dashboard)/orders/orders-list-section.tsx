@@ -77,16 +77,23 @@ export async function OrdersListSection({
     ordersQuery = ordersQuery.gte("order_date", dateRange.start).lte("order_date", dateRange.end);
   }
 
-  const [{ data: orders }, { data: branches }, { data: customers }] = await Promise.all([
+  const [{ data: orders }, { data: branches }] = await Promise.all([
     ordersQuery,
     supabase.from("branches").select("id, name").order("name"),
-    supabase.from("customers").select("id, name").order("name"),
   ]);
 
   const branchList = branches ?? [];
-  const customerList = customers ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
-  const customerNameById = new Map(customerList.map((c) => [c.id, c.name]));
+
+  // Chỉ tra tên đúng những khách hàng thực sự xuất hiện trong danh sách đơn
+  // đang hiển thị — không select("*") toàn bộ khách hàng vì Supabase giới
+  // hạn 1.000 dòng mỗi query (bảng khách hàng hiện có hơn 5.800 dòng).
+  const orderCustomerIds = [...new Set((orders ?? []).map((o) => o.customer_id))];
+  const { data: orderCustomers } =
+    orderCustomerIds.length > 0
+      ? await supabase.from("customers").select("id, name").in("id", orderCustomerIds)
+      : { data: [] };
+  const customerNameById = new Map((orderCustomers ?? []).map((c) => [c.id, c.name]));
 
   return (
     <div className="space-y-4">
@@ -94,7 +101,6 @@ export async function OrdersListSection({
         <h2 className="text-2xl font-semibold">Đơn hàng</h2>
         <OrderDialog
           branches={branchList}
-          customers={customerList}
           trigger={
             <Button>
               <Plus className="size-4" />
