@@ -55,4 +55,9 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Bảng lương",
     roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
   },
+  {
+    href: "/legacy-orders",
+    label: "Đơn hàng cũ",
+    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+  },
 ];
