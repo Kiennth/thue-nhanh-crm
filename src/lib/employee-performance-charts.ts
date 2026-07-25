@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   computeOrderCommissionFund,
   computeTaskCommission,
@@ -60,28 +61,33 @@ export async function computeEmployeeMonthlyPerformance(
     employeesQuery = employeesQuery.in("id", options.employeeIds);
   }
 
-  const [{ data: employees }, { data: doneTasks }, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] =
+  const [{ data: employees }, tasksInMonth, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] =
     await Promise.all([
       employeesQuery,
-      admin
-        .from("order_tasks")
-        .select("task_type, employee_id, completed_date, order_id")
-        .not("completed_date", "is", null)
-        .gte("completed_date", start)
-        .lt("completed_date", end),
+      fetchAllRows<{ task_type: TaskType; employee_id: string | null; completed_date: string; order_id: string }>(
+        (from, to) =>
+          admin
+            .from("order_tasks")
+            .select("task_type, employee_id, completed_date, order_id")
+            .not("completed_date", "is", null)
+            .gte("completed_date", start)
+            .lt("completed_date", end)
+            .range(from, to),
+      ),
       admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
       admin.from("task_weights").select("task_type, weight_percentage"),
       admin.from("bonus_tiers").select("branch_id, threshold_amount, bonus_amount"),
     ]);
 
   const employeeList = employees ?? [];
-  const tasksInMonth = doneTasks ?? [];
-  const orderIds = [...new Set(tasksInMonth.map((t) => t.order_id))];
 
-  const { data: orders } = orderIds.length
-    ? await admin.from("orders").select("id, total_value, pickup_branch_id").in("id", orderIds)
-    : { data: [] };
-  const orderById = new Map((orders ?? []).map((o) => [o.id, o]));
+  // Không lọc orders bằng .in(id, orderIds) — 1 tháng bận có thể liên quan
+  // hàng nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL của
+  // PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
+  const allOrders = await fetchAllRows<{ id: string; total_value: number; pickup_branch_id: string }>(
+    (from, to) => admin.from("orders").select("id, total_value, pickup_branch_id").range(from, to),
+  );
+  const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
   return employeeList.map((emp) => {
     const empTasks = tasksInMonth.filter((t) => t.employee_id === emp.id);

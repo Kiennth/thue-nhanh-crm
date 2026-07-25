@@ -1,11 +1,13 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   computeOrderCommissionFund,
   computeTaskCommission,
   findCommissionRate,
   findTaskWeight,
 } from "@/lib/commission";
+import type { TaskType } from "@/types/database";
 
 function currentMonthRange() {
   const now = new Date();
@@ -48,28 +50,31 @@ export async function computeMyPerformance(
   const { start, end, label } = currentMonthRange();
   const admin = createAdminClient();
 
-  const [{ data: tasks }, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] =
-    await Promise.all([
+  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] = await Promise.all([
+    fetchAllRows<{ task_type: TaskType; order_id: string }>((from, to) =>
       admin
         .from("order_tasks")
         .select("task_type, order_id")
         .eq("employee_id", employeeId)
         .not("completed_date", "is", null)
         .gte("completed_date", start)
-        .lt("completed_date", end),
-      admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
-      admin.from("task_weights").select("task_type, weight_percentage"),
-      branchId
-        ? admin.from("bonus_tiers").select("*").eq("branch_id", branchId).order("tier_number")
-        : Promise.resolve({ data: [] as { tier_number: number; threshold_amount: number; bonus_amount: number }[] }),
-    ]);
+        .lt("completed_date", end)
+        .range(from, to),
+    ),
+    admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
+    admin.from("task_weights").select("task_type, weight_percentage"),
+    branchId
+      ? admin.from("bonus_tiers").select("*").eq("branch_id", branchId).order("tier_number")
+      : Promise.resolve({ data: [] as { tier_number: number; threshold_amount: number; bonus_amount: number }[] }),
+  ]);
 
-  const taskList = tasks ?? [];
-  const orderIds = [...new Set(taskList.map((t) => t.order_id))];
-  const { data: orders } = orderIds.length
-    ? await admin.from("orders").select("id, total_value, pickup_branch_id").in("id", orderIds)
-    : { data: [] };
-  const orderById = new Map((orders ?? []).map((o) => [o.id, o]));
+  // Không lọc orders bằng .in(id, orderIds) — nhân viên bận có thể liên quan
+  // hàng trăm/nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL
+  // của PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
+  const allOrders = await fetchAllRows<{ id: string; total_value: number; pickup_branch_id: string }>(
+    (from, to) => admin.from("orders").select("id, total_value, pickup_branch_id").range(from, to),
+  );
+  const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
   const totalCommission = taskList.reduce((sum, t) => {
     const order = orderById.get(t.order_id);
