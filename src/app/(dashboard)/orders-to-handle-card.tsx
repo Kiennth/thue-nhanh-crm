@@ -12,11 +12,13 @@ function OrderCountdownList({
   icon: Icon,
   emptyMessage,
   orders,
+  hideViewAllLink,
 }: {
   title: string;
   icon: ComponentType<{ className?: string }>;
   emptyMessage: string;
   orders: OrderToHandle[];
+  hideViewAllLink?: boolean;
 }) {
   return (
     <Card>
@@ -25,9 +27,11 @@ function OrderCountdownList({
           <Icon className="size-4 text-muted-foreground" />
           {title}
         </CardTitle>
-        <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
-          Xem tất cả →
-        </Link>
+        {!hideViewAllLink && (
+          <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
+            Xem tất cả →
+          </Link>
+        )}
       </CardHeader>
       <CardContent className="space-y-1">
         {!orders.length && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
@@ -53,24 +57,38 @@ function OrderCountdownList({
   );
 }
 
-export function UpcomingDeliveriesCard({ orders }: { orders: OrderToHandle[] }) {
+export function UpcomingDeliveriesCard({
+  orders,
+  hideViewAllLink,
+}: {
+  orders: OrderToHandle[];
+  hideViewAllLink?: boolean;
+}) {
   return (
     <OrderCountdownList
       title="Đơn hàng sắp tới"
       icon={Truck}
       emptyMessage="Không có đơn nào sắp tới cần giao."
       orders={orders}
+      hideViewAllLink={hideViewAllLink}
     />
   );
 }
 
-export function PendingCollectionsCard({ orders }: { orders: OrderToHandle[] }) {
+export function PendingCollectionsCard({
+  orders,
+  hideViewAllLink,
+}: {
+  orders: OrderToHandle[];
+  hideViewAllLink?: boolean;
+}) {
   return (
     <OrderCountdownList
       title="Đơn hàng sắp về"
       icon={PackageCheck}
       emptyMessage="Không có đơn nào sắp về."
       orders={orders}
+      hideViewAllLink={hideViewAllLink}
     />
   );
 }
