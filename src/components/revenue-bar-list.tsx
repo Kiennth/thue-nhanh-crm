@@ -3,7 +3,7 @@ export interface RevenuePoint {
   value: number;
 }
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export function formatCurrency(value: number): string {
   return `${currencyFormatter.format(value)}đ`;

@@ -15,7 +15,7 @@ import {
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function PayrollPage({
   searchParams,

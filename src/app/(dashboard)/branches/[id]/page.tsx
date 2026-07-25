@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   revenueForDay,
   revenueForMonth,
@@ -30,7 +31,7 @@ export default async function BranchDashboardPage({
 
   const [
     { data: branch },
-    { data: orders },
+    orders,
     { data: types },
     { data: units },
     { data: instances },
@@ -39,7 +40,13 @@ export default async function BranchDashboardPage({
     { data: stock },
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
-    supabase.from("orders").select("id, order_date, total_value").eq("pickup_branch_id", id),
+    fetchAllRows<{ id: string; order_date: string; total_value: number }>((from, to) =>
+      supabase
+        .from("orders")
+        .select("id, order_date, total_value")
+        .eq("pickup_branch_id", id)
+        .range(from, to),
+    ),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
@@ -64,14 +71,21 @@ export default async function BranchDashboardPage({
     notFound();
   }
 
-  const orderList = orders ?? [];
-  const orderIds = orderList.map((o) => o.id);
-  const { data: orderLines } = orderIds.length
-    ? await supabase
-        .from("order_equipment")
-        .select("equipment_type_id, line_total")
-        .in("order_id", orderIds)
-    : { data: [] };
+  const orderList = orders;
+  const orderIdSet = new Set(orderList.map((o) => o.id));
+  // Không lọc order_equipment bằng .in(order_id, ...) — chi nhánh đông có thể
+  // hàng nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL của
+  // PostgREST. Lấy toàn bộ order_equipment (phân trang) rồi lọc ở JS.
+  const allOrderLines = orderIdSet.size
+    ? await fetchAllRows<{ order_id: string; equipment_type_id: string | null; line_total: number }>(
+        (from, to) =>
+          supabase
+            .from("order_equipment")
+            .select("order_id, equipment_type_id, line_total")
+            .range(from, to),
+      )
+    : [];
+  const orderLines = allOrderLines.filter((line) => orderIdSet.has(line.order_id));
 
   const typeList = types ?? [];
   const reports = computeEquipmentTypeReports(

@@ -30,7 +30,7 @@ export const ACTIVITY_ACTION_LABELS: Record<"insert" | "update" | "delete", stri
   delete: "Xoá",
 };
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Suy ra nhãn ngắn gọn để hiển thị từ snapshot jsonb (new_data khi còn tồn
 // tại, old_data khi đã bị xoá) — mỗi bảng có 1 vài trường "tên" tự nhiên

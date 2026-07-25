@@ -2,7 +2,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PeriodStat } from "@/lib/orders-overview";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 function GrowthBadge({ growthPct }: { growthPct: number | null }) {
   if (growthPct === null) {

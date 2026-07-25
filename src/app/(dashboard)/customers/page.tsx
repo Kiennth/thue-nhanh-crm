@@ -15,12 +15,15 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllCustomersLite } from "@/lib/customers";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { buildCustomerReportRows } from "@/lib/customer-reports";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { CustomerReportSection } from "./customer-report-section";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 const PAGE_SIZE = 50;
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function CustomersPage({
   searchParams,
@@ -35,17 +38,29 @@ export default async function CustomersPage({
 
   const searchFilter = `name.ilike.%${activeSearch}%,phone.ilike.%${activeSearch}%`;
 
-  const [allCustomersLite, { data: orders }, { data: payments }, { count: totalCount }] =
-    await Promise.all([
-      fetchAllCustomersLite(),
-      supabase.from("orders").select("id, customer_id, total_value, order_date, cancelled_at"),
-      supabase.from("order_payments").select("order_id, amount"),
-      (() => {
-        let q = supabase.from("customers").select("id", { count: "exact", head: true });
-        if (activeSearch) q = q.or(searchFilter);
-        return q;
-      })(),
-    ]);
+  const [allCustomersLite, orders, payments, { count: totalCount }] = await Promise.all([
+    fetchAllCustomersLite(),
+    fetchAllRows<{
+      id: string;
+      customer_id: string;
+      total_value: number;
+      order_date: string;
+      cancelled_at: string | null;
+    }>((from, to) =>
+      supabase
+        .from("orders")
+        .select("id, customer_id, total_value, order_date, cancelled_at")
+        .range(from, to),
+    ),
+    fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
+      supabase.from("order_payments").select("order_id, amount").range(from, to),
+    ),
+    (() => {
+      let q = supabase.from("customers").select("id", { count: "exact", head: true });
+      if (activeSearch) q = q.or(searchFilter);
+      return q;
+    })(),
+  ]);
 
   const safeTotalCount = totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(safeTotalCount / PAGE_SIZE));
@@ -58,6 +73,12 @@ export default async function CustomersPage({
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   const customerList = customers ?? [];
+  // Số lượng đơn/doanh số hiển thị ở bảng — tính lại trên đúng trang hiện tại
+  // (không phải toàn bộ khách hàng) bằng cùng hàm dùng cho báo cáo phía trên,
+  // tái dùng orders/payments đã fetch sẵn thay vì query thêm.
+  const pageReportById = new Map(
+    buildCustomerReportRows(customerList, orders ?? [], payments ?? []).map((r) => [r.id, r]),
+  );
 
   return (
     <div className="space-y-6">
@@ -95,6 +116,8 @@ export default async function CustomersPage({
               <TableHead>Loại</TableHead>
               <TableHead>Điện thoại</TableHead>
               <TableHead>Địa chỉ</TableHead>
+              <TableHead>Số lượng đơn</TableHead>
+              <TableHead>Tổng doanh số</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow>
           </TableHeader>
@@ -112,6 +135,10 @@ export default async function CustomersPage({
                 </TableCell>
                 <TableCell>{customer.phone ?? "—"}</TableCell>
                 <TableCell className="max-w-80 truncate">{customer.address ?? "—"}</TableCell>
+                <TableCell>{pageReportById.get(customer.id)?.orderCount ?? 0}</TableCell>
+                <TableCell>
+                  {currencyFormatter.format(pageReportById.get(customer.id)?.totalRevenue ?? 0)}đ
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <CustomerDialog
@@ -130,7 +157,7 @@ export default async function CustomersPage({
             ))}
             {!customerList.length && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   {activeSearch ? "Không tìm thấy khách hàng nào." : "Chưa có khách hàng nào."}
                 </TableCell>
               </TableRow>

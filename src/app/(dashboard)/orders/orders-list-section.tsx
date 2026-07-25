@@ -28,7 +28,7 @@ import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 const PAGE_SIZE = 50;
 const CHUNK = 1000;

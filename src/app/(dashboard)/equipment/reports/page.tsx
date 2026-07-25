@@ -8,36 +8,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { PRODUCT_TYPE_LABELS } from "@/lib/equipment-labels";
 
 const VIEW_ROLES = ["admin", "ke_toan"] as const;
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function EquipmentReportsPage() {
   await requireRole([...VIEW_ROLES]);
 
   const supabase = await createClient();
-  const [
-    { data: types },
-    { data: units },
-    { data: instances },
-    { data: purchases },
-    { data: disposals },
-    { data: stock },
-    { data: orderLines },
-  ] = await Promise.all([
-    supabase.from("equipment_types").select("id, name, product_type").order("name"),
-    supabase.from("equipment_units").select("id, equipment_type_id"),
-    supabase
-      .from("equipment_instances")
-      .select("equipment_type_id, purchase_price, disposal_price, status"),
-    supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
-    supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-    supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-    supabase.from("order_equipment").select("equipment_type_id, line_total"),
-  ]);
+  const [{ data: types }, { data: units }, { data: instances }, { data: purchases }, { data: disposals }, { data: stock }, orderLines] =
+    await Promise.all([
+      supabase.from("equipment_types").select("id, name, product_type").order("name"),
+      supabase.from("equipment_units").select("id, equipment_type_id"),
+      supabase
+        .from("equipment_instances")
+        .select("equipment_type_id, purchase_price, disposal_price, status"),
+      supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
+      supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
+      supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
+      fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
+        supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
+      ),
+    ]);
 
   const typeList = types ?? [];
   const reports = computeEquipmentTypeReports(

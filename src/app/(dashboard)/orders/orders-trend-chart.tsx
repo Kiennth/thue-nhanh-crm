@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/chart";
 import type { TrendPoint } from "@/lib/orders-overview";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 type Granularity = "week" | "month" | "year";
 type Metric = "count" | "revenue";

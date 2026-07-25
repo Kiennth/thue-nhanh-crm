@@ -52,7 +52,7 @@ import { SearchInput } from "@/components/search-input";
 import { RfidTagDialog } from "./rfid-tag-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat("vi-VN");
 
 const INSTANCE_STATUS_VARIANT = {

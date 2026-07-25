@@ -12,7 +12,7 @@ import { PeriodPicker } from "@/components/period-picker";
 import { formatDayLabel } from "@/components/dashboard-cards";
 import { revenueForDay, revenueForMonth, revenueForYear } from "@/lib/dashboard-reports";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 function formatPercentShare(value: number, total: number) {
   if (total <= 0) return "—";

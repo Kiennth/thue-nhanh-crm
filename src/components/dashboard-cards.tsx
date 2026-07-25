@@ -7,7 +7,7 @@ import {
 } from "@/components/revenue-bar-list";
 import { PeriodPicker } from "@/components/period-picker";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export function formatDayLabel(day: string) {
   const [y, m, d] = day.split("-");

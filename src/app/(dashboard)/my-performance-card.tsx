@@ -2,7 +2,7 @@ import { Trophy, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MyPerformance } from "@/lib/my-performance";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 function formatMonthLabel(month: string) {
   const [y, m] = month.split("-");

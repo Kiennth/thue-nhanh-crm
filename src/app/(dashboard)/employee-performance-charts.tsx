@@ -14,7 +14,7 @@ import { PeriodPicker } from "@/components/period-picker";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import type { EmployeeMonthlyPerformance } from "@/lib/employee-performance-charts";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 function rowHeight(count: number) {
   return Math.max(220, count * 44);

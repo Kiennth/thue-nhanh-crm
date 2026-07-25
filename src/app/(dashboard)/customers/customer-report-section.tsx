@@ -10,7 +10,7 @@ import {
 import { buildCustomerReportRows, type CustomerReportRow } from "@/lib/customer-reports";
 import type { CustomerType } from "@/types/database";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // 4 thẻ tóm tắt — dùng chung cho báo cáo đầy đủ ở /customers và khối tóm tắt
 // condensed trên Trang chủ.

@@ -15,6 +15,7 @@ import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import { fetchAllCustomersLite } from "@/lib/customers";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
 import {
   computeEmployeeMonthlyPerformance,
@@ -69,19 +70,19 @@ export default async function DashboardHomePage({
     branchList,
     customersCount,
     equipmentTypes,
-    { data: orders },
+    orders,
     { data: types },
     { data: units },
     { data: instances },
     { data: purchases },
     { data: disposals },
     { data: stock },
-    { data: orderLines },
+    orderLines,
     ordersToHandle,
     { count: processingCount },
     customersLite,
-    { data: customerOrders },
-    { data: customerPayments },
+    customerOrders,
+    customerPayments,
     myPerformance,
     employeeRows,
   ] = await Promise.all([
@@ -89,7 +90,9 @@ export default async function DashboardHomePage({
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("pickup_branch_id, order_date, total_value"),
+    fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>((from, to) =>
+      supabase.from("orders").select("pickup_branch_id, order_date, total_value").range(from, to),
+    ),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
@@ -98,12 +101,27 @@ export default async function DashboardHomePage({
     supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
     supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
     supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-    supabase.from("order_equipment").select("equipment_type_id, line_total"),
+    fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
+      supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
+    ),
     getOrdersToHandle(branchId, HANDLE_LIMIT),
     processingOrdersQuery,
     fetchAllCustomersLite(),
-    supabase.from("orders").select("id, customer_id, total_value, order_date, cancelled_at"),
-    supabase.from("order_payments").select("order_id, amount"),
+    fetchAllRows<{
+      id: string;
+      customer_id: string;
+      total_value: number;
+      order_date: string;
+      cancelled_at: string | null;
+    }>((from, to) =>
+      supabase
+        .from("orders")
+        .select("id, customer_id, total_value, order_date, cancelled_at")
+        .range(from, to),
+    ),
+    fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
+      supabase.from("order_payments").select("order_id, amount").range(from, to),
+    ),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
     canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
   ]);

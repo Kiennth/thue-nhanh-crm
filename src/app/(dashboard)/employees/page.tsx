@@ -16,7 +16,7 @@ import { EmployeeDialog } from "./employee-dialog";
 import { ToggleActiveButton } from "./toggle-active-button";
 
 const HR_ROLES = ["admin", "ke_toan"];
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function EmployeesPage() {
   const supabase = await createClient();

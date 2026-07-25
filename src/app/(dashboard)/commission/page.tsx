@@ -19,7 +19,7 @@ import { BonusTierDialog } from "./bonus-tier-dialog";
 import { TaskWeightRow } from "./task-weight-row";
 
 const VIEW_ROLES = ["admin", "ke_toan"] as const;
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function CommissionPage() {
   const employee = await requireRole([...VIEW_ROLES]);
