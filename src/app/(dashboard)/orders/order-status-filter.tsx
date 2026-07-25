@@ -22,6 +22,7 @@ export function OrderStatusFilter({ value }: { value: string }) {
     } else {
       params.set("status", next);
     }
+    params.delete("page");
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
   }

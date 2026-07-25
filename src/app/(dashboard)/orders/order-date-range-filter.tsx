@@ -45,6 +45,7 @@ export function OrderDateRangeFilter({
       if (next.to) params.set("to", next.to);
       else params.delete("to");
     }
+    params.delete("page");
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
