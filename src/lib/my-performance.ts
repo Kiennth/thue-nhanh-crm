@@ -2,10 +2,14 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
+  computeLineDirectPayout,
   computeOrderCommissionFund,
+  computeOrderPoolValue,
+  computePoolExcludedTotal,
   computeTaskCommission,
   findCommissionRate,
   findTaskWeight,
+  type PoolExcludedLineInput,
 } from "@/lib/commission";
 import type { TaskType } from "@/types/database";
 
@@ -31,6 +35,8 @@ export interface MyPerformance {
   baseSalary: number;
   totalCommission: number;
   bonus: number;
+  servicePayout: number;
+  overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
   tiers: BonusTierProgress[];
@@ -50,23 +56,46 @@ export async function computeMyPerformance(
   const { start, end, label } = currentMonthRange();
   const admin = createAdminClient();
 
-  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] = await Promise.all([
-    fetchAllRows<{ task_type: TaskType; order_id: string }>((from, to) =>
-      admin
-        .from("order_tasks")
-        .select("task_type, order_id")
-        .eq("employee_id", employeeId)
-        .not("completed_date", "is", null)
-        .gte("completed_date", start)
-        .lt("completed_date", end)
-        .range(from, to),
-    ),
-    admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
-    admin.from("task_weights").select("task_type, weight_percentage"),
-    branchId
-      ? admin.from("bonus_tiers").select("*").eq("branch_id", branchId).order("tier_number")
-      : Promise.resolve({ data: [] as { tier_number: number; threshold_amount: number; bonus_amount: number }[] }),
-  ]);
+  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }, { data: equipmentTypes }, allOrderLines, overtimeInMonth] =
+    await Promise.all([
+      fetchAllRows<{ task_type: TaskType; order_id: string }>((from, to) =>
+        admin
+          .from("order_tasks")
+          .select("task_type, order_id")
+          .eq("employee_id", employeeId)
+          .not("completed_date", "is", null)
+          .gte("completed_date", start)
+          .lt("completed_date", end)
+          .range(from, to),
+      ),
+      admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
+      admin.from("task_weights").select("task_type, weight_percentage"),
+      branchId
+        ? admin.from("bonus_tiers").select("*").eq("branch_id", branchId).order("tier_number")
+        : Promise.resolve({ data: [] as { tier_number: number; threshold_amount: number; bonus_amount: number }[] }),
+      admin.from("equipment_types").select("id, payout_percentage"),
+      fetchAllRows<{
+        order_id: string;
+        equipment_type_id: string | null;
+        employee_id: string | null;
+        completed_date: string | null;
+        line_total: number;
+      }>((from, to) =>
+        admin
+          .from("order_equipment")
+          .select("order_id, equipment_type_id, employee_id, completed_date, line_total")
+          .range(from, to),
+      ),
+      fetchAllRows<{ amount: number }>((from, to) =>
+        admin
+          .from("overtime_entries")
+          .select("amount")
+          .eq("employee_id", employeeId)
+          .gte("entry_date", start)
+          .lt("entry_date", end)
+          .range(from, to),
+      ),
+    ]);
 
   // Không lọc orders bằng .in(id, orderIds) — nhân viên bận có thể liên quan
   // hàng trăm/nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL
@@ -76,11 +105,42 @@ export async function computeMyPerformance(
   );
   const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
+  // Dòng dịch vụ trả khoán trực tiếp — loại khỏi quỹ khoán theo khâu của cả
+  // đơn (không giới hạn theo tháng), tính riêng phần trả trực tiếp trong
+  // tháng cho nhân viên này.
+  const payoutPercentByTypeId = new Map(
+    (equipmentTypes ?? [])
+      .filter((t): t is { id: string; payout_percentage: number } => t.payout_percentage != null)
+      .map((t) => [t.id, t.payout_percentage]),
+  );
+  const linesByOrderId = new Map<string, PoolExcludedLineInput[]>();
+  for (const line of allOrderLines) {
+    const list = linesByOrderId.get(line.order_id) ?? [];
+    list.push(line);
+    linesByOrderId.set(line.order_id, list);
+  }
+  const poolExclusionByOrderId = new Map(
+    [...linesByOrderId.entries()].map(([orderId, lines]) => [
+      orderId,
+      computePoolExcludedTotal(lines, payoutPercentByTypeId),
+    ]),
+  );
+
+  const servicePayout = allOrderLines.reduce((sum, line) => {
+    if (line.employee_id !== employeeId || !line.equipment_type_id || !line.completed_date) return sum;
+    if (line.completed_date < start || line.completed_date >= end) return sum;
+    const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
+    if (payoutPercentage == null) return sum;
+    return sum + computeLineDirectPayout(line.line_total, payoutPercentage);
+  }, 0);
+  const overtimePay = overtimeInMonth.reduce((sum, entry) => sum + entry.amount, 0);
+
   const totalCommission = taskList.reduce((sum, t) => {
     const order = orderById.get(t.order_id);
     if (!order) return sum;
-    const rate = findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, order.total_value);
-    const fund = computeOrderCommissionFund(order.total_value, rate);
+    const poolValue = computeOrderPoolValue(order.total_value, poolExclusionByOrderId.get(order.id) ?? 0);
+    const rate = findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, poolValue);
+    const fund = computeOrderCommissionFund(poolValue, rate);
     const weight = findTaskWeight(taskWeights ?? [], t.task_type);
     return sum + computeTaskCommission(fund, weight);
   }, 0);
@@ -112,7 +172,9 @@ export async function computeMyPerformance(
     baseSalary,
     totalCommission,
     bonus,
-    totalIncome: baseSalary + totalCommission + bonus,
+    servicePayout,
+    overtimePay,
+    totalIncome: baseSalary + totalCommission + bonus + servicePayout + overtimePay,
     completedTaskCount: taskList.length,
     tiers: tierList,
     currentTierIndex,

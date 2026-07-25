@@ -268,6 +268,67 @@ export async function updateOrderEquipmentLinePrice(
   return { success: true };
 }
 
+const AssignOrderLineEmployeeSchema = z.object({
+  employee_id: z.string().uuid().optional(),
+});
+
+// Gán nhân viên thực hiện 1 dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo
+// dỡ/Hỗ trợ kỹ thuật...) — tự đóng dấu ngày hôm nay khi gán, xoá khi bỏ
+// chọn, giống hệt semantics completed_date của upsertOrderTask. Chỉ áp dụng
+// dòng có equipment_type.payout_percentage khác null — kiểm tra lại ở đây
+// dù UI đã ẩn field với dòng không phải dịch vụ trả khoán trực tiếp.
+export async function assignOrderLineEmployee(
+  lineId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = AssignOrderLineEmployeeSchema.safeParse({
+    employee_id: formData.get("employee_id") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: line, error: lineError } = await supabase
+    .from("order_equipment")
+    .select("order_id, equipment_type_id")
+    .eq("id", lineId)
+    .single();
+
+  if (lineError || !line) {
+    return { error: "Không tìm thấy dòng hàng." };
+  }
+
+  const { data: equipmentType } = line.equipment_type_id
+    ? await supabase
+        .from("equipment_types")
+        .select("payout_percentage")
+        .eq("id", line.equipment_type_id)
+        .maybeSingle()
+    : { data: null };
+  if (equipmentType?.payout_percentage == null) {
+    return { error: "Dòng hàng này không phải dịch vụ trả khoán trực tiếp." };
+  }
+
+  const { error } = await supabase
+    .from("order_equipment")
+    .update({
+      employee_id: parsed.data.employee_id ?? null,
+      completed_date: parsed.data.employee_id ? new Date().toISOString().slice(0, 10) : null,
+    })
+    .eq("id", lineId);
+
+  if (error) {
+    return { error: "Không thể gán nhân viên: " + error.message };
+  }
+
+  revalidatePath(`/orders/${line.order_id}`);
+  return { success: true };
+}
+
 const RentalPeriodSchema = z.object({
   rental_start_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ bắt đầu thuê." }),
   rental_end_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ kết thúc thuê." }),

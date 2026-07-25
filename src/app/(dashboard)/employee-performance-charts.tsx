@@ -57,6 +57,8 @@ function EmployeeTaskCountBarChart({ rows }: { rows: EmployeeMonthlyPerformance[
 const INCOME_COMPOSITION_CONFIG = {
   baseSalary: { label: "Lương cứng", color: "var(--chart-1)" },
   totalCommission: { label: "Khoán", color: "var(--chart-2)" },
+  servicePayout: { label: "Phí dịch vụ", color: "var(--chart-3)" },
+  overtimePay: { label: "OT", color: "var(--chart-5)" },
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
 
@@ -77,6 +79,8 @@ function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthlyPerform
         <ChartLegend content={<ChartLegendContent />} />
         <Bar dataKey="baseSalary" stackId="income" fill="var(--color-baseSalary)" radius={[0, 0, 0, 0]} />
         <Bar dataKey="totalCommission" stackId="income" fill="var(--color-totalCommission)" />
+        <Bar dataKey="servicePayout" stackId="income" fill="var(--color-servicePayout)" />
+        <Bar dataKey="overtimePay" stackId="income" fill="var(--color-overtimePay)" />
         <Bar dataKey="bonus" stackId="income" fill="var(--color-bonus)" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ChartContainer>

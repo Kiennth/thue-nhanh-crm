@@ -44,6 +44,40 @@ export function computeTaskCommission(fund: number, taskWeightPercent: number): 
   return round2(fund * (taskWeightPercent / 100));
 }
 
+// Khoán trực tiếp của 1 dòng dịch vụ (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật) = Giá
+// trị dòng x %payout của loại dịch vụ đó — trả thẳng cho người thực hiện,
+// KHÔNG qua quỹ khoán theo khâu.
+export function computeLineDirectPayout(lineTotal: number, payoutPercentage: number): number {
+  return round2(lineTotal * (payoutPercentage / 100));
+}
+
+export interface PoolExcludedLineInput {
+  equipment_type_id: string | null;
+  line_total: number;
+}
+
+// Tổng giá trị các dòng dịch vụ đã có payout_percentage (Lắp đặt/Tháo dỡ/Hỗ
+// trợ kỹ thuật...) — dùng để loại ra khỏi giá trị đơn trước khi tra bậc
+// %hoa hồng/tính quỹ khoán theo khâu, tránh tính khoán 2 lần cho cùng 1
+// đồng doanh số.
+export function computePoolExcludedTotal(
+  lines: PoolExcludedLineInput[],
+  payoutPercentByTypeId: Map<string, number>,
+): number {
+  return lines.reduce((sum, line) => {
+    if (line.equipment_type_id && payoutPercentByTypeId.has(line.equipment_type_id)) {
+      return sum + line.line_total;
+    }
+    return sum;
+  }, 0);
+}
+
+// Giá trị đơn dùng để tra bậc %hoa hồng/tính quỹ khoán theo khâu — đã loại
+// doanh số các dòng dịch vụ trả khoán trực tiếp.
+export function computeOrderPoolValue(totalValue: number, excludedTotal: number): number {
+  return Math.max(0, totalValue - excludedTotal);
+}
+
 export function findTaskWeight(weights: TaskWeightInput[], taskType: TaskType): number {
   return weights.find((w) => w.task_type === taskType)?.weight_percentage ?? 0;
 }

@@ -59,6 +59,11 @@ const EquipmentTypeSchema = z
     rental_period_unit: z.enum(["hour", "day", "week", "month", "year"]).optional(),
     pricing_template_id: z.string().uuid().optional(),
     deposit_amount: z.coerce.number().min(0, { message: "Tiền cọc không được âm." }).optional(),
+    payout_percentage: z.coerce
+      .number()
+      .min(0, { message: "% trả trực tiếp phải từ 0-100." })
+      .max(100, { message: "% trả trực tiếp phải từ 0-100." })
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.product_type !== "rental") return;
@@ -96,7 +101,22 @@ const EquipmentTypeSchema = z
 function normalizeEquipmentType(
   data: z.infer<typeof EquipmentTypeSchema>,
 ): EquipmentTypeInsert {
-  if (data.product_type !== "rental") {
+  if (data.product_type === "rental") {
+    return {
+      name: data.name,
+      product_type: data.product_type,
+      price: data.price,
+      tracking_type: data.tracking_type ?? null,
+      pricing_method: data.pricing_method ?? null,
+      rental_period_unit: data.rental_period_unit ?? null,
+      pricing_template_id:
+        data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
+      deposit_amount: data.deposit_amount ?? 0,
+      payout_percentage: null,
+    };
+  }
+
+  if (data.product_type === "service") {
     return {
       name: data.name,
       product_type: data.product_type,
@@ -106,19 +126,21 @@ function normalizeEquipmentType(
       rental_period_unit: null,
       pricing_template_id: null,
       deposit_amount: 0,
+      payout_percentage: data.payout_percentage ?? null,
     };
   }
 
+  // sale
   return {
     name: data.name,
     product_type: data.product_type,
     price: data.price,
-    tracking_type: data.tracking_type ?? null,
-    pricing_method: data.pricing_method ?? null,
-    rental_period_unit: data.rental_period_unit ?? null,
-    pricing_template_id:
-      data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
-    deposit_amount: data.deposit_amount ?? 0,
+    tracking_type: null,
+    pricing_method: null,
+    rental_period_unit: null,
+    pricing_template_id: null,
+    deposit_amount: 0,
+    payout_percentage: null,
   };
 }
 
@@ -132,6 +154,7 @@ function parseEquipmentTypeForm(formData: FormData) {
     rental_period_unit: formData.get("rental_period_unit") || undefined,
     pricing_template_id: formData.get("pricing_template_id") || undefined,
     deposit_amount: formData.get("deposit_amount") || undefined,
+    payout_percentage: formData.get("payout_percentage") || undefined,
   });
 }
 

@@ -56,6 +56,7 @@ interface EquipmentTypeDialogProps {
     pricing_template_id: string | null;
     deposit_amount: number;
     image_url: string | null;
+    payout_percentage: number | null;
   };
 }
 
@@ -341,6 +342,26 @@ export function EquipmentTypeDialog({
                 defaultValue={equipmentType?.price ?? 0}
                 required
               />
+            </div>
+          )}
+
+          {productType === "service" && (
+            <div className="space-y-2">
+              <Label htmlFor="payout_percentage">% trả trực tiếp cho người thực hiện</Label>
+              <Input
+                id="payout_percentage"
+                name="payout_percentage"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                defaultValue={equipmentType?.payout_percentage ?? ""}
+                placeholder="Để trống nếu tính theo quỹ khoán chung"
+              />
+              <p className="text-xs text-muted-foreground">
+                VD: Lắp đặt/Tháo dỡ = 100%, Hỗ trợ kỹ thuật = 50%. Bỏ trống thì dòng này vẫn tính
+                khoán theo quỹ chung như các dòng khác.
+              </p>
             </div>
           )}
 

@@ -7,13 +7,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PeriodPicker } from "@/components/period-picker";
 import { getCurrentEmployee } from "@/lib/dal";
 import {
   computeEmployeeMonthlyPerformance,
   currentMonth,
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
+import { MonthNavigator } from "./month-navigator";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -39,7 +39,7 @@ export default async function PayrollPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bảng lương tháng</h1>
-        <PeriodPicker paramName="month" type="month" value={month} label="Chọn tháng" />
+        <MonthNavigator month={month} />
       </div>
 
       <Card>
@@ -53,6 +53,8 @@ export default async function PayrollPage({
                 <TableHead>Nhân viên</TableHead>
                 <TableHead>Lương cứng</TableHead>
                 <TableHead>Tổng khoán</TableHead>
+                <TableHead>Phí dịch vụ</TableHead>
+                <TableHead>OT</TableHead>
                 <TableHead>Thưởng</TableHead>
                 <TableHead>Tổng thu nhập</TableHead>
               </TableRow>
@@ -63,6 +65,8 @@ export default async function PayrollPage({
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{currencyFormatter.format(row.baseSalary)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.totalCommission)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.servicePayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.overtimePay)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.bonus)}đ</TableCell>
                   <TableCell className="font-medium">
                     {currencyFormatter.format(row.totalIncome)}đ
@@ -71,7 +75,7 @@ export default async function PayrollPage({
               ))}
               {!rows.length && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Không có dữ liệu.
                   </TableCell>
                 </TableRow>

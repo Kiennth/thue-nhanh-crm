@@ -129,6 +129,11 @@ export interface Database {
           pricing_template_id: string | null;
           deposit_amount: number;
           image_url: string | null;
+          // Chỉ có giá trị với product_type='service' — % doanh số dòng này
+          // trả thẳng cho nhân viên thực hiện (vd Lắp đặt=100, Hỗ trợ kỹ
+          // thuật=50), tách khỏi quỹ khoán theo khâu. null = vẫn tính theo
+          // quỹ khoán chung như cũ.
+          payout_percentage: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -143,6 +148,7 @@ export interface Database {
           pricing_template_id?: string | null;
           deposit_amount?: number;
           image_url?: string | null;
+          payout_percentage?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];
@@ -376,6 +382,10 @@ export interface Database {
           quantity: number;
           unit_price: number;
           line_total: number;
+          // Chỉ có ý nghĩa với dòng dịch vụ có payout_percentage (equipment_type)
+          // — ai thực hiện + ngày hoàn thành, dùng để trả khoán trực tiếp.
+          employee_id: string | null;
+          completed_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -388,6 +398,8 @@ export interface Database {
           quantity?: number;
           unit_price?: number;
           line_total?: number;
+          employee_id?: string | null;
+          completed_date?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;
         Relationships: [];
@@ -436,6 +448,29 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["order_payments"]["Insert"]>;
+        Relationships: [];
+      };
+      overtime_entries: {
+        Row: {
+          id: string;
+          employee_id: string;
+          order_id: string | null;
+          entry_date: string;
+          hours: number | null;
+          amount: number;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          order_id?: string | null;
+          entry_date?: string;
+          hours?: number | null;
+          amount: number;
+          note?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["overtime_entries"]["Insert"]>;
         Relationships: [];
       };
       commission_tiers: {

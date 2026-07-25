@@ -2,11 +2,15 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
+  computeLineDirectPayout,
   computeOrderCommissionFund,
+  computeOrderPoolValue,
+  computePoolExcludedTotal,
   computeTaskCommission,
   findBonusAmount,
   findCommissionRate,
   findTaskWeight,
+  type PoolExcludedLineInput,
 } from "@/lib/commission";
 import type { TaskType } from "@/types/database";
 
@@ -35,6 +39,11 @@ export interface EmployeeMonthlyPerformance {
   baseSalary: number;
   totalCommission: number;
   bonus: number;
+  // Khoán trực tiếp từ dòng dịch vụ (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) và
+  // phụ cấp OT — cộng vào totalIncome nhưng KHÔNG tính vào cơ sở bậc thưởng
+  // (findBonusAmount chỉ dùng totalCommission gốc).
+  servicePayout: number;
+  overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
   taskTypeCounts: Partial<Record<TaskType, number>>;
@@ -61,23 +70,52 @@ export async function computeEmployeeMonthlyPerformance(
     employeesQuery = employeesQuery.in("id", options.employeeIds);
   }
 
-  const [{ data: employees }, tasksInMonth, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }] =
-    await Promise.all([
-      employeesQuery,
-      fetchAllRows<{ task_type: TaskType; employee_id: string | null; completed_date: string; order_id: string }>(
-        (from, to) =>
-          admin
-            .from("order_tasks")
-            .select("task_type, employee_id, completed_date, order_id")
-            .not("completed_date", "is", null)
-            .gte("completed_date", start)
-            .lt("completed_date", end)
-            .range(from, to),
-      ),
-      admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
-      admin.from("task_weights").select("task_type, weight_percentage"),
-      admin.from("bonus_tiers").select("branch_id, threshold_amount, bonus_amount"),
-    ]);
+  const [
+    { data: employees },
+    tasksInMonth,
+    { data: commissionTiers },
+    { data: taskWeights },
+    { data: bonusTiers },
+    { data: equipmentTypes },
+    allOrderLines,
+    overtimeInMonth,
+  ] = await Promise.all([
+    employeesQuery,
+    fetchAllRows<{ task_type: TaskType; employee_id: string | null; completed_date: string; order_id: string }>(
+      (from, to) =>
+        admin
+          .from("order_tasks")
+          .select("task_type, employee_id, completed_date, order_id")
+          .not("completed_date", "is", null)
+          .gte("completed_date", start)
+          .lt("completed_date", end)
+          .range(from, to),
+    ),
+    admin.from("commission_tiers").select("branch_id, min_value, max_value, percentage"),
+    admin.from("task_weights").select("task_type, weight_percentage"),
+    admin.from("bonus_tiers").select("branch_id, threshold_amount, bonus_amount"),
+    admin.from("equipment_types").select("id, payout_percentage"),
+    fetchAllRows<{
+      order_id: string;
+      equipment_type_id: string | null;
+      employee_id: string | null;
+      completed_date: string | null;
+      line_total: number;
+    }>((from, to) =>
+      admin
+        .from("order_equipment")
+        .select("order_id, equipment_type_id, employee_id, completed_date, line_total")
+        .range(from, to),
+    ),
+    fetchAllRows<{ employee_id: string; amount: number }>((from, to) =>
+      admin
+        .from("overtime_entries")
+        .select("employee_id, amount")
+        .gte("entry_date", start)
+        .lt("entry_date", end)
+        .range(from, to),
+    ),
+  ]);
 
   const employeeList = employees ?? [];
 
@@ -89,6 +127,43 @@ export async function computeEmployeeMonthlyPerformance(
   );
   const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
+  // Dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) —
+  // loại khỏi quỹ khoán theo khâu của CẢ đơn (không giới hạn theo tháng, vì
+  // đây là thuộc tính cố định của đơn), và tính riêng phần trả trực tiếp
+  // trong tháng cho người thực hiện.
+  const payoutPercentByTypeId = new Map(
+    (equipmentTypes ?? [])
+      .filter((t): t is { id: string; payout_percentage: number } => t.payout_percentage != null)
+      .map((t) => [t.id, t.payout_percentage]),
+  );
+  const linesByOrderId = new Map<string, PoolExcludedLineInput[]>();
+  for (const line of allOrderLines) {
+    const list = linesByOrderId.get(line.order_id) ?? [];
+    list.push(line);
+    linesByOrderId.set(line.order_id, list);
+  }
+  const poolExclusionByOrderId = new Map(
+    [...linesByOrderId.entries()].map(([orderId, lines]) => [
+      orderId,
+      computePoolExcludedTotal(lines, payoutPercentByTypeId),
+    ]),
+  );
+
+  const servicePayoutByEmployeeId = new Map<string, number>();
+  for (const line of allOrderLines) {
+    if (!line.employee_id || !line.equipment_type_id || !line.completed_date) continue;
+    if (line.completed_date < start || line.completed_date >= end) continue;
+    const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
+    if (payoutPercentage == null) continue;
+    const payout = computeLineDirectPayout(line.line_total, payoutPercentage);
+    servicePayoutByEmployeeId.set(line.employee_id, (servicePayoutByEmployeeId.get(line.employee_id) ?? 0) + payout);
+  }
+
+  const overtimeByEmployeeId = new Map<string, number>();
+  for (const entry of overtimeInMonth) {
+    overtimeByEmployeeId.set(entry.employee_id, (overtimeByEmployeeId.get(entry.employee_id) ?? 0) + entry.amount);
+  }
+
   return employeeList.map((emp) => {
     const empTasks = tasksInMonth.filter((t) => t.employee_id === emp.id);
     const taskTypeCounts: Partial<Record<TaskType, number>> = {};
@@ -96,21 +171,26 @@ export async function computeEmployeeMonthlyPerformance(
       taskTypeCounts[t.task_type] = (taskTypeCounts[t.task_type] ?? 0) + 1;
       const order = orderById.get(t.order_id);
       if (!order) return sum;
-      const rate = findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, order.total_value);
-      const fund = computeOrderCommissionFund(order.total_value, rate);
+      const poolValue = computeOrderPoolValue(order.total_value, poolExclusionByOrderId.get(order.id) ?? 0);
+      const rate = findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, poolValue);
+      const fund = computeOrderCommissionFund(poolValue, rate);
       const weight = findTaskWeight(taskWeights ?? [], t.task_type);
       return sum + computeTaskCommission(fund, weight);
     }, 0);
     const bonus = emp.branch_id
       ? findBonusAmount(bonusTiers ?? [], emp.branch_id, totalCommission)
       : 0;
+    const servicePayout = servicePayoutByEmployeeId.get(emp.id) ?? 0;
+    const overtimePay = overtimeByEmployeeId.get(emp.id) ?? 0;
     return {
       id: emp.id,
       name: emp.name,
       baseSalary: emp.base_salary,
       totalCommission,
       bonus,
-      totalIncome: emp.base_salary + totalCommission + bonus,
+      servicePayout,
+      overtimePay,
+      totalIncome: emp.base_salary + totalCommission + bonus + servicePayout + overtimePay,
       completedTaskCount: empTasks.length,
       taskTypeCounts,
     };

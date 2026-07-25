@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
+import { deleteOvertimeEntry } from "@/lib/actions/overtime";
 import {
   PAYMENT_METHOD_LABELS,
   TASK_TYPE_LABELS,
@@ -25,8 +26,11 @@ import {
 import {
   findCommissionRate,
   computeOrderCommissionFund,
+  computeOrderPoolValue,
+  computePoolExcludedTotal,
   computeTaskCommission,
   findTaskWeight,
+  type PoolExcludedLineInput,
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
@@ -34,6 +38,7 @@ import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
+import { OrderLineEmployeeForm } from "./order-line-employee-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import CloseOrderButton from "./close-order-button";
 import { CancelOrderButton } from "./cancel-order-button";
@@ -41,6 +46,7 @@ import { DuplicateOrderButton } from "./duplicate-order-button";
 import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
+import { OvertimeDialog } from "./overtime-dialog";
 
 const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -62,6 +68,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: equipmentStock },
     { data: commissionTiers },
     { data: taskWeights },
+    { data: overtimeEntries },
     employee,
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
@@ -72,7 +79,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("employees_public").select("id, name").order("name"),
     supabase
       .from("equipment_types")
-      .select("id, name, product_type, tracking_type, pricing_method, price, deposit_amount")
+      .select("id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage")
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
     supabase
@@ -81,6 +88,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
     supabase.from("commission_tiers").select("*"),
     supabase.from("task_weights").select("*"),
+    supabase.from("overtime_entries").select("*").eq("order_id", id).order("entry_date", { ascending: false }),
     getCurrentEmployee(),
   ]);
 
@@ -110,10 +118,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const doneCount = (tasks ?? []).filter((t) => t.completed_date).length;
   const allDone = doneCount === TASK_TYPE_SEQUENCE.length;
 
+  // Doanh số các dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ
+  // thuật...) loại khỏi giá trị dùng để tra bậc %hoa hồng/tính quỹ khoán
+  // theo khâu — tránh tính khoán 2 lần cho cùng 1 đồng doanh số.
+  const poolExcludedTotal = computePoolExcludedTotal(
+    (lines ?? []) as PoolExcludedLineInput[],
+    new Map(
+      (equipmentTypes ?? [])
+        .filter((t): t is typeof t & { payout_percentage: number } => t.payout_percentage != null)
+        .map((t) => [t.id, t.payout_percentage]),
+    ),
+  );
+  const poolValue = computeOrderPoolValue(order.total_value, poolExcludedTotal);
   const commissionRate = canManage
-    ? findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, order.total_value)
+    ? findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, poolValue)
     : 0;
-  const commissionFund = canManage ? computeOrderCommissionFund(order.total_value, commissionRate) : 0;
+  const commissionFund = canManage ? computeOrderCommissionFund(poolValue, commissionRate) : 0;
 
   // Giá trong đơn (total_value) chưa gồm VAT — chỉ cộng thêm để hiển thị số
   // tổng phải thu của khách, không dùng số đã gồm VAT để tính khoán.
@@ -357,6 +377,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <TableHead>SL</TableHead>
                 <TableHead>Đơn giá</TableHead>
                 <TableHead>Thành tiền</TableHead>
+                <TableHead>Người thực hiện</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
@@ -388,6 +409,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     </TableCell>
                     <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
                     <TableCell>
+                      {type?.payout_percentage != null ? (
+                        canManage ? (
+                          <OrderLineEmployeeForm
+                            lineId={line.id}
+                            employeeId={line.employee_id}
+                            employees={employeeList}
+                          />
+                        ) : (
+                          (employeeNameById.get(line.employee_id ?? "") ?? "—")
+                        )
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <ConfirmDeleteButton
                         confirmMessage="Xoá dòng hàng này?"
                         successMessage="Đã xoá dòng hàng."
@@ -400,7 +436,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               })}
               {!lines?.length && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Chưa có dòng hàng nào.
                   </TableCell>
                 </TableRow>
@@ -555,7 +591,72 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               %hoa hồng chi nhánh: {commissionRate}% · Tổng quỹ khoán:{" "}
               {currencyFormatter.format(commissionFund)}đ (chỉ tính vào lương khi khâu đã hoàn
               thành)
+              {poolExcludedTotal > 0 && (
+                <>
+                  {" "}
+                  — đã loại {currencyFormatter.format(poolExcludedTotal)}đ doanh số dịch vụ trả
+                  khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) khỏi quỹ này.
+                </>
+              )}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {canManage && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">OT (tăng ca)</CardTitle>
+            <OvertimeDialog
+              orderId={order.id}
+              employees={employeeList}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <Plus className="size-4" />
+                  Ghi nhận OT
+                </Button>
+              }
+            />
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ngày</TableHead>
+                  <TableHead>Nhân viên</TableHead>
+                  <TableHead>Số giờ</TableHead>
+                  <TableHead>Số tiền</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                  <TableHead className="w-16"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(overtimeEntries ?? []).map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>{entry.entry_date}</TableCell>
+                    <TableCell>{employeeNameById.get(entry.employee_id) ?? "—"}</TableCell>
+                    <TableCell>{entry.hours ?? "—"}</TableCell>
+                    <TableCell>{currencyFormatter.format(entry.amount)}đ</TableCell>
+                    <TableCell className="text-muted-foreground">{entry.note ?? "—"}</TableCell>
+                    <TableCell>
+                      <ConfirmDeleteButton
+                        confirmMessage="Xoá khoản OT này?"
+                        successMessage="Đã xoá OT."
+                        action={deleteOvertimeEntry}
+                        actionArg={entry.id}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!overtimeEntries?.length && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Chưa ghi nhận OT nào.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
