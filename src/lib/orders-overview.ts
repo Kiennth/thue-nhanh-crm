@@ -28,6 +28,10 @@ export interface TrendPoint {
   isCurrent: boolean;
   projectedCount?: number;
   projectedRevenue?: number;
+  // Giá trị của đúng kỳ này 1 năm trước (cùng khoảng ngày, dịch lùi đúng 1
+  // năm) — chỉ có ở view tuần/tháng, view năm tự thân đã là so sánh liên năm.
+  previousYearCount?: number;
+  previousYearRevenue?: number;
 }
 
 export interface OrdersOverview {
@@ -70,6 +74,10 @@ function daysInMonth(year: number, month0: number) {
 
 function isLeapYear(y: number) {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+function shiftYears(d: Date, years: number) {
+  return new Date(d.getFullYear() + years, d.getMonth(), d.getDate());
 }
 
 // Supabase/PostgREST giới hạn 1.000 dòng mỗi lần gọi — cần TOÀN BỘ đơn (chưa
@@ -171,6 +179,10 @@ function computeYearStat(orders: LiteOrder[], today: Date): PeriodStat {
   return buildPeriodStat("Năm nay", current, prev, dayOfYear / totalDays);
 }
 
+// 364 ngày = đúng 52 tuần — dịch lùi giữ nguyên thứ trong tuần (khác với dịch
+// lùi 1 năm dương lịch, vốn không rơi đúng vào cùng thứ).
+const ONE_YEAR_IN_WEEKS_DAYS = 364;
+
 function buildWeekTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
   const currentWeekStart = startOfWeekMonday(today);
   const points: TrendPoint[] = [];
@@ -178,7 +190,13 @@ function buildWeekTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
     const start = addDays(currentWeekStart, -7 * i);
     const end = addDays(start, 6);
     const isCurrent = i === 0;
-    const { count, totalRevenue } = sumInRange(orders, start, isCurrent ? today : end);
+    const compareEnd = isCurrent ? today : end;
+    const { count, totalRevenue } = sumInRange(orders, start, compareEnd);
+    const lastYear = sumInRange(
+      orders,
+      addDays(start, -ONE_YEAR_IN_WEEKS_DAYS),
+      addDays(compareEnd, -ONE_YEAR_IN_WEEKS_DAYS),
+    );
     const label = `${start.getDate()}/${start.getMonth() + 1}`;
     if (isCurrent) {
       const elapsedDays = Math.floor((today.getTime() - start.getTime()) / 86400000) + 1;
@@ -190,9 +208,18 @@ function buildWeekTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
         isCurrent: true,
         projectedCount: Math.round(count / fraction),
         projectedRevenue: Math.round(totalRevenue / fraction),
+        previousYearCount: lastYear.count,
+        previousYearRevenue: lastYear.totalRevenue,
       });
     } else {
-      points.push({ label, count, revenue: totalRevenue, isCurrent: false });
+      points.push({
+        label,
+        count,
+        revenue: totalRevenue,
+        isCurrent: false,
+        previousYearCount: lastYear.count,
+        previousYearRevenue: lastYear.totalRevenue,
+      });
     }
   }
   return points;
@@ -204,7 +231,9 @@ function buildMonthTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
     const bucketDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const end = new Date(bucketDate.getFullYear(), bucketDate.getMonth() + 1, 0);
     const isCurrent = i === 0;
-    const { count, totalRevenue } = sumInRange(orders, bucketDate, isCurrent ? today : end);
+    const compareEnd = isCurrent ? today : end;
+    const { count, totalRevenue } = sumInRange(orders, bucketDate, compareEnd);
+    const lastYear = sumInRange(orders, shiftYears(bucketDate, -1), shiftYears(compareEnd, -1));
     const label = `Th${bucketDate.getMonth() + 1}`;
     if (isCurrent) {
       const totalDays = daysInMonth(bucketDate.getFullYear(), bucketDate.getMonth());
@@ -216,9 +245,18 @@ function buildMonthTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
         isCurrent: true,
         projectedCount: Math.round(count / fraction),
         projectedRevenue: Math.round(totalRevenue / fraction),
+        previousYearCount: lastYear.count,
+        previousYearRevenue: lastYear.totalRevenue,
       });
     } else {
-      points.push({ label, count, revenue: totalRevenue, isCurrent: false });
+      points.push({
+        label,
+        count,
+        revenue: totalRevenue,
+        isCurrent: false,
+        previousYearCount: lastYear.count,
+        previousYearRevenue: lastYear.totalRevenue,
+      });
     }
   }
   return points;

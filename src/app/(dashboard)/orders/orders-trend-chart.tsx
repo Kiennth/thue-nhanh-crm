@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import type { TrendPoint } from "@/lib/orders-overview";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
@@ -27,10 +34,12 @@ function toChartRows(points: TrendPoint[], metric: Metric) {
   return points.map((p) => {
     const actual = metric === "count" ? p.count : p.revenue;
     const projectedTotal = metric === "count" ? p.projectedCount : p.projectedRevenue;
+    const previousYear = metric === "count" ? p.previousYearCount : p.previousYearRevenue;
     return {
       label: p.label,
       actual,
       projected: p.isCurrent && projectedTotal !== undefined ? Math.max(0, projectedTotal - actual) : 0,
+      previousYear,
     };
   });
 }
@@ -44,9 +53,11 @@ export function OrdersTrendChart({
   const [metric, setMetric] = useState<Metric>("revenue");
 
   const rows = toChartRows(trend[granularity], metric);
+  const showPreviousYear = granularity !== "year";
   const config = {
     actual: { label: METRIC_LABELS[metric], color: "var(--chart-1)" },
     projected: { label: "Dự kiến thêm", color: "var(--chart-1)" },
+    previousYear: { label: "Cùng kỳ năm trước", color: "var(--muted-foreground)" },
   } satisfies ChartConfig;
 
   return (
@@ -86,7 +97,7 @@ export function OrdersTrendChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
-          <BarChart data={rows} margin={{ left: 8 }}>
+          <ComposedChart data={rows} margin={{ left: 8 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis
@@ -98,8 +109,12 @@ export function OrdersTrendChart({
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => {
-                    const isProjected = name === "projected";
-                    const label = isProjected ? "Dự kiến thêm" : METRIC_LABELS[metric];
+                    const label =
+                      name === "projected"
+                        ? "Dự kiến thêm"
+                        : name === "previousYear"
+                          ? "Cùng kỳ năm trước"
+                          : METRIC_LABELS[metric];
                     const formatted =
                       metric === "revenue"
                         ? `${currencyFormatter.format(Number(value))}đ`
@@ -116,9 +131,20 @@ export function OrdersTrendChart({
                 />
               }
             />
+            <ChartLegend content={<ChartLegendContent />} />
             <Bar dataKey="actual" stackId="trend" fill="var(--color-actual)" />
             <Bar dataKey="projected" stackId="trend" fill="var(--color-projected)" fillOpacity={0.35} />
-          </BarChart>
+            {showPreviousYear && (
+              <Line
+                dataKey="previousYear"
+                type="monotone"
+                stroke="var(--color-previousYear)"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={false}
+              />
+            )}
+          </ComposedChart>
         </ChartContainer>
       </CardContent>
     </Card>

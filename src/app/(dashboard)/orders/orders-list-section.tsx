@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { PaginationControls } from "@/components/pagination-controls";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
@@ -28,7 +29,7 @@ import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
-const dateFormatter = new Intl.DateTimeFormat("vi-VN");
+const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 const PAGE_SIZE = 50;
 const CHUNK = 1000;
 
@@ -233,10 +234,11 @@ export async function OrdersListSection({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Mã đơn</TableHead>
-            <TableHead>Chi nhánh</TableHead>
+            <TableHead className="w-28">Mã đơn</TableHead>
+            <TableHead className="w-28">Chi nhánh</TableHead>
             <TableHead>Khách hàng</TableHead>
-            <TableHead>Ngày</TableHead>
+            <TableHead>Ngày bắt đầu</TableHead>
+            <TableHead>Ngày kết thúc</TableHead>
             <TableHead>Doanh số</TableHead>
             <TableHead>Trạng thái</TableHead>
             {canDelete && <TableHead className="w-16"></TableHead>}
@@ -245,18 +247,28 @@ export async function OrdersListSection({
         <TableBody>
           {orders?.map((order) => (
             <TableRow key={order.id}>
-              <TableCell className="font-medium">
+              <TableCell className="max-w-28 truncate font-medium">
                 <Link href={`/orders/${order.id}`} className="hover:underline">
                   {order.order_code}
                 </Link>
               </TableCell>
-              <TableCell>
+              <TableCell className="max-w-28 truncate">
                 {branchNameById.get(order.pickup_branch_id) ?? "—"}
                 {order.return_branch_id !== order.pickup_branch_id &&
                   ` → ${branchNameById.get(order.return_branch_id) ?? "—"}`}
               </TableCell>
-              <TableCell>{customerNameById.get(order.customer_id) ?? "—"}</TableCell>
-              <TableCell>{dateFormatter.format(new Date(order.order_date))}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <CustomerAvatar id={order.customer_id} name={customerNameById.get(order.customer_id) ?? "—"} />
+                  {customerNameById.get(order.customer_id) ?? "—"}
+                </div>
+              </TableCell>
+              <TableCell>
+                {order.rental_start_at ? dateTimeFormatter.format(new Date(order.rental_start_at)) : "—"}
+              </TableCell>
+              <TableCell>
+                {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
+              </TableCell>
               <TableCell>{currencyFormatter.format(order.total_value)}đ</TableCell>
               <TableCell>
                 {order.cancelled_at ? (
@@ -281,7 +293,7 @@ export async function OrdersListSection({
           ))}
           {!orders?.length && (
             <TableRow>
-              <TableCell colSpan={canDelete ? 7 : 6} className="text-center text-muted-foreground">
+              <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-muted-foreground">
                 Không có đơn hàng nào khớp bộ lọc.
               </TableCell>
             </TableRow>

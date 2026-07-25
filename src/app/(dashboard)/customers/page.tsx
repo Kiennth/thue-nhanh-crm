@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
+import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllCustomersLite } from "@/lib/customers";
 import { CustomerDialog } from "./customer-dialog";
@@ -101,7 +102,8 @@ export default async function CustomersPage({
             {customerList.map((customer) => (
               <TableRow key={customer.id}>
                 <TableCell className="font-medium">
-                  <Link href={`/customers/${customer.id}`} className="hover:underline">
+                  <Link href={`/customers/${customer.id}`} className="flex items-center gap-2 hover:underline">
+                    <CustomerAvatar id={customer.id} name={customer.name} />
                     {customer.name}
                   </Link>
                 </TableCell>
