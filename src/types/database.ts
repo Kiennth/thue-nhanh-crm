@@ -102,35 +102,6 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["customers"]["Insert"]>;
         Relationships: [];
       };
-      legacy_orders: {
-        Row: {
-          id: string;
-          old_order_code: string | null;
-          order_date: string;
-          customer_id: string | null;
-          customer_name_raw: string;
-          customer_phone_raw: string | null;
-          branch_name: string | null;
-          product_summary: string | null;
-          total_value: number;
-          notes: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          old_order_code?: string | null;
-          order_date: string;
-          customer_id?: string | null;
-          customer_name_raw: string;
-          customer_phone_raw?: string | null;
-          branch_name?: string | null;
-          product_summary?: string | null;
-          total_value?: number;
-          notes?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["legacy_orders"]["Insert"]>;
-        Relationships: [];
-      };
       activity_log: {
         Row: {
           id: string;

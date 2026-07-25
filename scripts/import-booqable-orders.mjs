@@ -14,6 +14,24 @@ const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+// Supabase/PostgREST caps a plain .select() at 1000 rows — paginate with
+// .range() to fetch every row for tables that can exceed that. Takes a
+// factory (not a built query) since a query builder can't be safely re-run
+// after being awaited once.
+async function fetchAllRows(buildQuery) {
+  const pageSize = 1000;
+  let from = 0;
+  const all = [];
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw new Error("Truy vấn Supabase thất bại: " + error.message);
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 const RPC_OPERATOR_EMAIL = "hoapham@thuenhanh.vn";
 const RPC_OPERATOR_PASSWORD = "123456789";
 const CEO_EMAIL = "ceo@thuenhanh.vn";
@@ -199,8 +217,9 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
 
 // equipment_type name (normalized) -> row
 async function loadEquipmentTypes() {
-  const { data, error } = await db.from("equipment_types").select("id,name,product_type,tracking_type");
-  if (error) throw error;
+  const data = await fetchAllRows(() =>
+    db.from("equipment_types").select("id,name,product_type,tracking_type").order("id"),
+  );
   const map = new Map();
   for (const e of data) map.set(normalize(e.name), e);
   return map;
@@ -463,10 +482,13 @@ async function main() {
 
   const equipmentTypeMap = await loadEquipmentTypes();
 
-  const { data: existingOrders } = await db.from("orders").select("order_code").like("order_code", "BQ%");
-  const existingOrderCodes = new Set((existingOrders || []).map((o) => o.order_code));
+  const existingOrderCodes = new Set(
+    (
+      await fetchAllRows(() => db.from("orders").select("order_code").like("order_code", "BQ%").order("id"))
+    ).map((o) => o.order_code),
+  );
 
-  const { data: allCustomers } = await db.from("customers").select("id,name,phone");
+  const allCustomers = await fetchAllRows(() => db.from("customers").select("id,name,phone").order("id"));
   const customersByPhone = new Map();
   const customersByName = new Map();
   for (const c of allCustomers || []) {

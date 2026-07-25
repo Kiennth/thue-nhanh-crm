@@ -16,7 +16,6 @@ import { createClient } from "@/lib/supabase/server";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { CustomerReportSection } from "./customer-report-section";
-import { LegacyOrdersSection } from "./legacy-orders-section";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 const PAGE_SIZE = 50;
@@ -44,9 +43,9 @@ async function fetchAllCustomersLite(supabase: Awaited<ReturnType<typeof createC
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; legacySearch?: string; legacyPage?: string }>;
+  searchParams: Promise<{ search?: string; page?: string }>;
 }) {
-  const { search, page: pageParam, legacySearch, legacyPage } = await searchParams;
+  const { search, page: pageParam } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
 
@@ -158,8 +157,6 @@ export default async function CustomersPage({
 
         <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="khách hàng" />
       </div>
-
-      <LegacyOrdersSection search={legacySearch} page={legacyPage} />
     </div>
   );
 }

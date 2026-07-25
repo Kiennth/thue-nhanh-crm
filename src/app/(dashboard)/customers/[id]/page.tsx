@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerDialog } from "../customer-dialog";
 import { DeleteCustomerButton } from "../delete-customer-button";
-import { LegacyOrdersSection } from "../legacy-orders-section";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 const DEPOSIT_PERCENTAGE_LABELS: Record<number, string> = {
@@ -79,8 +78,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )}
         </CardContent>
       </Card>
-
-      <LegacyOrdersSection customerId={customer.id} />
     </div>
   );
 }
