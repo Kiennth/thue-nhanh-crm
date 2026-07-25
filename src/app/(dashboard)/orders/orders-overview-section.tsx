@@ -4,13 +4,15 @@ import { UpcomingDeliveriesCard, PendingCollectionsCard } from "../orders-to-han
 import { PeriodStatCards } from "./period-stat-cards";
 import { OrdersTrendChart } from "./orders-trend-chart";
 
+const HANDLE_LIMIT = 5;
+
 // Toàn cảnh đơn hàng: quá khứ (xu hướng), hiện tại (thống kê kỳ này), tương
 // lai (đơn sắp tới/sắp về), và dự đoán (chiếu theo tốc độ hiện tại cho phần
 // còn lại của kỳ) — không phụ thuộc bộ lọc trạng thái/thời gian của bảng
 // danh sách bên dưới.
 export async function OrdersOverviewSection({ branchId }: { branchId: string | null }) {
   const [ordersToHandle, overview] = await Promise.all([
-    getOrdersToHandle(branchId),
+    getOrdersToHandle(branchId, HANDLE_LIMIT),
     computeOrdersOverview(branchId),
   ]);
 
