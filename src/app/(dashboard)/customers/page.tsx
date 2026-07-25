@@ -13,32 +13,13 @@ import {
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllCustomersLite } from "@/lib/customers";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { CustomerReportSection } from "./customer-report-section";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 const PAGE_SIZE = 50;
-
-// Supabase/PostgREST giới hạn tối đa 1000 dòng mỗi lần gọi dù không truyền
-// .range() — với 5800+ khách hàng, báo cáo cần TOÀN BỘ danh sách (không chỉ
-// trang hiện tại) nên phải gọi nhiều lần .range() gộp lại.
-async function fetchAllCustomersLite(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const CHUNK = 1000;
-  const all: { id: string; name: string; customer_type: "individual" | "company" }[] = [];
-  let from = 0;
-  while (true) {
-    const { data } = await supabase
-      .from("customers")
-      .select("id, name, customer_type")
-      .range(from, from + CHUNK - 1);
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < CHUNK) break;
-    from += CHUNK;
-  }
-  return all;
-}
 
 export default async function CustomersPage({
   searchParams,
@@ -55,7 +36,7 @@ export default async function CustomersPage({
 
   const [allCustomersLite, { data: orders }, { data: payments }, { count: totalCount }] =
     await Promise.all([
-      fetchAllCustomersLite(supabase),
+      fetchAllCustomersLite(),
       supabase.from("orders").select("id, customer_id, total_value, order_date, cancelled_at"),
       supabase.from("order_payments").select("order_id, amount"),
       (() => {

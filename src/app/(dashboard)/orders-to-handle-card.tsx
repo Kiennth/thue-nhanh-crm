@@ -20,11 +20,14 @@ function OrderCountdownList({
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <Icon className="size-4 text-muted-foreground" />
           {title}
         </CardTitle>
+        <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
+          Xem tất cả →
+        </Link>
       </CardHeader>
       <CardContent className="space-y-1">
         {!orders.length && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}

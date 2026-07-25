@@ -35,9 +35,8 @@ function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
 }
 
-// Dùng chung cho trang /orders (Admin/Kế toán/Quản lý chi nhánh — thấy tất cả
-// chi nhánh) và phần nhúng vào Trang chủ của kỹ thuật/sales (branchId khác
-// null — chỉ thấy đơn ở đúng chi nhánh mình).
+// Nội dung trang /orders — Admin/Kế toán thấy tất cả chi nhánh (branchId
+// null), các role khác chỉ thấy đơn liên quan tới chi nhánh mình.
 export async function OrdersListSection({
   status,
   range,

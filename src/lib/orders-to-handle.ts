@@ -36,7 +36,10 @@ function statusIndex(status: TaskType) {
 // viên kỹ thuật/quản lý chi nhánh — chỉ thấy kho mình): đơn GIAO tại chi nhánh
 // mình vào danh sách sắp giao, đơn THU HỒI về chi nhánh mình vào danh sách cần
 // thu hồi — 2 chi nhánh của đơn có thể khác nhau.
-export async function getOrdersToHandle(branchId: string | null): Promise<OrdersToHandleResult> {
+export async function getOrdersToHandle(
+  branchId: string | null,
+  limit?: number,
+): Promise<OrdersToHandleResult> {
   const supabase = await createClient();
 
   let query = supabase
@@ -104,5 +107,8 @@ export async function getOrdersToHandle(branchId: string | null): Promise<Orders
   upcomingDeliveries.sort((a, b) => a.actionDate.localeCompare(b.actionDate));
   pendingCollections.sort((a, b) => a.actionDate.localeCompare(b.actionDate));
 
-  return { upcomingDeliveries, pendingCollections };
+  return {
+    upcomingDeliveries: limit ? upcomingDeliveries.slice(0, limit) : upcomingDeliveries,
+    pendingCollections: limit ? pendingCollections.slice(0, limit) : pendingCollections,
+  };
 }

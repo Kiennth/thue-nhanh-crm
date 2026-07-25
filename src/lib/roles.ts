@@ -41,6 +41,11 @@ export const SETTINGS_ITEMS: NavItem[] = [
 
 export const NAV_ITEMS: NavItem[] = [
   {
+    href: "/orders",
+    label: "Đơn hàng",
+    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+  },
+  {
     href: "/customers",
     label: "Khách hàng",
     roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],

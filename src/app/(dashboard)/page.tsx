@@ -14,9 +14,19 @@ import {
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
+import { fetchAllCustomersLite } from "@/lib/customers";
+import { buildCustomerReportRows } from "@/lib/customer-reports";
+import {
+  computeEmployeeMonthlyPerformance,
+  currentMonth,
+  MANAGE_ROLES,
+} from "@/lib/employee-performance-charts";
 import { MyPerformanceCard } from "./my-performance-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
-import { OrdersListSection } from "./orders/orders-list-section";
+import { CustomerOverviewTiles } from "./customers/customer-report-section";
+import { EmployeePerformanceChartsSection } from "./employee-performance-charts";
+
+const HANDLE_LIMIT = 8;
 
 export default async function DashboardHomePage({
   searchParams,
@@ -25,10 +35,7 @@ export default async function DashboardHomePage({
     day?: string;
     month?: string;
     year?: string;
-    status?: string;
-    range?: string;
-    from?: string;
-    to?: string;
+    chartMonth?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -36,55 +43,31 @@ export default async function DashboardHomePage({
   const day = params.day || defaults.day;
   const month = params.month || defaults.month;
   const year = params.year || defaults.year;
+  const chartMonth = params.chartMonth || currentMonth();
 
   const employee = await getCurrentEmployee();
+  if (!employee) return null;
 
-  // Trang chủ của nhân viên kỹ thuật/sales gộp luôn phần đơn hàng vào đây —
-  // chỉ cần 1 điểm dừng chân duy nhất, không cần chuyển qua trang /orders
-  // riêng. Không cần report toàn công ty/chi nhánh (đó là việc của quản
-  // lý/kế toán).
-  if (employee?.role === "ky_thuat_sales") {
-    const [myPerformance, ordersToHandle] = await Promise.all([
-      computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
-      employee.branch_id
-        ? getOrdersToHandle(employee.branch_id)
-        : Promise.resolve({ upcomingDeliveries: [], pendingCollections: [] }),
-    ]);
+  const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
+  const branchId = canManage ? null : employee.branch_id;
 
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Trang chủ</h1>
-          <p className="text-sm text-muted-foreground">
-            Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
-          </p>
-        </div>
+  const supabase = await createClient();
 
-        <MyPerformanceCard perf={myPerformance} />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
-          <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
-        </div>
-
-        <OrdersListSection
-          status={params.status}
-          range={params.range}
-          from={params.from}
-          to={params.to}
-          branchId={employee.branch_id}
-          canDelete={false}
-        />
-      </div>
+  let processingOrdersQuery = supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .is("completed_at", null)
+    .is("cancelled_at", null);
+  if (branchId) {
+    processingOrdersQuery = processingOrdersQuery.or(
+      `pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`,
     );
   }
 
-  const supabase = await createClient();
-  const canCompareBranches = employee?.role === "admin" || employee?.role === "ke_toan";
-  const canDeleteOrders = canCompareBranches;
   const [
     branches,
     branchList,
-    customers,
+    customersCount,
     equipmentTypes,
     { data: orders },
     { data: types },
@@ -95,6 +78,12 @@ export default async function DashboardHomePage({
     { data: stock },
     { data: orderLines },
     ordersToHandle,
+    { count: processingCount },
+    customersLite,
+    { data: customerOrders },
+    { data: customerPayments },
+    myPerformance,
+    employeeRows,
   ] = await Promise.all([
     supabase.from("branches").select("*", { count: "exact", head: true }),
     supabase.from("branches").select("id, name").order("name"),
@@ -110,12 +99,19 @@ export default async function DashboardHomePage({
     supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
     supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
     supabase.from("order_equipment").select("equipment_type_id, line_total"),
-    getOrdersToHandle(null),
+    getOrdersToHandle(branchId, HANDLE_LIMIT),
+    processingOrdersQuery,
+    fetchAllCustomersLite(),
+    supabase.from("orders").select("id, customer_id, total_value, order_date, cancelled_at"),
+    supabase.from("order_payments").select("order_id, amount"),
+    computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
+    canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
   ]);
 
   const stats = [
+    { label: "Đơn hàng đang xử lý", count: processingCount ?? 0, href: "/orders" },
     { label: "Chi nhánh", count: branches.count ?? 0, href: "/branches" },
-    { label: "Khách hàng", count: customers.count ?? 0, href: "/customers" },
+    { label: "Khách hàng", count: customersCount.count ?? 0, href: "/customers" },
     { label: "Loại thiết bị", count: equipmentTypes.count ?? 0, href: "/equipment" },
   ];
 
@@ -148,36 +144,29 @@ export default async function DashboardHomePage({
     .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
     .slice(0, 5);
 
-  const myPerformance = employee
-    ? await computeMyPerformance(employee.id, employee.branch_id, employee.base_salary)
-    : null;
+  const customerReportRows = buildCustomerReportRows(
+    customersLite ?? [],
+    customerOrders ?? [],
+    customerPayments ?? [],
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Trang chủ</h1>
         <p className="text-sm text-muted-foreground">
-          Xin chào, {employee?.name} ({employee ? ROLE_LABELS[employee.role] : ""})
+          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
         </p>
       </div>
 
-      {myPerformance && <MyPerformanceCard perf={myPerformance} />}
+      <MyPerformanceCard perf={myPerformance} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
         <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
       </div>
 
-      <OrdersListSection
-        status={params.status}
-        range={params.range}
-        from={params.from}
-        to={params.to}
-        branchId={null}
-        canDelete={canDeleteOrders}
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((stat) => (
           <Link key={stat.href} href={stat.href}>
             <Card className="transition-colors hover:bg-muted/50">
@@ -194,7 +183,17 @@ export default async function DashboardHomePage({
         ))}
       </div>
 
-      {!canCompareBranches && (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Khách hàng</h2>
+          <Link href="/customers" className="text-xs text-muted-foreground hover:underline">
+            Xem báo cáo đầy đủ →
+          </Link>
+        </div>
+        <CustomerOverviewTiles rows={customerReportRows} />
+      </div>
+
+      {!canManage && (
         <PeriodRevenueCards
           day={day}
           month={month}
@@ -208,7 +207,7 @@ export default async function DashboardHomePage({
         />
       )}
 
-      {canCompareBranches && (
+      {canManage && (
         <BranchComparisonSection
           branches={branchList.data ?? []}
           orders={orderList}
@@ -229,6 +228,10 @@ export default async function DashboardHomePage({
           value: (r.report.profitRatio ?? 0) * 100,
         }))}
       />
+
+      {canManage && employeeRows && (
+        <EmployeePerformanceChartsSection rows={employeeRows} chartMonth={chartMonth} />
+      )}
     </div>
   );
 }

@@ -8,12 +8,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RevenueBarList } from "@/components/revenue-bar-list";
-import { buildCustomerReportRows, daysSince } from "@/lib/customer-reports";
+import { buildCustomerReportRows, daysSince, type CustomerReportRow } from "@/lib/customer-reports";
 import type { CustomerType } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 const dateFormatter = new Intl.DateTimeFormat("vi-VN");
 const DORMANT_THRESHOLD_DAYS = 60;
+
+// 4 thẻ tóm tắt — dùng chung cho báo cáo đầy đủ ở /customers và khối tóm tắt
+// condensed trên Trang chủ.
+export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
+  const individualCount = rows.filter((r) => r.customerType === "individual").length;
+  const companyCount = rows.filter((r) => r.customerType === "company").length;
+  const newCount = rows.filter((r) => r.orderCount === 1).length;
+  const returningCount = rows.filter((r) => r.orderCount > 1).length;
+
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-normal text-muted-foreground">Tổng khách hàng</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-semibold">{rows.length}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-normal text-muted-foreground">Cá nhân / Doanh nghiệp</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-semibold">
+            {individualCount} / {companyCount}
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-normal text-muted-foreground">Khách mới (1 đơn)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-semibold">{newCount}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-normal text-muted-foreground">Khách quay lại (2+ đơn)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-semibold">{returningCount}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export function CustomerReportSection({
   customers,
@@ -33,11 +81,6 @@ export function CustomerReportSection({
   const rows = buildCustomerReportRows(customers, orders, payments);
   const now = new Date();
 
-  const individualCount = rows.filter((r) => r.customerType === "individual").length;
-  const companyCount = rows.filter((r) => r.customerType === "company").length;
-  const newCount = rows.filter((r) => r.orderCount === 1).length;
-  const returningCount = rows.filter((r) => r.orderCount > 1).length;
-
   const topByRevenue = [...rows]
     .filter((r) => r.totalRevenue > 0)
     .sort((a, b) => b.totalRevenue - a.totalRevenue)
@@ -53,42 +96,7 @@ export function CustomerReportSection({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Báo cáo khách hàng</h2>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Tổng khách hàng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{rows.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Cá nhân / Doanh nghiệp</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">
-              {individualCount} / {companyCount}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Khách mới (1 đơn)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{newCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Khách quay lại (2+ đơn)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{returningCount}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <CustomerOverviewTiles rows={rows} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
