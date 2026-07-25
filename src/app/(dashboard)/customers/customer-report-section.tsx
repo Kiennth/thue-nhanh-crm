@@ -7,13 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RevenueBarList } from "@/components/revenue-bar-list";
-import { buildCustomerReportRows, daysSince, type CustomerReportRow } from "@/lib/customer-reports";
+import { buildCustomerReportRows, type CustomerReportRow } from "@/lib/customer-reports";
 import type { CustomerType } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
-const dateFormatter = new Intl.DateTimeFormat("vi-VN");
-const DORMANT_THRESHOLD_DAYS = 60;
 
 // 4 thẻ tóm tắt — dùng chung cho báo cáo đầy đủ ở /customers và khối tóm tắt
 // condensed trên Trang chủ.
@@ -79,18 +76,16 @@ export function CustomerReportSection({
   payments: { order_id: string; amount: number }[];
 }) {
   const rows = buildCustomerReportRows(customers, orders, payments);
-  const now = new Date();
 
   const topByRevenue = [...rows]
     .filter((r) => r.totalRevenue > 0)
     .sort((a, b) => b.totalRevenue - a.totalRevenue)
-    .slice(0, 5);
+    .slice(0, 10);
 
-  const debtRows = [...rows].filter((r) => r.totalOwed > 0).sort((a, b) => b.totalOwed - a.totalOwed);
-
-  const dormantRows = rows
-    .filter((r) => r.lastOrderDate && daysSince(r.lastOrderDate, now) > DORMANT_THRESHOLD_DAYS)
-    .sort((a, b) => daysSince(a.lastOrderDate!, now) < daysSince(b.lastOrderDate!, now) ? 1 : -1);
+  const debtRows = [...rows]
+    .filter((r) => r.totalOwed > 0)
+    .sort((a, b) => b.totalOwed - a.totalOwed)
+    .slice(0, 10);
 
   return (
     <div className="space-y-4">
@@ -104,13 +99,29 @@ export function CustomerReportSection({
             <CardTitle className="text-base">Top khách hàng theo doanh số</CardTitle>
           </CardHeader>
           <CardContent>
-            <RevenueBarList
-              points={topByRevenue.map((r) => ({ label: r.name, value: r.totalRevenue }))}
-              labelWidthClassName="w-32"
-            />
-            {!topByRevenue.length && (
-              <p className="text-sm text-muted-foreground">Chưa có doanh số nào.</p>
-            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Khách hàng</TableHead>
+                  <TableHead>Doanh số</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topByRevenue.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell>{currencyFormatter.format(r.totalRevenue)}đ</TableCell>
+                  </TableRow>
+                ))}
+                {!topByRevenue.length && (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">
+                      Chưa có doanh số nào.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
@@ -147,41 +158,6 @@ export function CustomerReportSection({
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Khách lâu không quay lại (trên {DORMANT_THRESHOLD_DAYS} ngày)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Khách hàng</TableHead>
-                <TableHead>Đơn gần nhất</TableHead>
-                <TableHead>Số ngày</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dormantRows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell>{dateFormatter.format(new Date(r.lastOrderDate!))}</TableCell>
-                  <TableCell>{daysSince(r.lastOrderDate!, now)} ngày</TableCell>
-                </TableRow>
-              ))}
-              {!dormantRows.length && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    Không có khách nào lâu không quay lại.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }

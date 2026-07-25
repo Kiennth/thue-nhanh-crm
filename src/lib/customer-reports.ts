@@ -9,7 +9,6 @@ export interface CustomerReportRow {
   totalRevenue: number;
   totalPaid: number;
   totalOwed: number;
-  lastOrderDate: string | null;
 }
 
 // Doanh số/công nợ chỉ tính trên đơn CHƯA huỷ — đơn huỷ không tính là doanh
@@ -45,10 +44,6 @@ export function buildCustomerReportRows(
       0,
     );
     const totalPaid = custOrders.reduce((sum, o) => sum + (paidByOrderId.get(o.id) ?? 0), 0);
-    const lastOrderDate = custOrders.reduce<string | null>(
-      (latest, o) => (!latest || o.order_date > latest ? o.order_date : latest),
-      null,
-    );
 
     return {
       id: c.id,
@@ -58,13 +53,6 @@ export function buildCustomerReportRows(
       totalRevenue,
       totalPaid,
       totalOwed: Math.max(0, totalRevenue - totalPaid),
-      lastOrderDate,
     };
   });
-}
-
-export function daysSince(dateStr: string, now: Date): number {
-  const then = new Date(`${dateStr}T00:00:00`);
-  const diffMs = now.getTime() - then.getTime();
-  return Math.floor(diffMs / (24 * 3600 * 1000));
 }
