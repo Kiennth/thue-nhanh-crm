@@ -61,6 +61,47 @@ export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
   );
 }
 
+function TopRevenueCard({ title, rows }: { title: string; rows: CustomerReportRow[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Khách hàng</TableHead>
+              <TableHead>Số lượng đơn</TableHead>
+              <TableHead>Doanh số</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium">
+                  <Link href={`/customers/${r.id}`} className="hover:underline">
+                    {r.name}
+                  </Link>
+                </TableCell>
+                <TableCell>{r.orderCount}</TableCell>
+                <TableCell>{currencyFormatter.format(r.totalRevenue)}đ</TableCell>
+              </TableRow>
+            ))}
+            {!rows.length && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-muted-foreground">
+                  Chưa có doanh số nào.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function CustomerReportSection({
   customers,
   orders,
@@ -78,8 +119,13 @@ export function CustomerReportSection({
 }) {
   const rows = buildCustomerReportRows(customers, orders, payments);
 
-  const topByRevenue = [...rows]
-    .filter((r) => r.totalRevenue > 0)
+  const topCompanyByRevenue = [...rows]
+    .filter((r) => r.customerType === "company" && r.totalRevenue > 0)
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 10);
+
+  const topIndividualByRevenue = [...rows]
+    .filter((r) => r.customerType === "individual" && r.totalRevenue > 0)
     .sort((a, b) => b.totalRevenue - a.totalRevenue)
     .slice(0, 10);
 
@@ -94,41 +140,9 @@ export function CustomerReportSection({
 
       <CustomerOverviewTiles rows={rows} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top khách hàng theo doanh số</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Khách hàng</TableHead>
-                  <TableHead>Doanh số</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topByRevenue.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/customers/${r.id}`} className="hover:underline">
-                        {r.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{currencyFormatter.format(r.totalRevenue)}đ</TableCell>
-                  </TableRow>
-                ))}
-                {!topByRevenue.length && (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
-                      Chưa có doanh số nào.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TopRevenueCard title="Top khách hàng công ty theo doanh số" rows={topCompanyByRevenue} />
+        <TopRevenueCard title="Top khách hàng cá nhân theo doanh số" rows={topIndividualByRevenue} />
 
         <Card>
           <CardHeader>
@@ -139,6 +153,7 @@ export function CustomerReportSection({
               <TableHeader>
                 <TableRow>
                   <TableHead>Khách hàng</TableHead>
+                  <TableHead>Số lượng đơn</TableHead>
                   <TableHead>Còn nợ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -150,6 +165,7 @@ export function CustomerReportSection({
                         {r.name}
                       </Link>
                     </TableCell>
+                    <TableCell>{r.orderCount}</TableCell>
                     <TableCell className="text-destructive">
                       {currencyFormatter.format(r.totalOwed)}đ
                     </TableCell>
@@ -157,7 +173,7 @@ export function CustomerReportSection({
                 ))}
                 {!debtRows.length && (
                   <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">
                       Không có khách nào còn nợ.
                     </TableCell>
                   </TableRow>
