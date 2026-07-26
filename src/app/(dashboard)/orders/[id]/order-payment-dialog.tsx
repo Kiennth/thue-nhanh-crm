@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,15 +36,27 @@ const SUBMIT_LABELS: Record<OrderPaymentType, string> = {
   deposit_refund: "Ghi nhận hoàn cọc",
 };
 
+const TRIGGER_LABELS: Record<OrderPaymentType, string> = {
+  invoice: "Thêm",
+  deposit_collect: "Thu",
+  deposit_refund: "Hoàn",
+};
+
 export function OrderPaymentDialog({
   orderId,
-  trigger,
   paymentType = "invoice",
 }: {
   orderId: string;
-  trigger: React.ReactElement;
   paymentType?: OrderPaymentType;
 }) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <Plus className="size-4" />
+      {TRIGGER_LABELS[paymentType]}
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

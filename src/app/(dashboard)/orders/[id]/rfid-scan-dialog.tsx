@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Radio } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -17,13 +18,20 @@ import { RFID_SCAN_TYPE_LABELS } from "@/lib/rfid-labels";
 import type { RfidScanType } from "@/types/database";
 
 interface RfidScanDialogProps {
-  trigger: React.ReactElement;
   orderId: string;
   branchId: string;
   scanType: RfidScanType;
 }
 
-export function RfidScanDialog({ trigger, orderId, branchId, scanType }: RfidScanDialogProps) {
+export function RfidScanDialog({ orderId, branchId, scanType }: RfidScanDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <Radio className="size-4" />
+      Quét RFID
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [tagCode, setTagCode] = useState("");
   const [scannedCodes, setScannedCodes] = useState<string[]>([]);

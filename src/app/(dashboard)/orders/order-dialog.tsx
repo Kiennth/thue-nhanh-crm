@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,6 @@ interface BranchOption {
 }
 
 interface OrderDialogProps {
-  trigger: React.ReactElement;
   branches: BranchOption[];
   order?: {
     id: string;
@@ -50,8 +50,18 @@ function generateOrderCode() {
   return `DH${y}${m}${d}-${rand}`;
 }
 
-export function OrderDialog({ trigger, branches, order }: OrderDialogProps) {
+export function OrderDialog({ branches, order }: OrderDialogProps) {
   const isEdit = !!order;
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = isEdit ? (
+    <Button variant="outline">Sửa</Button>
+  ) : (
+    <Button>
+      <Plus className="size-4" />
+      Thêm đơn hàng
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

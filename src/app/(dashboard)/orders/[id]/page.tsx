@@ -1,7 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Plus, Radio } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -320,7 +318,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <OrderDialog
             branches={branchList}
             order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
-            trigger={<Button variant="outline">Sửa</Button>}
           />
           <DuplicateOrderButton orderId={order.id} />
           {!order.completed_at && !order.cancelled_at && (
@@ -396,12 +393,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 equipmentTypes={equipmentTypes ?? []}
                 equipmentUnits={equipmentUnits ?? []}
                 equipmentInstances={equipmentInstances ?? []}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Plus className="size-4" />
-                    Thêm dòng hàng
-                  </Button>
-                }
               />
             </CardHeader>
             <CardContent className="space-y-4">
@@ -578,12 +569,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
                             }
                             scanType={scanType}
-                            trigger={
-                              <Button variant="outline" size="sm">
-                                <Radio className="size-4" />
-                                Quét RFID
-                              </Button>
-                            }
                           />
                         )}
                       </div>
@@ -608,15 +593,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base">Thanh toán</CardTitle>
-              <OrderPaymentDialog
-                orderId={order.id}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Plus className="size-4" />
-                    Thêm
-                  </Button>
-                }
-              />
+              <OrderPaymentDialog orderId={order.id} />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -677,26 +654,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="text-base">Tiền cọc</CardTitle>
                 <div className="flex gap-1">
-                  <OrderPaymentDialog
-                    orderId={order.id}
-                    paymentType="deposit_collect"
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <Plus className="size-4" />
-                        Thu
-                      </Button>
-                    }
-                  />
-                  <OrderPaymentDialog
-                    orderId={order.id}
-                    paymentType="deposit_refund"
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <Plus className="size-4" />
-                        Hoàn
-                      </Button>
-                    }
-                  />
+                  <OrderPaymentDialog orderId={order.id} paymentType="deposit_collect" />
+                  <OrderPaymentDialog orderId={order.id} paymentType="deposit_refund" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -795,16 +754,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="text-base">OT (tăng ca)</CardTitle>
-                <OvertimeDialog
-                  orderId={order.id}
-                  employees={employeeList}
-                  trigger={
-                    <Button variant="outline" size="sm">
-                      <Plus className="size-4" />
-                      Ghi nhận
-                    </Button>
-                  }
-                />
+                <OvertimeDialog orderId={order.id} employees={employeeList} />
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">

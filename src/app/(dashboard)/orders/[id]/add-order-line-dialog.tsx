@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,6 @@ interface EquipmentInstanceOption {
 }
 
 interface AddOrderLineDialogProps {
-  trigger: React.ReactElement;
   orderId: string;
   equipmentTypes: EquipmentTypeOption[];
   equipmentUnits: EquipmentUnitOption[];
@@ -50,12 +50,19 @@ interface AddOrderLineDialogProps {
 }
 
 export function AddOrderLineDialog({
-  trigger,
   orderId,
   equipmentTypes,
   equipmentUnits,
   equipmentInstances,
 }: AddOrderLineDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <Plus className="size-4" />
+      Thêm dòng hàng
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
