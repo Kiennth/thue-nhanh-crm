@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,6 @@ interface PricingTemplateOption {
 }
 
 interface EquipmentTypeDialogProps {
-  trigger: React.ReactElement;
   templates: PricingTemplateOption[];
   equipmentType?: {
     id: string;
@@ -58,6 +58,9 @@ interface EquipmentTypeDialogProps {
     image_url: string | null;
     payout_percentage: number | null;
   };
+  // Biến thể nút "Sửa" — icon-only ở bảng danh sách (mặc định), outline có
+  // chữ ở trang chi tiết.
+  editTriggerVariant?: "icon" | "outline";
 }
 
 const PRICE_LABEL: Record<ProductType, string> = {
@@ -67,11 +70,33 @@ const PRICE_LABEL: Record<ProductType, string> = {
 };
 
 export function EquipmentTypeDialog({
-  trigger,
   templates,
   equipmentType,
+  editTriggerVariant = "icon",
 }: EquipmentTypeDialogProps) {
   const isEdit = !!equipmentType;
+  // Nút trigger dựng NGAY TRONG client component này (không nhận qua prop từ
+  // Server Component như trước) — nhận qua prop gây lệch hydration ở
+  // data-slot của DialogTrigger/Button (mismatch "dialog-trigger" server vs
+  // "button" client), vì phần tử JSX phải xuyên qua ranh giới RSC trước khi
+  // Base UI merge props vào. Dựng nội bộ như ConfirmDeleteButton (không bao
+  // giờ lỗi này) thì tránh được.
+  const trigger = !isEdit ? (
+    <Button>
+      <Plus className="size-4" />
+      Thêm hàng hoá
+    </Button>
+  ) : editTriggerVariant === "outline" ? (
+    <Button variant="outline" size="sm">
+      <Pencil className="size-4" />
+      Sửa
+    </Button>
+  ) : (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

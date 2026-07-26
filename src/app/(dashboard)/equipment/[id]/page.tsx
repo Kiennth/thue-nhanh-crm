@@ -212,12 +212,7 @@ export default async function EquipmentDetailPage({
               <EquipmentTypeDialog
                 templates={templateList}
                 equipmentType={type}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Pencil className="size-4" />
-                    Sửa
-                  </Button>
-                }
+                editTriggerVariant="outline"
               />
               <ConfirmDeleteButton
                 confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}

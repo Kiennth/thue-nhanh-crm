@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil, ImageOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -46,7 +45,15 @@ const TOP_N = 10;
 
 type EquipmentTypeRow = Database["public"]["Tables"]["equipment_types"]["Row"];
 
-const SORT_KEYS = ["name", "productType", "trackingType", "pricingMethod", "price", "stock"] as const;
+const SORT_KEYS = [
+  "name",
+  "productType",
+  "trackingType",
+  "pricingMethod",
+  "price",
+  "stock",
+  "stockValue",
+] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 function isSortKey(value: string): value is SortKey {
   return (SORT_KEYS as readonly string[]).includes(value);
@@ -181,6 +188,10 @@ export default async function EquipmentPage({
     }
     return stockTotalByTypeId.get(t.id) ?? 0;
   }
+  function inventoryValueForType(t: EquipmentTypeRow): number {
+    if (t.product_type === "service") return 0;
+    return t.price * Math.max(0, stockValue(t));
+  }
 
   const dirMult = activeDir === "asc" ? 1 : -1;
   const sortedTypes = [...allTypes].sort((a, b) => {
@@ -195,6 +206,8 @@ export default async function EquipmentPage({
         return dirMult * (a.price - b.price);
       case "stock":
         return dirMult * (stockValue(a) - stockValue(b));
+      case "stockValue":
+        return dirMult * (inventoryValueForType(a) - inventoryValueForType(b));
       case "name":
         return dirMult * a.name.localeCompare(b.name, "vi");
       default:
@@ -321,17 +334,7 @@ export default async function EquipmentPage({
             value={activeSearch}
             resetParams={["page"]}
           />
-          {canManageCatalog && (
-            <EquipmentTypeDialog
-              templates={templateList}
-              trigger={
-                <Button>
-                  <Plus className="size-4" />
-                  Thêm hàng hoá
-                </Button>
-              }
-            />
-          )}
+          {canManageCatalog && <EquipmentTypeDialog templates={templateList} />}
         </div>
       </div>
 
@@ -401,6 +404,7 @@ export default async function EquipmentPage({
             <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
             <SortableTableHead sortKey="price" label="Giá" />
             <SortableTableHead sortKey="stock" label="Tồn kho" />
+            <SortableTableHead sortKey="stockValue" label="Tổng giá trị tồn kho" />
             <TableHead className="w-16"></TableHead>
           </TableRow>
         </TableHeader>
@@ -417,6 +421,11 @@ export default async function EquipmentPage({
                 : type.tracking_type === "individual"
                   ? `${instanceCountByTypeId.get(type.id) ?? 0} sản phẩm`
                   : `${stockTotalByTypeId.get(type.id) ?? 0}`;
+
+            const stockValueDisplay =
+              type.product_type === "service"
+                ? "—"
+                : `${currencyFormatter.format(inventoryValueForType(type))}đ`;
 
             return (
               <TableRow key={type.id}>
@@ -444,20 +453,12 @@ export default async function EquipmentPage({
                 <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
                 <TableCell className="text-muted-foreground">{priceLine}</TableCell>
                 <TableCell>{stockDisplay}</TableCell>
+                <TableCell>{stockValueDisplay}</TableCell>
                 <TableCell>
                   {(canManageCatalog || canManageStock) && (
                     <div className="flex items-center gap-1">
                       {canManageCatalog && (
-                        <EquipmentTypeDialog
-                          templates={templateList}
-                          equipmentType={type}
-                          trigger={
-                            <Button variant="ghost" size="icon-sm">
-                              <Pencil className="size-4" />
-                              <span className="sr-only">Sửa</span>
-                            </Button>
-                          }
-                        />
+                        <EquipmentTypeDialog templates={templateList} equipmentType={type} />
                       )}
                       {canManageCatalog && (
                         <ConfirmDeleteButton
@@ -475,7 +476,7 @@ export default async function EquipmentPage({
           })}
           {!typeList.length && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
                 {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
               </TableCell>
             </TableRow>
