@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import type { DateRange } from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
 
 export interface OrderToHandle {
@@ -14,6 +15,8 @@ export interface OrderToHandle {
 export interface OrdersToHandleResult {
   upcomingDeliveries: OrderToHandle[];
   pendingCollections: OrderToHandle[];
+  lateDeliveriesCount: number;
+  lateCollectionsCount: number;
 }
 
 const CHOT_DON_INDEX = TASK_TYPE_SEQUENCE.indexOf("chot_don");
@@ -23,6 +26,23 @@ const THU_HOI_INDEX = TASK_TYPE_SEQUENCE.indexOf("thu_hoi");
 
 function statusIndex(status: TaskType) {
   return TASK_TYPE_SEQUENCE.indexOf(status);
+}
+
+// range.start/end là "YYYY-MM-DD" (biên bao gồm cả 2 đầu, theo đúng quy ước
+// của computeDateRange) — actionDate là timestamptz, so theo mốc ngày giờ.
+function isWithinDateRange(actionDate: string, range: DateRange | null): boolean {
+  if (!range) return true;
+  const date = new Date(actionDate);
+  const start = new Date(`${range.start}T00:00:00`);
+  const end = new Date(`${range.end}T23:59:59.999`);
+  return date >= start && date <= end;
+}
+
+// Học theo Booqable: đơn đã trễ hẹn (giao/thu hồi) bị ẩn khỏi danh sách
+// chính cho đỡ rối, chỉ hiện khi bấm nút "Trễ hạn (N)" — xem lateOnly bên
+// dưới.
+function isLate(actionDate: string, now: Date): boolean {
+  return new Date(actionDate) < now;
 }
 
 // "Đơn hàng sắp tới" (cần giao) — hiện ngay khi đã Chốt đơn xong, cho đến khi
@@ -39,6 +59,11 @@ function statusIndex(status: TaskType) {
 export async function getOrdersToHandle(
   branchId: string | null,
   limit?: number,
+  options?: {
+    delivery?: DateRange | null;
+    collection?: DateRange | null;
+    lateOnly?: { delivery?: boolean; collection?: boolean };
+  },
 ): Promise<OrdersToHandleResult> {
   const supabase = await createClient();
 
@@ -55,7 +80,13 @@ export async function getOrdersToHandle(
   const { data: orders } = await query;
 
   const orderList = orders ?? [];
-  if (!orderList.length) return { upcomingDeliveries: [], pendingCollections: [] };
+  if (!orderList.length)
+    return {
+      upcomingDeliveries: [],
+      pendingCollections: [],
+      lateDeliveriesCount: 0,
+      lateCollectionsCount: 0,
+    };
 
   const customerIds = [...new Set(orderList.map((o) => o.customer_id))];
   const branchIds = [...new Set(orderList.flatMap((o) => [o.pickup_branch_id, o.return_branch_id]))];
@@ -68,6 +99,11 @@ export async function getOrdersToHandle(
 
   const upcomingDeliveries: OrderToHandle[] = [];
   const pendingCollections: OrderToHandle[] = [];
+  const now = new Date();
+  const lateOnlyDelivery = options?.lateOnly?.delivery ?? false;
+  const lateOnlyCollection = options?.lateOnly?.collection ?? false;
+  let lateDeliveriesCount = 0;
+  let lateCollectionsCount = 0;
 
   for (const order of orderList) {
     const idx = statusIndex(order.status);
@@ -83,11 +119,18 @@ export async function getOrdersToHandle(
       order.rental_start_at &&
       (!branchId || order.pickup_branch_id === branchId)
     ) {
-      upcomingDeliveries.push({
-        ...base,
-        branchName: branchNameById.get(order.pickup_branch_id) ?? "—",
-        actionDate: order.rental_start_at,
-      });
+      const late = isLate(order.rental_start_at, now);
+      if (late) lateDeliveriesCount += 1;
+      const include = late
+        ? lateOnlyDelivery
+        : !lateOnlyDelivery && isWithinDateRange(order.rental_start_at, options?.delivery ?? null);
+      if (include) {
+        upcomingDeliveries.push({
+          ...base,
+          branchName: branchNameById.get(order.pickup_branch_id) ?? "—",
+          actionDate: order.rental_start_at,
+        });
+      }
     }
 
     if (
@@ -96,11 +139,18 @@ export async function getOrdersToHandle(
       order.rental_end_at &&
       (!branchId || order.return_branch_id === branchId)
     ) {
-      pendingCollections.push({
-        ...base,
-        branchName: branchNameById.get(order.return_branch_id) ?? "—",
-        actionDate: order.rental_end_at,
-      });
+      const late = isLate(order.rental_end_at, now);
+      if (late) lateCollectionsCount += 1;
+      const include = late
+        ? lateOnlyCollection
+        : !lateOnlyCollection && isWithinDateRange(order.rental_end_at, options?.collection ?? null);
+      if (include) {
+        pendingCollections.push({
+          ...base,
+          branchName: branchNameById.get(order.return_branch_id) ?? "—",
+          actionDate: order.rental_end_at,
+        });
+      }
     }
   }
 
@@ -110,5 +160,7 @@ export async function getOrdersToHandle(
   return {
     upcomingDeliveries: limit ? upcomingDeliveries.slice(0, limit) : upcomingDeliveries,
     pendingCollections: limit ? pendingCollections.slice(0, limit) : pendingCollections,
+    lateDeliveriesCount,
+    lateCollectionsCount,
   };
 }

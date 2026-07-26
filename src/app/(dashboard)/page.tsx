@@ -14,6 +14,11 @@ import {
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
+import {
+  computeDateRange,
+  DATE_RANGE_PRESET_OPTIONS,
+  type DateRangePreset,
+} from "@/lib/date-range-presets";
 import { fetchAllCustomersLite } from "@/lib/customers";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
@@ -24,10 +29,16 @@ import {
 } from "@/lib/employee-performance-charts";
 import { MyPerformanceCard } from "./my-performance-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
+import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
+import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
 import { CustomerOverviewTiles } from "./customers/customer-report-section";
 import { EmployeePerformanceChartsSection } from "./employee-performance-charts";
 
-const HANDLE_LIMIT = 8;
+const HANDLE_LIMIT = 5;
+
+function isDateRangePreset(value: string): value is DateRangePreset {
+  return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
 
 export default async function DashboardHomePage({
   searchParams,
@@ -37,6 +48,10 @@ export default async function DashboardHomePage({
     month?: string;
     year?: string;
     chartMonth?: string;
+    upcomingRange?: string;
+    returningRange?: string;
+    upcomingLate?: string;
+    returningLate?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -45,6 +60,15 @@ export default async function DashboardHomePage({
   const month = params.month || defaults.month;
   const year = params.year || defaults.year;
   const chartMonth = params.chartMonth || currentMonth();
+  const upcomingRangePreset: DateRangePreset =
+    params.upcomingRange && isDateRangePreset(params.upcomingRange) ? params.upcomingRange : "all";
+  const returningRangePreset: DateRangePreset =
+    params.returningRange && isDateRangePreset(params.returningRange) ? params.returningRange : "all";
+  const upcomingLateActive = params.upcomingLate === "1";
+  const returningLateActive = params.returningLate === "1";
+  const now = new Date();
+  const upcomingDateRange = computeDateRange(upcomingRangePreset, now);
+  const returningDateRange = computeDateRange(returningRangePreset, now);
 
   const employee = await getCurrentEmployee();
   if (!employee) return null;
@@ -104,7 +128,11 @@ export default async function DashboardHomePage({
     fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
       supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
     ),
-    getOrdersToHandle(branchId, HANDLE_LIMIT),
+    getOrdersToHandle(branchId, HANDLE_LIMIT, {
+      delivery: upcomingDateRange,
+      collection: returningDateRange,
+      lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
+    }),
     processingOrdersQuery,
     fetchAllCustomersLite(),
     fetchAllRows<{
@@ -180,8 +208,36 @@ export default async function DashboardHomePage({
       <MyPerformanceCard perf={myPerformance} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} />
-        <PendingCollectionsCard orders={ordersToHandle.pendingCollections} />
+        <UpcomingDeliveriesCard
+          orders={ordersToHandle.upcomingDeliveries}
+          rangeFilter={
+            !upcomingLateActive && (
+              <OrdersToHandleRangeFilter paramName="upcomingRange" value={upcomingRangePreset} />
+            )
+          }
+          lateToggle={
+            <OrdersToHandleLateToggle
+              paramName="upcomingLate"
+              count={ordersToHandle.lateDeliveriesCount}
+              active={upcomingLateActive}
+            />
+          }
+        />
+        <PendingCollectionsCard
+          orders={ordersToHandle.pendingCollections}
+          rangeFilter={
+            !returningLateActive && (
+              <OrdersToHandleRangeFilter paramName="returningRange" value={returningRangePreset} />
+            )
+          }
+          lateToggle={
+            <OrdersToHandleLateToggle
+              paramName="returningLate"
+              count={ordersToHandle.lateCollectionsCount}
+              active={returningLateActive}
+            />
+          }
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

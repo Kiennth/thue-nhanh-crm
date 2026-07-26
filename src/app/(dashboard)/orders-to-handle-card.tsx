@@ -14,12 +14,16 @@ function OrderCountdownList({
   emptyMessage,
   orders,
   hideViewAllLink,
+  rangeFilter,
+  lateToggle,
 }: {
   title: string;
   icon: ComponentType<{ className?: string }>;
   emptyMessage: string;
   orders: OrderToHandle[];
   hideViewAllLink?: boolean;
+  rangeFilter?: React.ReactNode;
+  lateToggle?: React.ReactNode;
 }) {
   return (
     <Card>
@@ -28,11 +32,15 @@ function OrderCountdownList({
           <Icon className="size-4 text-muted-foreground" />
           {title}
         </CardTitle>
-        {!hideViewAllLink && (
-          <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
-            Xem tất cả →
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {rangeFilter}
+          {lateToggle}
+          {!hideViewAllLink && (
+            <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
+              Xem tất cả →
+            </Link>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-1">
         {!orders.length && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
@@ -61,9 +69,13 @@ function OrderCountdownList({
 export function UpcomingDeliveriesCard({
   orders,
   hideViewAllLink,
+  rangeFilter,
+  lateToggle,
 }: {
   orders: OrderToHandle[];
   hideViewAllLink?: boolean;
+  rangeFilter?: React.ReactNode;
+  lateToggle?: React.ReactNode;
 }) {
   return (
     <OrderCountdownList
@@ -72,6 +84,8 @@ export function UpcomingDeliveriesCard({
       emptyMessage="Không có đơn nào sắp tới cần giao."
       orders={orders}
       hideViewAllLink={hideViewAllLink}
+      rangeFilter={rangeFilter}
+      lateToggle={lateToggle}
     />
   );
 }
@@ -79,9 +93,13 @@ export function UpcomingDeliveriesCard({
 export function PendingCollectionsCard({
   orders,
   hideViewAllLink,
+  rangeFilter,
+  lateToggle,
 }: {
   orders: OrderToHandle[];
   hideViewAllLink?: boolean;
+  rangeFilter?: React.ReactNode;
+  lateToggle?: React.ReactNode;
 }) {
   return (
     <OrderCountdownList
@@ -90,6 +108,8 @@ export function PendingCollectionsCard({
       emptyMessage="Không có đơn nào sắp về."
       orders={orders}
       hideViewAllLink={hideViewAllLink}
+      rangeFilter={rangeFilter}
+      lateToggle={lateToggle}
     />
   );
 }
