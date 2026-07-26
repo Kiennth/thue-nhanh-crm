@@ -641,6 +641,15 @@ export interface Database {
         };
         Returns: void;
       };
+      record_equipment_cost_adjustment: {
+        Args: {
+          p_equipment_unit_id: string;
+          p_branch_id: string;
+          p_unit_cost: number;
+          p_note?: string | null;
+        };
+        Returns: void;
+      };
       record_equipment_disposal: {
         Args: {
           p_equipment_unit_id: string;

@@ -44,6 +44,7 @@ import { TransferStockDialog } from "../transfer-stock-dialog";
 import { EquipmentInstanceDialog } from "../equipment-instance-dialog";
 import { EquipmentInstanceDisposeDialog } from "../equipment-instance-dispose-dialog";
 import { EquipmentPurchaseDialog } from "../equipment-purchase-dialog";
+import { EquipmentCostAdjustmentDialog } from "../equipment-cost-adjustment-dialog";
 import { EquipmentDisposalDialog } from "../equipment-disposal-dialog";
 import { RfidTagDialog } from "../rfid-tag-dialog";
 import type { Database } from "@/types/database";
@@ -381,6 +382,16 @@ export default async function EquipmentDetailPage({
                             Mua hàng
                           </Button>
                         }
+                      />
+                      <EquipmentCostAdjustmentDialog
+                        equipmentUnitId={unit.id}
+                        branchStocks={unitStock
+                          .filter((row) => row.quantity_in_stock > 0)
+                          .map((row) => ({
+                            branch_id: row.branch_id,
+                            branch_name: branchNameById.get(row.branch_id) ?? "—",
+                            quantity_in_stock: row.quantity_in_stock,
+                          }))}
                       />
                       <EquipmentDisposalDialog
                         equipmentUnitId={unit.id}

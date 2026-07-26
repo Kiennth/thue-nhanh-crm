@@ -651,6 +651,52 @@ export async function createEquipmentPurchase(
   return { success: true };
 }
 
+// Gán giá vốn cho tồn kho ĐÃ CÓ SẴN (mua từ trước, chưa từng ghi nhận giá
+// vốn) — khác với createEquipmentPurchase (luôn cộng thêm số lượng). Dùng
+// khi ấn "Mua hàng" sẽ biến 1 sản phẩm thành 2 một cách sai lệch.
+const EquipmentCostAdjustmentSchema = z.object({
+  equipment_unit_id: z.string().uuid(),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  unit_cost: z.coerce.number().min(0, { message: "Giá vốn không được âm." }),
+  note: z.string().trim().optional(),
+});
+
+export async function adjustEquipmentUnitCost(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
+
+  const parsed = EquipmentCostAdjustmentSchema.safeParse({
+    equipment_unit_id: formData.get("equipment_unit_id"),
+    branch_id: formData.get("branch_id"),
+    unit_cost: formData.get("unit_cost"),
+    note: formData.get("note") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_equipment_cost_adjustment", {
+    p_equipment_unit_id: parsed.data.equipment_unit_id,
+    p_branch_id: parsed.data.branch_id,
+    p_unit_cost: parsed.data.unit_cost,
+    p_note: parsed.data.note ?? null,
+  });
+
+  if (error) {
+    return { error: "Không thể điều chỉnh giá vốn: " + error.message };
+  }
+
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
 const EquipmentDisposalSchema = z.object({
   equipment_unit_id: z.string().uuid(),
   branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
