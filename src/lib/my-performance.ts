@@ -7,12 +7,14 @@ import {
   computeOrderPoolValue,
   computePoolExcludedTotal,
   computeTaskCommission,
+  computeTransportPayoutPercentage,
   findCommissionRate,
   findTaskWeight,
   SERVICE_LINE_CATEGORY_BY_TYPE_ID,
+  TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
-import type { TaskType } from "@/types/database";
+import type { DeliveryMethod, TaskType } from "@/types/database";
 
 function currentMonthRange() {
   const now = new Date();
@@ -39,6 +41,8 @@ export interface MyPerformance {
   installationPayout: number;
   removalPayout: number;
   supportPayout: number;
+  deliveryPayout: number;
+  collectionPayout: number;
   overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
@@ -83,10 +87,11 @@ export async function computeMyPerformance(
         employee_id: string | null;
         completed_date: string | null;
         line_total: number;
+        delivery_method: DeliveryMethod | null;
       }>((from, to) =>
         admin
           .from("order_equipment")
-          .select("order_id, equipment_type_id, employee_id, completed_date, line_total")
+          .select("order_id, equipment_type_id, employee_id, completed_date, line_total, delivery_method")
           .range(from, to),
       ),
       fetchAllRows<{ amount: number }>((from, to) =>
@@ -103,8 +108,17 @@ export async function computeMyPerformance(
   // Không lọc orders bằng .in(id, orderIds) — nhân viên bận có thể liên quan
   // hàng trăm/nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL
   // của PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
-  const allOrders = await fetchAllRows<{ id: string; total_value: number; pickup_branch_id: string }>(
-    (from, to) => admin.from("orders").select("id, total_value, pickup_branch_id").range(from, to),
+  const allOrders = await fetchAllRows<{
+    id: string;
+    total_value: number;
+    pickup_branch_id: string;
+    rental_start_at: string | null;
+    rental_end_at: string | null;
+  }>((from, to) =>
+    admin
+      .from("orders")
+      .select("id, total_value, pickup_branch_id, rental_start_at, rental_end_at")
+      .range(from, to),
   );
   const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
@@ -116,6 +130,10 @@ export async function computeMyPerformance(
       .filter((t): t is { id: string; payout_percentage: number } => t.payout_percentage != null)
       .map((t) => [t.id, t.payout_percentage]),
   );
+  const directPayoutTypeIds = new Set([
+    ...payoutPercentByTypeId.keys(),
+    ...Object.keys(TRANSPORT_LINE_CATEGORY_BY_TYPE_ID),
+  ]);
   const linesByOrderId = new Map<string, PoolExcludedLineInput[]>();
   for (const line of allOrderLines) {
     const list = linesByOrderId.get(line.order_id) ?? [];
@@ -125,7 +143,7 @@ export async function computeMyPerformance(
   const poolExclusionByOrderId = new Map(
     [...linesByOrderId.entries()].map(([orderId, lines]) => [
       orderId,
-      computePoolExcludedTotal(lines, payoutPercentByTypeId),
+      computePoolExcludedTotal(lines, directPayoutTypeIds),
     ]),
   );
 
@@ -133,14 +151,27 @@ export async function computeMyPerformance(
     (acc, line) => {
       if (line.employee_id !== employeeId || !line.equipment_type_id || !line.completed_date) return acc;
       if (line.completed_date < start || line.completed_date >= end) return acc;
-      const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
-      if (payoutPercentage == null) return acc;
-      const category = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
-      if (!category) return acc;
-      acc[category] += computeLineDirectPayout(line.line_total, payoutPercentage);
+
+      const serviceCategory = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+      if (serviceCategory) {
+        const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
+        if (payoutPercentage != null) {
+          acc[serviceCategory] += computeLineDirectPayout(line.line_total, payoutPercentage);
+        }
+        return acc;
+      }
+
+      const transportCategory = TRANSPORT_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+      if (transportCategory) {
+        const order = orderById.get(line.order_id);
+        const scheduledAt =
+          transportCategory === "delivery" ? (order?.rental_start_at ?? null) : (order?.rental_end_at ?? null);
+        const payoutPercentage = computeTransportPayoutPercentage(line.delivery_method, scheduledAt);
+        acc[transportCategory] += computeLineDirectPayout(line.line_total, payoutPercentage);
+      }
       return acc;
     },
-    { installation: 0, removal: 0, support: 0 },
+    { installation: 0, removal: 0, support: 0, delivery: 0, collection: 0 },
   );
   const overtimePay = overtimeInMonth.reduce((sum, entry) => sum + entry.amount, 0);
 
@@ -184,6 +215,8 @@ export async function computeMyPerformance(
     installationPayout: servicePayout.installation,
     removalPayout: servicePayout.removal,
     supportPayout: servicePayout.support,
+    deliveryPayout: servicePayout.delivery,
+    collectionPayout: servicePayout.collection,
     overtimePay,
     totalIncome:
       baseSalary +
@@ -192,6 +225,8 @@ export async function computeMyPerformance(
       servicePayout.installation +
       servicePayout.removal +
       servicePayout.support +
+      servicePayout.delivery +
+      servicePayout.collection +
       overtimePay,
     completedTaskCount: taskList.length,
     tiers: tierList,

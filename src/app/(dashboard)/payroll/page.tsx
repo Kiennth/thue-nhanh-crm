@@ -80,8 +80,10 @@ export default async function PayrollPage({
                 <TableHead>Lương cứng</TableHead>
                 <TableHead>Tổng khoán</TableHead>
                 <TableHead>Phí Lắp đặt</TableHead>
-                <TableHead>Phí Thu hồi</TableHead>
+                <TableHead>Phí Tháo dỡ</TableHead>
                 <TableHead>Phí Support</TableHead>
+                <TableHead>Phí Giao hàng</TableHead>
+                <TableHead>Phí Thu hồi</TableHead>
                 <TableHead>OT</TableHead>
                 <TableHead>Thưởng</TableHead>
                 <TableHead>Tổng thu nhập</TableHead>
@@ -103,6 +105,8 @@ export default async function PayrollPage({
                   <TableCell>{currencyFormatter.format(row.installationPayout)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.removalPayout)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.supportPayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.deliveryPayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.collectionPayout)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.overtimePay)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.bonus)}đ</TableCell>
                   <TableCell className="font-medium">
@@ -112,7 +116,7 @@ export default async function PayrollPage({
               ))}
               {!sortedRows.length && (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground">
                     Không có dữ liệu.
                   </TableCell>
                 </TableRow>

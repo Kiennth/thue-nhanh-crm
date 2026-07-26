@@ -7,13 +7,15 @@ import {
   computeOrderPoolValue,
   computePoolExcludedTotal,
   computeTaskCommission,
+  computeTransportPayoutPercentage,
   findBonusAmount,
   findCommissionRate,
   findTaskWeight,
   SERVICE_LINE_CATEGORY_BY_TYPE_ID,
+  TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
-import type { TaskType } from "@/types/database";
+import type { DeliveryMethod, TaskType } from "@/types/database";
 import { MANAGE_ROLES } from "@/lib/roles";
 
 export { MANAGE_ROLES };
@@ -46,6 +48,8 @@ export interface EmployeeMonthlyPerformance {
   installationPayout: number;
   removalPayout: number;
   supportPayout: number;
+  deliveryPayout: number;
+  collectionPayout: number;
   overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
@@ -107,10 +111,11 @@ export async function computeEmployeeMonthlyPerformance(
       employee_id: string | null;
       completed_date: string | null;
       line_total: number;
+      delivery_method: DeliveryMethod | null;
     }>((from, to) =>
       admin
         .from("order_equipment")
-        .select("order_id, equipment_type_id, employee_id, completed_date, line_total")
+        .select("order_id, equipment_type_id, employee_id, completed_date, line_total, delivery_method")
         .range(from, to),
     ),
     fetchAllRows<{ employee_id: string; amount: number }>((from, to) =>
@@ -128,8 +133,17 @@ export async function computeEmployeeMonthlyPerformance(
   // Không lọc orders bằng .in(id, orderIds) — 1 tháng bận có thể liên quan
   // hàng nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL của
   // PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
-  const allOrders = await fetchAllRows<{ id: string; total_value: number; pickup_branch_id: string }>(
-    (from, to) => admin.from("orders").select("id, total_value, pickup_branch_id").range(from, to),
+  const allOrders = await fetchAllRows<{
+    id: string;
+    total_value: number;
+    pickup_branch_id: string;
+    rental_start_at: string | null;
+    rental_end_at: string | null;
+  }>((from, to) =>
+    admin
+      .from("orders")
+      .select("id, total_value, pickup_branch_id, rental_start_at, rental_end_at")
+      .range(from, to),
   );
   const orderById = new Map(allOrders.map((o) => [o.id, o]));
 
@@ -142,6 +156,10 @@ export async function computeEmployeeMonthlyPerformance(
       .filter((t): t is { id: string; payout_percentage: number } => t.payout_percentage != null)
       .map((t) => [t.id, t.payout_percentage]),
   );
+  const directPayoutTypeIds = new Set([
+    ...payoutPercentByTypeId.keys(),
+    ...Object.keys(TRANSPORT_LINE_CATEGORY_BY_TYPE_ID),
+  ]);
   const linesByOrderId = new Map<string, PoolExcludedLineInput[]>();
   for (const line of allOrderLines) {
     const list = linesByOrderId.get(line.order_id) ?? [];
@@ -151,29 +169,45 @@ export async function computeEmployeeMonthlyPerformance(
   const poolExclusionByOrderId = new Map(
     [...linesByOrderId.entries()].map(([orderId, lines]) => [
       orderId,
-      computePoolExcludedTotal(lines, payoutPercentByTypeId),
+      computePoolExcludedTotal(lines, directPayoutTypeIds),
     ]),
   );
 
   const servicePayoutByEmployeeId = new Map<
     string,
-    { installation: number; removal: number; support: number }
+    { installation: number; removal: number; support: number; delivery: number; collection: number }
   >();
   for (const line of allOrderLines) {
     if (!line.employee_id || !line.equipment_type_id || !line.completed_date) continue;
     if (line.completed_date < start || line.completed_date >= end) continue;
-    const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
-    if (payoutPercentage == null) continue;
-    const category = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
-    if (!category) continue;
-    const payout = computeLineDirectPayout(line.line_total, payoutPercentage);
+
     const entry = servicePayoutByEmployeeId.get(line.employee_id) ?? {
       installation: 0,
       removal: 0,
       support: 0,
+      delivery: 0,
+      collection: 0,
     };
-    entry[category] += payout;
-    servicePayoutByEmployeeId.set(line.employee_id, entry);
+
+    const serviceCategory = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+    if (serviceCategory) {
+      const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
+      if (payoutPercentage != null) {
+        entry[serviceCategory] += computeLineDirectPayout(line.line_total, payoutPercentage);
+        servicePayoutByEmployeeId.set(line.employee_id, entry);
+      }
+      continue;
+    }
+
+    const transportCategory = TRANSPORT_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+    if (transportCategory) {
+      const order = orderById.get(line.order_id);
+      const scheduledAt =
+        transportCategory === "delivery" ? (order?.rental_start_at ?? null) : (order?.rental_end_at ?? null);
+      const payoutPercentage = computeTransportPayoutPercentage(line.delivery_method, scheduledAt);
+      entry[transportCategory] += computeLineDirectPayout(line.line_total, payoutPercentage);
+      servicePayoutByEmployeeId.set(line.employee_id, entry);
+    }
   }
 
   const overtimeByEmployeeId = new Map<string, number>();
@@ -197,7 +231,13 @@ export async function computeEmployeeMonthlyPerformance(
     const bonus = emp.branch_id
       ? findBonusAmount(bonusTiers ?? [], emp.branch_id, totalCommission)
       : 0;
-    const service = servicePayoutByEmployeeId.get(emp.id) ?? { installation: 0, removal: 0, support: 0 };
+    const service = servicePayoutByEmployeeId.get(emp.id) ?? {
+      installation: 0,
+      removal: 0,
+      support: 0,
+      delivery: 0,
+      collection: 0,
+    };
     const overtimePay = overtimeByEmployeeId.get(emp.id) ?? 0;
     return {
       id: emp.id,
@@ -209,6 +249,8 @@ export async function computeEmployeeMonthlyPerformance(
       installationPayout: service.installation,
       removalPayout: service.removal,
       supportPayout: service.support,
+      deliveryPayout: service.delivery,
+      collectionPayout: service.collection,
       overtimePay,
       totalIncome:
         emp.base_salary +
@@ -217,6 +259,8 @@ export async function computeEmployeeMonthlyPerformance(
         service.installation +
         service.removal +
         service.support +
+        service.delivery +
+        service.collection +
         overtimePay,
       completedTaskCount: empTasks.length,
       taskTypeCounts,

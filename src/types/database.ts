@@ -15,6 +15,7 @@ export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" |
 export type OrderPaymentType = "invoice" | "deposit_collect" | "deposit_refund";
 export type RfidTagStatus = "in_stock" | "with_customer";
 export type RfidScanType = "giao_hang" | "thu_hoi";
+export type DeliveryMethod = "self_ride" | "external_service";
 
 export type TaskType =
   | "tiep_nhan_yeu_cau"
@@ -387,6 +388,10 @@ export interface Database {
           // — ai thực hiện + ngày hoàn thành, dùng để trả khoán trực tiếp.
           employee_id: string | null;
           completed_date: string | null;
+          // Chỉ có ý nghĩa với 2 SKU vận chuyển (giao/thu hồi bằng xe máy) —
+          // tự chạy hay đặt xe dịch vụ, cùng giờ hẹn trên đơn quyết định %payout
+          // (xem computeTransportPayoutPercentage() trong commission.ts).
+          delivery_method: DeliveryMethod | null;
           created_at: string;
         };
         Insert: {
@@ -401,6 +406,7 @@ export interface Database {
           line_total?: number;
           employee_id?: string | null;
           completed_date?: string | null;
+          delivery_method?: DeliveryMethod | null;
         };
         Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;
         Relationships: [];

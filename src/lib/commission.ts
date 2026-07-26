@@ -1,4 +1,4 @@
-import type { TaskType } from "@/types/database";
+import type { DeliveryMethod, TaskType } from "@/types/database";
 
 export interface CommissionTierInput {
   branch_id: string;
@@ -56,16 +56,17 @@ export interface PoolExcludedLineInput {
   line_total: number;
 }
 
-// Tổng giá trị các dòng dịch vụ đã có payout_percentage (Lắp đặt/Tháo dỡ/Hỗ
-// trợ kỹ thuật...) — dùng để loại ra khỏi giá trị đơn trước khi tra bậc
-// %hoa hồng/tính quỹ khoán theo khâu, tránh tính khoán 2 lần cho cùng 1
-// đồng doanh số.
+// Tổng giá trị các dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ
+// kỹ thuật... có payout_percentage CỐ ĐỊNH, cộng phí vận chuyển giao/thu hồi
+// bằng xe máy có payout %ĐỘNG — xem TRANSPORT_LINE_CATEGORY_BY_TYPE_ID) —
+// dùng để loại ra khỏi giá trị đơn trước khi tra bậc %hoa hồng/tính quỹ
+// khoán theo khâu, tránh tính khoán 2 lần cho cùng 1 đồng doanh số.
 export function computePoolExcludedTotal(
   lines: PoolExcludedLineInput[],
-  payoutPercentByTypeId: Map<string, number>,
+  directPayoutTypeIds: Set<string>,
 ): number {
   return lines.reduce((sum, line) => {
-    if (line.equipment_type_id && payoutPercentByTypeId.has(line.equipment_type_id)) {
+    if (line.equipment_type_id && directPayoutTypeIds.has(line.equipment_type_id)) {
       return sum + line.line_total;
     }
     return sum;
@@ -91,6 +92,42 @@ export const SERVICE_LINE_CATEGORY_BY_TYPE_ID: Record<string, ServiceLineCategor
   "a364f692-c8ea-4b0d-84de-1e762fe6d29d": "removal", // Phí dịch vụ tháo dỡ | Removal Fee
   "5c0e4a96-38e4-4925-b7b6-331409e70d54": "support", // Phí dịch vụ hỗ trợ kỹ thuật| On site support
 };
+
+export type TransportLineCategory = "delivery" | "collection";
+
+// 2 SKU phí vận chuyển (giao/thu hồi bằng xe máy) trả khoán trực tiếp — khác
+// SERVICE_LINE_CATEGORY_BY_TYPE_ID ở chỗ %payout KHÔNG cố định trên
+// equipment_types (payout_percentage để null), mà tính động theo giờ hẹn +
+// cách thực hiện, xem computeTransportPayoutPercentage().
+export const TRANSPORT_LINE_CATEGORY_BY_TYPE_ID: Record<string, TransportLineCategory> = {
+  "38f5c644-3898-4b1f-a3f5-901e55f77c6a": "delivery", // Phí giao hàng bằng xe máy | Bike Delivery
+  "13c85fe0-8b13-4d76-9df5-a20b19598cc9": "collection", // Phí thu hồi bằng xe máy | Bike Collection
+};
+
+const BUSINESS_HOURS_START_MINUTES = 8 * 60 + 30; // 8:30
+const BUSINESS_HOURS_END_MINUTES = 17 * 60 + 30; // 17:30
+
+function isWithinBusinessHours(dateTimeIso: string): boolean {
+  const d = new Date(dateTimeIso);
+  const minutes = d.getHours() * 60 + d.getMinutes();
+  return minutes >= BUSINESS_HOURS_START_MINUTES && minutes <= BUSINESS_HOURS_END_MINUTES;
+}
+
+// Quy định chia sẻ phí vận chuyển (thoả thuận với CEO, chống lạm dụng như
+// nhân viên cũ từng bỏ bê việc để chạy giao hàng lấy 100% phí):
+// - Đặt xe dịch vụ ngoài (không tự chạy): 0% — chỉ nhận khoán công việc.
+// - Tự chạy NGOÀI giờ hành chính (8:30-17:30): 100%.
+// - Tự chạy TRONG giờ hành chính: 50% (bắt buộc phải đi vì lý do nào đó).
+// scheduledAt = giờ hẹn trên đơn (rental_start_at cho giao, rental_end_at
+// cho thu hồi) — KHÔNG dùng giờ hoàn thành tự khai, để tránh gian lận (giờ
+// hẹn đã chốt từ lúc tạo đơn, mọi thay đổi đều có activity_log).
+export function computeTransportPayoutPercentage(
+  method: DeliveryMethod | null,
+  scheduledAt: string | null,
+): number {
+  if (method !== "self_ride" || !scheduledAt) return 0;
+  return isWithinBusinessHours(scheduledAt) ? 50 : 100;
+}
 
 export function findTaskWeight(weights: TaskWeightInput[], taskType: TaskType): number {
   return weights.find((w) => w.task_type === taskType)?.weight_percentage ?? 0;

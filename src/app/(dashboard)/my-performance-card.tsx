@@ -23,7 +23,7 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-9">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-11">
           <div>
             <p className="text-xs text-muted-foreground">Lương cứng</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.baseSalary)}đ</p>
@@ -37,12 +37,20 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.installationPayout)}đ</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Phí Thu hồi</p>
+            <p className="text-xs text-muted-foreground">Phí Tháo dỡ</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.removalPayout)}đ</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Phí Support</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.supportPayout)}đ</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Phí Giao hàng</p>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.deliveryPayout)}đ</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Phí Thu hồi</p>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.collectionPayout)}đ</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">OT</p>

@@ -31,6 +31,7 @@ import {
   computePoolExcludedTotal,
   computeTaskCommission,
   findTaskWeight,
+  TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
@@ -48,7 +49,7 @@ import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -107,6 +108,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .maybeSingle();
 
   const canManage = !!employee && MANAGE_ROLES.includes(employee.role);
+  // Dòng vận chuyển (giao/thu hồi xe máy) — Cửa hàng trưởng/Kỹ thuật-Sale
+  // được tự điền (theo yêu cầu CEO), khác các dòng dịch vụ tĩnh khác chỉ
+  // canManage mới sửa được.
+  const canAssignTransport = canManage || (!!employee && BRANCH_SCOPED_ROLES.includes(employee.role));
   const branchList = branches ?? [];
   const employeeList = employees ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
@@ -124,11 +129,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // theo khâu — tránh tính khoán 2 lần cho cùng 1 đồng doanh số.
   const poolExcludedTotal = computePoolExcludedTotal(
     (lines ?? []) as PoolExcludedLineInput[],
-    new Map(
-      (equipmentTypes ?? [])
-        .filter((t): t is typeof t & { payout_percentage: number } => t.payout_percentage != null)
-        .map((t) => [t.id, t.payout_percentage]),
-    ),
+    new Set([
+      ...(equipmentTypes ?? []).filter((t) => t.payout_percentage != null).map((t) => t.id),
+      ...Object.keys(TRANSPORT_LINE_CATEGORY_BY_TYPE_ID),
+    ]),
   );
   const poolValue = computeOrderPoolValue(order.total_value, poolExcludedTotal);
   const commissionRate = canManage
@@ -400,6 +404,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             <TableBody>
               {lines?.map((line) => {
                 const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
+                const isTransportLine =
+                  !!line.equipment_type_id && line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
                 const detail = line.equipment_unit_id
                   ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
                   : line.equipment_instance_id
@@ -425,12 +431,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     </TableCell>
                     <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
                     <TableCell>
-                      {type?.payout_percentage != null ? (
-                        canManage ? (
+                      {type?.payout_percentage != null || isTransportLine ? (
+                        (isTransportLine ? canAssignTransport : canManage) ? (
                           <OrderLineEmployeeForm
                             lineId={line.id}
                             employeeId={line.employee_id}
                             employees={employeeList}
+                            isTransportLine={isTransportLine}
+                            deliveryMethod={line.delivery_method}
                           />
                         ) : (
                           (employeeNameById.get(line.employee_id ?? "") ?? "—")

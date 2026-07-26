@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/dal";
+import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
-import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { ALL_ROLES, BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 
 const DELETE_ROLES = MANAGE_ROLES;
 
@@ -269,22 +270,37 @@ export async function updateOrderEquipmentLinePrice(
 
 const AssignOrderLineEmployeeSchema = z.object({
   employee_id: z.string().uuid().optional(),
+  // Chỉ có ý nghĩa với 2 dòng phí vận chuyển (giao/thu hồi bằng xe máy).
+  delivery_method: z.enum(["self_ride", "external_service"]).optional(),
 });
 
 // Gán nhân viên thực hiện 1 dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo
-// dỡ/Hỗ trợ kỹ thuật...) — tự đóng dấu ngày hôm nay khi gán, xoá khi bỏ
-// chọn, giống hệt semantics completed_date của upsertOrderTask. Chỉ áp dụng
-// dòng có equipment_type.payout_percentage khác null — kiểm tra lại ở đây
-// dù UI đã ẩn field với dòng không phải dịch vụ trả khoán trực tiếp.
+// dỡ/Hỗ trợ kỹ thuật... hoặc phí vận chuyển giao/thu hồi bằng xe máy) — tự
+// đóng dấu ngày hôm nay khi gán, xoá khi bỏ chọn, giống hệt semantics
+// completed_date của upsertOrderTask. Chỉ áp dụng dòng có
+// equipment_type.payout_percentage khác null HOẶC nằm trong
+// TRANSPORT_LINE_CATEGORY_BY_TYPE_ID (payout %động, không set trên
+// equipment_types) — kiểm tra lại ở đây dù UI đã ẩn field với dòng khác.
+//
+// Quyền: dòng dịch vụ tĩnh (Lắp đặt/Tháo dỡ/Support) chỉ Admin/Kế toán/Giám
+// đốc gán được, như cũ. Riêng 2 dòng vận chuyển (giao/thu hồi xe máy) — theo
+// yêu cầu CEO — Cửa hàng trưởng/Kỹ thuật-Sale được TỰ điền (chọn bất kỳ nhân
+// viên nào, không giới hạn tự chọn mình), Admin/Kế toán/Giám đốc rà lại thủ
+// công sau (không có trạng thái "đã xác nhận" riêng — sửa lại trực tiếp nếu
+// sai là đủ).
 export async function assignOrderLineEmployee(
   lineId: string,
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const viewer = await getCurrentEmployee();
+  if (!viewer) {
+    redirect("/");
+  }
 
   const parsed = AssignOrderLineEmployeeSchema.safeParse({
     employee_id: formData.get("employee_id") || undefined,
+    delivery_method: formData.get("delivery_method") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -301,6 +317,12 @@ export async function assignOrderLineEmployee(
     return { error: "Không tìm thấy dòng hàng." };
   }
 
+  const isTransportLine = !!line.equipment_type_id && line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
+  const allowedRoles = isTransportLine ? [...MANAGE_ROLES, ...BRANCH_SCOPED_ROLES] : [...MANAGE_ROLES];
+  if (!allowedRoles.includes(viewer.role)) {
+    return { error: "Bạn không có quyền gán nhân viên cho dòng hàng này." };
+  }
+
   const { data: equipmentType } = line.equipment_type_id
     ? await supabase
         .from("equipment_types")
@@ -308,7 +330,7 @@ export async function assignOrderLineEmployee(
         .eq("id", line.equipment_type_id)
         .maybeSingle()
     : { data: null };
-  if (equipmentType?.payout_percentage == null) {
+  if (equipmentType?.payout_percentage == null && !isTransportLine) {
     return { error: "Dòng hàng này không phải dịch vụ trả khoán trực tiếp." };
   }
 
@@ -317,6 +339,8 @@ export async function assignOrderLineEmployee(
     .update({
       employee_id: parsed.data.employee_id ?? null,
       completed_date: parsed.data.employee_id ? new Date().toISOString().slice(0, 10) : null,
+      delivery_method:
+        isTransportLine && parsed.data.employee_id ? (parsed.data.delivery_method ?? null) : null,
     })
     .eq("id", lineId);
 

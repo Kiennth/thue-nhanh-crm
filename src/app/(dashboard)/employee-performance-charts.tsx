@@ -58,8 +58,10 @@ const INCOME_COMPOSITION_CONFIG = {
   baseSalary: { label: "Lương cứng", color: "var(--chart-1)" },
   totalCommission: { label: "Khoán", color: "var(--chart-2)" },
   installationPayout: { label: "Phí Lắp đặt", color: "var(--chart-3)" },
-  removalPayout: { label: "Phí Thu hồi", color: "var(--chart-6)" },
+  removalPayout: { label: "Phí Tháo dỡ", color: "var(--chart-6)" },
   supportPayout: { label: "Phí Support", color: "var(--chart-7)" },
+  deliveryPayout: { label: "Phí Giao hàng", color: "var(--chart-8)" },
+  collectionPayout: { label: "Phí Thu hồi", color: "var(--chart-9)" },
   overtimePay: { label: "OT", color: "var(--chart-5)" },
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
@@ -84,6 +86,8 @@ function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthlyPerform
         <Bar dataKey="installationPayout" stackId="income" fill="var(--color-installationPayout)" />
         <Bar dataKey="removalPayout" stackId="income" fill="var(--color-removalPayout)" />
         <Bar dataKey="supportPayout" stackId="income" fill="var(--color-supportPayout)" />
+        <Bar dataKey="deliveryPayout" stackId="income" fill="var(--color-deliveryPayout)" />
+        <Bar dataKey="collectionPayout" stackId="income" fill="var(--color-collectionPayout)" />
         <Bar dataKey="overtimePay" stackId="income" fill="var(--color-overtimePay)" />
         <Bar dataKey="bonus" stackId="income" fill="var(--color-bonus)" radius={[0, 4, 4, 0]} />
       </BarChart>
