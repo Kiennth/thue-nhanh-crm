@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -109,7 +110,11 @@ export function CustomerReportSection({
               <TableBody>
                 {topByRevenue.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/customers/${r.id}`} className="hover:underline">
+                        {r.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{currencyFormatter.format(r.totalRevenue)}đ</TableCell>
                   </TableRow>
                 ))}
@@ -140,7 +145,11 @@ export function CustomerReportSection({
               <TableBody>
                 {debtRows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/customers/${r.id}`} className="hover:underline">
+                        {r.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-destructive">
                       {currencyFormatter.format(r.totalOwed)}đ
                     </TableCell>

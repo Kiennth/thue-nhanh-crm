@@ -14,32 +14,77 @@ import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllCustomersLite } from "@/lib/customers";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
+import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { CustomerReportSection } from "./customer-report-section";
+import { CustomerSortHeader } from "./customer-sort-header";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+
+const SORT_KEYS = ["name", "customer_type", "orderCount", "totalRevenue"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+function isSortKey(value: string): value is SortKey {
+  return (SORT_KEYS as readonly string[]).includes(value);
+}
+
+interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  address: string | null;
+  customer_type: CustomerType;
+  tax_code: string | null;
+  deposit_percentage: number;
+  created_at: string;
+  orderCount: number;
+  totalRevenue: number;
+}
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string }>;
 }) {
-  const { search, page: pageParam } = await searchParams;
+  const { search, page: pageParam, sort, dir } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
+  const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
-  const searchFilter = `name.ilike.%${activeSearch}%,phone.ilike.%${activeSearch}%`;
-
-  const [allCustomersLite, orders, payments, { count: totalCount }] = await Promise.all([
-    fetchAllCustomersLite(),
+  // Số lượng đơn/doanh số là giá trị suy ra (join orders/payments), không
+  // phải cột trong bảng customers — không thể .order()/.range() ở tầng
+  // Postgres theo các cột này. Lấy TOÀN BỘ khách hàng + đơn hàng (đằng nào
+  // cũng cần đủ cho khối báo cáo phía trên), lọc/sắp/phân trang gộp 1 lần
+  // trong JS thay vì query riêng cho bảng danh sách.
+  const [allCustomers, orders, payments] = await Promise.all([
+    fetchAllRows<{
+      id: string;
+      name: string;
+      phone: string | null;
+      email: string | null;
+      notes: string | null;
+      address: string | null;
+      customer_type: CustomerType;
+      tax_code: string | null;
+      deposit_percentage: number;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("customers")
+        .select(
+          "id, name, phone, email, notes, address, customer_type, tax_code, deposit_percentage, created_at",
+        )
+        .range(from, to),
+    ),
     fetchAllRows<{
       id: string;
       customer_id: string;
@@ -55,30 +100,48 @@ export default async function CustomersPage({
     fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
       supabase.from("order_payments").select("order_id, amount").range(from, to),
     ),
-    (() => {
-      let q = supabase.from("customers").select("id", { count: "exact", head: true });
-      if (activeSearch) q = q.or(searchFilter);
-      return q;
-    })(),
   ]);
 
-  const safeTotalCount = totalCount ?? 0;
+  const reportById = new Map(
+    buildCustomerReportRows(allCustomers, orders, payments).map((r) => [r.id, r]),
+  );
+  const allRows: CustomerRow[] = allCustomers.map((c) => ({
+    ...c,
+    orderCount: reportById.get(c.id)?.orderCount ?? 0,
+    totalRevenue: reportById.get(c.id)?.totalRevenue ?? 0,
+  }));
+
+  const searchLower = activeSearch.toLowerCase();
+  const filteredRows = activeSearch
+    ? allRows.filter(
+        (r) =>
+          r.name.toLowerCase().includes(searchLower) || (r.phone ?? "").toLowerCase().includes(searchLower),
+      )
+    : allRows;
+
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    const dirMult = activeDir === "asc" ? 1 : -1;
+    switch (activeSort) {
+      case "name":
+        return dirMult * a.name.localeCompare(b.name, "vi");
+      case "customer_type":
+        return (
+          dirMult *
+          CUSTOMER_TYPE_LABELS[a.customer_type].localeCompare(CUSTOMER_TYPE_LABELS[b.customer_type], "vi")
+        );
+      case "orderCount":
+        return dirMult * (a.orderCount - b.orderCount);
+      case "totalRevenue":
+        return dirMult * (a.totalRevenue - b.totalRevenue);
+      default:
+        return b.created_at.localeCompare(a.created_at);
+    }
+  });
+
+  const safeTotalCount = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(safeTotalCount / PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
-
-  let dataQuery = supabase.from("customers").select("*");
-  if (activeSearch) dataQuery = dataQuery.or(searchFilter);
-  const { data: customers } = await dataQuery
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-
-  const customerList = customers ?? [];
-  // Số lượng đơn/doanh số hiển thị ở bảng — tính lại trên đúng trang hiện tại
-  // (không phải toàn bộ khách hàng) bằng cùng hàm dùng cho báo cáo phía trên,
-  // tái dùng orders/payments đã fetch sẵn thay vì query thêm.
-  const pageReportById = new Map(
-    buildCustomerReportRows(customerList, orders ?? [], payments ?? []).map((r) => [r.id, r]),
-  );
+  const customerList = sortedRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -94,11 +157,7 @@ export default async function CustomersPage({
         />
       </div>
 
-      <CustomerReportSection
-        customers={allCustomersLite ?? []}
-        orders={orders ?? []}
-        payments={payments ?? []}
-      />
+      <CustomerReportSection customers={allCustomers} orders={orders} payments={payments} />
 
       <div className="space-y-3">
         <SearchInput
@@ -112,12 +171,12 @@ export default async function CustomersPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tên</TableHead>
-              <TableHead>Loại</TableHead>
+              <CustomerSortHeader sortKey="name" label="Tên" />
+              <CustomerSortHeader sortKey="customer_type" label="Loại" />
               <TableHead>Điện thoại</TableHead>
               <TableHead>Địa chỉ</TableHead>
-              <TableHead>Số lượng đơn</TableHead>
-              <TableHead>Tổng doanh số</TableHead>
+              <CustomerSortHeader sortKey="orderCount" label="Số lượng đơn" />
+              <CustomerSortHeader sortKey="totalRevenue" label="Tổng doanh số" />
               <TableHead className="w-24"></TableHead>
             </TableRow>
           </TableHeader>
@@ -135,10 +194,8 @@ export default async function CustomersPage({
                 </TableCell>
                 <TableCell>{customer.phone ?? "—"}</TableCell>
                 <TableCell className="max-w-80 truncate">{customer.address ?? "—"}</TableCell>
-                <TableCell>{pageReportById.get(customer.id)?.orderCount ?? 0}</TableCell>
-                <TableCell>
-                  {currencyFormatter.format(pageReportById.get(customer.id)?.totalRevenue ?? 0)}đ
-                </TableCell>
+                <TableCell>{customer.orderCount}</TableCell>
+                <TableCell>{currencyFormatter.format(customer.totalRevenue)}đ</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <CustomerDialog
