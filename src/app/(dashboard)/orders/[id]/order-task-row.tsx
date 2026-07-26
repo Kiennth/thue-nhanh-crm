@@ -29,17 +29,13 @@ interface OrderTaskRowProps {
     has_issue: boolean;
     completed_date: string | null;
   };
-  canComplete: boolean;
+  // done: đã hoàn thành, chỉ hiện tóm tắt. current: khâu đang tới lượt — do
+  // gating tuần tự nên chỉ có đúng 1 khâu ở trạng thái này cùng lúc, hiện
+  // form đầy đủ. locked: chưa tới lượt, hiện mờ, không có form/nút bấm.
+  status: "done" | "current" | "locked";
 }
 
-export function OrderTaskRow({
-  orderId,
-  taskType,
-  label,
-  employees,
-  task,
-  canComplete,
-}: OrderTaskRowProps) {
+export function OrderTaskRow({ orderId, taskType, label, employees, task, status }: OrderTaskRowProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -53,55 +49,63 @@ export function OrderTaskRow({
     });
   }
 
-  const isDone = !!task?.completed_date;
-  // Remount với dữ liệu mới sau mỗi lần lưu thành công — tránh lệch trạng
-  // thái giữa input uncontrolled và dữ liệu thật (React tự reset form sau
-  // khi action chạy xong).
-  const rowKey = `${task?.employee_id ?? ""}-${task?.completed_date ?? ""}-${task?.note ?? ""}`;
+  if (status === "done") {
+    return (
+      <div className="flex items-center gap-2 py-0.5">
+        <span className="text-sm font-medium">{label}</span>
+        {task?.completed_date && (
+          <span className="text-xs text-muted-foreground">({task.completed_date})</span>
+        )}
+      </div>
+    );
+  }
+
+  if (status === "locked") {
+    return (
+      <div className="py-0.5">
+        <span className="text-sm text-muted-foreground/60">{label}</span>
+      </div>
+    );
+  }
+
+  const rowKey = `${task?.employee_id ?? ""}-${task?.note ?? ""}`;
 
   return (
     <form
       key={rowKey}
       action={handleSubmit}
-      className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 border-b py-2 last:border-b-0"
+      className="space-y-2 rounded-md border bg-muted/30 p-2.5"
     >
       <input type="hidden" name="order_id" value={orderId} />
       <input type="hidden" name="task_type" value={taskType} />
       <input type="hidden" name="completed" value="on" />
 
-      <div className="flex items-center gap-2">
-        <span className={isDone ? "font-medium" : ""}>{label}</span>
-        {isDone && (
-          <span className="text-xs text-muted-foreground">({task?.completed_date})</span>
-        )}
-      </div>
+      <p className="text-sm font-medium">{label}</p>
 
-      <Select name="employee_id" defaultValue={task?.employee_id ?? undefined} disabled={isDone}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Người phụ trách">
-            {(value: string) => employees.find((e) => e.id === value)?.name}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {employees.map((e) => (
-            <SelectItem key={e.id} value={e.id}>
-              {e.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <Select name="employee_id" defaultValue={task?.employee_id ?? undefined}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Người phụ trách">
+              {(value: string) => employees.find((e) => e.id === value)?.name}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {employees.map((e) => (
+              <SelectItem key={e.id} value={e.id}>
+                {e.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Input name="note" placeholder="Ghi chú" defaultValue={task?.note ?? ""} disabled={isDone} />
+        <Input name="note" placeholder="Ghi chú" defaultValue={task?.note ?? ""} />
 
-      {isDone ? (
-        <span className="text-sm whitespace-nowrap text-muted-foreground">✓ Hoàn thành</span>
-      ) : (
-        <Button type="submit" size="sm" disabled={pending || !canComplete}>
+        <Button type="submit" size="sm" disabled={pending}>
           {pending ? "..." : "Hoàn thành"}
         </Button>
-      )}
+      </div>
 
-      {error && <p className="col-span-4 text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </form>
   );
 }

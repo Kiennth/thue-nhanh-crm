@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Check, Lock } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -331,8 +333,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Cột chính: thông tin đơn, thiết bị thuê, khâu tính khoán — chiếm
-            2/3 ở màn lớn, giống cột chính của Booqable. */}
+        {/* Cột chính: thông tin đơn, thiết bị thuê, thanh toán — chiếm 2/3 ở
+            màn lớn, giống cột chính của Booqable. */}
         <div className="space-y-4 lg:col-span-2">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Card>
@@ -529,68 +531,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {TASK_TYPE_SEQUENCE.map((taskType, index) => {
-                  const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
-                  const canComplete = earlier.every((t) => taskByType.get(t)?.completed_date);
-                  const task = taskByType.get(taskType);
-                  const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
-
-                  const scanType =
-                    taskType === "giao_hang_ban_giao"
-                      ? "giao_hang"
-                      : taskType === "thu_hoi"
-                        ? "thu_hoi"
-                        : null;
-
-                  return (
-                    <div key={taskType}>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <OrderTaskRow
-                            orderId={order.id}
-                            taskType={taskType}
-                            label={TASK_TYPE_LABELS[taskType]}
-                            employees={employeeList}
-                            task={task}
-                            canComplete={canComplete}
-                          />
-                        </div>
-                        {scanType && !task?.completed_date && (
-                          <RfidScanDialog
-                            orderId={order.id}
-                            branchId={
-                              scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
-                            }
-                            scanType={scanType}
-                          />
-                        )}
-                      </div>
-                      {canManage && task?.employee_id && (
-                        <p className="pb-1 text-xs text-muted-foreground">
-                          {employeeNameById.get(task.employee_id) ?? "—"} · {weight}% ={" "}
-                          {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar: tiền bạc — thanh toán, cọc, khoán, OT. Danh sách rút gọn
-            thành thẻ dọc thay vì bảng nhiều cột để không bị bó hẹp ở cột phụ,
-            giống khu Payments/Documents bên phải của Booqable. */}
-        <div className="space-y-4">
-          <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base">Thanh toán</CardTitle>
               <OrderPaymentDialog orderId={order.id} />
@@ -645,6 +585,100 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 {!invoicePaymentList.length && (
                   <p className="text-sm text-muted-foreground">Chưa có thanh toán nào.</p>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar: khâu tính khoán + tiền bạc liên quan — cọc, khoán, OT.
+            Danh sách rút gọn thành thẻ dọc thay vì bảng nhiều cột để không
+            bị bó hẹp ở cột phụ, giống khu Payments/Documents bên phải của
+            Booqable. */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                {TASK_TYPE_SEQUENCE.map((taskType, index) => {
+                  const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
+                  const task = taskByType.get(taskType);
+                  const isDone = !!task?.completed_date;
+                  const canComplete = earlier.every((t) => taskByType.get(t)?.completed_date);
+                  const status: "done" | "current" | "locked" = isDone
+                    ? "done"
+                    : canComplete
+                      ? "current"
+                      : "locked";
+                  const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
+                  const isLast = index === TASK_TYPE_SEQUENCE.length - 1;
+
+                  const scanType =
+                    taskType === "giao_hang_ban_giao"
+                      ? "giao_hang"
+                      : taskType === "thu_hoi"
+                        ? "thu_hoi"
+                        : null;
+
+                  return (
+                    <div key={taskType} className="relative flex gap-3">
+                      {!isLast && (
+                        <div
+                          aria-hidden
+                          className="absolute top-6 bottom-0 left-[11px] w-px bg-border"
+                        />
+                      )}
+                      <div
+                        className={cn(
+                          "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
+                          status === "done" && "border-primary bg-primary text-primary-foreground",
+                          status === "current" && "border-primary text-primary",
+                          status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
+                        )}
+                      >
+                        {status === "done" ? (
+                          <Check className="size-3.5" />
+                        ) : status === "locked" ? (
+                          <Lock className="size-3" />
+                        ) : (
+                          index + 1
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 pb-5 last:pb-0">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <OrderTaskRow
+                              orderId={order.id}
+                              taskType={taskType}
+                              label={TASK_TYPE_LABELS[taskType]}
+                              employees={employeeList}
+                              task={task}
+                              status={status}
+                            />
+                          </div>
+                          {scanType && status === "current" && (
+                            <RfidScanDialog
+                              orderId={order.id}
+                              branchId={
+                                scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
+                              }
+                              scanType={scanType}
+                            />
+                          )}
+                        </div>
+                        {canManage && task?.employee_id && (
+                          <p className="text-xs text-muted-foreground">
+                            {employeeNameById.get(task.employee_id) ?? "—"} · {weight}% ={" "}
+                            {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
