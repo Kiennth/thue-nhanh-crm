@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import {
@@ -36,6 +37,7 @@ import {
   RENTAL_PERIOD_UNIT_LABELS,
   TRACKING_TYPE_LABELS,
 } from "@/lib/equipment-labels";
+import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
@@ -47,7 +49,7 @@ import { EquipmentPurchaseDialog } from "../equipment-purchase-dialog";
 import { EquipmentCostAdjustmentDialog } from "../equipment-cost-adjustment-dialog";
 import { EquipmentDisposalDialog } from "../equipment-disposal-dialog";
 import { RfidTagDialog } from "../rfid-tag-dialog";
-import type { Database } from "@/types/database";
+import type { Database, TaskType } from "@/types/database";
 
 type EquipmentUnitRow = Database["public"]["Tables"]["equipment_units"]["Row"];
 type EquipmentInstanceRow = Database["public"]["Tables"]["equipment_instances"]["Row"];
@@ -72,20 +74,29 @@ const INSTANCE_STATUS_VARIANT = {
 
 const TABS = [
   { value: "stock", label: "Tồn kho" },
+  { value: "rentals", label: "Lịch sử thuê" },
   { value: "history", label: "Lịch sử chuyển kho" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
+
+const INSTANCE_SORT_KEYS = ["branch", "status"] as const;
+type InstanceSortKey = (typeof INSTANCE_SORT_KEYS)[number];
+function isInstanceSortKey(value: string): value is InstanceSortKey {
+  return (INSTANCE_SORT_KEYS as readonly string[]).includes(value);
+}
 
 export default async function EquipmentDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; sort?: string; dir?: string }>;
 }) {
   const { id } = await params;
-  const { tab } = await searchParams;
-  const activeTab: Tab = tab === "history" ? "history" : "stock";
+  const { tab, sort, dir } = await searchParams;
+  const activeTab: Tab = tab === "history" ? "history" : tab === "rentals" ? "rentals" : "stock";
+  const instanceSort: InstanceSortKey | null = sort && isInstanceSortKey(sort) ? sort : null;
+  const instanceDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
@@ -144,6 +155,41 @@ export default async function EquipmentDetailPage({
     ]);
   const rfidTags = [...(unitRfidTags ?? []), ...(instanceRfidTags ?? [])];
 
+  // Lịch sử thuê — chỉ tải khi mở đúng tab (giống lịch sử chuyển kho): lấy
+  // dòng order_equipment của loại hàng này trước, rồi tra ngược sang
+  // orders/customers (không dùng nested select — codebase này join tay bằng
+  // Map cho nhất quán với các trang khác).
+  const { data: rentalLines } =
+    activeTab === "rentals"
+      ? await supabase
+          .from("order_equipment")
+          .select("id, order_id, equipment_instance_id, equipment_unit_id, quantity, line_total")
+          .eq("equipment_type_id", id)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : { data: [] as { id: string; order_id: string; equipment_instance_id: string | null; equipment_unit_id: string | null; quantity: number; line_total: number }[] };
+
+  const rentalOrderIds = [...new Set((rentalLines ?? []).map((l) => l.order_id))];
+  const { data: rentalOrders } = rentalOrderIds.length
+    ? await supabase
+        .from("orders")
+        .select("id, order_code, customer_id, rental_start_at, rental_end_at, status, completed_at, cancelled_at")
+        .in("id", rentalOrderIds)
+    : { data: [] as { id: string; order_code: string; customer_id: string; rental_start_at: string | null; rental_end_at: string | null; status: TaskType; completed_at: string | null; cancelled_at: string | null }[] };
+  const rentalOrderById = new Map((rentalOrders ?? []).map((o) => [o.id, o]));
+
+  const rentalCustomerIds = [...new Set((rentalOrders ?? []).map((o) => o.customer_id))];
+  const { data: rentalCustomers } = rentalCustomerIds.length
+    ? await supabase.from("customers").select("id, name").in("id", rentalCustomerIds)
+    : { data: [] as { id: string; name: string }[] };
+  const rentalCustomerNameById = new Map((rentalCustomers ?? []).map((c) => [c.id, c.name]));
+
+  function rentalStatusLabel(o: { status: TaskType; completed_at: string | null; cancelled_at: string | null }) {
+    if (o.cancelled_at) return "Đã huỷ";
+    if (o.completed_at) return "Hoàn tất";
+    return TASK_TYPE_LABELS[o.status];
+  }
+
   const employeeChecked = employee;
   const canManageCatalog = !!employeeChecked && MANAGE_ROLES.includes(employeeChecked.role);
   const canManageStock = !!employeeChecked && EQUIPMENT_WRITE_ROLES.includes(employeeChecked.role);
@@ -174,6 +220,28 @@ export default async function EquipmentDetailPage({
   }
 
   const unitById = new Map(unitList.map((u) => [u.id, u]));
+  const instanceById = new Map((instances ?? []).map((i) => [i.id, i]));
+
+  // Sắp xếp bảng sản phẩm theo từng cái (Chi nhánh/Trạng thái) — mặc định
+  // giữ nguyên thứ tự mã định danh khi chưa chọn cột nào.
+  const instanceDirMult = instanceDir === "asc" ? 1 : -1;
+  const sortedInstances = [...(instances ?? [])].sort((a, b) => {
+    if (instanceSort === "branch") {
+      const branchA = branchNameById.get(a.branch_id ?? "") ?? "—";
+      const branchB = branchNameById.get(b.branch_id ?? "") ?? "—";
+      return instanceDirMult * branchA.localeCompare(branchB, "vi");
+    }
+    if (instanceSort === "status") {
+      return (
+        instanceDirMult *
+        EQUIPMENT_INSTANCE_STATUS_LABELS[a.status].localeCompare(
+          EQUIPMENT_INSTANCE_STATUS_LABELS[b.status],
+          "vi",
+        )
+      );
+    }
+    return a.identifier_code.localeCompare(b.identifier_code, "vi");
+  });
 
   const priceLine =
     type.product_type === "rental"
@@ -431,14 +499,14 @@ export default async function EquipmentDetailPage({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mã định danh</TableHead>
-                    <TableHead>Chi nhánh</TableHead>
-                    <TableHead>Trạng thái</TableHead>
+                    <SortableTableHead sortKey="branch" label="Chi nhánh" />
+                    <SortableTableHead sortKey="status" label="Trạng thái" />
                     <TableHead>Ghi chú</TableHead>
                     {canManageStock && <TableHead className="w-20"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(instances ?? []).map((inst) => {
+                  {sortedInstances.map((inst) => {
                     const instTags = rfidTagsByInstance.get(inst.id) ?? [];
                     return (
                       <TableRow key={inst.id}>
@@ -525,6 +593,65 @@ export default async function EquipmentDetailPage({
             </>
           )}
         </div>
+      )}
+
+      {activeTab === "rentals" && (
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mã đơn</TableHead>
+                  <TableHead>Khách hàng</TableHead>
+                  <TableHead>Sản phẩm</TableHead>
+                  <TableHead>Ngày bắt đầu</TableHead>
+                  <TableHead>Ngày kết thúc</TableHead>
+                  <TableHead>Số lượng</TableHead>
+                  <TableHead>Doanh thu</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(rentalLines ?? []).map((line) => {
+                  const order = rentalOrderById.get(line.order_id);
+                  if (!order) return null;
+                  const productLabel = line.equipment_instance_id
+                    ? (instanceById.get(line.equipment_instance_id)?.identifier_code ?? "—")
+                    : line.equipment_unit_id
+                      ? (unitById.get(line.equipment_unit_id)?.brand_model ?? "—")
+                      : "—";
+                  return (
+                    <TableRow key={line.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/orders/${order.id}`} className="hover:underline">
+                          {order.order_code}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{rentalCustomerNameById.get(order.customer_id) ?? "—"}</TableCell>
+                      <TableCell>{productLabel}</TableCell>
+                      <TableCell>
+                        {order.rental_start_at ? dateFormatter.format(new Date(order.rental_start_at)) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {order.rental_end_at ? dateFormatter.format(new Date(order.rental_end_at)) : "—"}
+                      </TableCell>
+                      <TableCell>{line.quantity}</TableCell>
+                      <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
+                      <TableCell>{rentalStatusLabel(order)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {!rentalLines?.length && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      Chưa có lượt thuê nào.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === "history" && (
