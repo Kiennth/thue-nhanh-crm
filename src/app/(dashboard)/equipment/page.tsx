@@ -23,6 +23,11 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType } from "@/lib/actions/equipment";
 import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
 import {
+  computeDateRange,
+  DATE_RANGE_PRESET_OPTIONS,
+  type DateRangePreset,
+} from "@/lib/date-range-presets";
+import {
   PRICING_METHOD_LABELS,
   PRODUCT_TYPE_LABELS,
   RENTAL_PERIOD_UNIT_LABELS,
@@ -31,6 +36,7 @@ import {
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
+import { OrderDateRangeFilter } from "../orders/order-date-range-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const PAGE_SIZE = 20;
@@ -44,16 +50,30 @@ function isSortKey(value: string): value is SortKey {
   return (SORT_KEYS as readonly string[]).includes(value);
 }
 
+function isDateRangePreset(value: string): value is DateRangePreset {
+  return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
+
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
-  const { search, page: pageParam, sort, dir } = await searchParams;
+  const { search, page: pageParam, sort, dir, range, from: rangeFrom, to: rangeTo } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
+  const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
+  const reportDateRange = computeDateRange(activeRange, new Date(), { from: rangeFrom, to: rangeTo });
 
   const supabase = await createClient();
   const employee = await getCurrentEmployee();
@@ -190,7 +210,7 @@ export default async function EquipmentPage({
       { data: purchases },
       { data: disposals },
       { data: reportStock },
-      orderLines,
+      rawOrderLines,
     ] = await Promise.all([
       supabase.from("equipment_types").select("id, name, product_type").order("name"),
       supabase.from("equipment_units").select("id, equipment_type_id"),
@@ -198,10 +218,27 @@ export default async function EquipmentPage({
       supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
       supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
       supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-      fetchAllRows<OrderLineInput>((from, to) =>
-        supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
+      fetchAllRows<OrderLineInput & { order_id: string }>((from, to) =>
+        supabase.from("order_equipment").select("equipment_type_id, line_total, order_id").range(from, to),
       ),
     ]);
+
+    // Doanh thu/số lượt thuê/tỉ suất lợi nhuận lọc theo ngày đặt đơn (order_date)
+    // khi có chọn khoảng thời gian — order_equipment không có cột ngày riêng
+    // nên phải lấy trước tập order_id khớp khoảng ngày rồi lọc theo đó.
+    let orderLines = rawOrderLines;
+    if (reportDateRange) {
+      const ordersInRange = await fetchAllRows<{ id: string }>((from, to) =>
+        supabase
+          .from("orders")
+          .select("id")
+          .gte("order_date", reportDateRange.start)
+          .lte("order_date", reportDateRange.end)
+          .range(from, to),
+      );
+      const orderIdsInRange = new Set(ordersInRange.map((o) => o.id));
+      orderLines = rawOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
+    }
 
     const reportTypeList = reportTypes ?? [];
     const reports = computeEquipmentTypeReports(
@@ -300,6 +337,11 @@ export default async function EquipmentPage({
               </div>
             </CardContent>
           </Card>
+
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Báo cáo</h2>
+            <OrderDateRangeFilter preset={activeRange} from={rangeFrom ?? ""} to={rangeTo ?? ""} />
+          </div>
 
           <ProductHighlightCards
             mostRented={reportSummary.topRentalCount}
