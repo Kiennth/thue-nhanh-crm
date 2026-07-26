@@ -270,14 +270,15 @@ export default async function EquipmentPage({
       totalInventoryValue,
       totalUnitsInStock,
       averageInventoryValue: totalUnitsInStock > 0 ? totalInventoryValue / totalUnitsInStock : 0,
+      // Chỉ tính hàng cho thuê thật — bỏ dịch vụ phụ phát sinh (phí giao/thu
+      // hồi bằng xe máy/ô tô, hỗ trợ kỹ thuật...) vì không phản ánh sản phẩm
+      // công ty cho thuê.
       topRevenue: reportRows
-        .filter((r) => r.report.revenue > 0)
+        .filter((r) => r.type.product_type === "rental" && r.report.revenue > 0)
         .sort((a, b) => b.report.revenue - a.report.revenue)
         .slice(0, 5)
         .map((r) => ({ label: r.type.name, value: r.report.revenue })),
       topRentalCount: reportRows
-        // Chỉ tính hàng cho thuê thật — bỏ dịch vụ phụ phát sinh (phí giao/thu
-        // hồi bằng xe máy/ô tô...) vì không phản ánh sản phẩm công ty cho thuê.
         .filter((r) => r.type.product_type === "rental" && r.report.rentalCount > 0)
         .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
         .slice(0, 5)
