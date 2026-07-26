@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil, ImageOff, ListTree } from "lucide-react";
+import { Plus, Pencil, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,10 +15,12 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
 import { SortableTableHead } from "@/components/sortable-table-head";
+import { ProductHighlightCards } from "@/components/dashboard-cards";
+import { RevenueBarList, type RevenuePoint } from "@/components/revenue-bar-list";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
-import { deleteEquipmentType, deletePricingTemplate } from "@/lib/actions/equipment";
+import { deleteEquipmentType } from "@/lib/actions/equipment";
 import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
 import {
   PRICING_METHOD_LABELS,
@@ -29,8 +31,6 @@ import {
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
-import { PricingTemplateDialog } from "./pricing-template-dialog";
-import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const PAGE_SIZE = 20;
@@ -71,7 +71,6 @@ export default async function EquipmentPage({
   });
 
   const { data: templates } = await supabase.from("pricing_templates").select("*").order("name");
-  const { data: tiers } = await supabase.from("pricing_template_tiers").select("*").order("min_duration");
   const templateList = templates ?? [];
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
 
@@ -177,16 +176,10 @@ export default async function EquipmentPage({
     totalInventoryValue: number;
     totalUnitsInStock: number;
     averageInventoryValue: number;
-    topRevenue: { name: string; revenue: number; rentalCount: number }[];
-    topRentalCount: { name: string; rentalCount: number; revenue: number }[];
-    topProfitRatio: {
-      name: string;
-      purchaseCost: number;
-      revenue: number;
-      profit: number;
-      profitRatio: number;
-    }[];
-    deadCapital: { name: string; purchaseCost: number; currentInventoryValue: number }[];
+    topRevenue: RevenuePoint[];
+    topRentalCount: RevenuePoint[];
+    topProfitRatio: RevenuePoint[];
+    deadCapital: RevenuePoint[];
   } | null = null;
 
   if (canManageCatalog) {
@@ -235,32 +228,22 @@ export default async function EquipmentPage({
         .filter((r) => r.report.revenue > 0)
         .sort((a, b) => b.report.revenue - a.report.revenue)
         .slice(0, 5)
-        .map((r) => ({ name: r.type.name, revenue: r.report.revenue, rentalCount: r.report.rentalCount })),
+        .map((r) => ({ label: r.type.name, value: r.report.revenue })),
       topRentalCount: reportRows
         .filter((r) => r.report.rentalCount > 0)
         .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
         .slice(0, 5)
-        .map((r) => ({ name: r.type.name, rentalCount: r.report.rentalCount, revenue: r.report.revenue })),
+        .map((r) => ({ label: r.type.name, value: r.report.rentalCount })),
       topProfitRatio: reportRows
         .filter((r) => r.report.profitRatio !== null)
         .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
         .slice(0, TOP_N)
-        .map((r) => ({
-          name: r.type.name,
-          purchaseCost: r.report.purchaseCost,
-          revenue: r.report.revenue,
-          profit: r.report.profit,
-          profitRatio: r.report.profitRatio ?? 0,
-        })),
+        .map((r) => ({ label: r.type.name, value: (r.report.profitRatio ?? 0) * 100 })),
       deadCapital: reportRows
         .filter((r) => r.report.rentalCount === 0 && r.report.purchaseCost > 0)
         .sort((a, b) => b.report.currentInventoryValue - a.report.currentInventoryValue)
         .slice(0, TOP_N)
-        .map((r) => ({
-          name: r.type.name,
-          purchaseCost: r.report.purchaseCost,
-          currentInventoryValue: r.report.currentInventoryValue,
-        })),
+        .map((r) => ({ label: r.type.name, value: r.report.currentInventoryValue })),
     };
   }
 
@@ -318,306 +301,113 @@ export default async function EquipmentPage({
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Doanh thu cao nhất</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hàng hoá</TableHead>
-                      <TableHead>Doanh thu</TableHead>
-                      <TableHead>Số lượt thuê</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportSummary.topRevenue.map((r) => (
-                      <TableRow key={r.name}>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell>{currencyFormatter.format(r.revenue)}đ</TableCell>
-                        <TableCell>{r.rentalCount}</TableCell>
-                      </TableRow>
-                    ))}
-                    {!reportSummary.topRevenue.length && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">
-                          Chưa có dữ liệu.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+          <ProductHighlightCards
+            mostRented={reportSummary.topRentalCount}
+            flagship={reportSummary.topRevenue}
+            topMargin={reportSummary.topProfitRatio}
+          />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cho thuê nhiều lần nhất</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hàng hoá</TableHead>
-                      <TableHead>Số lượt thuê</TableHead>
-                      <TableHead>Doanh thu</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportSummary.topRentalCount.map((r) => (
-                      <TableRow key={r.name}>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell>{r.rentalCount}</TableCell>
-                        <TableCell>{currencyFormatter.format(r.revenue)}đ</TableCell>
-                      </TableRow>
-                    ))}
-                    {!reportSummary.topRentalCount.length && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">
-                          Chưa có dữ liệu.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tỉ suất lợi nhuận cao nhất</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Tỉ suất lợi nhuận = (Doanh thu + Thu thanh lý) / Giá vốn — chỉ tính hàng đã có giá
-                  vốn (100% = hoà vốn, trên 100% = đã có lãi).
-                </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hàng hoá</TableHead>
-                      <TableHead>Giá vốn</TableHead>
-                      <TableHead>Lợi nhuận</TableHead>
-                      <TableHead>Tỉ suất</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportSummary.topProfitRatio.map((r) => (
-                      <TableRow key={r.name}>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell>{currencyFormatter.format(r.purchaseCost)}đ</TableCell>
-                        <TableCell className={r.profit < 0 ? "text-destructive" : ""}>
-                          {currencyFormatter.format(r.profit)}đ
-                        </TableCell>
-                        <TableCell>{(r.profitRatio * 100).toFixed(0)}%</TableCell>
-                      </TableRow>
-                    ))}
-                    {!reportSummary.topProfitRatio.length && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
-                          Chưa có dữ liệu.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Vốn đọng — đã mua nhưng chưa từng cho thuê</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hàng hoá</TableHead>
-                      <TableHead>Giá vốn</TableHead>
-                      <TableHead>Giá trị tồn kho</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportSummary.deadCapital.map((r) => (
-                      <TableRow key={r.name}>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell>{currencyFormatter.format(r.purchaseCost)}đ</TableCell>
-                        <TableCell>{currencyFormatter.format(r.currentInventoryValue)}đ</TableCell>
-                      </TableRow>
-                    ))}
-                    {!reportSummary.deadCapital.length && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">
-                          Không có hàng nào đọng vốn.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Vốn đọng — đã mua nhưng chưa từng cho thuê</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RevenueBarList points={reportSummary.deadCapital} labelWidthClassName="w-32" />
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {canManageCatalog && (
-            <Card>
-              <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="text-base">Bảng giá mẫu</CardTitle>
-                <PricingTemplateDialog
-                  trigger={
-                    <Button variant="outline" size="sm">
-                      <Plus className="size-4" />
-                      Thêm bảng giá
-                    </Button>
-                  }
-                />
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên</TableHead>
-                      <TableHead>Số bậc giá</TableHead>
-                      <TableHead className="w-24"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {templateList.map((template) => {
-                      const templateTiers = (tiers ?? []).filter((t) => t.template_id === template.id);
-                      return (
-                        <TableRow key={template.id}>
-                          <TableCell className="font-medium">{template.name}</TableCell>
-                          <TableCell>{templateTiers.length}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <PricingTemplateTiersDialog
-                                templateId={template.id}
-                                templateName={template.name}
-                                tiers={templateTiers}
-                                trigger={
-                                  <Button variant="ghost" size="icon-sm">
-                                    <ListTree className="size-4" />
-                                    <span className="sr-only">Quản lý bậc giá</span>
-                                  </Button>
-                                }
-                              />
-                              <ConfirmDeleteButton
-                                confirmMessage={`Xoá bảng giá "${template.name}"?`}
-                                successMessage="Đã xoá bảng giá."
-                                action={deletePricingTemplate}
-                                actionArg={template.id}
-                              />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {!templateList.length && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">
-                          Chưa có bảng giá mẫu nào.
-                        </TableCell>
-                      </TableRow>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SortableTableHead sortKey="name" label="Tên hàng hoá" />
+            <SortableTableHead sortKey="productType" label="Loại hàng hoá" />
+            <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
+            <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
+            <SortableTableHead sortKey="price" label="Giá" />
+            <SortableTableHead sortKey="stock" label="Tồn kho" />
+            <TableHead className="w-16"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {typeList.map((type) => {
+            const priceLine =
+              type.product_type === "rental"
+                ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}`
+                : `${currencyFormatter.format(type.price)}đ`;
+
+            const stockDisplay =
+              type.product_type === "service"
+                ? "—"
+                : type.tracking_type === "individual"
+                  ? `${instanceCountByTypeId.get(type.id) ?? 0} sản phẩm`
+                  : `${stockTotalByTypeId.get(type.id) ?? 0}`;
+
+            return (
+              <TableRow key={type.id}>
+                <TableCell className="font-medium">
+                  <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
+                    {type.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={type.image_url}
+                        alt=""
+                        className="size-9 shrink-0 rounded-md border object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                        <ImageOff className="size-4" />
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead sortKey="name" label="Tên hàng hoá" />
-                <SortableTableHead sortKey="productType" label="Loại hàng hoá" />
-                <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
-                <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
-                <SortableTableHead sortKey="price" label="Giá" />
-                <SortableTableHead sortKey="stock" label="Tồn kho" />
-                <TableHead className="w-16"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {typeList.map((type) => {
-                const priceLine =
-                  type.product_type === "rental"
-                    ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}`
-                    : `${currencyFormatter.format(type.price)}đ`;
-
-                const stockDisplay =
-                  type.product_type === "service"
-                    ? "—"
-                    : type.tracking_type === "individual"
-                      ? `${instanceCountByTypeId.get(type.id) ?? 0} sản phẩm`
-                      : `${stockTotalByTypeId.get(type.id) ?? 0}`;
-
-                return (
-                  <TableRow key={type.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
-                        {type.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={type.image_url}
-                            alt=""
-                            className="size-9 shrink-0 rounded-md border object-cover"
-                          />
-                        ) : (
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-                            <ImageOff className="size-4" />
-                          </div>
-                        )}
-                        {type.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
-                    <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
-                    <TableCell className="text-muted-foreground">{priceLine}</TableCell>
-                    <TableCell>{stockDisplay}</TableCell>
-                    <TableCell>
-                      {(canManageCatalog || canManageStock) && (
-                        <div className="flex items-center gap-1">
-                          {canManageCatalog && (
-                            <EquipmentTypeDialog
-                              templates={templateList}
-                              equipmentType={type}
-                              trigger={
-                                <Button variant="ghost" size="icon-sm">
-                                  <Pencil className="size-4" />
-                                  <span className="sr-only">Sửa</span>
-                                </Button>
-                              }
-                            />
-                          )}
-                          {canManageCatalog && (
-                            <ConfirmDeleteButton
-                              confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
-                              successMessage="Đã xoá."
-                              action={deleteEquipmentType}
-                              actionArg={type.id}
-                            />
-                          )}
-                        </div>
+                    {type.name}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
+                <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
+                <TableCell className="text-muted-foreground">{priceLine}</TableCell>
+                <TableCell>{stockDisplay}</TableCell>
+                <TableCell>
+                  {(canManageCatalog || canManageStock) && (
+                    <div className="flex items-center gap-1">
+                      {canManageCatalog && (
+                        <EquipmentTypeDialog
+                          templates={templateList}
+                          equipmentType={type}
+                          trigger={
+                            <Button variant="ghost" size="icon-sm">
+                              <Pencil className="size-4" />
+                              <span className="sr-only">Sửa</span>
+                            </Button>
+                          }
+                        />
                       )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {!typeList.length && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                      {canManageCatalog && (
+                        <ConfirmDeleteButton
+                          confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
+                          successMessage="Đã xoá."
+                          action={deleteEquipmentType}
+                          actionArg={type.id}
+                        />
+                      )}
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {!typeList.length && (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
+                {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
 
       <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="loại hàng hoá" />
     </div>

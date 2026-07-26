@@ -728,6 +728,7 @@ export async function createPricingTemplate(
   }
 
   revalidatePath("/equipment");
+  revalidatePath("/pricing-templates");
   return { success: true };
 }
 
@@ -744,6 +745,7 @@ export async function deletePricingTemplate(id: string) {
   }
 
   revalidatePath("/equipment");
+  revalidatePath("/pricing-templates");
 }
 
 const PricingTierSchema = z.object({
@@ -781,6 +783,7 @@ export async function createPricingTier(
   }
 
   revalidatePath("/equipment");
+  revalidatePath("/pricing-templates");
   return { success: true };
 }
 
@@ -795,4 +798,5 @@ export async function deletePricingTier(id: string) {
   }
 
   revalidatePath("/equipment");
+  revalidatePath("/pricing-templates");
 }

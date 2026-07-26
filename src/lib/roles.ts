@@ -54,6 +54,11 @@ export const SETTINGS_ITEMS: NavItem[] = [
     roles: [...MANAGE_ROLES],
   },
   {
+    href: "/pricing-templates",
+    label: "Bảng giá mẫu",
+    roles: [...MANAGE_ROLES],
+  },
+  {
     href: "/activity",
     label: "Nhật ký hoạt động",
     roles: [...MANAGE_ROLES],
