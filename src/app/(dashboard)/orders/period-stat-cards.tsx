@@ -1,5 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/stat-card";
 import type { PeriodStat } from "@/lib/orders-overview";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -27,21 +27,15 @@ function GrowthBadge({ growthPct }: { growthPct: number | null }) {
 
 function PeriodCard({ stat }: { stat: PeriodStat }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-normal text-muted-foreground">{stat.label}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5">
-        <p className="text-2xl font-semibold">{stat.count} đơn</p>
-        <p className="text-sm text-muted-foreground">
-          Trung bình {currencyFormatter.format(Math.round(stat.avgValue))}đ/đơn
-        </p>
-        <GrowthBadge growthPct={stat.growthPct} />
-        <p className="text-xs text-muted-foreground">
-          Dự kiến hết kỳ: ~{stat.projectedCount} đơn (~{currencyFormatter.format(stat.projectedRevenue)}đ)
-        </p>
-      </CardContent>
-    </Card>
+    <StatCard label={stat.label} value={`${stat.count} đơn`}>
+      <p className="text-sm text-muted-foreground">
+        Trung bình {currencyFormatter.format(Math.round(stat.avgValue))}đ/đơn
+      </p>
+      <GrowthBadge growthPct={stat.growthPct} />
+      <p className="text-xs text-muted-foreground">
+        Dự kiến hết kỳ: ~{stat.projectedCount} đơn (~{currencyFormatter.format(stat.projectedRevenue)}đ)
+      </p>
+    </StatCard>
   );
 }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/stat-card";
 import {
   Table,
   TableBody,
@@ -23,40 +24,10 @@ export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-normal text-muted-foreground">Tổng khách hàng</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold">{rows.length}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-normal text-muted-foreground">Cá nhân / Doanh nghiệp</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold">
-            {individualCount} / {companyCount}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-normal text-muted-foreground">Khách mới (1 đơn)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold">{newCount}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-normal text-muted-foreground">Khách quay lại (2+ đơn)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold">{returningCount}</p>
-        </CardContent>
-      </Card>
+      <StatCard label="Tổng khách hàng" value={rows.length} />
+      <StatCard label="Cá nhân / Doanh nghiệp" value={`${individualCount} / ${companyCount}`} />
+      <StatCard label="Khách mới (1 đơn)" value={newCount} />
+      <StatCard label="Khách quay lại (2+ đơn)" value={returningCount} />
     </div>
   );
 }

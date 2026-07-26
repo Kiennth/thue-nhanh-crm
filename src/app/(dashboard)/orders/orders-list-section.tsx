@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/stat-card";
 import {
   Table,
   TableBody,
@@ -222,50 +222,14 @@ export async function OrdersListSection({
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">
-              Tổng đơn (khớp bộ lọc)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{totalCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Đang xử lý</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{processingCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Hoàn tất</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{completedCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Đã huỷ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{cancelledCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-muted-foreground">Tổng doanh số</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">
-              {currencyFormatter.format(Math.round(totalRevenue))}đ
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard label="Tổng đơn (khớp bộ lọc)" value={totalCount} />
+        <StatCard label="Đang xử lý" value={processingCount} />
+        <StatCard label="Hoàn tất" value={completedCount} />
+        <StatCard label="Đã huỷ" value={cancelledCount} />
+        <StatCard
+          label="Tổng doanh số"
+          value={`${currencyFormatter.format(Math.round(totalRevenue))}đ`}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
