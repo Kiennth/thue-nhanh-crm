@@ -12,18 +12,18 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { deleteBonusTier, deleteCommissionTier } from "@/lib/actions/commission";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { CommissionTierDialog } from "./commission-tier-dialog";
 import { BonusTierDialog } from "./bonus-tier-dialog";
 import { TaskWeightRow } from "./task-weight-row";
 
-const VIEW_ROLES = ["admin", "ke_toan"] as const;
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function CommissionPage() {
-  const employee = await requireRole([...VIEW_ROLES]);
-  const canManage = employee.role === "admin";
+  const employee = await requireRole([...MANAGE_ROLES]);
+  const canManage = employee.role === "giam_doc";
 
   const supabase = await createClient();
   const [{ data: branches }, { data: commissionTiers }, { data: bonusTiers }, { data: taskWeights }] =

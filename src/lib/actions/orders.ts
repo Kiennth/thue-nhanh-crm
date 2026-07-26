@@ -7,10 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
-const ALL_ROLES = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"] as const;
-const DELETE_ROLES = ["admin", "ke_toan"] as const;
-const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+const DELETE_ROLES = MANAGE_ROLES;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -422,7 +421,7 @@ export async function closeOrder(id: string) {
 // chỉ cập nhật khi completed_at is null nên status có thể bị "đứng hình" từ
 // lúc đóng đơn.
 export async function reopenOrder(id: string): Promise<ActionState> {
-  await requireRole(["admin", "ke_toan"]);
+  await requireRole([...MANAGE_ROLES]);
 
   const supabase = await createClient();
   const { data: tasks } = await supabase

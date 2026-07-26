@@ -41,7 +41,7 @@ interface EmployeeDialogProps {
   };
 }
 
-const ROLE_OPTIONS: UserRole[] = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"];
+const ROLE_OPTIONS: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"];
 
 export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogProps) {
   const [open, setOpen] = useState(false);

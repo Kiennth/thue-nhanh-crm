@@ -22,13 +22,13 @@ export default async function BranchesPage() {
     getCurrentEmployee(),
   ]);
 
-  const isAdmin = employee?.role === "admin";
+  const isDirector = employee?.role === "giam_doc";
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Chi nhánh</h1>
-        {isAdmin && (
+        {isDirector && (
           <BranchDialog
             trigger={
               <Button>
@@ -46,7 +46,7 @@ export default async function BranchesPage() {
             <TableHead>Tên chi nhánh</TableHead>
             <TableHead>Vùng lương tối thiểu</TableHead>
             <TableHead>Trạng thái</TableHead>
-            {isAdmin && <TableHead className="w-24"></TableHead>}
+            {isDirector && <TableHead className="w-24"></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -63,7 +63,7 @@ export default async function BranchesPage() {
                   {branch.is_active ? "Hoạt động" : "Ngừng"}
                 </Badge>
               </TableCell>
-              {isAdmin && (
+              {isDirector && (
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <BranchDialog
@@ -83,7 +83,7 @@ export default async function BranchesPage() {
           ))}
           {!branches?.length && (
             <TableRow>
-              <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-muted-foreground">
+              <TableCell colSpan={isDirector ? 4 : 3} className="text-center text-muted-foreground">
                 Chưa có chi nhánh nào.
               </TableCell>
             </TableRow>

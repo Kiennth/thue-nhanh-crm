@@ -10,13 +10,13 @@ import {
   findBonusAmount,
   findCommissionRate,
   findTaskWeight,
+  SERVICE_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
 import type { TaskType } from "@/types/database";
+import { MANAGE_ROLES } from "@/lib/roles";
 
-// Admin/Kế toán — 2 role duy nhất được xem lương/khoán của người khác (Bảng
-// lương + khối biểu đồ hiệu suất nhân viên ở Trang chủ).
-export const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+export { MANAGE_ROLES };
 
 export function getMonthRange(month: string) {
   const [yearStr, monthStr] = month.split("-");
@@ -36,13 +36,16 @@ export function currentMonth() {
 export interface EmployeeMonthlyPerformance {
   id: string;
   name: string;
+  branchId: string | null;
   baseSalary: number;
   totalCommission: number;
   bonus: number;
-  // Khoán trực tiếp từ dòng dịch vụ (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) và
-  // phụ cấp OT — cộng vào totalIncome nhưng KHÔNG tính vào cơ sở bậc thưởng
+  // Khoán trực tiếp từ dòng dịch vụ (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật) và phụ
+  // cấp OT — cộng vào totalIncome nhưng KHÔNG tính vào cơ sở bậc thưởng
   // (findBonusAmount chỉ dùng totalCommission gốc).
-  servicePayout: number;
+  installationPayout: number;
+  removalPayout: number;
+  supportPayout: number;
   overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
@@ -56,7 +59,7 @@ export interface EmployeeMonthlyPerformance {
 // giới hạn phạm vi nhân viên qua `options.employeeIds` ở tầng gọi theo role.
 export async function computeEmployeeMonthlyPerformance(
   month: string,
-  options?: { employeeIds?: string[] },
+  options?: { employeeIds?: string[]; branchId?: string },
 ): Promise<EmployeeMonthlyPerformance[]> {
   const { start, end } = getMonthRange(month);
   const admin = createAdminClient();
@@ -68,6 +71,9 @@ export async function computeEmployeeMonthlyPerformance(
     .order("name");
   if (options?.employeeIds) {
     employeesQuery = employeesQuery.in("id", options.employeeIds);
+  }
+  if (options?.branchId) {
+    employeesQuery = employeesQuery.eq("branch_id", options.branchId);
   }
 
   const [
@@ -149,14 +155,25 @@ export async function computeEmployeeMonthlyPerformance(
     ]),
   );
 
-  const servicePayoutByEmployeeId = new Map<string, number>();
+  const servicePayoutByEmployeeId = new Map<
+    string,
+    { installation: number; removal: number; support: number }
+  >();
   for (const line of allOrderLines) {
     if (!line.employee_id || !line.equipment_type_id || !line.completed_date) continue;
     if (line.completed_date < start || line.completed_date >= end) continue;
     const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
     if (payoutPercentage == null) continue;
+    const category = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+    if (!category) continue;
     const payout = computeLineDirectPayout(line.line_total, payoutPercentage);
-    servicePayoutByEmployeeId.set(line.employee_id, (servicePayoutByEmployeeId.get(line.employee_id) ?? 0) + payout);
+    const entry = servicePayoutByEmployeeId.get(line.employee_id) ?? {
+      installation: 0,
+      removal: 0,
+      support: 0,
+    };
+    entry[category] += payout;
+    servicePayoutByEmployeeId.set(line.employee_id, entry);
   }
 
   const overtimeByEmployeeId = new Map<string, number>();
@@ -180,17 +197,27 @@ export async function computeEmployeeMonthlyPerformance(
     const bonus = emp.branch_id
       ? findBonusAmount(bonusTiers ?? [], emp.branch_id, totalCommission)
       : 0;
-    const servicePayout = servicePayoutByEmployeeId.get(emp.id) ?? 0;
+    const service = servicePayoutByEmployeeId.get(emp.id) ?? { installation: 0, removal: 0, support: 0 };
     const overtimePay = overtimeByEmployeeId.get(emp.id) ?? 0;
     return {
       id: emp.id,
       name: emp.name,
+      branchId: emp.branch_id,
       baseSalary: emp.base_salary,
       totalCommission,
       bonus,
-      servicePayout,
+      installationPayout: service.installation,
+      removalPayout: service.removal,
+      supportPayout: service.support,
       overtimePay,
-      totalIncome: emp.base_salary + totalCommission + bonus + servicePayout + overtimePay,
+      totalIncome:
+        emp.base_salary +
+        totalCommission +
+        bonus +
+        service.installation +
+        service.removal +
+        service.support +
+        overtimePay,
       completedTaskCount: empTasks.length,
       taskTypeCounts,
     };

@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-
-const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+import { MANAGE_ROLES } from "@/lib/roles";
 
 export type ActionState = { error: string } | { success: true } | undefined;
 

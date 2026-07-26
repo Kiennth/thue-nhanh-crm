@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueBarList } from "@/components/revenue-bar-list";
 import { PeriodPicker } from "@/components/period-picker";
 import { formatDayLabel } from "@/components/dashboard-cards";
+import { BranchBadge } from "@/components/branch-badge";
 import { revenueForDay, revenueForMonth, revenueForYear } from "@/lib/dashboard-reports";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -124,7 +125,12 @@ export function BranchComparisonSection({
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.branch.id}>
-                  <TableCell className="font-medium">{r.branch.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <BranchBadge name={r.branch.name} />
+                      {r.branch.name}
+                    </div>
+                  </TableCell>
                   <TableCell>{currencyFormatter.format(r.day)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(r.month)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(r.year)}đ</TableCell>

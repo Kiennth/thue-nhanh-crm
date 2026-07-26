@@ -2,7 +2,7 @@
 // Sau khi link project Supabase thật, chạy lệnh sau để thay bằng bản generate chính xác:
 //   npx supabase gen types typescript --linked > src/types/database.ts
 
-export type UserRole = "admin" | "ke_toan" | "ky_thuat_sales" | "quan_ly_chi_nhanh";
+export type UserRole = "giam_doc" | "admin" | "ke_toan" | "cua_hang_truong" | "ky_thuat_sales";
 
 export type CustomerType = "individual" | "company";
 
@@ -12,6 +12,7 @@ export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
 export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" | "khac";
+export type OrderPaymentType = "invoice" | "deposit_collect" | "deposit_refund";
 export type RfidTagStatus = "in_stock" | "with_customer";
 export type RfidScanType = "giao_hang" | "thu_hoi";
 
@@ -433,6 +434,7 @@ export interface Database {
           order_id: string;
           amount: number;
           method: PaymentMethod;
+          payment_type: OrderPaymentType;
           paid_at: string;
           note: string | null;
           created_by: string | null;
@@ -443,6 +445,7 @@ export interface Database {
           order_id: string;
           amount: number;
           method: PaymentMethod;
+          payment_type?: OrderPaymentType;
           paid_at?: string;
           note?: string | null;
           created_by?: string | null;

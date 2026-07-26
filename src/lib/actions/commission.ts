@@ -4,14 +4,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-
-const ADMIN_ONLY = ["admin"] as const;
+import { DIRECTOR_ONLY } from "@/lib/roles";
 
 export type ActionState = { error: string } | { success: true } | undefined;
 
 // ---------------------------------------------------------------------------
 // commission_tiers — bậc thang % hoa hồng theo giá trị đơn, riêng từng chi
-// nhánh. Chỉ Admin sửa (Kế toán chỉ xem — theo PRD).
+// nhánh. Chỉ Giám đốc sửa (Admin/Kế toán chỉ xem).
 // ---------------------------------------------------------------------------
 
 const CommissionTierSchema = z.object({
@@ -29,7 +28,7 @@ export async function createCommissionTier(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...ADMIN_ONLY]);
+  await requireRole(DIRECTOR_ONLY);
 
   const parsed = CommissionTierSchema.safeParse({
     branch_id: formData.get("branch_id"),
@@ -58,7 +57,7 @@ export async function createCommissionTier(
 }
 
 export async function deleteCommissionTier(id: string) {
-  await requireRole([...ADMIN_ONLY]);
+  await requireRole(DIRECTOR_ONLY);
 
   const supabase = await createClient();
   const { error } = await supabase.from("commission_tiers").delete().eq("id", id);
@@ -85,7 +84,7 @@ export async function createBonusTier(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...ADMIN_ONLY]);
+  await requireRole(DIRECTOR_ONLY);
 
   const parsed = BonusTierSchema.safeParse({
     branch_id: formData.get("branch_id"),
@@ -110,7 +109,7 @@ export async function createBonusTier(
 }
 
 export async function deleteBonusTier(id: string) {
-  await requireRole([...ADMIN_ONLY]);
+  await requireRole(DIRECTOR_ONLY);
 
   const supabase = await createClient();
   const { error } = await supabase.from("bonus_tiers").delete().eq("id", id);
@@ -139,7 +138,7 @@ export async function updateTaskWeight(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...ADMIN_ONLY]);
+  await requireRole(DIRECTOR_ONLY);
 
   const parsed = TaskWeightSchema.safeParse({ weight_percentage: formData.get("weight_percentage") });
   if (!parsed.success) {

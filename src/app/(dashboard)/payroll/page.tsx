@@ -7,6 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BranchBadge } from "@/components/branch-badge";
+import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import {
   computeEmployeeMonthlyPerformance,
@@ -16,6 +18,10 @@ import {
 import { MonthNavigator } from "./month-navigator";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+
+// Thứ tự hiển thị chi nhánh cố định (khớp màu ở BranchBadge) — chi nhánh nào
+// không nằm trong danh sách này (nếu phát sinh sau) xếp cuối theo tên.
+const BRANCH_ORDER = ["Hà Nội", "TP HCM", "Đà Nẵng", "HQ"];
 
 export default async function PayrollPage({
   searchParams,
@@ -29,11 +35,30 @@ export default async function PayrollPage({
   if (!viewer) return null;
 
   const canViewAll = (MANAGE_ROLES as readonly string[]).includes(viewer.role);
+  const performanceOptions = canViewAll
+    ? undefined
+    : viewer.role === "cua_hang_truong" && viewer.branch_id
+      ? { branchId: viewer.branch_id }
+      : { employeeIds: [viewer.id] };
 
-  const rows = await computeEmployeeMonthlyPerformance(
-    month,
-    canViewAll ? undefined : { employeeIds: [viewer.id] },
-  );
+  const supabase = await createClient();
+  const [rows, { data: branches }] = await Promise.all([
+    computeEmployeeMonthlyPerformance(month, performanceOptions),
+    supabase.from("branches").select("id, name"),
+  ]);
+
+  const branchNameById = new Map((branches ?? []).map((b) => [b.id, b.name]));
+  const branchSortIndex = (branchId: string | null) => {
+    const name = branchId ? branchNameById.get(branchId) : undefined;
+    if (!name) return BRANCH_ORDER.length + 1;
+    const idx = BRANCH_ORDER.indexOf(name);
+    return idx === -1 ? BRANCH_ORDER.length : idx;
+  };
+  const sortedRows = [...rows].sort((a, b) => {
+    const branchDiff = branchSortIndex(a.branchId) - branchSortIndex(b.branchId);
+    if (branchDiff !== 0) return branchDiff;
+    return a.name.localeCompare(b.name, "vi");
+  });
 
   return (
     <div className="space-y-4">
@@ -51,21 +76,33 @@ export default async function PayrollPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Nhân viên</TableHead>
+                <TableHead>Chi nhánh</TableHead>
                 <TableHead>Lương cứng</TableHead>
                 <TableHead>Tổng khoán</TableHead>
-                <TableHead>Phí dịch vụ</TableHead>
+                <TableHead>Phí Lắp đặt</TableHead>
+                <TableHead>Phí Thu hồi</TableHead>
+                <TableHead>Phí Support</TableHead>
                 <TableHead>OT</TableHead>
                 <TableHead>Thưởng</TableHead>
                 <TableHead>Tổng thu nhập</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {sortedRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell>
+                    {row.branchId ? (
+                      <BranchBadge name={branchNameById.get(row.branchId) ?? "—"} />
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell>{currencyFormatter.format(row.baseSalary)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.totalCommission)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.servicePayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.installationPayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.removalPayout)}đ</TableCell>
+                  <TableCell>{currencyFormatter.format(row.supportPayout)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.overtimePay)}đ</TableCell>
                   <TableCell>{currencyFormatter.format(row.bonus)}đ</TableCell>
                   <TableCell className="font-medium">
@@ -73,9 +110,9 @@ export default async function PayrollPage({
                   </TableCell>
                 </TableRow>
               ))}
-              {!rows.length && (
+              {!sortedRows.length && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">
                     Không có dữ liệu.
                   </TableCell>
                 </TableRow>

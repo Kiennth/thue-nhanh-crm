@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
+import { DIRECTOR_ONLY } from "@/lib/roles";
 
 const BranchSchema = z.object({
   name: z.string().trim().min(1, { message: "Tên chi nhánh không được để trống." }),
@@ -17,7 +18,7 @@ export async function createBranch(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole(["admin"]);
+  await requireRole(DIRECTOR_ONLY);
 
   const parsed = BranchSchema.safeParse({
     name: formData.get("name"),
@@ -45,7 +46,7 @@ export async function updateBranch(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole(["admin"]);
+  await requireRole(DIRECTOR_ONLY);
 
   const parsed = BranchSchema.safeParse({
     name: formData.get("name"),
@@ -69,7 +70,7 @@ export async function updateBranch(
 }
 
 export async function deleteBranch(id: string) {
-  await requireRole(["admin"]);
+  await requireRole(DIRECTOR_ONLY);
 
   const supabase = await createClient();
   const { error } = await supabase.from("branches").delete().eq("id", id);

@@ -10,6 +10,7 @@ import {
 import { PaginationControls } from "@/components/pagination-controls";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { ACTIVITY_ACTION_LABELS, ACTIVITY_TABLE_LABELS, getActivityRecordLabel } from "@/lib/activity-labels";
 import { ActivityTableFilter } from "./activity-table-filter";
 
@@ -27,7 +28,7 @@ export default async function ActivityPage({
 }: {
   searchParams: Promise<{ table?: string; page?: string }>;
 }) {
-  await requireRole(["admin", "ke_toan"]);
+  await requireRole([...MANAGE_ROLES]);
 
   const { table, page: pageParam } = await searchParams;
   const activeTable = table && table !== "all" ? table : "";

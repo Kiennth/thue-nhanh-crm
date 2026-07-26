@@ -5,14 +5,13 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
-
-const HR_ROLES = ["admin", "ke_toan"] as const;
+import { MANAGE_ROLES as HR_ROLES } from "@/lib/roles";
 
 const employeeShape = {
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
   branch_id: z.string().uuid().optional().or(z.literal("")),
   base_salary: z.coerce.number().min(0, { message: "Lương cứng không được âm." }),
-  role: z.enum(["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"]),
+  role: z.enum(["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"]),
 };
 
 const CreateEmployeeSchema = z.object({

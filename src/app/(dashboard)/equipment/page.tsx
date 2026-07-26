@@ -50,8 +50,7 @@ import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 import { EquipmentSortSelect } from "./equipment-sort-select";
 import { SearchInput } from "@/components/search-input";
 import { RfidTagDialog } from "./rfid-tag-dialog";
-
-const MANAGE_ROLES = ["admin", "ke_toan"];
+import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat("vi-VN");
 
@@ -126,7 +125,13 @@ export default async function EquipmentPage({
     getCurrentEmployee(),
   ]);
 
-  const canManage = !!employee && MANAGE_ROLES.includes(employee.role);
+  // Sửa danh mục (loại hàng/biến thể/bảng giá — dùng chung toàn hệ thống,
+  // không gắn chi nhánh) vs sửa tồn kho/mua/thanh lý/chuyển kho (gắn chi
+  // nhánh cụ thể — Cửa hàng trưởng có quyền này trong chi nhánh mình, RLS đã
+  // giới hạn kết quả trả về theo đúng chi nhánh của họ nên không cần lọc
+  // thêm ở đây).
+  const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
+  const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
   const branchList = branches ?? [];
   const templateList = templates ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
@@ -189,7 +194,7 @@ export default async function EquipmentPage({
             value={activeSearch}
           />
           <EquipmentSortSelect value={activeSort} />
-          {canManage && (
+          {canManageCatalog && (
             <EquipmentTypeDialog
               templates={templateList}
               trigger={
@@ -203,7 +208,7 @@ export default async function EquipmentPage({
         </div>
       </div>
 
-      {canManage && (
+      {canManageCatalog && (
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Bảng giá mẫu</CardTitle>
@@ -319,7 +324,7 @@ export default async function EquipmentPage({
                     <p className="text-sm text-muted-foreground">{priceLine}</p>
                   </div>
                 </div>
-                {canManage && (
+                {canManageCatalog && (
                   <div className="flex items-center gap-1">
                     <EquipmentTypeDialog
                       templates={templateList}
@@ -364,7 +369,7 @@ export default async function EquipmentPage({
                                 </p>
                               )}
                             </div>
-                            {canManage && (
+                            {canManageCatalog && (
                               <div className="flex items-center gap-1">
                                 <RfidTagDialog
                                   label={unit.brand_model}
@@ -406,7 +411,7 @@ export default async function EquipmentPage({
                                 <TableHead>Trong kho</TableHead>
                                 <TableHead>Ở khách</TableHead>
                                 <TableHead>Bảo trì</TableHead>
-                                {canManage && <TableHead className="w-20"></TableHead>}
+                                {canManageStock && <TableHead className="w-20"></TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -419,7 +424,7 @@ export default async function EquipmentPage({
                                   <TableCell>{row.quantity_in_stock}</TableCell>
                                   <TableCell>{row.quantity_picked_up}</TableCell>
                                   <TableCell>{row.quantity_downtime}</TableCell>
-                                  {canManage && (
+                                  {canManageStock && (
                                     <TableCell>
                                       <div className="flex items-center gap-1">
                                         <EquipmentStockDialog
@@ -447,7 +452,7 @@ export default async function EquipmentPage({
                               {!unitStock.length && (
                                 <TableRow>
                                   <TableCell
-                                    colSpan={canManage ? 6 : 5}
+                                    colSpan={canManageStock ? 6 : 5}
                                     className="text-center text-muted-foreground"
                                   >
                                     Chưa có tồn kho ở chi nhánh nào.
@@ -457,7 +462,7 @@ export default async function EquipmentPage({
                             </TableBody>
                           </Table>
 
-                          {canManage && (
+                          {canManageStock && (
                             <div className="mt-2 flex items-center gap-2">
                               <EquipmentStockDialog
                                 equipmentUnitId={unit.id}
@@ -511,7 +516,7 @@ export default async function EquipmentPage({
                     </p>
                   )}
 
-                  {showUnitsBlock && canManage && (
+                  {showUnitsBlock && canManageCatalog && (
                     <EquipmentUnitDialog
                       equipmentTypeId={type.id}
                       trigger={
@@ -532,7 +537,7 @@ export default async function EquipmentPage({
                             <TableHead>Chi nhánh</TableHead>
                             <TableHead>Trạng thái</TableHead>
                             <TableHead>Ghi chú</TableHead>
-                            {canManage && <TableHead className="w-20"></TableHead>}
+                            {canManageStock && <TableHead className="w-20"></TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -552,7 +557,7 @@ export default async function EquipmentPage({
                                 </Badge>
                               </TableCell>
                               <TableCell>{inst.condition_notes ?? "—"}</TableCell>
-                              {canManage && (
+                              {canManageStock && (
                                 <TableCell>
                                   <div className="flex items-center gap-1">
                                     <RfidTagDialog
@@ -607,7 +612,7 @@ export default async function EquipmentPage({
                           {!typeInstances.length && (
                             <TableRow>
                               <TableCell
-                                colSpan={canManage ? 5 : 4}
+                                colSpan={canManageStock ? 5 : 4}
                                 className="text-center text-muted-foreground"
                               >
                                 Chưa có sản phẩm nào.
@@ -617,7 +622,7 @@ export default async function EquipmentPage({
                         </TableBody>
                       </Table>
 
-                      {canManage && (
+                      {canManageStock && (
                         <EquipmentInstanceDialog
                           equipmentTypeId={type.id}
                           branches={branchList}

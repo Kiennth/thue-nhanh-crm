@@ -14,6 +14,7 @@ import {
 import { PaginationControls } from "@/components/pagination-controls";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CustomerAvatar } from "@/components/customer-avatar";
+import { BranchBadge } from "@/components/branch-badge";
 import { createClient } from "@/lib/supabase/server";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
@@ -253,9 +254,15 @@ export async function OrdersListSection({
                 </Link>
               </TableCell>
               <TableCell className="max-w-28 truncate">
-                {branchNameById.get(order.pickup_branch_id) ?? "—"}
-                {order.return_branch_id !== order.pickup_branch_id &&
-                  ` → ${branchNameById.get(order.return_branch_id) ?? "—"}`}
+                <div className="flex items-center gap-1">
+                  <BranchBadge name={branchNameById.get(order.pickup_branch_id) ?? "—"} />
+                  {order.return_branch_id !== order.pickup_branch_id && (
+                    <>
+                      <span className="text-muted-foreground">→</span>
+                      <BranchBadge name={branchNameById.get(order.return_branch_id) ?? "—"} />
+                    </>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

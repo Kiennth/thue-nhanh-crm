@@ -21,13 +21,28 @@ import {
 } from "@/components/ui/select";
 import { createOrderPayment } from "@/lib/actions/order-payments";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_OPTIONS } from "@/lib/order-labels";
+import type { OrderPaymentType } from "@/types/database";
+
+const DIALOG_TITLES: Record<OrderPaymentType, string> = {
+  invoice: "Thêm thanh toán",
+  deposit_collect: "Thu tiền cọc",
+  deposit_refund: "Hoàn tiền cọc",
+};
+
+const SUBMIT_LABELS: Record<OrderPaymentType, string> = {
+  invoice: "Ghi nhận thanh toán",
+  deposit_collect: "Ghi nhận thu cọc",
+  deposit_refund: "Ghi nhận hoàn cọc",
+};
 
 export function OrderPaymentDialog({
   orderId,
   trigger,
+  paymentType = "invoice",
 }: {
   orderId: string;
   trigger: React.ReactElement;
+  paymentType?: OrderPaymentType;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +72,9 @@ export function OrderPaymentDialog({
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="order_id" value={orderId} />
+          <input type="hidden" name="payment_type" value={paymentType} />
           <DialogHeader>
-            <DialogTitle>Thêm thanh toán</DialogTitle>
+            <DialogTitle>{DIALOG_TITLES[paymentType]}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
@@ -102,7 +118,7 @@ export function OrderPaymentDialog({
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Đang lưu..." : "Ghi nhận thanh toán"}
+              {pending ? "Đang lưu..." : SUBMIT_LABELS[paymentType]}
             </Button>
           </DialogFooter>
         </form>

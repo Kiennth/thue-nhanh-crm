@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-
-const ALL_ROLES = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"] as const;
+import { ALL_ROLES } from "@/lib/roles";
 
 const CustomerSchema = z.object({
   name: z.string().trim().min(1, { message: "Tên khách hàng không được để trống." }),

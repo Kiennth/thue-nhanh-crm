@@ -9,6 +9,7 @@ import {
   computeTaskCommission,
   findCommissionRate,
   findTaskWeight,
+  SERVICE_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
 import type { TaskType } from "@/types/database";
@@ -35,7 +36,9 @@ export interface MyPerformance {
   baseSalary: number;
   totalCommission: number;
   bonus: number;
-  servicePayout: number;
+  installationPayout: number;
+  removalPayout: number;
+  supportPayout: number;
   overtimePay: number;
   totalIncome: number;
   completedTaskCount: number;
@@ -126,13 +129,19 @@ export async function computeMyPerformance(
     ]),
   );
 
-  const servicePayout = allOrderLines.reduce((sum, line) => {
-    if (line.employee_id !== employeeId || !line.equipment_type_id || !line.completed_date) return sum;
-    if (line.completed_date < start || line.completed_date >= end) return sum;
-    const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
-    if (payoutPercentage == null) return sum;
-    return sum + computeLineDirectPayout(line.line_total, payoutPercentage);
-  }, 0);
+  const servicePayout = allOrderLines.reduce(
+    (acc, line) => {
+      if (line.employee_id !== employeeId || !line.equipment_type_id || !line.completed_date) return acc;
+      if (line.completed_date < start || line.completed_date >= end) return acc;
+      const payoutPercentage = payoutPercentByTypeId.get(line.equipment_type_id);
+      if (payoutPercentage == null) return acc;
+      const category = SERVICE_LINE_CATEGORY_BY_TYPE_ID[line.equipment_type_id];
+      if (!category) return acc;
+      acc[category] += computeLineDirectPayout(line.line_total, payoutPercentage);
+      return acc;
+    },
+    { installation: 0, removal: 0, support: 0 },
+  );
   const overtimePay = overtimeInMonth.reduce((sum, entry) => sum + entry.amount, 0);
 
   const totalCommission = taskList.reduce((sum, t) => {
@@ -172,9 +181,18 @@ export async function computeMyPerformance(
     baseSalary,
     totalCommission,
     bonus,
-    servicePayout,
+    installationPayout: servicePayout.installation,
+    removalPayout: servicePayout.removal,
+    supportPayout: servicePayout.support,
     overtimePay,
-    totalIncome: baseSalary + totalCommission + bonus + servicePayout + overtimePay,
+    totalIncome:
+      baseSalary +
+      totalCommission +
+      bonus +
+      servicePayout.installation +
+      servicePayout.removal +
+      servicePayout.support +
+      overtimePay,
     completedTaskCount: taskList.length,
     tiers: tierList,
     currentTierIndex,

@@ -18,6 +18,7 @@ import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
 import { deleteOvertimeEntry } from "@/lib/actions/overtime";
 import {
+  ORDER_PAYMENT_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
   TASK_TYPE_LABELS,
   TASK_TYPE_SEQUENCE,
@@ -47,8 +48,8 @@ import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
+import { MANAGE_ROLES } from "@/lib/roles";
 
-const MANAGE_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -140,8 +141,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
 
-  const paymentList = payments ?? [];
-  const totalPaid = paymentList.reduce((sum, p) => sum + p.amount, 0);
+  // order_payments gồm 3 loại (payment_type) dùng chung 1 bảng: thanh toán
+  // hoá đơn thuê/dịch vụ, thu cọc, hoàn cọc — cọc không tính vào "Đã thanh
+  // toán" hoá đơn vì nó là khoản giữ hộ (không tính VAT), không phải doanh
+  // thu đơn.
+  const invoicePaymentList = (payments ?? []).filter((p) => p.payment_type === "invoice");
+  const totalPaid = invoicePaymentList.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, grandTotal - totalPaid);
   const paymentStatus =
     totalPaid <= 0 ? "Chưa thanh toán" : remaining <= 0 ? "Đã thanh toán đủ" : "Thanh toán một phần";
@@ -158,6 +163,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
   const totalDeposit =
     Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+
+  const depositPaymentList = (payments ?? [])
+    .filter((p) => p.payment_type === "deposit_collect" || p.payment_type === "deposit_refund")
+    .sort((a, b) => a.paid_at.localeCompare(b.paid_at));
+  const depositCollected = depositPaymentList
+    .filter((p) => p.payment_type === "deposit_collect")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const depositRefunded = depositPaymentList
+    .filter((p) => p.payment_type === "deposit_refund")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const depositHeld = depositCollected - depositRefunded;
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -529,7 +545,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paymentList.map((payment) => (
+              {invoicePaymentList.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell>{payment.paid_at}</TableCell>
                   <TableCell>{PAYMENT_METHOD_LABELS[payment.method]}</TableCell>
@@ -547,7 +563,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   </TableCell>
                 </TableRow>
               ))}
-              {!paymentList.length && (
+              {!invoicePaymentList.length && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
                     Chưa có thanh toán nào.
@@ -561,22 +577,103 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
       {rawDeposit > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Tiền cọc</CardTitle>
+            <div className="flex gap-2">
+              <OrderPaymentDialog
+                orderId={order.id}
+                paymentType="deposit_collect"
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Plus className="size-4" />
+                    Thu cọc
+                  </Button>
+                }
+              />
+              <OrderPaymentDialog
+                orderId={order.id}
+                paymentType="deposit_refund"
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Plus className="size-4" />
+                    Hoàn cọc
+                  </Button>
+                }
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            {customerDepositPercentage <= 0 ? (
-              <p className="text-2xl font-semibold">Miễn cọc</p>
-            ) : (
-              <p className="text-2xl font-semibold">{currencyFormatter.format(totalDeposit)}đ</p>
-            )}
-            <p className="mt-1 text-sm text-muted-foreground">
-              {customerDepositPercentage < 100 && (
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Cọc dự kiến</p>
+                <p className="font-medium">
+                  {customerDepositPercentage <= 0 ? "Miễn cọc" : `${currencyFormatter.format(totalDeposit)}đ`}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Đã thu cọc</p>
+                <p className="font-medium">{currencyFormatter.format(depositCollected)}đ</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Đã hoàn cọc</p>
+                <p className="font-medium">{currencyFormatter.format(depositRefunded)}đ</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Đang giữ</p>
+                <p className="font-medium">{currencyFormatter.format(depositHeld)}đ</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {customerDepositPercentage < 100 && customerDepositPercentage > 0 && (
                 <>Khách hàng được áp tỉ lệ cọc {customerDepositPercentage}%. </>
               )}
               Thu cùng lúc với đơn (không tính VAT), hoàn lại cho khách sau khi hoàn thành khâu
               Nghiệm thu.
+              {!taskByType.get("nghiem_thu")?.completed_date && depositCollected > depositRefunded && (
+                <> Đơn chưa hoàn thành khâu Nghiệm thu.</>
+              )}
             </p>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ngày</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead>Hình thức</TableHead>
+                  <TableHead>Số tiền</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                  <TableHead className="w-16"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {depositPaymentList.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{payment.paid_at}</TableCell>
+                    <TableCell>{ORDER_PAYMENT_TYPE_LABELS[payment.payment_type]}</TableCell>
+                    <TableCell>{PAYMENT_METHOD_LABELS[payment.method]}</TableCell>
+                    <TableCell>{currencyFormatter.format(payment.amount)}đ</TableCell>
+                    <TableCell className="text-muted-foreground">{payment.note ?? "—"}</TableCell>
+                    <TableCell>
+                      {canManage && (
+                        <ConfirmDeleteButton
+                          confirmMessage="Xoá lần cọc này?"
+                          successMessage="Đã xoá."
+                          action={deleteOrderPayment}
+                          actionArg={payment.id}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!depositPaymentList.length && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Chưa ghi nhận thu/hoàn cọc nào.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}

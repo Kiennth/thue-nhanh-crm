@@ -5,9 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import type { RfidScanType } from "@/types/database";
-
-const ALL_ROLES = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"] as const;
-const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 export type ActionState = { error: string } | { success: true } | undefined;
 

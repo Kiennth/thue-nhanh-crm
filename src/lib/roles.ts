@@ -1,11 +1,32 @@
 import type { UserRole } from "@/types/database";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  giam_doc: "Giám đốc",
   admin: "Admin",
   ke_toan: "Kế toán",
+  cua_hang_truong: "Cửa hàng trưởng",
   ky_thuat_sales: "Kỹ thuật/Sales",
-  quan_ly_chi_nhanh: "Quản lý chi nhánh",
 };
+
+// Cấp bậc quyền dùng chung toàn app (không có kế thừa thật ở tầng code —
+// giam_doc ⊇ admin được biểu diễn bằng cách LUÔN có mặt trong mọi mảng bên
+// dưới, không phải bằng logic so sánh cấp bậc).
+export const DIRECTOR_ONLY: UserRole[] = ["giam_doc"];
+export const MANAGE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan"];
+export const ALL_ROLES: UserRole[] = [
+  "giam_doc",
+  "admin",
+  "ke_toan",
+  "cua_hang_truong",
+  "ky_thuat_sales",
+];
+// Cửa hàng trưởng/Kỹ thuật-Sale chỉ thấy/thao tác đơn hàng + thiết bị đúng
+// chi nhánh mình (RLS + query filter) — không áp dụng cho khách hàng (dùng
+// chung toàn hệ thống, xem CEO quyết định trong plan cải tổ phân quyền).
+export const BRANCH_SCOPED_ROLES: UserRole[] = ["cua_hang_truong", "ky_thuat_sales"];
+// Ai được SỬA thiết bị (tồn kho/mua/thanh lý/chuyển kho) — Cửa hàng trưởng
+// có quyền mới này (giới hạn chi nhánh mình), Kỹ thuật/Sale vẫn chỉ xem.
+export const EQUIPMENT_WRITE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
 
 export interface NavItem {
   href: string;
@@ -20,22 +41,22 @@ export const SETTINGS_ITEMS: NavItem[] = [
   {
     href: "/branches",
     label: "Chi nhánh",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+    roles: [...DIRECTOR_ONLY],
   },
   {
     href: "/employees",
     label: "Nhân viên",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+    roles: [...MANAGE_ROLES],
   },
   {
     href: "/commission",
     label: "Chính sách khoán",
-    roles: ["admin", "ke_toan"],
+    roles: [...MANAGE_ROLES],
   },
   {
     href: "/activity",
     label: "Nhật ký hoạt động",
-    roles: ["admin", "ke_toan"],
+    roles: [...MANAGE_ROLES],
   },
 ];
 
@@ -43,26 +64,26 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/orders",
     label: "Đơn hàng",
-    roles: ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"],
+    roles: [...ALL_ROLES],
   },
   {
     href: "/customers",
     label: "Khách hàng",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
   },
   {
     href: "/equipment",
     label: "Thiết bị",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+    roles: [...ALL_ROLES],
   },
   {
     href: "/equipment/reports",
     label: "Báo cáo thiết bị",
-    roles: ["admin", "ke_toan"],
+    roles: [...MANAGE_ROLES],
   },
   {
     href: "/payroll",
     label: "Bảng lương",
-    roles: ["admin", "ke_toan", "quan_ly_chi_nhanh"],
+    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
   },
 ];

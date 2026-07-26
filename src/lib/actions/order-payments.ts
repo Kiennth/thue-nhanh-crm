@@ -5,16 +5,17 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/order-labels";
-
-const ALL_ROLES = ["admin", "ke_toan", "ky_thuat_sales", "quan_ly_chi_nhanh"] as const;
-const DELETE_ROLES = ["admin", "ke_toan"] as const;
+import { ALL_ROLES, MANAGE_ROLES as DELETE_ROLES } from "@/lib/roles";
 
 export type ActionState = { error: string } | { success: true } | undefined;
+
+const ORDER_PAYMENT_TYPE_OPTIONS = ["invoice", "deposit_collect", "deposit_refund"] as const;
 
 const OrderPaymentSchema = z.object({
   order_id: z.string().uuid(),
   amount: z.coerce.number().positive({ message: "Số tiền phải lớn hơn 0." }),
   method: z.enum(PAYMENT_METHOD_OPTIONS),
+  payment_type: z.enum(ORDER_PAYMENT_TYPE_OPTIONS).default("invoice"),
   paid_at: z.string().min(1, { message: "Vui lòng chọn ngày thanh toán." }),
   note: z.string().trim().optional(),
 });
@@ -29,6 +30,7 @@ export async function createOrderPayment(
     order_id: formData.get("order_id"),
     amount: formData.get("amount"),
     method: formData.get("method"),
+    payment_type: formData.get("payment_type") || undefined,
     paid_at: formData.get("paid_at"),
     note: formData.get("note") || undefined,
   });

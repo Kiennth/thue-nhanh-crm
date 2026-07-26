@@ -78,6 +78,20 @@ export function computeOrderPoolValue(totalValue: number, excludedTotal: number)
   return Math.max(0, totalValue - excludedTotal);
 }
 
+export type ServiceLineCategory = "installation" | "removal" | "support";
+
+// 3 SKU dịch vụ trả khoán trực tiếp hiện có trong equipment_types, nhận diện
+// theo id (không đổi dù tên SKU bị sửa sau này) — dùng để tách "Phí dịch vụ"
+// thành 3 cột riêng (Lắp đặt / Thu hồi / Support) trên bảng lương. SKU dịch
+// vụ khác có payout_percentage nhưng không nằm trong map này (nếu có) vẫn
+// được cộng vào totalIncome qua computeLineDirectPayout, chỉ không lên cột
+// riêng nào trong 3 cột trên.
+export const SERVICE_LINE_CATEGORY_BY_TYPE_ID: Record<string, ServiceLineCategory> = {
+  "d05bbc53-4d85-4da8-972f-ca0e7545622c": "installation", // Phí dịch vụ Lắp Đặt | Installation Fee
+  "a364f692-c8ea-4b0d-84de-1e762fe6d29d": "removal", // Phí dịch vụ tháo dỡ | Removal Fee
+  "5c0e4a96-38e4-4925-b7b6-331409e70d54": "support", // Phí dịch vụ hỗ trợ kỹ thuật| On site support
+};
+
 export function findTaskWeight(weights: TaskWeightInput[], taskType: TaskType): number {
   return weights.find((w) => w.task_type === taskType)?.weight_percentage ?? 0;
 }

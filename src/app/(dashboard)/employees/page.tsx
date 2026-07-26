@@ -9,13 +9,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BranchBadge } from "@/components/branch-badge";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
-import { ROLE_LABELS } from "@/lib/roles";
+import { MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
 import { EmployeeDialog } from "./employee-dialog";
 import { ToggleActiveButton } from "./toggle-active-button";
-
-const HR_ROLES = ["admin", "ke_toan"];
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function EmployeesPage() {
@@ -65,7 +64,7 @@ export default async function EmployeesPage() {
               <TableCell className="font-medium">{emp.name}</TableCell>
               <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
               <TableCell>
-                {emp.branch_id ? (branchNameById.get(emp.branch_id) ?? "—") : "—"}
+                {emp.branch_id ? <BranchBadge name={branchNameById.get(emp.branch_id) ?? "—"} /> : "—"}
               </TableCell>
               <TableCell>{ROLE_LABELS[emp.role]}</TableCell>
               {isHr && (

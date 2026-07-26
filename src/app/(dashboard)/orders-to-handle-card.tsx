@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 import { Truck, PackageCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BranchBadge } from "@/components/branch-badge";
 import type { OrderToHandle } from "@/lib/orders-to-handle";
 import { CountdownTimer } from "./countdown-timer";
 
@@ -44,7 +45,7 @@ function OrderCountdownList({
             <div className="flex items-center gap-2">
               <span className="font-medium">{order.orderCode}</span>
               <span className="text-muted-foreground">{order.customerName}</span>
-              <span className="text-xs text-muted-foreground">· {order.branchName}</span>
+              <BranchBadge name={order.branchName} />
             </div>
             <div className="flex flex-col items-end">
               <CountdownTimer targetDate={order.actionDate} />

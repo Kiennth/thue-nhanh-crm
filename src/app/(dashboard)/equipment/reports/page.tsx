@@ -10,14 +10,14 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { PRODUCT_TYPE_LABELS } from "@/lib/equipment-labels";
 
-const VIEW_ROLES = ["admin", "ke_toan"] as const;
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function EquipmentReportsPage() {
-  await requireRole([...VIEW_ROLES]);
+  await requireRole([...MANAGE_ROLES]);
 
   const supabase = await createClient();
   const [{ data: types }, { data: units }, { data: instances }, { data: purchases }, { data: disposals }, { data: stock }, orderLines] =

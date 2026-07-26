@@ -4,12 +4,26 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
+import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 
 type EquipmentTypeInsert = Database["public"]["Tables"]["equipment_types"]["Insert"];
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-const MANAGE_ROLES = ["admin", "ke_toan"] as const;
+// Cửa hàng trưởng chỉ được thao tác tồn kho/mua/thanh lý/chuyển kho trong
+// đúng chi nhánh mình — RLS đã chặn thật ở DB (migration
+// 20260727000000_role_hierarchy.sql), check này chỉ để trả lỗi rõ ràng thay
+// vì để lỗi RLS thô lộ ra.
+function assertOwnBranch(
+  employee: { role: string; branch_id: string | null },
+  branchId: string | null | undefined,
+): string | null {
+  if (employee.role !== "cua_hang_truong") return null;
+  if (!branchId || branchId !== employee.branch_id) {
+    return "Bạn chỉ được thao tác thiết bị trong chi nhánh của mình.";
+  }
+  return null;
+}
 
 export type ActionState = { error: string } | { success: true } | undefined;
 
@@ -356,7 +370,7 @@ export async function upsertEquipmentStock(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = EquipmentStockSchema.safeParse({
     equipment_unit_id: formData.get("equipment_unit_id"),
@@ -369,6 +383,9 @@ export async function upsertEquipmentStock(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -384,7 +401,7 @@ export async function upsertEquipmentStock(
 }
 
 export async function deleteEquipmentStock(id: string) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const supabase = await createClient();
   const { error } = await supabase.from("equipment_stock").delete().eq("id", id);
@@ -413,7 +430,7 @@ export async function transferEquipmentStock(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = TransferStockSchema.safeParse({
     equipment_unit_id: formData.get("equipment_unit_id"),
@@ -425,6 +442,14 @@ export async function transferEquipmentStock(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  if (
+    employee.role === "cua_hang_truong" &&
+    parsed.data.from_branch_id !== employee.branch_id &&
+    parsed.data.to_branch_id !== employee.branch_id
+  ) {
+    return { error: "Bạn chỉ được chuyển kho liên quan đến chi nhánh của mình." };
   }
 
   const supabase = await createClient();
@@ -475,12 +500,15 @@ export async function createEquipmentInstance(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = parseEquipmentInstanceForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
 
   const supabase = await createClient();
   const { error } = await supabase.from("equipment_instances").insert(parsed.data);
@@ -498,12 +526,15 @@ export async function updateEquipmentInstance(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = parseEquipmentInstanceForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -520,7 +551,7 @@ export async function updateEquipmentInstance(
 }
 
 export async function deleteEquipmentInstance(id: string) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const supabase = await createClient();
   const { error } = await supabase.from("equipment_instances").delete().eq("id", id);
@@ -542,7 +573,7 @@ export async function disposeEquipmentInstance(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = DisposeEquipmentInstanceSchema.safeParse({
     disposal_price: formData.get("disposal_price"),
@@ -586,7 +617,7 @@ export async function createEquipmentPurchase(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = EquipmentPurchaseSchema.safeParse({
     equipment_unit_id: formData.get("equipment_unit_id"),
@@ -600,6 +631,9 @@ export async function createEquipmentPurchase(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("record_equipment_purchase", {
@@ -632,7 +666,7 @@ export async function createEquipmentDisposal(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = EquipmentDisposalSchema.safeParse({
     equipment_unit_id: formData.get("equipment_unit_id"),
@@ -646,6 +680,9 @@ export async function createEquipmentDisposal(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+
+  const branchError = assertOwnBranch(employee, parsed.data.branch_id);
+  if (branchError) return { error: branchError };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("record_equipment_disposal", {
