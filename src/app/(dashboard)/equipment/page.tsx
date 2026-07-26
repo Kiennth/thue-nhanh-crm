@@ -276,7 +276,9 @@ export default async function EquipmentPage({
         .slice(0, 5)
         .map((r) => ({ label: r.type.name, value: r.report.revenue })),
       topRentalCount: reportRows
-        .filter((r) => r.report.rentalCount > 0)
+        // Chỉ tính hàng cho thuê thật — bỏ dịch vụ phụ phát sinh (phí giao/thu
+        // hồi bằng xe máy/ô tô...) vì không phản ánh sản phẩm công ty cho thuê.
+        .filter((r) => r.type.product_type === "rental" && r.report.rentalCount > 0)
         .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
         .slice(0, 5)
         .map((r) => ({ label: r.type.name, value: r.report.rentalCount })),
