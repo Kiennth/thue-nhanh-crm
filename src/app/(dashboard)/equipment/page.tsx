@@ -234,12 +234,12 @@ export default async function EquipmentPage({
       topRevenue: reportRows
         .filter((r) => r.report.revenue > 0)
         .sort((a, b) => b.report.revenue - a.report.revenue)
-        .slice(0, TOP_N)
+        .slice(0, 5)
         .map((r) => ({ name: r.type.name, revenue: r.report.revenue, rentalCount: r.report.rentalCount })),
       topRentalCount: reportRows
         .filter((r) => r.report.rentalCount > 0)
         .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
-        .slice(0, TOP_N)
+        .slice(0, 5)
         .map((r) => ({ name: r.type.name, rentalCount: r.report.rentalCount, revenue: r.report.revenue })),
       topProfitRatio: reportRows
         .filter((r) => r.report.profitRatio !== null)
