@@ -284,7 +284,7 @@ export default async function EquipmentPage({
         .slice(0, 5)
         .map((r) => ({ label: r.type.name, value: r.report.rentalCount })),
       topProfitRatio: reportRows
-        .filter((r) => r.report.profitRatio !== null)
+        .filter((r) => r.type.product_type === "rental" && r.report.profitRatio !== null)
         .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
         .slice(0, TOP_N)
         .map((r) => ({ label: r.type.name, value: (r.report.profitRatio ?? 0) * 100 })),
