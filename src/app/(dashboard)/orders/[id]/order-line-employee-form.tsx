@@ -57,10 +57,10 @@ export function OrderLineEmployeeForm({
     <form
       key={`${employeeId ?? ""}-${deliveryMethod ?? ""}`}
       action={handleSubmit}
-      className="flex items-center gap-1"
+      className="flex flex-col items-start gap-1"
     >
       <Select name="employee_id" defaultValue={employeeId ?? UNASSIGNED}>
-        <SelectTrigger className="h-8 w-36">
+        <SelectTrigger className="h-8 w-32">
           <SelectValue placeholder="Người thực hiện">
             {(value: string) =>
               value === UNASSIGNED ? "— Chưa gán —" : (employees.find((e) => e.id === value)?.name ?? "—")
@@ -78,7 +78,7 @@ export function OrderLineEmployeeForm({
       </Select>
       {isTransportLine && (
         <Select name="delivery_method" defaultValue={deliveryMethod ?? undefined}>
-          <SelectTrigger className="h-8 w-36">
+          <SelectTrigger className="h-8 w-32">
             <SelectValue placeholder="Phương thức">
               {(value: DeliveryMethod) => DELIVERY_METHOD_LABELS[value]}
             </SelectValue>

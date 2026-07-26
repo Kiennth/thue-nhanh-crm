@@ -28,7 +28,7 @@ export function OrderLineQuantityForm({ lineId, quantity }: { lineId: string; qu
         min={1}
         step={1}
         defaultValue={quantity}
-        className="h-8 w-16"
+        className="h-8 w-14"
       />
       <Button type="submit" variant="ghost" size="sm" disabled={pending}>
         {pending ? "..." : "Lưu"}

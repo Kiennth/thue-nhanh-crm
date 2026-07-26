@@ -28,7 +28,7 @@ export function OrderLinePriceForm({ lineId, unitPrice }: { lineId: string; unit
         min={0}
         step={1000}
         defaultValue={unitPrice}
-        className="h-8 w-28"
+        className="h-8 w-24"
       />
       <Button type="submit" variant="ghost" size="sm" disabled={pending}>
         {pending ? "..." : "Lưu"}
