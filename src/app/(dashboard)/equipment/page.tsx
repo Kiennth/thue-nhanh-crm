@@ -188,10 +188,44 @@ export default async function EquipmentPage({
     }
     return stockTotalByTypeId.get(t.id) ?? 0;
   }
-  function inventoryValueForType(t: EquipmentTypeRow): number {
-    if (t.product_type === "service") return 0;
-    return t.price * Math.max(0, stockValue(t));
-  }
+
+  // Giá trị tồn kho = giá VỐN mua vào (bình quân gia quyền) x số lượng còn
+  // giữ — KHÔNG phải giá thuê x số lượng (giá thuê là doanh thu tiềm năng,
+  // không phải giá trị tài sản đang có). Tính 1 lần cho TOÀN BỘ danh mục —
+  // dùng cho cả cột trong bảng (mọi vai trò đều thấy) lẫn phần "Báo cáo" bên
+  // dưới (chỉ MANAGE_ROLES).
+  const [
+    { data: reportTypes },
+    { data: reportUnits },
+    { data: reportInstances },
+    { data: purchases },
+    { data: disposals },
+    { data: reportStock },
+    allOrderLines,
+  ] = await Promise.all([
+    supabase.from("equipment_types").select("id, name, product_type").order("name"),
+    supabase.from("equipment_units").select("id, equipment_type_id"),
+    supabase.from("equipment_instances").select("equipment_type_id, purchase_price, disposal_price, status"),
+    supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
+    supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
+    supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
+    fetchAllRows<OrderLineInput & { order_id: string }>((from, to) =>
+      supabase.from("order_equipment").select("equipment_type_id, line_total, order_id").range(from, to),
+    ),
+  ]);
+  const reportTypeList = reportTypes ?? [];
+  const baseReports = computeEquipmentTypeReports(
+    reportTypeList,
+    reportUnits ?? [],
+    reportInstances ?? [],
+    purchases ?? [],
+    disposals ?? [],
+    reportStock ?? [],
+    allOrderLines,
+  );
+  const inventoryValueByTypeId = new Map(
+    reportTypeList.map((t) => [t.id, baseReports.get(t.id)?.currentInventoryValue ?? 0]),
+  );
 
   const dirMult = activeDir === "asc" ? 1 : -1;
   const sortedTypes = [...allTypes].sort((a, b) => {
@@ -207,7 +241,7 @@ export default async function EquipmentPage({
       case "stock":
         return dirMult * (stockValue(a) - stockValue(b));
       case "stockValue":
-        return dirMult * (inventoryValueForType(a) - inventoryValueForType(b));
+        return dirMult * ((inventoryValueByTypeId.get(a.id) ?? 0) - (inventoryValueByTypeId.get(b.id) ?? 0));
       case "name":
         return dirMult * a.name.localeCompare(b.name, "vi");
       default:
@@ -238,53 +272,35 @@ export default async function EquipmentPage({
   } | null = null;
 
   if (canManageCatalog) {
-    const [
-      { data: reportTypes },
-      { data: reportUnits },
-      { data: reportInstances },
-      { data: purchases },
-      { data: disposals },
-      { data: reportStock },
-      rawOrderLines,
-    ] = await Promise.all([
-      supabase.from("equipment_types").select("id, name, product_type").order("name"),
-      supabase.from("equipment_units").select("id, equipment_type_id"),
-      supabase.from("equipment_instances").select("equipment_type_id, purchase_price, disposal_price, status"),
-      supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
-      supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-      supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-      fetchAllRows<OrderLineInput & { order_id: string }>((from, to) =>
-        supabase.from("order_equipment").select("equipment_type_id, line_total, order_id").range(from, to),
-      ),
-    ]);
-
     // Doanh thu/số lượt thuê/tỉ suất lợi nhuận lọc theo ngày đặt đơn (order_date)
     // khi có chọn khoảng thời gian — order_equipment không có cột ngày riêng
-    // nên phải lấy trước tập order_id khớp khoảng ngày rồi lọc theo đó.
-    let orderLines = rawOrderLines;
-    if (reportDateRange) {
-      const ordersInRange = await fetchAllRows<{ id: string }>((from, to) =>
-        supabase
-          .from("orders")
-          .select("id")
-          .gte("order_date", reportDateRange.start)
-          .lte("order_date", reportDateRange.end)
-          .range(from, to),
-      );
-      const orderIdsInRange = new Set(ordersInRange.map((o) => o.id));
-      orderLines = rawOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
-    }
-
-    const reportTypeList = reportTypes ?? [];
-    const reports = computeEquipmentTypeReports(
-      reportTypeList,
-      reportUnits ?? [],
-      reportInstances ?? [],
-      purchases ?? [],
-      disposals ?? [],
-      reportStock ?? [],
-      orderLines,
-    );
+    // nên phải lấy trước tập order_id khớp khoảng ngày rồi lọc theo đó. Giá
+    // trị tồn kho (currentInventoryValue) KHÔNG phụ thuộc đơn hàng nên luôn
+    // dùng lại baseReports (đã tính sẵn ở trên) — chỉ tính lại reports khi
+    // thật sự có bộ lọc thời gian, tránh tính 2 lần không cần thiết.
+    const reports = reportDateRange
+      ? await (async () => {
+          const ordersInRange = await fetchAllRows<{ id: string }>((from, to) =>
+            supabase
+              .from("orders")
+              .select("id")
+              .gte("order_date", reportDateRange.start)
+              .lte("order_date", reportDateRange.end)
+              .range(from, to),
+          );
+          const orderIdsInRange = new Set(ordersInRange.map((o) => o.id));
+          const filteredOrderLines = allOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
+          return computeEquipmentTypeReports(
+            reportTypeList,
+            reportUnits ?? [],
+            reportInstances ?? [],
+            purchases ?? [],
+            disposals ?? [],
+            reportStock ?? [],
+            filteredOrderLines,
+          );
+        })()
+      : baseReports;
     const reportRows = reportTypeList.map((type) => ({ type, report: reports.get(type.id)! }));
 
     const totalInventoryValue = reportRows.reduce((sum, r) => sum + r.report.currentInventoryValue, 0);
@@ -425,7 +441,7 @@ export default async function EquipmentPage({
             const stockValueDisplay =
               type.product_type === "service"
                 ? "—"
-                : `${currencyFormatter.format(inventoryValueForType(type))}đ`;
+                : `${currencyFormatter.format(inventoryValueByTypeId.get(type.id) ?? 0)}đ`;
 
             return (
               <TableRow key={type.id}>
