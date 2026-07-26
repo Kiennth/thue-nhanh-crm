@@ -79,10 +79,21 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
 
-const INSTANCE_SORT_KEYS = ["branch", "status"] as const;
-type InstanceSortKey = (typeof INSTANCE_SORT_KEYS)[number];
-function isInstanceSortKey(value: string): value is InstanceSortKey {
-  return (INSTANCE_SORT_KEYS as readonly string[]).includes(value);
+// Dùng chung 1 cặp param sort/dir cho cả 2 bảng (Tồn kho theo từng cái +
+// Lịch sử thuê) — không đụng nhau vì chỉ 1 bảng hiển thị tuỳ theo tab.
+const SORT_KEYS = [
+  "branch",
+  "status",
+  "order_code",
+  "customer",
+  "start",
+  "end",
+  "quantity",
+  "revenue",
+] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+function isSortKey(value: string): value is SortKey {
+  return (SORT_KEYS as readonly string[]).includes(value);
 }
 
 export default async function EquipmentDetailPage({
@@ -95,8 +106,8 @@ export default async function EquipmentDetailPage({
   const { id } = await params;
   const { tab, sort, dir } = await searchParams;
   const activeTab: Tab = tab === "history" ? "history" : tab === "rentals" ? "rentals" : "stock";
-  const instanceSort: InstanceSortKey | null = sort && isInstanceSortKey(sort) ? sort : null;
-  const instanceDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
+  const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
@@ -224,16 +235,16 @@ export default async function EquipmentDetailPage({
 
   // Sắp xếp bảng sản phẩm theo từng cái (Chi nhánh/Trạng thái) — mặc định
   // giữ nguyên thứ tự mã định danh khi chưa chọn cột nào.
-  const instanceDirMult = instanceDir === "asc" ? 1 : -1;
+  const activeDirMult = activeDir === "asc" ? 1 : -1;
   const sortedInstances = [...(instances ?? [])].sort((a, b) => {
-    if (instanceSort === "branch") {
+    if (activeSort === "branch") {
       const branchA = branchNameById.get(a.branch_id ?? "") ?? "—";
       const branchB = branchNameById.get(b.branch_id ?? "") ?? "—";
-      return instanceDirMult * branchA.localeCompare(branchB, "vi");
+      return activeDirMult * branchA.localeCompare(branchB, "vi");
     }
-    if (instanceSort === "status") {
+    if (activeSort === "status") {
       return (
-        instanceDirMult *
+        activeDirMult *
         EQUIPMENT_INSTANCE_STATUS_LABELS[a.status].localeCompare(
           EQUIPMENT_INSTANCE_STATUS_LABELS[b.status],
           "vi",
@@ -241,6 +252,50 @@ export default async function EquipmentDetailPage({
       );
     }
     return a.identifier_code.localeCompare(b.identifier_code, "vi");
+  });
+
+  // Ghép + sắp xếp bảng lịch sử thuê — bỏ dòng nào không tra được order (dữ
+  // liệu mồ côi, không nên xảy ra nhưng phòng hờ).
+  const rentalRows = (rentalLines ?? [])
+    .map((line) => {
+      const order = rentalOrderById.get(line.order_id);
+      if (!order) return null;
+      const productLabel = line.equipment_instance_id
+        ? (instanceById.get(line.equipment_instance_id)?.identifier_code ?? "—")
+        : line.equipment_unit_id
+          ? (unitById.get(line.equipment_unit_id)?.brand_model ?? "—")
+          : "—";
+      return {
+        line,
+        order,
+        customerName: rentalCustomerNameById.get(order.customer_id) ?? "—",
+        productLabel,
+        statusLabel: rentalStatusLabel(order),
+      };
+    })
+    .filter((r) => r !== null);
+
+  const sortedRentalRows = [...rentalRows].sort((a, b) => {
+    switch (activeSort) {
+      case "order_code":
+        return activeDirMult * a.order.order_code.localeCompare(b.order.order_code, "vi");
+      case "customer":
+        return activeDirMult * a.customerName.localeCompare(b.customerName, "vi");
+      case "start":
+        return (
+          activeDirMult * (a.order.rental_start_at ?? "").localeCompare(b.order.rental_start_at ?? "")
+        );
+      case "end":
+        return activeDirMult * (a.order.rental_end_at ?? "").localeCompare(b.order.rental_end_at ?? "");
+      case "quantity":
+        return activeDirMult * (a.line.quantity - b.line.quantity);
+      case "revenue":
+        return activeDirMult * (a.line.line_total - b.line.line_total);
+      case "status":
+        return activeDirMult * a.statusLabel.localeCompare(b.statusLabel, "vi");
+      default:
+        return 0;
+    }
   });
 
   const priceLine =
@@ -601,47 +656,38 @@ export default async function EquipmentDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mã đơn</TableHead>
-                  <TableHead>Khách hàng</TableHead>
+                  <SortableTableHead sortKey="order_code" label="Mã đơn" />
+                  <SortableTableHead sortKey="customer" label="Khách hàng" />
                   <TableHead>Sản phẩm</TableHead>
-                  <TableHead>Ngày bắt đầu</TableHead>
-                  <TableHead>Ngày kết thúc</TableHead>
-                  <TableHead>Số lượng</TableHead>
-                  <TableHead>Doanh thu</TableHead>
-                  <TableHead>Trạng thái</TableHead>
+                  <SortableTableHead sortKey="start" label="Ngày bắt đầu" />
+                  <SortableTableHead sortKey="end" label="Ngày kết thúc" />
+                  <SortableTableHead sortKey="quantity" label="Số lượng" />
+                  <SortableTableHead sortKey="revenue" label="Doanh thu" />
+                  <SortableTableHead sortKey="status" label="Trạng thái" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(rentalLines ?? []).map((line) => {
-                  const order = rentalOrderById.get(line.order_id);
-                  if (!order) return null;
-                  const productLabel = line.equipment_instance_id
-                    ? (instanceById.get(line.equipment_instance_id)?.identifier_code ?? "—")
-                    : line.equipment_unit_id
-                      ? (unitById.get(line.equipment_unit_id)?.brand_model ?? "—")
-                      : "—";
-                  return (
-                    <TableRow key={line.id}>
-                      <TableCell className="font-medium">
-                        <Link href={`/orders/${order.id}`} className="hover:underline">
-                          {order.order_code}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{rentalCustomerNameById.get(order.customer_id) ?? "—"}</TableCell>
-                      <TableCell>{productLabel}</TableCell>
-                      <TableCell>
-                        {order.rental_start_at ? dateFormatter.format(new Date(order.rental_start_at)) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {order.rental_end_at ? dateFormatter.format(new Date(order.rental_end_at)) : "—"}
-                      </TableCell>
-                      <TableCell>{line.quantity}</TableCell>
-                      <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
-                      <TableCell>{rentalStatusLabel(order)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-                {!rentalLines?.length && (
+                {sortedRentalRows.map(({ line, order, customerName, productLabel, statusLabel }) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/orders/${order.id}`} className="hover:underline">
+                        {order.order_code}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{customerName}</TableCell>
+                    <TableCell>{productLabel}</TableCell>
+                    <TableCell>
+                      {order.rental_start_at ? dateFormatter.format(new Date(order.rental_start_at)) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {order.rental_end_at ? dateFormatter.format(new Date(order.rental_end_at)) : "—"}
+                    </TableCell>
+                    <TableCell>{line.quantity}</TableCell>
+                    <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
+                    <TableCell>{statusLabel}</TableCell>
+                  </TableRow>
+                ))}
+                {!sortedRentalRows.length && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground">
                       Chưa có lượt thuê nào.
