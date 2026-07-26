@@ -72,21 +72,21 @@ export default async function PayrollPage({
           <CardTitle className="text-base">Tháng {month}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="tabular-nums">
             <TableHeader>
               <TableRow>
                 <TableHead>Nhân viên</TableHead>
                 <TableHead>Chi nhánh</TableHead>
-                <TableHead>Lương cứng</TableHead>
-                <TableHead>Tổng khoán</TableHead>
-                <TableHead>Phí Lắp đặt</TableHead>
-                <TableHead>Phí Tháo dỡ</TableHead>
-                <TableHead>Phí Support</TableHead>
-                <TableHead>Phí Giao hàng</TableHead>
-                <TableHead>Phí Thu hồi</TableHead>
-                <TableHead>OT</TableHead>
-                <TableHead>Thưởng</TableHead>
-                <TableHead>Tổng thu nhập</TableHead>
+                <TableHead className="text-right">Lương cứng</TableHead>
+                <TableHead className="text-right">Tổng khoán</TableHead>
+                <TableHead className="text-right">Phí Lắp đặt</TableHead>
+                <TableHead className="text-right">Phí Tháo dỡ</TableHead>
+                <TableHead className="text-right">Phí Support</TableHead>
+                <TableHead className="text-right">Phí Giao hàng</TableHead>
+                <TableHead className="text-right">Phí Thu hồi</TableHead>
+                <TableHead className="text-right">OT</TableHead>
+                <TableHead className="text-right">Thưởng</TableHead>
+                <TableHead className="text-right">Tổng thu nhập</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -100,16 +100,16 @@ export default async function PayrollPage({
                       "—"
                     )}
                   </TableCell>
-                  <TableCell>{currencyFormatter.format(row.baseSalary)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.totalCommission)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.installationPayout)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.removalPayout)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.supportPayout)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.deliveryPayout)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.collectionPayout)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.overtimePay)}đ</TableCell>
-                  <TableCell>{currencyFormatter.format(row.bonus)}đ</TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="text-right">{currencyFormatter.format(row.baseSalary)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.totalCommission)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.installationPayout)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.removalPayout)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.supportPayout)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.deliveryPayout)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.collectionPayout)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.overtimePay)}đ</TableCell>
+                  <TableCell className="text-right">{currencyFormatter.format(row.bonus)}đ</TableCell>
+                  <TableCell className="text-right font-medium">
                     {currencyFormatter.format(row.totalIncome)}đ
                   </TableCell>
                 </TableRow>
