@@ -6,9 +6,17 @@ import { OrdersListSection } from "./orders-list-section";
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; range?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+  }>;
 }) {
-  const { status, range, from, to, page } = await searchParams;
+  const { status, range, from, to, page, sort, dir } = await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
@@ -22,6 +30,8 @@ export default async function OrdersPage({
         from={from}
         to={to}
         page={page}
+        sort={sort}
+        dir={dir}
         branchId={branchId}
         canDelete={canManage}
       />

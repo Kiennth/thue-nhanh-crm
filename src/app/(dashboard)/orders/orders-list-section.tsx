@@ -15,7 +15,9 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { BranchBadge } from "@/components/branch-badge";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import {
@@ -31,8 +33,7 @@ import { OrderDateRangeFilter } from "./order-date-range-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
-const PAGE_SIZE = 50;
-const CHUNK = 1000;
+const PAGE_SIZE = 20;
 
 function isTaskType(value: string): value is TaskType {
   return (TASK_TYPE_SEQUENCE as readonly string[]).includes(value);
@@ -40,6 +41,12 @@ function isTaskType(value: string): value is TaskType {
 
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
+
+const ORDER_SORT_KEYS = ["rental_start_at", "rental_end_at", "customer", "total_value", "status"] as const;
+type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];
+function isOrderSortKey(value: string): value is OrderSortKey {
+  return (ORDER_SORT_KEYS as readonly string[]).includes(value);
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -50,8 +57,23 @@ interface OrderFilters {
   dateRange: DateRange | null;
 }
 
-// Áp cùng 1 bộ lọc (chi nhánh/trạng thái/khoảng ngày) cho cả câu truy vấn
-// tổng kết và câu truy vấn phân trang — tránh 2 nơi lệch logic.
+interface OrderRow {
+  id: string;
+  order_code: string;
+  pickup_branch_id: string;
+  return_branch_id: string;
+  customer_id: string;
+  rental_start_at: string | null;
+  rental_end_at: string | null;
+  total_value: number;
+  status: TaskType;
+  order_date: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+}
+
+// Áp cùng 1 bộ lọc (chi nhánh/trạng thái/khoảng ngày) cho câu truy vấn TOÀN
+// BỘ đơn khớp bộ lọc — dùng chung cho cả thẻ tổng kết lẫn bảng danh sách.
 function ordersQueryWithFilters<Q extends string>(
   supabase: SupabaseServerClient,
   selectColumns: Q,
@@ -74,40 +96,10 @@ function ordersQueryWithFilters<Q extends string>(
   return q;
 }
 
-// Supabase/PostgREST giới hạn 1.000 dòng mỗi lần gọi — bảng tổng kết cần
-// TOÀN BỘ đơn khớp bộ lọc (không chỉ trang hiện tại) nên phải gộp nhiều
-// .range().
-async function fetchOrderStats(supabase: SupabaseServerClient, filters: OrderFilters) {
-  let totalCount = 0;
-  let totalRevenue = 0;
-  let completedCount = 0;
-  let cancelledCount = 0;
-  let from = 0;
-  while (true) {
-    const { data } = await ordersQueryWithFilters(
-      supabase,
-      "total_value, completed_at, cancelled_at",
-      filters,
-    )
-      .order("id")
-      .range(from, from + CHUNK - 1);
-    if (!data || data.length === 0) break;
-    for (const o of data) {
-      totalCount += 1;
-      totalRevenue += o.total_value;
-      if (o.cancelled_at) cancelledCount += 1;
-      else if (o.completed_at) completedCount += 1;
-    }
-    if (data.length < CHUNK) break;
-    from += CHUNK;
-  }
-  return {
-    totalCount,
-    totalRevenue,
-    completedCount,
-    cancelledCount,
-    processingCount: totalCount - completedCount - cancelledCount,
-  };
+function statusLabel(order: Pick<OrderRow, "status" | "completed_at" | "cancelled_at">): string {
+  if (order.cancelled_at) return "Đã huỷ";
+  if (order.completed_at) return "Hoàn tất";
+  return TASK_TYPE_LABELS[order.status];
 }
 
 // Nội dung trang /orders — Admin/Kế toán thấy tất cả chi nhánh (branchId
@@ -118,6 +110,8 @@ export async function OrdersListSection({
   from,
   to,
   page,
+  sort,
+  dir,
   branchId,
   canDelete,
 }: {
@@ -126,6 +120,8 @@ export async function OrdersListSection({
   from?: string;
   to?: string;
   page?: string;
+  sort?: string;
+  dir?: string;
   branchId: string | null;
   canDelete: boolean;
 }) {
@@ -133,37 +129,76 @@ export async function OrdersListSection({
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
   const dateRange = computeDateRange(activeRange, new Date(), { from, to });
   const filters: OrderFilters = { branchId, activeStatus, dateRange };
+  const activeSort: OrderSortKey | null = sort && isOrderSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
-  const [stats, { data: branches }] = await Promise.all([
-    fetchOrderStats(supabase, filters),
+  // Sắp xếp theo Khách hàng/Doanh số/Trạng thái không thể đẩy hết xuống
+  // Postgres (tên khách phải join qua bảng customers, trạng thái là suy ra
+  // từ 3 cột) — lấy TOÀN BỘ đơn khớp bộ lọc (đằng nào cũng cần đủ để tính
+  // thẻ tổng kết phía trên), lọc/sắp/phân trang gộp 1 lần trong JS.
+  const [allOrders, { data: branches }, allCustomers] = await Promise.all([
+    fetchAllRows<OrderRow>((rangeFrom, rangeTo) =>
+      ordersQueryWithFilters(
+        supabase,
+        "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, total_value, status, order_date, completed_at, cancelled_at",
+        filters,
+      )
+        .order("id")
+        .range(rangeFrom, rangeTo),
+    ),
     supabase.from("branches").select("id, name").order("name"),
+    fetchAllRows<{ id: string; name: string }>((rangeFrom, rangeTo) =>
+      supabase.from("customers").select("id, name").range(rangeFrom, rangeTo),
+    ),
   ]);
-
-  const totalPages = Math.max(1, Math.ceil(stats.totalCount / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
-
-  // .order("id") thứ 2 làm tie-breaker — nhiều đơn cùng order_date, nếu chỉ
-  // sort theo order_date thì thứ tự giữa các trang không ổn định, gây trùng
-  // hoặc bỏ sót dòng khi chuyển trang.
-  const { data: orders } = await ordersQueryWithFilters(supabase, "*", filters)
-    .order("order_date", { ascending: false })
-    .order("id", { ascending: false })
-    .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
+  const customerNameById = new Map(allCustomers.map((c) => [c.id, c.name]));
 
-  // Chỉ tra tên đúng những khách hàng thực sự xuất hiện trong danh sách đơn
-  // đang hiển thị — không select("*") toàn bộ khách hàng vì Supabase giới
-  // hạn 1.000 dòng mỗi query (bảng khách hàng hiện có hơn 5.800 dòng).
-  const orderCustomerIds = [...new Set((orders ?? []).map((o) => o.customer_id))];
-  const { data: orderCustomers } =
-    orderCustomerIds.length > 0
-      ? await supabase.from("customers").select("id, name").in("id", orderCustomerIds)
-      : { data: [] };
-  const customerNameById = new Map((orderCustomers ?? []).map((c) => [c.id, c.name]));
+  const totalCount = allOrders.length;
+  let totalRevenue = 0;
+  let completedCount = 0;
+  let cancelledCount = 0;
+  for (const o of allOrders) {
+    totalRevenue += o.total_value;
+    if (o.cancelled_at) cancelledCount += 1;
+    else if (o.completed_at) completedCount += 1;
+  }
+  const processingCount = totalCount - completedCount - cancelledCount;
+
+  const dirMult = activeDir === "asc" ? 1 : -1;
+  const sortedOrders = [...allOrders].sort((a, b) => {
+    switch (activeSort) {
+      case "rental_start_at":
+        return dirMult * (a.rental_start_at ?? "").localeCompare(b.rental_start_at ?? "");
+      case "rental_end_at":
+        return dirMult * (a.rental_end_at ?? "").localeCompare(b.rental_end_at ?? "");
+      case "customer":
+        return (
+          dirMult *
+          (customerNameById.get(a.customer_id) ?? "").localeCompare(
+            customerNameById.get(b.customer_id) ?? "",
+            "vi",
+          )
+        );
+      case "total_value":
+        return dirMult * (a.total_value - b.total_value);
+      case "status":
+        return dirMult * statusLabel(a).localeCompare(statusLabel(b), "vi");
+      default:
+        // .order("id") thứ 2 làm tie-breaker — nhiều đơn cùng order_date,
+        // nếu chỉ sort theo order_date thì thứ tự giữa các trang không ổn
+        // định, gây trùng hoặc bỏ sót dòng khi chuyển trang.
+        return b.order_date.localeCompare(a.order_date) || b.id.localeCompare(a.id);
+    }
+  });
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+  const orders = sortedOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -188,7 +223,7 @@ export async function OrdersListSection({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{stats.totalCount}</p>
+            <p className="text-2xl font-semibold">{totalCount}</p>
           </CardContent>
         </Card>
         <Card>
@@ -196,7 +231,7 @@ export async function OrdersListSection({
             <CardTitle className="text-sm font-normal text-muted-foreground">Đang xử lý</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{stats.processingCount}</p>
+            <p className="text-2xl font-semibold">{processingCount}</p>
           </CardContent>
         </Card>
         <Card>
@@ -204,7 +239,7 @@ export async function OrdersListSection({
             <CardTitle className="text-sm font-normal text-muted-foreground">Hoàn tất</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{stats.completedCount}</p>
+            <p className="text-2xl font-semibold">{completedCount}</p>
           </CardContent>
         </Card>
         <Card>
@@ -212,7 +247,7 @@ export async function OrdersListSection({
             <CardTitle className="text-sm font-normal text-muted-foreground">Đã huỷ</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{stats.cancelledCount}</p>
+            <p className="text-2xl font-semibold">{cancelledCount}</p>
           </CardContent>
         </Card>
         <Card>
@@ -221,7 +256,7 @@ export async function OrdersListSection({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">
-              {currencyFormatter.format(Math.round(stats.totalRevenue))}đ
+              {currencyFormatter.format(Math.round(totalRevenue))}đ
             </p>
           </CardContent>
         </Card>
@@ -237,16 +272,16 @@ export async function OrdersListSection({
           <TableRow>
             <TableHead className="w-28">Mã đơn</TableHead>
             <TableHead className="w-28">Chi nhánh</TableHead>
-            <TableHead>Khách hàng</TableHead>
-            <TableHead>Ngày bắt đầu</TableHead>
-            <TableHead>Ngày kết thúc</TableHead>
-            <TableHead>Doanh số</TableHead>
-            <TableHead>Trạng thái</TableHead>
+            <SortableTableHead sortKey="customer" label="Khách hàng" />
+            <SortableTableHead sortKey="rental_start_at" label="Ngày bắt đầu" />
+            <SortableTableHead sortKey="rental_end_at" label="Ngày kết thúc" />
+            <SortableTableHead sortKey="total_value" label="Doanh số" />
+            <SortableTableHead sortKey="status" label="Trạng thái" />
             {canDelete && <TableHead className="w-16"></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders?.map((order) => (
+          {orders.map((order) => (
             <TableRow key={order.id}>
               <TableCell className="max-w-28 truncate font-medium">
                 <Link href={`/orders/${order.id}`} className="hover:underline">
@@ -298,7 +333,7 @@ export async function OrdersListSection({
               )}
             </TableRow>
           ))}
-          {!orders?.length && (
+          {!orders.length && (
             <TableRow>
               <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-muted-foreground">
                 Không có đơn hàng nào khớp bộ lọc.
@@ -311,7 +346,7 @@ export async function OrdersListSection({
       <PaginationControls
         page={currentPage}
         totalPages={totalPages}
-        totalCount={stats.totalCount}
+        totalCount={totalCount}
         itemLabel="đơn hàng"
       />
     </div>
