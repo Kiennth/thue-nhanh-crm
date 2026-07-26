@@ -210,6 +210,7 @@ export default async function DashboardHomePage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard
           orders={ordersToHandle.upcomingDeliveries}
+          hideViewAllLink
           rangeFilter={
             !upcomingLateActive && (
               <OrdersToHandleRangeFilter paramName="upcomingRange" value={upcomingRangePreset} />
@@ -225,6 +226,7 @@ export default async function DashboardHomePage({
         />
         <PendingCollectionsCard
           orders={ordersToHandle.pendingCollections}
+          hideViewAllLink
           rangeFilter={
             !returningLateActive && (
               <OrdersToHandleRangeFilter paramName="returningRange" value={returningRangePreset} />
