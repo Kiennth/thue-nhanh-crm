@@ -22,6 +22,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType } from "@/lib/actions/equipment";
 import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
+import { computeEquipmentValueOverview } from "@/lib/equipment-value-overview";
 import {
   computeDateRange,
   DATE_RANGE_PRESET_OPTIONS,
@@ -36,6 +37,7 @@ import {
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
+import { EquipmentValueTrendChart } from "./equipment-value-trend-chart";
 import { OrderDateRangeFilter } from "../orders/order-date-range-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -79,6 +81,13 @@ export default async function EquipmentPage({
   const employee = await getCurrentEmployee();
   const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
+  // Xu hướng giá trị thiết bị: Giám đốc/Admin/Kế toán xem toàn hệ thống,
+  // Cửa hàng trưởng xem đúng chi nhánh mình quản lý — rộng hơn phần "Báo cáo"
+  // bên dưới (chỉ MANAGE_ROLES), vì CEO yêu cầu Cửa hàng trưởng cũng thấy.
+  const canViewInventoryTrend = canManageCatalog || employee?.role === "cua_hang_truong";
+  const equipmentValueOverview = canViewInventoryTrend
+    ? await computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
+    : null;
 
   // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
   // nhãn ghép từ 2 cột, Tồn kho là tổng suy ra từ equipment_units/stock hoặc
@@ -309,6 +318,8 @@ export default async function EquipmentPage({
           )}
         </div>
       </div>
+
+      {equipmentValueOverview && <EquipmentValueTrendChart trend={equipmentValueOverview.trend} />}
 
       {reportSummary && (
         <div className="space-y-4">
