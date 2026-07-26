@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Radio, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input";
 import { createRfidTag, deleteRfidTag } from "@/lib/actions/rfid";
 
 interface RfidTagDialogProps {
-  trigger: React.ReactElement;
   label: string;
   equipmentTypeId: string;
   equipmentUnitId?: string;
@@ -24,13 +23,20 @@ interface RfidTagDialogProps {
 }
 
 export function RfidTagDialog({
-  trigger,
   label,
   equipmentTypeId,
   equipmentUnitId,
   equipmentInstanceId,
   tags,
 }: RfidTagDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="ghost" size="icon-sm">
+      <Radio className="size-4" />
+      <span className="sr-only">Tag RFID ({tags.length})</span>
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [tagCode, setTagCode] = useState("");
   const [error, setError] = useState<string | null>(null);

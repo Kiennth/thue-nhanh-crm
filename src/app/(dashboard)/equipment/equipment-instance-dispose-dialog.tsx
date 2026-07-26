@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Banknote } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,16 +16,22 @@ import { Label } from "@/components/ui/label";
 import { disposeEquipmentInstance } from "@/lib/actions/equipment";
 
 interface EquipmentInstanceDisposeDialogProps {
-  trigger: React.ReactElement;
   instanceId: string;
   identifierCode: string;
 }
 
 export function EquipmentInstanceDisposeDialog({
-  trigger,
   instanceId,
   identifierCode,
 }: EquipmentInstanceDisposeDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="ghost" size="icon-sm">
+      <Banknote className="size-4" />
+      <span className="sr-only">Thanh lý</span>
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

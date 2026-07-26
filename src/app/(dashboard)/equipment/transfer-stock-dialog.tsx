@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,16 +28,22 @@ interface Branch {
 }
 
 interface TransferStockDialogProps {
-  trigger: React.ReactElement;
   equipmentUnitId: string;
   branches: Branch[];
 }
 
 export function TransferStockDialog({
-  trigger,
   equipmentUnitId,
   branches,
 }: TransferStockDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <ArrowLeftRight className="size-4" />
+      Chuyển kho
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

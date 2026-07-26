@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { ListTree } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,18 +40,24 @@ interface Tier {
 }
 
 interface PricingTemplateTiersDialogProps {
-  trigger: React.ReactElement;
   templateId: string;
   templateName: string;
   tiers: Tier[];
 }
 
 export function PricingTemplateTiersDialog({
-  trigger,
   templateId,
   templateName,
   tiers,
 }: PricingTemplateTiersDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="ghost" size="icon-sm">
+      <ListTree className="size-4" />
+      <span className="sr-only">Quản lý bậc giá</span>
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

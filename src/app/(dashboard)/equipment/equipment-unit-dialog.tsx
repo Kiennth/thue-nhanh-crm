@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { createEquipmentUnit, updateEquipmentUnit } from "@/lib/actions/equipment";
 
 interface EquipmentUnitDialogProps {
-  trigger: React.ReactElement;
   equipmentTypeId: string;
   unit?: {
     id: string;
@@ -25,10 +25,22 @@ interface EquipmentUnitDialogProps {
 }
 
 export function EquipmentUnitDialog({
-  trigger,
   equipmentTypeId,
   unit,
 }: EquipmentUnitDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = unit ? (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  ) : (
+    <Button variant="outline" size="sm">
+      <Plus className="size-4" />
+      Thêm biến thể
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

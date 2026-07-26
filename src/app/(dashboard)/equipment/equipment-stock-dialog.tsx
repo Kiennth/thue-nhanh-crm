@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,6 @@ interface Branch {
 }
 
 interface EquipmentStockDialogProps {
-  trigger: React.ReactElement;
   equipmentUnitId: string;
   branches: Branch[];
   stock?: {
@@ -38,11 +38,23 @@ interface EquipmentStockDialogProps {
 }
 
 export function EquipmentStockDialog({
-  trigger,
   equipmentUnitId,
   branches,
   stock,
 }: EquipmentStockDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = stock ? (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  ) : (
+    <Button variant="outline" size="sm">
+      <Plus className="size-4" />
+      Thêm tồn kho
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

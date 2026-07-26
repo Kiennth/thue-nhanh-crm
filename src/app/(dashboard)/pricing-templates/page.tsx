@@ -1,5 +1,3 @@
-import { Plus, ListTree } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -31,14 +29,7 @@ export default async function PricingTemplatesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bảng giá mẫu</h1>
-        <PricingTemplateDialog
-          trigger={
-            <Button>
-              <Plus className="size-4" />
-              Thêm bảng giá
-            </Button>
-          }
-        />
+        <PricingTemplateDialog />
       </div>
 
       <Card>
@@ -67,12 +58,6 @@ export default async function PricingTemplatesPage() {
                           templateId={template.id}
                           templateName={template.name}
                           tiers={templateTiers}
-                          trigger={
-                            <Button variant="ghost" size="icon-sm">
-                              <ListTree className="size-4" />
-                              <span className="sr-only">Quản lý bậc giá</span>
-                            </Button>
-                          }
                         />
                         <ConfirmDeleteButton
                           confirmMessage={`Xoá bảng giá "${template.name}"?`}

@@ -1,15 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  Plus,
-  Pencil,
-  ArrowLeftRight,
-  ShoppingCart,
-  Banknote,
-  Radio,
-  ImageOff,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -392,23 +383,8 @@ export default async function EquipmentDetailPage({
                           equipmentTypeId={type.id}
                           equipmentUnitId={unit.id}
                           tags={unitTags}
-                          trigger={
-                            <Button variant="ghost" size="icon-sm">
-                              <Radio className="size-4" />
-                              <span className="sr-only">Tag RFID ({unitTags.length})</span>
-                            </Button>
-                          }
                         />
-                        <EquipmentUnitDialog
-                          equipmentTypeId={type.id}
-                          unit={unit}
-                          trigger={
-                            <Button variant="ghost" size="icon-sm">
-                              <Pencil className="size-4" />
-                              <span className="sr-only">Sửa</span>
-                            </Button>
-                          }
-                        />
+                        <EquipmentUnitDialog equipmentTypeId={type.id} unit={unit} />
                         <ConfirmDeleteButton
                           confirmMessage={`Xoá biến thể "${unit.brand_model}"?`}
                           successMessage="Đã xoá biến thể."
@@ -443,12 +419,6 @@ export default async function EquipmentDetailPage({
                                   equipmentUnitId={unit.id}
                                   branches={branchList}
                                   stock={row}
-                                  trigger={
-                                    <Button variant="ghost" size="icon-sm">
-                                      <Pencil className="size-4" />
-                                      <span className="sr-only">Sửa</span>
-                                    </Button>
-                                  }
                                 />
                                 <ConfirmDeleteButton
                                   confirmMessage={`Xoá tồn kho "${unit.brand_model}" tại ${branchNameById.get(row.branch_id) ?? ""}?`}
@@ -476,36 +446,9 @@ export default async function EquipmentDetailPage({
 
                   {canManageStock && (
                     <div className="mt-2 flex items-center gap-2">
-                      <EquipmentStockDialog
-                        equipmentUnitId={unit.id}
-                        branches={branchList}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            <Plus className="size-4" />
-                            Thêm tồn kho
-                          </Button>
-                        }
-                      />
-                      <TransferStockDialog
-                        equipmentUnitId={unit.id}
-                        branches={branchList}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            <ArrowLeftRight className="size-4" />
-                            Chuyển kho
-                          </Button>
-                        }
-                      />
-                      <EquipmentPurchaseDialog
-                        equipmentUnitId={unit.id}
-                        branches={branchList}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            <ShoppingCart className="size-4" />
-                            Mua hàng
-                          </Button>
-                        }
-                      />
+                      <EquipmentStockDialog equipmentUnitId={unit.id} branches={branchList} />
+                      <TransferStockDialog equipmentUnitId={unit.id} branches={branchList} />
+                      <EquipmentPurchaseDialog equipmentUnitId={unit.id} branches={branchList} />
                       <EquipmentCostAdjustmentDialog
                         equipmentUnitId={unit.id}
                         branchStocks={unitStock
@@ -516,16 +459,7 @@ export default async function EquipmentDetailPage({
                             quantity_in_stock: row.quantity_in_stock,
                           }))}
                       />
-                      <EquipmentDisposalDialog
-                        equipmentUnitId={unit.id}
-                        branches={branchList}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            <Banknote className="size-4" />
-                            Bán/thanh lý
-                          </Button>
-                        }
-                      />
+                      <EquipmentDisposalDialog equipmentUnitId={unit.id} branches={branchList} />
                     </div>
                   )}
                 </div>
@@ -537,15 +471,7 @@ export default async function EquipmentDetailPage({
           )}
 
           {showUnitsBlock && canManageCatalog && (
-            <EquipmentUnitDialog
-              equipmentTypeId={type.id}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <Plus className="size-4" />
-                  Thêm biến thể
-                </Button>
-              }
-            />
+            <EquipmentUnitDialog equipmentTypeId={type.id} />
           )}
 
           {isRentalIndividual && (
@@ -581,34 +507,16 @@ export default async function EquipmentDetailPage({
                                 equipmentTypeId={type.id}
                                 equipmentInstanceId={inst.id}
                                 tags={instTags}
-                                trigger={
-                                  <Button variant="ghost" size="icon-sm">
-                                    <Radio className="size-4" />
-                                    <span className="sr-only">Tag RFID ({instTags.length})</span>
-                                  </Button>
-                                }
                               />
                               <EquipmentInstanceDialog
                                 equipmentTypeId={type.id}
                                 branches={branchList}
                                 instance={inst}
-                                trigger={
-                                  <Button variant="ghost" size="icon-sm">
-                                    <Pencil className="size-4" />
-                                    <span className="sr-only">Sửa</span>
-                                  </Button>
-                                }
                               />
                               {inst.status !== "disposed" && (
                                 <EquipmentInstanceDisposeDialog
                                   instanceId={inst.id}
                                   identifierCode={inst.identifier_code}
-                                  trigger={
-                                    <Button variant="ghost" size="icon-sm">
-                                      <Banknote className="size-4" />
-                                      <span className="sr-only">Thanh lý</span>
-                                    </Button>
-                                  }
                                 />
                               )}
                               <ConfirmDeleteButton
@@ -634,16 +542,7 @@ export default async function EquipmentDetailPage({
               </Table>
 
               {canManageStock && (
-                <EquipmentInstanceDialog
-                  equipmentTypeId={type.id}
-                  branches={branchList}
-                  trigger={
-                    <Button variant="outline" size="sm">
-                      <Plus className="size-4" />
-                      Thêm sản phẩm
-                    </Button>
-                  }
-                />
+                <EquipmentInstanceDialog equipmentTypeId={type.id} branches={branchList} />
               )}
             </>
           )}

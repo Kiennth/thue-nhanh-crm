@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Banknote } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,16 +28,22 @@ interface Branch {
 }
 
 interface EquipmentDisposalDialogProps {
-  trigger: React.ReactElement;
   equipmentUnitId: string;
   branches: Branch[];
 }
 
 export function EquipmentDisposalDialog({
-  trigger,
   equipmentUnitId,
   branches,
 }: EquipmentDisposalDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <Banknote className="size-4" />
+      Bán/thanh lý
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
