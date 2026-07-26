@@ -14,69 +14,57 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType, deletePricingTemplate } from "@/lib/actions/equipment";
 import {
-  EQUIPMENT_SORT_OPTIONS,
   PRODUCT_TYPE_LABELS,
   RENTAL_PERIOD_UNIT_LABELS,
   TRACKING_TYPE_LABELS,
-  type EquipmentSort,
 } from "@/lib/equipment-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
-import { EquipmentSortSelect } from "./equipment-sort-select";
 import { PricingTemplateDialog } from "./pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "./pricing-template-tiers-dialog";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const PAGE_SIZE = 20;
 
-function isEquipmentSort(value: string): value is EquipmentSort {
-  return (EQUIPMENT_SORT_OPTIONS.map((o) => o.value) as string[]).includes(value);
+type EquipmentTypeRow = Database["public"]["Tables"]["equipment_types"]["Row"];
+
+const SORT_KEYS = ["name", "type", "price", "stock"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+function isSortKey(value: string): value is SortKey {
+  return (SORT_KEYS as readonly string[]).includes(value);
 }
 
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string }>;
 }) {
-  const { sort, search, page: pageParam } = await searchParams;
-  const activeSort: EquipmentSort = sort && isEquipmentSort(sort) ? sort : "name_asc";
+  const { search, page: pageParam, sort, dir } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
+  const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
-  function baseTypesQuery() {
-    let q = supabase.from("equipment_types").select("*", { count: "exact" });
+  // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
+  // nhãn ghép từ 2 cột, Tồn kho là tổng suy ra từ equipment_units/stock hoặc
+  // equipment_instances) — lấy TOÀN BỘ loại hàng khớp tìm kiếm, tính/lọc/sắp/
+  // phân trang gộp 1 lần trong JS.
+  const allTypes = await fetchAllRows<EquipmentTypeRow>((from, to) => {
+    let q = supabase.from("equipment_types").select("*");
     if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
-    return q;
-  }
+    return q.range(from, to);
+  });
 
-  const { count: totalCount } = await baseTypesQuery();
-  const safeTotalCount = totalCount ?? 0;
-  const totalPages = Math.max(1, Math.ceil(safeTotalCount / PAGE_SIZE));
-  const page = Math.min(requestedPage, totalPages);
-
-  let typesQuery = baseTypesQuery();
-  if (activeSort === "price_desc") {
-    typesQuery = typesQuery.order("price", { ascending: false });
-  } else if (activeSort === "price_asc") {
-    typesQuery = typesQuery.order("price", { ascending: true });
-  } else if (activeSort === "updated_desc") {
-    typesQuery = typesQuery.order("updated_at", { ascending: false });
-  } else if (activeSort === "updated_asc") {
-    typesQuery = typesQuery.order("updated_at", { ascending: true });
-  } else if (activeSort === "name_desc") {
-    typesQuery = typesQuery.order("name", { ascending: false });
-  } else {
-    typesQuery = typesQuery.order("name", { ascending: true });
-  }
-
-  const [{ data: types }, { data: templates }, { data: tiers }, employee] = await Promise.all([
-    typesQuery.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
+  const [{ data: templates }, { data: tiers }, employee] = await Promise.all([
     supabase.from("pricing_templates").select("*").order("name"),
     supabase.from("pricing_template_tiers").select("*").order("min_duration"),
     getCurrentEmployee(),
@@ -86,48 +74,88 @@ export default async function EquipmentPage({
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
   const templateList = templates ?? [];
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
-  const typeList = types ?? [];
 
-  // Tồn kho tổng chỉ để hiển thị tóm tắt ở bảng danh sách — chỉ tra cứu cho
-  // đúng trang đang hiển thị (không phải toàn bộ 500+ loại hàng), scoped
-  // theo equipment_type_id của các dòng trên trang này.
-  const rentalOrSaleTypeIds = typeList
+  const rentalOrSaleTypeIds = allTypes
     .filter((t) => t.product_type === "sale" || (t.product_type === "rental" && t.tracking_type === "quantity"))
     .map((t) => t.id);
-  const individualTypeIds = typeList
+  const individualTypeIds = allTypes
     .filter((t) => t.product_type === "rental" && t.tracking_type === "individual")
     .map((t) => t.id);
 
-  const [{ data: units }, { data: instanceCounts }] = await Promise.all([
+  const [units, instanceCounts] = await Promise.all([
     rentalOrSaleTypeIds.length
-      ? supabase
-          .from("equipment_units")
-          .select("id, equipment_type_id")
-          .in("equipment_type_id", rentalOrSaleTypeIds)
-      : Promise.resolve({ data: [] as { id: string; equipment_type_id: string }[] }),
+      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
+          supabase
+            .from("equipment_units")
+            .select("id, equipment_type_id")
+            .in("equipment_type_id", rentalOrSaleTypeIds)
+            .range(from, to),
+        )
+      : Promise.resolve([]),
     individualTypeIds.length
-      ? supabase
-          .from("equipment_instances")
-          .select("id, equipment_type_id")
-          .in("equipment_type_id", individualTypeIds)
-      : Promise.resolve({ data: [] as { id: string; equipment_type_id: string }[] }),
+      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
+          supabase
+            .from("equipment_instances")
+            .select("id, equipment_type_id")
+            .in("equipment_type_id", individualTypeIds)
+            .range(from, to),
+        )
+      : Promise.resolve([]),
   ]);
-  const unitIds = (units ?? []).map((u) => u.id);
-  const { data: stock } = unitIds.length
-    ? await supabase.from("equipment_stock").select("equipment_unit_id, quantity_total").in("equipment_unit_id", unitIds)
-    : { data: [] as { equipment_unit_id: string; quantity_total: number }[] };
+  const unitIds = units.map((u) => u.id);
+  const stock = unitIds.length
+    ? await fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) =>
+        supabase
+          .from("equipment_stock")
+          .select("equipment_unit_id, quantity_total")
+          .in("equipment_unit_id", unitIds)
+          .range(from, to),
+      )
+    : [];
 
-  const unitTypeById = new Map((units ?? []).map((u) => [u.id, u.equipment_type_id]));
+  const unitTypeById = new Map(units.map((u) => [u.id, u.equipment_type_id]));
   const stockTotalByTypeId = new Map<string, number>();
-  for (const row of stock ?? []) {
+  for (const row of stock) {
     const typeId = unitTypeById.get(row.equipment_unit_id);
     if (!typeId) continue;
     stockTotalByTypeId.set(typeId, (stockTotalByTypeId.get(typeId) ?? 0) + row.quantity_total);
   }
   const instanceCountByTypeId = new Map<string, number>();
-  for (const inst of instanceCounts ?? []) {
+  for (const inst of instanceCounts) {
     instanceCountByTypeId.set(inst.equipment_type_id, (instanceCountByTypeId.get(inst.equipment_type_id) ?? 0) + 1);
   }
+
+  function typeLabel(t: EquipmentTypeRow) {
+    return `${PRODUCT_TYPE_LABELS[t.product_type]}${t.tracking_type ? ` ${TRACKING_TYPE_LABELS[t.tracking_type]}` : ""}`;
+  }
+  function stockValue(t: EquipmentTypeRow): number {
+    if (t.product_type === "service") return -1;
+    if (t.product_type === "rental" && t.tracking_type === "individual") {
+      return instanceCountByTypeId.get(t.id) ?? 0;
+    }
+    return stockTotalByTypeId.get(t.id) ?? 0;
+  }
+
+  const dirMult = activeDir === "asc" ? 1 : -1;
+  const sortedTypes = [...allTypes].sort((a, b) => {
+    switch (activeSort) {
+      case "type":
+        return dirMult * typeLabel(a).localeCompare(typeLabel(b), "vi");
+      case "price":
+        return dirMult * (a.price - b.price);
+      case "stock":
+        return dirMult * (stockValue(a) - stockValue(b));
+      case "name":
+        return dirMult * a.name.localeCompare(b.name, "vi");
+      default:
+        return a.name.localeCompare(b.name, "vi");
+    }
+  });
+
+  const safeTotalCount = sortedTypes.length;
+  const totalPages = Math.max(1, Math.ceil(safeTotalCount / PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const typeList = sortedTypes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -141,7 +169,6 @@ export default async function EquipmentPage({
             value={activeSearch}
             resetParams={["page"]}
           />
-          <EquipmentSortSelect value={activeSort} />
           {canManageCatalog && (
             <EquipmentTypeDialog
               templates={templateList}
@@ -225,10 +252,10 @@ export default async function EquipmentPage({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Tên hàng hoá</TableHead>
-            <TableHead>Loại</TableHead>
-            <TableHead>Giá</TableHead>
-            <TableHead>Tồn kho</TableHead>
+            <SortableTableHead sortKey="name" label="Tên hàng hoá" />
+            <SortableTableHead sortKey="type" label="Loại" />
+            <SortableTableHead sortKey="price" label="Giá" />
+            <SortableTableHead sortKey="stock" label="Tồn kho" />
             <TableHead className="w-16"></TableHead>
           </TableRow>
         </TableHeader>

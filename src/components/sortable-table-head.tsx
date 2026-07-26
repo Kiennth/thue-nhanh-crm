@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { TableHead } from "@/components/ui/table";
 
 // Bấm lần 1 → tăng dần, lần 2 → giảm dần, lần 3 → bỏ sắp xếp (về mặc định
@@ -48,14 +48,10 @@ export function SortableTableHead({
         className="flex items-center gap-1 hover:text-foreground"
       >
         {label}
-        {isActive ? (
-          activeDir === "asc" ? (
-            <ArrowUp className="size-3" />
-          ) : (
-            <ArrowDown className="size-3" />
-          )
+        {isActive && activeDir === "desc" ? (
+          <ArrowDown className="size-3" />
         ) : (
-          <ArrowUpDown className="size-3 text-muted-foreground/50" />
+          <ArrowUp className={isActive ? "size-3" : "size-3 text-muted-foreground/40"} />
         )}
       </button>
     </TableHead>
