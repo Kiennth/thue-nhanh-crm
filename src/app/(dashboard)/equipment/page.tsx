@@ -180,7 +180,6 @@ export default async function EquipmentPage({
     topRentalCount: RevenuePoint[];
     topProfitRatio: RevenuePoint[];
     topInventoryValue: RevenuePoint[];
-    deadCapital: RevenuePoint[];
   } | null = null;
 
   if (canManageCatalog) {
@@ -242,11 +241,6 @@ export default async function EquipmentPage({
         .map((r) => ({ label: r.type.name, value: (r.report.profitRatio ?? 0) * 100 })),
       topInventoryValue: reportRows
         .filter((r) => r.report.currentInventoryValue > 0)
-        .sort((a, b) => b.report.currentInventoryValue - a.report.currentInventoryValue)
-        .slice(0, TOP_N)
-        .map((r) => ({ label: r.type.name, value: r.report.currentInventoryValue })),
-      deadCapital: reportRows
-        .filter((r) => r.report.rentalCount === 0 && r.report.purchaseCost > 0)
         .sort((a, b) => b.report.currentInventoryValue - a.report.currentInventoryValue)
         .slice(0, TOP_N)
         .map((r) => ({ label: r.type.name, value: r.report.currentInventoryValue })),
@@ -313,25 +307,14 @@ export default async function EquipmentPage({
             topMargin={reportSummary.topProfitRatio}
           />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Giá trị tồn kho lớn nhất</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RevenueBarList points={reportSummary.topInventoryValue} labelWidthClassName="w-32" />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Vốn đọng — đã mua nhưng chưa từng cho thuê</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RevenueBarList points={reportSummary.deadCapital} labelWidthClassName="w-32" />
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Giá trị tồn kho lớn nhất</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RevenueBarList points={reportSummary.topInventoryValue} labelWidthClassName="w-32" />
+            </CardContent>
+          </Card>
         </div>
       )}
 
