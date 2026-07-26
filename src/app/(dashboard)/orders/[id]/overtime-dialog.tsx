@@ -26,6 +26,10 @@ interface EmployeeOption {
   name: string;
 }
 
+// Đơn giá OT mặc định — tự tính "Số tiền" khi nhập "Số giờ", vẫn sửa tay
+// được nếu ca đó áp mức khác.
+const DEFAULT_OT_RATE = 45000;
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -49,7 +53,17 @@ export function OvertimeDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [employeeId, setEmployeeId] = useState<string>("");
+  const [hours, setHours] = useState("");
+  const [amount, setAmount] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+
+  function handleHoursChange(next: string) {
+    setHours(next);
+    const parsed = Number(next);
+    if (next && !Number.isNaN(parsed)) {
+      setAmount(String(Math.round(parsed * DEFAULT_OT_RATE)));
+    }
+  }
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -60,6 +74,8 @@ export function OvertimeDialog({
       } else {
         formRef.current?.reset();
         setEmployeeId("");
+        setHours("");
+        setAmount("");
         setOpen(false);
       }
     });
@@ -107,12 +123,34 @@ export function OvertimeDialog({
 
           <div className="space-y-2">
             <Label htmlFor="ot_hours">Số giờ (không bắt buộc)</Label>
-            <Input id="ot_hours" name="hours" type="number" min={0} step={0.5} placeholder="Vd: 2.5" />
+            <Input
+              id="ot_hours"
+              name="hours"
+              type="number"
+              min={0}
+              step={0.5}
+              placeholder="Vd: 2.5"
+              value={hours}
+              onChange={(e) => handleHoursChange(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Đơn giá mặc định {DEFAULT_OT_RATE.toLocaleString("vi-VN")}đ/giờ — tự điền số tiền bên
+              dưới, sửa lại nếu ca này áp mức khác.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="ot_amount">Số tiền (đ)</Label>
-            <Input id="ot_amount" name="amount" type="number" min={0} step={10000} required />
+            <Input
+              id="ot_amount"
+              name="amount"
+              type="number"
+              min={0}
+              step={1}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
           </div>
 
           <div className="space-y-2">
