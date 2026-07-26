@@ -77,11 +77,6 @@ export const NAV_ITEMS: NavItem[] = [
     roles: [...ALL_ROLES],
   },
   {
-    href: "/equipment/reports",
-    label: "Báo cáo thiết bị",
-    roles: [...MANAGE_ROLES],
-  },
-  {
     href: "/payroll",
     label: "Bảng lương",
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
