@@ -20,7 +20,7 @@ import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { CustomerReportSection } from "./customer-report-section";
-import { CustomerSortHeader } from "./customer-sort-header";
+import { SortableTableHead } from "@/components/sortable-table-head";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
 const PAGE_SIZE = 20;
@@ -171,12 +171,12 @@ export default async function CustomersPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <CustomerSortHeader sortKey="name" label="Tên" />
-              <CustomerSortHeader sortKey="customer_type" label="Loại" />
+              <SortableTableHead sortKey="name" label="Tên" />
+              <SortableTableHead sortKey="customer_type" label="Loại" />
               <TableHead>Điện thoại</TableHead>
               <TableHead>Địa chỉ</TableHead>
-              <CustomerSortHeader sortKey="orderCount" label="Số lượng đơn" />
-              <CustomerSortHeader sortKey="totalRevenue" label="Tổng doanh số" />
+              <SortableTableHead sortKey="orderCount" label="Số lượng đơn" />
+              <SortableTableHead sortKey="totalRevenue" label="Tổng doanh số" />
               <TableHead className="w-24"></TableHead>
             </TableRow>
           </TableHeader>

@@ -5,8 +5,9 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { TableHead } from "@/components/ui/table";
 
 // Bấm lần 1 → tăng dần, lần 2 → giảm dần, lần 3 → bỏ sắp xếp (về mặc định
-// theo ngày tạo mới nhất) — xoay vòng 3 trạng thái thay vì chỉ đảo asc/desc.
-export function CustomerSortHeader({
+// của trang) — xoay vòng 3 trạng thái thay vì chỉ đảo asc/desc. Dùng chung
+// "sort"/"dir" trên URL — mỗi trang chỉ có 1 cột đang sắp xếp tại 1 thời điểm.
+export function SortableTableHead({
   sortKey,
   label,
   className,

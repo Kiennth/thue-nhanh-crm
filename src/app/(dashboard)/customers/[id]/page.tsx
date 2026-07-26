@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { CustomerDialog } from "../customer-dialog";
 import { DeleteCustomerButton } from "../delete-customer-button";
 
@@ -27,8 +28,23 @@ const DEPOSIT_PERCENTAGE_LABELS: Record<number, string> = {
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 
-export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const ORDER_SORT_KEYS = ["rental_start_at", "rental_end_at", "total_value"] as const;
+type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];
+function isOrderSortKey(value: string): value is OrderSortKey {
+  return (ORDER_SORT_KEYS as readonly string[]).includes(value);
+}
+
+export default async function CustomerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string }>;
+}) {
   const { id } = await params;
+  const { sort, dir } = await searchParams;
+  const activeSort: OrderSortKey | null = sort && isOrderSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
   const supabase = await createClient();
 
   const [{ data: customer }, { data: orders }] = await Promise.all([
@@ -41,7 +57,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
   if (!customer) notFound();
 
-  const orderList = orders ?? [];
+  const dirMult = activeDir === "asc" ? 1 : -1;
+  const orderList = [...(orders ?? [])].sort((a, b) => {
+    switch (activeSort) {
+      case "rental_start_at":
+        return dirMult * (a.rental_start_at ?? "").localeCompare(b.rental_start_at ?? "");
+      case "rental_end_at":
+        return dirMult * (a.rental_end_at ?? "").localeCompare(b.rental_end_at ?? "");
+      case "total_value":
+        return dirMult * (a.total_value - b.total_value);
+      default:
+        return 0;
+    }
+  });
   const branchIds = [...new Set(orderList.flatMap((o) => [o.pickup_branch_id, o.return_branch_id]))];
   const { data: branches } = branchIds.length
     ? await supabase.from("branches").select("id, name").in("id", branchIds)
@@ -118,9 +146,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <TableRow>
                 <TableHead>Mã đơn</TableHead>
                 <TableHead>Chi nhánh</TableHead>
-                <TableHead>Ngày bắt đầu</TableHead>
-                <TableHead>Ngày kết thúc</TableHead>
-                <TableHead>Doanh số</TableHead>
+                <SortableTableHead sortKey="rental_start_at" label="Ngày bắt đầu" />
+                <SortableTableHead sortKey="rental_end_at" label="Ngày kết thúc" />
+                <SortableTableHead sortKey="total_value" label="Doanh số" />
                 <TableHead>Trạng thái</TableHead>
               </TableRow>
             </TableHeader>
