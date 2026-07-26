@@ -56,6 +56,19 @@ function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
 }
 
+// Báo cáo thiết bị chỉ nhìn lại quá khứ (doanh thu/lượt thuê đã phát sinh) —
+// không có "tuần tới"/"tháng tới" như bộ lọc đơn hàng sắp giao/sắp thu hồi.
+const EQUIPMENT_REPORT_RANGE_VALUES = [
+  "all",
+  "today",
+  "yesterday",
+  "last_7_days",
+  "last_week",
+  "last_month",
+  "last_year",
+  "custom",
+] as const satisfies readonly DateRangePreset[];
+
 export default async function EquipmentPage({
   searchParams,
 }: {
@@ -354,7 +367,12 @@ export default async function EquipmentPage({
 
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Báo cáo</h2>
-            <OrderDateRangeFilter preset={activeRange} from={rangeFrom ?? ""} to={rangeTo ?? ""} />
+            <OrderDateRangeFilter
+              preset={activeRange}
+              from={rangeFrom ?? ""}
+              to={rangeTo ?? ""}
+              values={EQUIPMENT_REPORT_RANGE_VALUES}
+            />
           </div>
 
           <ProductHighlightCards

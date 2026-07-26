@@ -9,17 +9,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { DATE_RANGE_PRESET_OPTIONS } from "@/lib/date-range-presets";
+import { DATE_RANGE_PRESET_OPTIONS, type DateRangePreset } from "@/lib/date-range-presets";
 
 export function OrderDateRangeFilter({
   preset,
   from,
   to,
+  // Giới hạn các mốc hiển thị trong dropdown — mặc định đủ cả quá khứ lẫn
+  // tương lai (dùng cho /orders). Truyền vào nếu bối cảnh chỉ hợp lý 1 chiều
+  // (VD: báo cáo thiết bị chỉ nhìn lại quá khứ, không có "tuần tới").
+  values,
 }: {
   preset: string;
   from: string;
   to: string;
+  values?: readonly DateRangePreset[];
 }) {
+  const options = values
+    ? DATE_RANGE_PRESET_OPTIONS.filter((o) => values.includes(o.value))
+    : DATE_RANGE_PRESET_OPTIONS;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -55,11 +63,11 @@ export function OrderDateRangeFilter({
       <Select value={preset} onValueChange={(v) => updateParams({ range: v ?? "all" })}>
         <SelectTrigger className="w-48">
           <SelectValue placeholder="Khoảng thời gian">
-            {(v: string) => DATE_RANGE_PRESET_OPTIONS.find((o) => o.value === v)?.label}
+            {(v: string) => options.find((o) => o.value === v)?.label}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {DATE_RANGE_PRESET_OPTIONS.map((o) => (
+          {options.map((o) => (
             <SelectItem key={o.value} value={o.value}>
               {o.label}
             </SelectItem>
