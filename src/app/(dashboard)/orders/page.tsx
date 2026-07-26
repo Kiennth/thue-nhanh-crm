@@ -14,9 +14,10 @@ export default async function OrdersPage({
     page?: string;
     sort?: string;
     dir?: string;
+    search?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir } = await searchParams;
+  const { status, range, from, to, page, sort, dir, search } = await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
@@ -32,6 +33,7 @@ export default async function OrdersPage({
         page={page}
         sort={sort}
         dir={dir}
+        search={search}
         branchId={branchId}
         canDelete={canManage}
       />

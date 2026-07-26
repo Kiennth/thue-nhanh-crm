@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaginationControls } from "@/components/pagination-controls";
+import { SearchInput } from "@/components/search-input";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { BranchBadge } from "@/components/branch-badge";
@@ -112,6 +113,7 @@ export async function OrdersListSection({
   page,
   sort,
   dir,
+  search,
   branchId,
   canDelete,
 }: {
@@ -122,6 +124,7 @@ export async function OrdersListSection({
   page?: string;
   sort?: string;
   dir?: string;
+  search?: string;
   branchId: string | null;
   canDelete: boolean;
 }) {
@@ -131,6 +134,7 @@ export async function OrdersListSection({
   const filters: OrderFilters = { branchId, activeStatus, dateRange };
   const activeSort: OrderSortKey | null = sort && isOrderSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
+  const activeSearch = search?.trim() ?? "";
 
   const supabase = await createClient();
 
@@ -158,11 +162,23 @@ export async function OrdersListSection({
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
   const customerNameById = new Map(allCustomers.map((c) => [c.id, c.name]));
 
-  const totalCount = allOrders.length;
+  // Tìm theo mã đơn hoặc tên khách hàng — lọc trên tập đã khớp
+  // chi nhánh/trạng thái/khoảng ngày, áp trước khi tính thẻ tổng kết để các
+  // con số phía trên cũng phản ánh đúng kết quả tìm kiếm.
+  const searchLower = activeSearch.toLowerCase();
+  const searchedOrders = activeSearch
+    ? allOrders.filter(
+        (o) =>
+          o.order_code.toLowerCase().includes(searchLower) ||
+          (customerNameById.get(o.customer_id) ?? "").toLowerCase().includes(searchLower),
+      )
+    : allOrders;
+
+  const totalCount = searchedOrders.length;
   let totalRevenue = 0;
   let completedCount = 0;
   let cancelledCount = 0;
-  for (const o of allOrders) {
+  for (const o of searchedOrders) {
     totalRevenue += o.total_value;
     if (o.cancelled_at) cancelledCount += 1;
     else if (o.completed_at) completedCount += 1;
@@ -170,7 +186,7 @@ export async function OrdersListSection({
   const processingCount = totalCount - completedCount - cancelledCount;
 
   const dirMult = activeDir === "asc" ? 1 : -1;
-  const sortedOrders = [...allOrders].sort((a, b) => {
+  const sortedOrders = [...searchedOrders].sort((a, b) => {
     switch (activeSort) {
       case "rental_start_at":
         return dirMult * (a.rental_start_at ?? "").localeCompare(b.rental_start_at ?? "");
@@ -263,6 +279,13 @@ export async function OrdersListSection({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <SearchInput
+          key={activeSearch}
+          paramName="search"
+          placeholder="Tìm theo mã đơn, tên khách hàng..."
+          value={activeSearch}
+          resetParams={["page"]}
+        />
         <OrderStatusFilter value={activeStatus} />
         <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
       </div>
