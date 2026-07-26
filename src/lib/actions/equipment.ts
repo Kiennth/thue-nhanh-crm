@@ -362,8 +362,7 @@ const EquipmentStockSchema = z.object({
   equipment_unit_id: z.string().uuid(),
   branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
   quantity_in_stock: z.coerce.number().int().min(0, { message: "Số lượng trong kho không được âm." }),
-  quantity_picked_up: z.coerce.number().int().min(0, { message: "Số lượng ở khách không được âm." }),
-  quantity_downtime: z.coerce.number().int().min(0, { message: "Số lượng bảo trì không được âm." }),
+  quantity_picked_up: z.coerce.number().int().min(0, { message: "Số lượng đang cho thuê không được âm." }),
 });
 
 export async function upsertEquipmentStock(
@@ -377,7 +376,6 @@ export async function upsertEquipmentStock(
     branch_id: formData.get("branch_id"),
     quantity_in_stock: formData.get("quantity_in_stock"),
     quantity_picked_up: formData.get("quantity_picked_up"),
-    quantity_downtime: formData.get("quantity_downtime"),
   });
 
   if (!parsed.success) {

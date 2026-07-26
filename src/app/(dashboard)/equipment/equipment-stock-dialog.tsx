@@ -34,7 +34,6 @@ interface EquipmentStockDialogProps {
     branch_id: string;
     quantity_in_stock: number;
     quantity_picked_up: number;
-    quantity_downtime: number;
   };
 }
 
@@ -106,7 +105,7 @@ export function EquipmentStockDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="quantity_in_stock">Trong kho</Label>
               <Input
@@ -119,7 +118,7 @@ export function EquipmentStockDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quantity_picked_up">Đang ở khách</Label>
+              <Label htmlFor="quantity_picked_up">Đang cho thuê</Label>
               <Input
                 id="quantity_picked_up"
                 name="quantity_picked_up"
@@ -129,21 +128,10 @@ export function EquipmentStockDialog({
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="quantity_downtime">Bảo trì</Label>
-              <Input
-                id="quantity_downtime"
-                name="quantity_downtime"
-                type="number"
-                min={0}
-                defaultValue={stock?.quantity_downtime ?? 0}
-                required
-              />
-            </div>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Ô &quot;Đang ở khách&quot; do hệ thống tự cập nhật theo khâu giao/thu hồi của đơn hàng —
+            Ô &quot;Đang cho thuê&quot; do hệ thống tự cập nhật theo khâu giao/thu hồi của đơn hàng —
             chỉ sửa tay khi cần đối chiếu lại số liệu.
           </p>
 

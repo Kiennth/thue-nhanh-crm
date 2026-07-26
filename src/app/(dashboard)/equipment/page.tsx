@@ -20,6 +20,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType, deletePricingTemplate } from "@/lib/actions/equipment";
 import {
+  PRICING_METHOD_LABELS,
   PRODUCT_TYPE_LABELS,
   RENTAL_PERIOD_UNIT_LABELS,
   TRACKING_TYPE_LABELS,
@@ -35,7 +36,7 @@ const PAGE_SIZE = 20;
 
 type EquipmentTypeRow = Database["public"]["Tables"]["equipment_types"]["Row"];
 
-const SORT_KEYS = ["name", "type", "price", "stock"] as const;
+const SORT_KEYS = ["name", "productType", "trackingType", "pricingMethod", "price", "stock"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 function isSortKey(value: string): value is SortKey {
   return (SORT_KEYS as readonly string[]).includes(value);
@@ -125,8 +126,13 @@ export default async function EquipmentPage({
     instanceCountByTypeId.set(inst.equipment_type_id, (instanceCountByTypeId.get(inst.equipment_type_id) ?? 0) + 1);
   }
 
-  function typeLabel(t: EquipmentTypeRow) {
-    return `${PRODUCT_TYPE_LABELS[t.product_type]}${t.tracking_type ? ` ${TRACKING_TYPE_LABELS[t.tracking_type]}` : ""}`;
+  function trackingTypeLabel(t: EquipmentTypeRow) {
+    return t.tracking_type ? TRACKING_TYPE_LABELS[t.tracking_type] : "—";
+  }
+  function pricingMethodLabel(t: EquipmentTypeRow) {
+    if (!t.pricing_method) return "—";
+    if (t.pricing_method === "flat_fee") return PRICING_METHOD_LABELS.flat_fee;
+    return templateNameById.get(t.pricing_template_id ?? "") ?? PRICING_METHOD_LABELS.pricing_structure;
   }
   function stockValue(t: EquipmentTypeRow): number {
     if (t.product_type === "service") return -1;
@@ -139,8 +145,12 @@ export default async function EquipmentPage({
   const dirMult = activeDir === "asc" ? 1 : -1;
   const sortedTypes = [...allTypes].sort((a, b) => {
     switch (activeSort) {
-      case "type":
-        return dirMult * typeLabel(a).localeCompare(typeLabel(b), "vi");
+      case "productType":
+        return dirMult * PRODUCT_TYPE_LABELS[a.product_type].localeCompare(PRODUCT_TYPE_LABELS[b.product_type], "vi");
+      case "trackingType":
+        return dirMult * trackingTypeLabel(a).localeCompare(trackingTypeLabel(b), "vi");
+      case "pricingMethod":
+        return dirMult * pricingMethodLabel(a).localeCompare(pricingMethodLabel(b), "vi");
       case "price":
         return dirMult * (a.price - b.price);
       case "stock":
@@ -253,7 +263,9 @@ export default async function EquipmentPage({
         <TableHeader>
           <TableRow>
             <SortableTableHead sortKey="name" label="Tên hàng hoá" />
-            <SortableTableHead sortKey="type" label="Loại" />
+            <SortableTableHead sortKey="productType" label="Loại hàng hoá" />
+            <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
+            <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
             <SortableTableHead sortKey="price" label="Giá" />
             <SortableTableHead sortKey="stock" label="Tồn kho" />
             <TableHead className="w-16"></TableHead>
@@ -263,10 +275,7 @@ export default async function EquipmentPage({
           {typeList.map((type) => {
             const priceLine =
               type.product_type === "rental"
-                ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}` +
-                  (type.pricing_method === "pricing_structure"
-                    ? ` · ${templateNameById.get(type.pricing_template_id ?? "") ?? "—"}`
-                    : "")
+                ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}`
                 : `${currencyFormatter.format(type.price)}đ`;
 
             const stockDisplay =
@@ -296,13 +305,10 @@ export default async function EquipmentPage({
                   </Link>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
-                    {type.tracking_type && (
-                      <Badge variant="outline">{TRACKING_TYPE_LABELS[type.tracking_type]}</Badge>
-                    )}
-                  </div>
+                  <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
                 </TableCell>
+                <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
+                <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
                 <TableCell className="text-muted-foreground">{priceLine}</TableCell>
                 <TableCell>{stockDisplay}</TableCell>
                 <TableCell>
@@ -336,7 +342,7 @@ export default async function EquipmentPage({
           })}
           {!typeList.length && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
               </TableCell>
             </TableRow>

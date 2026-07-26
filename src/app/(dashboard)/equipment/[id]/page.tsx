@@ -306,8 +306,7 @@ export default async function EquipmentDetailPage({
                         <TableHead>Chi nhánh</TableHead>
                         <TableHead>Tổng</TableHead>
                         <TableHead>Trong kho</TableHead>
-                        <TableHead>Ở khách</TableHead>
-                        <TableHead>Bảo trì</TableHead>
+                        <TableHead>Đang cho thuê</TableHead>
                         {canManageStock && <TableHead className="w-20"></TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -318,7 +317,6 @@ export default async function EquipmentDetailPage({
                           <TableCell>{row.quantity_total}</TableCell>
                           <TableCell>{row.quantity_in_stock}</TableCell>
                           <TableCell>{row.quantity_picked_up}</TableCell>
-                          <TableCell>{row.quantity_downtime}</TableCell>
                           {canManageStock && (
                             <TableCell>
                               <div className="flex items-center gap-1">
@@ -347,7 +345,7 @@ export default async function EquipmentDetailPage({
                       {!unitStock.length && (
                         <TableRow>
                           <TableCell
-                            colSpan={canManageStock ? 6 : 5}
+                            colSpan={canManageStock ? 5 : 4}
                             className="text-center text-muted-foreground"
                           >
                             Chưa có tồn kho ở chi nhánh nào.
