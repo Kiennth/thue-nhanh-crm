@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { TableHead } from "@/components/ui/table";
 
@@ -17,6 +18,7 @@ export function SortableTableHead({
   className?: string;
 }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeSort = searchParams.get("sort");
@@ -37,6 +39,7 @@ export function SortableTableHead({
     }
     params.delete("page");
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 

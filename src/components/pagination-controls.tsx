@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +21,7 @@ export function PaginationControls({
   paramName = "page",
 }: PaginationControlsProps) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -31,6 +33,7 @@ export function PaginationControls({
       params.set(paramName, String(next));
     }
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 

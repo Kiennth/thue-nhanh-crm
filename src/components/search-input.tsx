@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -23,6 +24,7 @@ export function SearchInput({
   className = "w-64",
 }: SearchInputProps) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [text, setText] = useState(value);
@@ -40,6 +42,7 @@ export function SearchInput({
       }
       for (const p of resetParams) params.delete(p);
       const query = params.toString();
+      start();
       router.push(query ? `${pathname}?${query}` : pathname);
     }, 300);
   }

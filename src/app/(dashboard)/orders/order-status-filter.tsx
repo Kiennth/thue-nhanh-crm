@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,7 @@ import { ORDER_STATUS_FILTER_OPTIONS } from "@/lib/order-labels";
 
 export function OrderStatusFilter({ value }: { value: string }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -24,6 +26,7 @@ export function OrderStatusFilter({ value }: { value: string }) {
     }
     params.delete("page");
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 

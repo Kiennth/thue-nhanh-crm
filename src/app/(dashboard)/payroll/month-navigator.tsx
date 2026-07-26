@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { Button } from "@/components/ui/button";
 import { PeriodPicker } from "@/components/period-picker";
 
@@ -15,12 +16,14 @@ function shiftMonth(month: string, delta: number) {
 // dễ bị bỏ sót là có thể bấm được để xem tháng trước.
 export function MonthNavigator({ month }: { month: string }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   function goToMonth(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", next);
+    start();
     router.push(`${pathname}?${params.toString()}`);
   }
 

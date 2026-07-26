@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { cn } from "@/lib/utils";
 
 export function OrdersToHandleLateToggle({
@@ -13,6 +14,7 @@ export function OrdersToHandleLateToggle({
   active: boolean;
 }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -26,6 +28,7 @@ export function OrdersToHandleLateToggle({
       params.set(paramName, "1");
     }
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 

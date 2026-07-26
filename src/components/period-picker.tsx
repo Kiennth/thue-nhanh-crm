@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import { Input } from "@/components/ui/input";
 
 export function PeriodPicker({
@@ -15,6 +16,7 @@ export function PeriodPicker({
   label: string;
 }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -22,6 +24,7 @@ export function PeriodPicker({
     if (!newValue) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set(paramName, newValue);
+    start();
     router.push(`${pathname}?${params.toString()}`);
   }
 

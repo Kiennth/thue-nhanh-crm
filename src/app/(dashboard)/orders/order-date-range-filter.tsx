@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ export function OrderDateRangeFilter({
     ? DATE_RANGE_PRESET_OPTIONS.filter((o) => values.includes(o.value))
     : DATE_RANGE_PRESET_OPTIONS;
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -55,6 +57,7 @@ export function OrderDateRangeFilter({
     }
     params.delete("page");
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 

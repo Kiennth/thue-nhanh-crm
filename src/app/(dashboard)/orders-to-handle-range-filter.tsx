@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTopLoader } from "nextjs-toploader";
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ export function OrdersToHandleRangeFilter({
   value: string;
 }) {
   const router = useRouter();
+  const { start } = useTopLoader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -45,6 +47,7 @@ export function OrdersToHandleRangeFilter({
       params.set(paramName, next);
     }
     const query = params.toString();
+    start();
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 
