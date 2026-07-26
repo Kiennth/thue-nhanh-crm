@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -81,15 +79,7 @@ export default async function CustomerDetailPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{customer.name}</h1>
         <div className="flex items-center gap-2">
-          <CustomerDialog
-            customer={customer}
-            trigger={
-              <Button variant="outline">
-                <Pencil className="size-4" />
-                Sửa
-              </Button>
-            }
-          />
+          <CustomerDialog customer={customer} editTriggerVariant="outline" />
           <DeleteCustomerButton id={customer.id} name={customer.name} />
         </div>
       </div>

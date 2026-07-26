@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,6 @@ interface Branch {
 }
 
 interface EmployeeDialogProps {
-  trigger: React.ReactElement;
   branches: Branch[];
   employee?: {
     id: string;
@@ -43,7 +43,20 @@ interface EmployeeDialogProps {
 
 const ROLE_OPTIONS: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"];
 
-export function EmployeeDialog({ trigger, branches, employee }: EmployeeDialogProps) {
+export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = employee ? (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  ) : (
+    <Button>
+      <Plus className="size-4" />
+      Thêm nhân viên
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

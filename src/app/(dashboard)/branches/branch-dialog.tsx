@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { createBranch, updateBranch } from "@/lib/actions/branches";
 
 interface BranchDialogProps {
-  trigger: React.ReactElement;
   branch?: {
     id: string;
     name: string;
@@ -24,7 +24,20 @@ interface BranchDialogProps {
   };
 }
 
-export function BranchDialog({ trigger, branch }: BranchDialogProps) {
+export function BranchDialog({ branch }: BranchDialogProps) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = branch ? (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  ) : (
+    <Button>
+      <Plus className="size-4" />
+      Thêm chi nhánh
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

@@ -1,5 +1,3 @@
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -103,12 +101,6 @@ export default async function CommissionPage() {
                     <CommissionTierDialog
                       branchId={branch.id}
                       nextTierNumber={tiers.length + 1}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          <Plus className="size-4" />
-                          Thêm bậc
-                        </Button>
-                      }
                     />
                   )}
                 </div>
@@ -159,12 +151,6 @@ export default async function CommissionPage() {
                     <BonusTierDialog
                       branchId={branch.id}
                       nextTierNumber={bonuses.length + 1}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          <Plus className="size-4" />
-                          Thêm bậc
-                        </Button>
-                      }
                     />
                   )}
                 </div>

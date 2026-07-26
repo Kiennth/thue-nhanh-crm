@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,6 @@ const DEPOSIT_PERCENTAGE_LABELS: Record<string, string> = {
 };
 
 interface CustomerDialogProps {
-  trigger: React.ReactElement;
   customer?: {
     id: string;
     name: string;
@@ -46,9 +46,31 @@ interface CustomerDialogProps {
     address: string | null;
     deposit_percentage: number;
   };
+  // Biến thể nút "Sửa" — icon-only ở bảng danh sách (mặc định), outline có
+  // chữ ở trang chi tiết.
+  editTriggerVariant?: "icon" | "outline";
 }
 
-export function CustomerDialog({ trigger, customer }: CustomerDialogProps) {
+export function CustomerDialog({ customer, editTriggerVariant = "icon" }: CustomerDialogProps) {
+  const isEdit = !!customer;
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = !isEdit ? (
+    <Button>
+      <Plus className="size-4" />
+      Thêm khách hàng
+    </Button>
+  ) : editTriggerVariant === "outline" ? (
+    <Button variant="outline">
+      <Pencil className="size-4" />
+      Sửa
+    </Button>
+  ) : (
+    <Button variant="ghost" size="icon-sm">
+      <Pencil className="size-4" />
+      <span className="sr-only">Sửa</span>
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

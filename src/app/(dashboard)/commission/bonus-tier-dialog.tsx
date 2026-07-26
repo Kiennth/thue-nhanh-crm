@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,14 +15,20 @@ import { Label } from "@/components/ui/label";
 import { createBonusTier } from "@/lib/actions/commission";
 
 export function BonusTierDialog({
-  trigger,
   branchId,
   nextTierNumber,
 }: {
-  trigger: React.ReactElement;
   branchId: string;
   nextTierNumber: number;
 }) {
+  // Trigger dựng ngay trong component này (không nhận qua prop từ Server
+  // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
+  const trigger = (
+    <Button variant="outline" size="sm">
+      <Plus className="size-4" />
+      Thêm bậc
+    </Button>
+  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

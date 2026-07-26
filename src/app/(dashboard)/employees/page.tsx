@@ -1,5 +1,3 @@
-import { Plus, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -34,15 +32,7 @@ export default async function EmployeesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Nhân viên</h1>
         {isHr && (
-          <EmployeeDialog
-            branches={branchList}
-            trigger={
-              <Button>
-                <Plus className="size-4" />
-                Thêm nhân viên
-              </Button>
-            }
-          />
+          <EmployeeDialog branches={branchList} />
         )}
       </div>
 
@@ -78,16 +68,7 @@ export default async function EmployeesPage() {
               {isHr && (
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <EmployeeDialog
-                      branches={branchList}
-                      employee={emp}
-                      trigger={
-                        <Button variant="ghost" size="icon-sm">
-                          <Pencil className="size-4" />
-                          <span className="sr-only">Sửa</span>
-                        </Button>
-                      }
-                    />
+                    <EmployeeDialog branches={branchList} employee={emp} />
                     <ToggleActiveButton
                       id={emp.id}
                       name={emp.name}

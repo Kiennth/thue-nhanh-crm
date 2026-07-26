@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -29,14 +27,7 @@ export default async function BranchesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Chi nhánh</h1>
         {isDirector && (
-          <BranchDialog
-            trigger={
-              <Button>
-                <Plus className="size-4" />
-                Thêm chi nhánh
-              </Button>
-            }
-          />
+          <BranchDialog />
         )}
       </div>
 
@@ -66,15 +57,7 @@ export default async function BranchesPage() {
               {isDirector && (
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <BranchDialog
-                      branch={branch}
-                      trigger={
-                        <Button variant="ghost" size="icon-sm">
-                          <Pencil className="size-4" />
-                          <span className="sr-only">Sửa</span>
-                        </Button>
-                      }
-                    />
+                    <BranchDialog branch={branch} />
                     <DeleteBranchButton id={branch.id} name={branch.name} />
                   </div>
                 </TableCell>

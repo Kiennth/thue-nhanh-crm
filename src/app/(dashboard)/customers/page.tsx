@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -147,14 +145,7 @@ export default async function CustomersPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Khách hàng</h1>
-        <CustomerDialog
-          trigger={
-            <Button>
-              <Plus className="size-4" />
-              Thêm khách hàng
-            </Button>
-          }
-        />
+        <CustomerDialog />
       </div>
 
       <CustomerReportSection customers={allCustomers} orders={orders} payments={payments} />
@@ -198,15 +189,7 @@ export default async function CustomersPage({
                 <TableCell>{currencyFormatter.format(customer.totalRevenue)}đ</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <CustomerDialog
-                      customer={customer}
-                      trigger={
-                        <Button variant="ghost" size="icon-sm">
-                          <Pencil className="size-4" />
-                          <span className="sr-only">Sửa</span>
-                        </Button>
-                      }
-                    />
+                    <CustomerDialog customer={customer} />
                     <DeleteCustomerButton id={customer.id} name={customer.name} />
                   </div>
                 </TableCell>
