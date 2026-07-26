@@ -15,7 +15,6 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
 import { SortableTableHead } from "@/components/sortable-table-head";
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
@@ -45,18 +44,12 @@ function isSortKey(value: string): value is SortKey {
   return (SORT_KEYS as readonly string[]).includes(value);
 }
 
-const TABS = [
-  { value: "list", label: "Danh sách" },
-  { value: "reports", label: "Báo cáo" },
-] as const;
-type Tab = (typeof TABS)[number]["value"];
-
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string; tab?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string }>;
 }) {
-  const { search, page: pageParam, sort, dir, tab } = await searchParams;
+  const { search, page: pageParam, sort, dir } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
@@ -66,31 +59,19 @@ export default async function EquipmentPage({
   const employee = await getCurrentEmployee();
   const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
-  const activeTab: Tab = tab === "reports" && canManageCatalog ? "reports" : "list";
-
-  // ---------------------------------------------------------------------
-  // Tab "Danh sách"
-  // ---------------------------------------------------------------------
 
   // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
   // nhãn ghép từ 2 cột, Tồn kho là tổng suy ra từ equipment_units/stock hoặc
   // equipment_instances) — lấy TOÀN BỘ loại hàng khớp tìm kiếm, tính/lọc/sắp/
   // phân trang gộp 1 lần trong JS.
-  const allTypes =
-    activeTab === "list"
-      ? await fetchAllRows<EquipmentTypeRow>((from, to) => {
-          let q = supabase.from("equipment_types").select("*");
-          if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
-          return q.range(from, to);
-        })
-      : [];
+  const allTypes = await fetchAllRows<EquipmentTypeRow>((from, to) => {
+    let q = supabase.from("equipment_types").select("*");
+    if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
+    return q.range(from, to);
+  });
 
-  const { data: templates } =
-    activeTab === "list" ? await supabase.from("pricing_templates").select("*").order("name") : { data: [] };
-  const { data: tiers } =
-    activeTab === "list"
-      ? await supabase.from("pricing_template_tiers").select("*").order("min_duration")
-      : { data: [] };
+  const { data: templates } = await supabase.from("pricing_templates").select("*").order("name");
+  const { data: tiers } = await supabase.from("pricing_template_tiers").select("*").order("min_duration");
   const templateList = templates ?? [];
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
 
@@ -186,9 +167,10 @@ export default async function EquipmentPage({
   const typeList = sortedTypes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ---------------------------------------------------------------------
-  // Tab "Báo cáo" — tổng quan gọn: top thiết bị doanh thu cao, cho thuê
-  // nhiều lần, tỉ suất lợi nhuận cao, và vốn đọng (đã mua nhưng chưa từng
-  // cho thuê). KHÔNG liệt kê toàn bộ danh mục — chỉ top 10 mỗi mục.
+  // Báo cáo — hiển thị thẳng trên trang, không tách tab riêng: tổng quan
+  // gọn gồm top thiết bị doanh thu cao, cho thuê nhiều lần, tỉ suất lợi
+  // nhuận cao, và vốn đọng (đã mua nhưng chưa từng cho thuê). KHÔNG liệt
+  // kê toàn bộ danh mục — chỉ top 10 mỗi mục.
   // ---------------------------------------------------------------------
 
   let reportSummary: {
@@ -207,7 +189,7 @@ export default async function EquipmentPage({
     deadCapital: { name: string; purchaseCost: number; currentInventoryValue: number }[];
   } | null = null;
 
-  if (activeTab === "reports") {
+  if (canManageCatalog) {
     const [
       { data: reportTypes },
       { data: reportUnits },
@@ -286,50 +268,29 @@ export default async function EquipmentPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
-        {activeTab === "list" && (
-          <div className="flex items-center gap-2">
-            <SearchInput
-              key={activeSearch}
-              paramName="search"
-              placeholder="Tìm theo tên hàng hoá..."
-              value={activeSearch}
-              resetParams={["page"]}
+        <div className="flex items-center gap-2">
+          <SearchInput
+            key={activeSearch}
+            paramName="search"
+            placeholder="Tìm theo tên hàng hoá..."
+            value={activeSearch}
+            resetParams={["page"]}
+          />
+          {canManageCatalog && (
+            <EquipmentTypeDialog
+              templates={templateList}
+              trigger={
+                <Button>
+                  <Plus className="size-4" />
+                  Thêm hàng hoá
+                </Button>
+              }
             />
-            {canManageCatalog && (
-              <EquipmentTypeDialog
-                templates={templateList}
-                trigger={
-                  <Button>
-                    <Plus className="size-4" />
-                    Thêm hàng hoá
-                  </Button>
-                }
-              />
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {canManageCatalog && (
-        <div className="flex items-center gap-1 border-b">
-          {TABS.map((t) => (
-            <Link
-              key={t.value}
-              href={t.value === "list" ? "/equipment" : "/equipment?tab=reports"}
-              className={cn(
-                "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-                activeTab === t.value
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "reports" && reportSummary ? (
+      {reportSummary && (
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -499,9 +460,9 @@ export default async function EquipmentPage({
             </Card>
           </div>
         </div>
-      ) : (
-        <>
-          {canManageCatalog && (
+      )}
+
+      {canManageCatalog && (
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="text-base">Bảng giá mẫu</CardTitle>
@@ -658,9 +619,7 @@ export default async function EquipmentPage({
             </TableBody>
           </Table>
 
-          <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="loại hàng hoá" />
-        </>
-      )}
+      <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="loại hàng hoá" />
     </div>
   );
 }
