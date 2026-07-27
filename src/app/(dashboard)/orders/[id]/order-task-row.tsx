@@ -51,10 +51,10 @@ export function OrderTaskRow({ orderId, taskType, label, employees, task, status
 
   if (status === "done") {
     return (
-      <div className="flex items-center gap-2 py-0.5">
+      <div className="flex items-center justify-between gap-2 py-0.5">
         <span className="text-sm font-medium">{label}</span>
         {task?.completed_date && (
-          <span className="text-xs text-muted-foreground">({task.completed_date})</span>
+          <span className="text-xs text-muted-foreground">{task.completed_date}</span>
         )}
       </div>
     );
@@ -63,7 +63,7 @@ export function OrderTaskRow({ orderId, taskType, label, employees, task, status
   if (status === "locked") {
     return (
       <div className="py-0.5">
-        <span className="text-sm text-muted-foreground/60">{label}</span>
+        <span className="text-sm text-muted-foreground/50">{label}</span>
       </div>
     );
   }
@@ -74,7 +74,7 @@ export function OrderTaskRow({ orderId, taskType, label, employees, task, status
     <form
       key={rowKey}
       action={handleSubmit}
-      className="space-y-2 rounded-md border bg-muted/30 p-2.5"
+      className="space-y-2 rounded-lg border border-primary/25 bg-primary/[0.03] p-3 shadow-sm"
     >
       <input type="hidden" name="order_id" value={orderId} />
       <input type="hidden" name="task_type" value={taskType} />

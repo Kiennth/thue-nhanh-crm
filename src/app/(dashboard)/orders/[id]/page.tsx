@@ -54,6 +54,11 @@ import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
+// Khâu mở đầu mỗi giai đoạn (bán hàng/vận hành/hoàn tất) trong stepper 10
+// khâu — dùng để ngắt đường nối dọc trước nhãn giai đoạn, xem order-labels.ts
+// cho thứ tự đầy đủ.
+const TASK_PHASE_STARTS = new Set(["chuan_bi", "nghiem_thu"]);
+
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -600,6 +605,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <CardTitle className="text-base">
                 10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
               </CardTitle>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: `${(doneCount / TASK_TYPE_SEQUENCE.length) * 100}%` }}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div>
@@ -615,6 +626,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       : "locked";
                   const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
                   const isLast = index === TASK_TYPE_SEQUENCE.length - 1;
+                  // Nhóm 10 khâu theo 3 giai đoạn nghiệp vụ thật (bán hàng →
+                  // vận hành → hoàn tất) để dễ định vị đang ở đâu, thay vì 1
+                  // danh sách phẳng 10 dòng.
+                  const phaseLabel =
+                    taskType === "tiep_nhan_yeu_cau"
+                      ? "Bán hàng"
+                      : taskType === "chuan_bi"
+                        ? "Vận hành"
+                        : taskType === "nghiem_thu"
+                          ? "Hoàn tất"
+                          : null;
 
                   const scanType =
                     taskType === "giao_hang_ban_giao"
@@ -624,57 +646,65 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         : null;
 
                   return (
-                    <div key={taskType} className="relative flex gap-3">
-                      {!isLast && (
-                        <div
-                          aria-hidden
-                          className="absolute top-6 bottom-0 left-[11px] w-px bg-border"
-                        />
+                    <div key={taskType}>
+                      {phaseLabel && (
+                        <p className="mt-4 mb-1.5 pl-9 text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase first:mt-0">
+                          {phaseLabel}
+                        </p>
                       )}
-                      <div
-                        className={cn(
-                          "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
-                          status === "done" && "border-primary bg-primary text-primary-foreground",
-                          status === "current" && "border-primary text-primary",
-                          status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
+                      <div className="relative flex gap-3">
+                        {!isLast && !TASK_PHASE_STARTS.has(TASK_TYPE_SEQUENCE[index + 1]) && (
+                          <div
+                            aria-hidden
+                            className="absolute top-6 bottom-0 left-[11px] w-px bg-border"
+                          />
                         )}
-                      >
-                        {status === "done" ? (
-                          <Check className="size-3.5" />
-                        ) : status === "locked" ? (
-                          <Lock className="size-3" />
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1 pb-5 last:pb-0">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <OrderTaskRow
-                              orderId={order.id}
-                              taskType={taskType}
-                              label={TASK_TYPE_LABELS[taskType]}
-                              employees={employeeList}
-                              task={task}
-                              status={status}
-                            />
-                          </div>
-                          {scanType && status === "current" && (
-                            <RfidScanDialog
-                              orderId={order.id}
-                              branchId={
-                                scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
-                              }
-                              scanType={scanType}
-                            />
+                        <div
+                          className={cn(
+                            "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
+                            status === "done" && "border-primary bg-primary text-primary-foreground",
+                            status === "current" && "border-primary text-primary ring-4 ring-primary/10",
+                            status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
+                          )}
+                        >
+                          {status === "done" ? (
+                            <Check className="size-3.5" />
+                          ) : status === "locked" ? (
+                            <Lock className="size-3" />
+                          ) : (
+                            index + 1
                           )}
                         </div>
-                        {canManage && task?.employee_id && (
-                          <p className="text-xs text-muted-foreground">
-                            {employeeNameById.get(task.employee_id) ?? "—"} · {weight}% ={" "}
-                            {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
-                          </p>
-                        )}
+                        <div className="min-w-0 flex-1 pb-5 last:pb-0">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <OrderTaskRow
+                                orderId={order.id}
+                                taskType={taskType}
+                                label={TASK_TYPE_LABELS[taskType]}
+                                employees={employeeList}
+                                task={task}
+                                status={status}
+                              />
+                            </div>
+                            {scanType && status === "current" && (
+                              <RfidScanDialog
+                                orderId={order.id}
+                                branchId={
+                                  scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
+                                }
+                                scanType={scanType}
+                              />
+                            )}
+                          </div>
+                          {canManage && task?.employee_id && (
+                            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              {employeeNameById.get(task.employee_id) ?? "—"}
+                              <span className="text-muted-foreground/50">·</span>
+                              {weight}% = {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
