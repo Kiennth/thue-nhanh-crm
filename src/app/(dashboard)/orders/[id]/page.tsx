@@ -50,6 +50,7 @@ import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
+import { PrintMenu } from "./print-menu";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -322,6 +323,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
         <div className="flex items-center gap-2">
+          <PrintMenu orderId={order.id} />
           <OrderDialog
             branches={branchList}
             order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
