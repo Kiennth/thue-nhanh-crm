@@ -159,6 +159,18 @@ export default async function OrderPrintPage({
           </p>
         </div>
 
+        {docType !== "handover" && (
+          <div className="mt-6 space-y-1">
+            <p className="font-semibold">Thông tin chuyển khoản</p>
+            <p>Chủ tài khoản: {COMPANY_INFO.bankAccountName}</p>
+            {COMPANY_INFO.bankAccounts.map((account) => (
+              <p key={account.bankName}>
+                {account.bankName}: {account.accountNumber}
+              </p>
+            ))}
+          </div>
+        )}
+
         <div className="mt-10 space-y-2">
           <p className="font-semibold">Điều khoản</p>
           <ul className="list-inside list-disc space-y-1 text-neutral-700">
