@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PRINT_DOC_MENU_LABELS, type PrintDocType } from "@/lib/print-docs";
 
-const DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover"];
+const DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
 
 export function PrintMenu({ orderId }: { orderId: string }) {
   const trigger = (

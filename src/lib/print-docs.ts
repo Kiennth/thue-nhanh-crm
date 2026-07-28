@@ -1,15 +1,19 @@
-export type PrintDocType = "contract" | "quote" | "handover";
+export type PrintDocType = "contract" | "quote" | "handover" | "collection" | "acceptance";
 
 export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
   contract: "HỢP ĐỒNG CHO THUÊ",
   quote: "BÁO GIÁ",
   handover: "BIÊN BẢN BÀN GIAO",
+  collection: "BIÊN BẢN THU HỒI",
+  acceptance: "BIÊN BẢN NGHIỆM THU",
 };
 
 export const PRINT_DOC_MENU_LABELS: Record<PrintDocType, string> = {
   contract: "Tạo hợp đồng",
   quote: "Tạo báo giá",
   handover: "Tạo biên bản bàn giao",
+  collection: "Tạo biên bản thu hồi",
+  acceptance: "Tạo biên bản nghiệm thu",
 };
 
 export interface TermsSection {
@@ -101,9 +105,29 @@ export const PRINT_DOC_TERMS: Record<PrintDocType, TermsSection[]> = {
     {
       heading: "Điều khoản",
       items: [
-        "Hai bên xác nhận đã kiểm tra số lượng, tình trạng thiết bị tại thời điểm bàn giao/thu hồi như liệt kê trên.",
+        "Hai bên xác nhận đã kiểm tra số lượng, tình trạng thiết bị tại thời điểm giao hàng như liệt kê trên — thiết bị hoạt động tốt, đầy đủ phụ kiện đi kèm.",
+        "Bên thuê có trách nhiệm bảo quản thiết bị kể từ thời điểm ký biên bản này cho đến khi hoàn trả.",
         "Mọi khác biệt so với danh sách trên (nếu có) đã được ghi chú rõ tại mục ghi chú kèm theo.",
-        "Biên bản này là căn cứ đối chiếu khi thanh lý hợp đồng và hoàn tiền cọc (nếu có).",
+      ],
+    },
+  ],
+  collection: [
+    {
+      heading: "Điều khoản",
+      items: [
+        "Hai bên xác nhận đã kiểm tra số lượng, tình trạng thiết bị tại thời điểm thu hồi như liệt kê trên.",
+        "Mọi hư hỏng, thiếu phụ kiện, mất mát (nếu có) đã được ghi nhận cụ thể tại mục ghi chú kèm theo để làm căn cứ xử lý bồi thường (nếu có).",
+        "Biên bản này là căn cứ để lập Biên bản nghiệm thu và xử lý tiền ký quỹ.",
+      ],
+    },
+  ],
+  acceptance: [
+    {
+      heading: "Điều khoản",
+      items: [
+        "Hai bên xác nhận đã đối chiếu thiết bị thu hồi với Biên bản bàn giao ban đầu — thiết bị đầy đủ, hoạt động bình thường, không phát sinh hư hỏng ngoài hao mòn tự nhiên.",
+        "Trường hợp có hư hỏng/thiếu hụt, hai bên đã thống nhất mức bồi thường và ghi rõ tại mục ghi chú kèm theo.",
+        "Biên bản này là căn cứ để Bên cho thuê hoàn trả tiền ký quỹ (đã trừ chi phí phát sinh nếu có) và thanh lý hợp đồng thuê.",
       ],
     },
   ],

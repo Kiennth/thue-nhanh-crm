@@ -10,8 +10,10 @@ import { PrintButton } from "./print-button";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 
+const PRINT_DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
+
 function isPrintDocType(value: string | undefined): value is PrintDocType {
-  return value === "contract" || value === "quote" || value === "handover";
+  return !!value && (PRINT_DOC_TYPES as string[]).includes(value);
 }
 
 export default async function OrderPrintPage({
@@ -159,7 +161,7 @@ export default async function OrderPrintPage({
           </p>
         </div>
 
-        {docType !== "handover" && (
+        {(docType === "contract" || docType === "quote") && (
           <div className="mt-6 space-y-1">
             <p className="font-semibold">Thông tin chuyển khoản</p>
             <p>Chủ tài khoản: {COMPANY_INFO.bankAccountName}</p>
