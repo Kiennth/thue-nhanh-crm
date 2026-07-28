@@ -171,13 +171,17 @@ export default async function OrderPrintPage({
           </div>
         )}
 
-        <div className="mt-10 space-y-2">
-          <p className="font-semibold">Điều khoản</p>
-          <ul className="list-inside list-disc space-y-1 text-neutral-700">
-            {PRINT_DOC_TERMS[docType].map((term) => (
-              <li key={term}>{term}</li>
-            ))}
-          </ul>
+        <div className="mt-10 space-y-4">
+          {PRINT_DOC_TERMS[docType].map((section) => (
+            <div key={section.heading} className="space-y-1">
+              <p className="font-semibold uppercase">{section.heading}</p>
+              <ul className="list-inside list-disc space-y-1 text-neutral-700">
+                {section.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         <div className="mt-20 grid grid-cols-2 gap-6 text-center">
