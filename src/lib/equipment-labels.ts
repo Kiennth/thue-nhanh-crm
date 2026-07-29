@@ -36,3 +36,18 @@ export const EQUIPMENT_INSTANCE_STATUS_LABELS: Record<EquipmentInstanceStatus, s
   maintenance: "Bảo trì",
   disposed: "Đã thanh lý",
 };
+
+// Nhiều loại hàng hoá chỉ có đúng 1 biến thể (vd gói dịch vụ) — lúc tạo biến
+// thể đó, người nhập không có hãng/model thật để điền nên gõ lại luôn tên
+// loại hàng hoá cho đủ ô bắt buộc. Kết quả là cột "Biến thể/Sản phẩm" hiện
+// trùng y hệt cột "Hàng hoá". Hàm này ẩn phần trùng lặp đó, không đụng dữ
+// liệu gốc — biến thể thật sự khác tên (vd LG/TCL/Hisense) vẫn hiện bình
+// thường.
+export function equipmentDetailLabel(
+  typeName: string | null | undefined,
+  detail: string | null | undefined,
+): string {
+  if (!detail) return "—";
+  if (typeName && detail.trim().toLowerCase() === typeName.trim().toLowerCase()) return "—";
+  return detail;
+}

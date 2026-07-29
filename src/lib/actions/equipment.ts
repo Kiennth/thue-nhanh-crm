@@ -30,11 +30,12 @@ export type ActionState = { error: string } | { success: true } | undefined;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 // Ảnh đại diện thiết bị — upload lên Supabase Storage bucket public
-// "equipment-images", lưu public URL vào equipment_types.image_url. Chỉ xử
-// lý khi form thực sự có file mới (input file trống vẫn gửi 1 File rỗng).
+// "equipment-images", lưu public URL vào image_url của equipment_types hoặc
+// equipment_units (folder theo id của record đang sửa). Chỉ xử lý khi form
+// thực sự có file mới (input file trống vẫn gửi 1 File rỗng).
 async function uploadEquipmentImageIfPresent(
   supabase: SupabaseServerClient,
-  equipmentTypeId: string,
+  recordId: string,
   formData: FormData,
 ): Promise<{ imageUrl?: string; error?: string }> {
   const file = formData.get("image");
@@ -45,7 +46,7 @@ async function uploadEquipmentImageIfPresent(
   }
 
   const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
-  const path = `${equipmentTypeId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${recordId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage
     .from("equipment-images")
     .upload(path, file, { contentType: file.type || undefined });
@@ -300,10 +301,26 @@ export async function createEquipmentUnit(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("equipment_units").insert(parsed.data);
+  const { data: inserted, error } = await supabase
+    .from("equipment_units")
+    .insert(parsed.data)
+    .select("id")
+    .single();
 
-  if (error) {
-    return { error: "Không thể tạo biến thể: " + error.message };
+  if (error || !inserted) {
+    return { error: "Không thể tạo biến thể: " + (error?.message ?? "") };
+  }
+
+  const { imageUrl, error: imageError } = await uploadEquipmentImageIfPresent(
+    supabase,
+    inserted.id,
+    formData,
+  );
+  if (imageError) {
+    return { error: imageError };
+  }
+  if (imageUrl) {
+    await supabase.from("equipment_units").update({ image_url: imageUrl }).eq("id", inserted.id);
   }
 
   revalidatePath("/equipment");
@@ -328,9 +345,19 @@ export async function updateEquipmentUnit(
   }
 
   const supabase = await createClient();
+
+  const { imageUrl, error: imageError } = await uploadEquipmentImageIfPresent(
+    supabase,
+    id,
+    formData,
+  );
+  if (imageError) {
+    return { error: imageError };
+  }
+
   const { error } = await supabase
     .from("equipment_units")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...(imageUrl ? { image_url: imageUrl } : {}) })
     .eq("id", id);
 
   if (error) {
@@ -339,6 +366,19 @@ export async function updateEquipmentUnit(
 
   revalidatePath("/equipment");
   return { success: true };
+}
+
+export async function removeEquipmentUnitImage(id: string) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment_units").update({ image_url: null }).eq("id", id);
+
+  if (error) {
+    throw new Error("Không thể xoá ảnh: " + error.message);
+  }
+
+  revalidatePath("/equipment");
 }
 
 export async function deleteEquipmentUnit(id: string) {

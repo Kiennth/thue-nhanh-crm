@@ -224,6 +224,7 @@ export interface Database {
           equipment_type_id: string;
           brand_model: string;
           condition_notes: string | null;
+          image_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -232,6 +233,7 @@ export interface Database {
           equipment_type_id: string;
           brand_model: string;
           condition_notes?: string | null;
+          image_url?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_units"]["Insert"]>;
         Relationships: [];

@@ -13,7 +13,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createEquipmentUnit, updateEquipmentUnit } from "@/lib/actions/equipment";
+import {
+  createEquipmentUnit,
+  removeEquipmentUnitImage,
+  updateEquipmentUnit,
+} from "@/lib/actions/equipment";
 
 interface EquipmentUnitDialogProps {
   equipmentTypeId: string;
@@ -21,6 +25,7 @@ interface EquipmentUnitDialogProps {
     id: string;
     brand_model: string;
     condition_notes: string | null;
+    image_url: string | null;
   };
 }
 
@@ -44,6 +49,7 @@ export function EquipmentUnitDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [imagePreview, setImagePreview] = useState<string | null>(unit?.image_url ?? null);
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -57,6 +63,14 @@ export function EquipmentUnitDialog({
       } else {
         setOpen(false);
       }
+    });
+  }
+
+  function handleRemoveImage() {
+    if (!unit) return;
+    startTransition(async () => {
+      await removeEquipmentUnitImage(unit.id);
+      setImagePreview(null);
     });
   }
 
@@ -94,6 +108,39 @@ export function EquipmentUnitDialog({
               name="condition_notes"
               defaultValue={unit?.condition_notes ?? ""}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="image">Ảnh biến thể</Label>
+            {imagePreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imagePreview}
+                alt=""
+                className="h-24 w-24 rounded-lg border object-cover"
+              />
+            )}
+            <Input
+              id="image"
+              name="image"
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setImagePreview(URL.createObjectURL(file));
+              }}
+            />
+            {unit?.image_url && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleRemoveImage}
+                disabled={pending}
+              >
+                Xoá ảnh
+              </Button>
+            )}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

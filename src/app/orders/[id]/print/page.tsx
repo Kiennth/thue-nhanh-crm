@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
+import { equipmentDetailLabel } from "@/lib/equipment-labels";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
 import { PrintButton } from "./print-button";
@@ -126,15 +127,16 @@ export default async function OrderPrintPage({
               const equipmentType = line.equipment_type_id
                 ? equipmentTypeById.get(line.equipment_type_id)
                 : undefined;
-              const detail = line.equipment_unit_id
+              const rawDetail = line.equipment_unit_id
                 ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
                 : line.equipment_instance_id
                   ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
                   : null;
+              const detail = equipmentDetailLabel(equipmentType?.name, rawDetail);
               return (
                 <tr key={line.id} className="border-b border-neutral-200">
                   <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>
-                  <td className="py-2">{detail ?? "—"}</td>
+                  <td className="py-2">{detail}</td>
                   <td className="py-2 text-right">{line.quantity}</td>
                   <td className="py-2 text-right">{currencyFormatter.format(line.unit_price)}đ</td>
                   <td className="py-2 text-right">{currencyFormatter.format(line.line_total)}đ</td>

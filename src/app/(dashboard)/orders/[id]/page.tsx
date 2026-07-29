@@ -25,6 +25,7 @@ import {
   TASK_TYPE_SEQUENCE,
   VAT_RATE,
 } from "@/lib/order-labels";
+import { equipmentDetailLabel } from "@/lib/equipment-labels";
 import {
   findCommissionRate,
   computeOrderCommissionFund,
@@ -426,11 +427,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       const isTransportLine =
                         !!line.equipment_type_id &&
                         line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
-                      const detail = line.equipment_unit_id
+                      const rawDetail = line.equipment_unit_id
                         ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
                         : line.equipment_instance_id
                           ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
-                          : "—";
+                          : null;
+                      const detail = equipmentDetailLabel(type?.name, rawDetail);
                       return (
                         <TableRow key={line.id}>
                           <TableCell
@@ -439,8 +441,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           >
                             {type?.name ?? line.custom_name ?? "—"}
                           </TableCell>
-                          <TableCell className="max-w-[140px] truncate" title={detail ?? undefined}>
-                            {detail ?? "—"}
+                          <TableCell className="max-w-[140px] truncate" title={detail}>
+                            {detail}
                           </TableCell>
                           <TableCell>
                             {canManage && !line.equipment_instance_id ? (

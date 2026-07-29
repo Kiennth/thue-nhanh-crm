@@ -370,11 +370,21 @@ export default async function EquipmentDetailPage({
               return (
                 <div key={unit.id} className="rounded-lg border p-3">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{unit.brand_model}</p>
-                      {unit.condition_notes && (
-                        <p className="text-sm text-muted-foreground">{unit.condition_notes}</p>
+                    <div className="flex items-start gap-3">
+                      {unit.image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={unit.image_url}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-md border object-cover"
+                        />
                       )}
+                      <div>
+                        <p className="font-medium">{unit.brand_model}</p>
+                        {unit.condition_notes && (
+                          <p className="text-sm text-muted-foreground">{unit.condition_notes}</p>
+                        )}
+                      </div>
                     </div>
                     {canManageCatalog && (
                       <div className="flex items-center gap-1">
