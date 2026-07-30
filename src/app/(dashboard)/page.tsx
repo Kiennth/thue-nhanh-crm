@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
+import { ProductHighlightCards } from "@/components/dashboard-cards";
 import { BranchComparisonSection } from "@/components/branch-comparison";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import {
-  revenueForDay,
-  revenueForMonth,
-  revenueForYear,
-  todayParts,
-} from "@/lib/dashboard-reports";
+import { todayParts } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeMyPerformance } from "@/lib/my-performance";
 import { getOrdersToHandle } from "@/lib/orders-to-handle";
@@ -24,10 +19,12 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
 import {
   computeEmployeeMonthlyPerformance,
+  computeMyMonthlyTrend,
   currentMonth,
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
 import { MyPerformanceCard } from "./my-performance-card";
+import { MyPerformanceTrendCard } from "./my-performance-trend-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
@@ -109,6 +106,7 @@ export default async function DashboardHomePage({
     customerPayments,
     myPerformance,
     employeeRows,
+    myTrend,
   ] = await Promise.all([
     supabase.from("branches").select("*", { count: "exact", head: true }),
     supabase.from("branches").select("id, name").order("name"),
@@ -152,6 +150,9 @@ export default async function DashboardHomePage({
     ),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
     canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
+    // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
+    // khối biểu đồ hiệu suất toàn công ty riêng).
+    canManage ? Promise.resolve(null) : computeMyMonthlyTrend(employee.id),
   ]);
 
   const stats = [
@@ -207,6 +208,8 @@ export default async function DashboardHomePage({
 
       <MyPerformanceCard perf={myPerformance} />
 
+      {myTrend && <MyPerformanceTrendCard points={myTrend} />}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard
           orders={ordersToHandle.upcomingDeliveries}
@@ -242,45 +245,37 @@ export default async function DashboardHomePage({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {stats.map((stat) => (
-          <Link key={stat.href} href={stat.href}>
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardHeader>
-                <CardTitle className="text-sm font-normal text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-semibold">{stat.count}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Khách hàng</h2>
-          <Link href="/customers" className="text-xs text-muted-foreground hover:underline">
-            Xem báo cáo đầy đủ →
-          </Link>
+      {/* Số liệu tổng quát toàn công ty — chỉ ban quản lý (giam_doc/admin/
+          ke_toan) được xem; Sale/Kỹ thuật, Cửa hàng trưởng không thấy. */}
+      {canManage && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {stats.map((stat) => (
+            <Link key={stat.href} href={stat.href}>
+              <Card className="transition-colors hover:bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-sm font-normal text-muted-foreground">
+                    {stat.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold">{stat.count}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
-        <CustomerOverviewTiles rows={customerReportRows} />
-      </div>
+      )}
 
-      {!canManage && (
-        <PeriodRevenueCards
-          day={day}
-          month={month}
-          year={year}
-          isToday={day === defaults.day}
-          isThisMonth={month === defaults.month}
-          isThisYear={year === defaults.year}
-          dayRevenue={revenueForDay(orderList, day)}
-          monthRevenue={revenueForMonth(orderList, month)}
-          yearRevenue={revenueForYear(orderList, year)}
-        />
+      {canManage && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Khách hàng</h2>
+            <Link href="/customers" className="text-xs text-muted-foreground hover:underline">
+              Xem báo cáo đầy đủ →
+            </Link>
+          </div>
+          <CustomerOverviewTiles rows={customerReportRows} />
+        </div>
       )}
 
       {canManage && (
@@ -296,14 +291,16 @@ export default async function DashboardHomePage({
         />
       )}
 
-      <ProductHighlightCards
-        mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
-        flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
-        topMargin={topMargin.map((r) => ({
-          label: r.type.name,
-          value: (r.report.profitRatio ?? 0) * 100,
-        }))}
-      />
+      {canManage && (
+        <ProductHighlightCards
+          mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
+          flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
+          topMargin={topMargin.map((r) => ({
+            label: r.type.name,
+            value: (r.report.profitRatio ?? 0) * 100,
+          }))}
+        />
+      )}
 
       {canManage && employeeRows && (
         <EmployeePerformanceChartsSection rows={employeeRows} chartMonth={chartMonth} />

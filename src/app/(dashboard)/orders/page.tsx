@@ -21,10 +21,13 @@ export default async function OrdersPage({
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
+  // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
+  // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
+  const canViewAggregates = employee.role !== "ky_thuat_sales";
 
   return (
     <div className="space-y-6">
-      <OrdersOverviewSection branchId={branchId} />
+      <OrdersOverviewSection branchId={branchId} showAggregates={canViewAggregates} />
       <OrdersListSection
         status={status}
         range={range}
@@ -36,6 +39,7 @@ export default async function OrdersPage({
         search={search}
         branchId={branchId}
         canDelete={canManage}
+        showStats={canViewAggregates}
       />
     </div>
   );

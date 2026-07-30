@@ -114,6 +114,7 @@ export async function OrdersListSection({
   search,
   branchId,
   canDelete,
+  showStats = true,
 }: {
   status?: string;
   range?: string;
@@ -125,6 +126,9 @@ export async function OrdersListSection({
   search?: string;
   branchId: string | null;
   canDelete: boolean;
+  // Kỹ thuật/Sales không được xem số liệu tổng hợp — ẩn cả dãy thẻ thống kê
+  // (đếm đơn + tổng doanh số); việc hằng ngày của họ chỉ cần bảng danh sách.
+  showStats?: boolean;
 }) {
   const activeStatus = status ?? "all";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
@@ -221,16 +225,18 @@ export async function OrdersListSection({
         <OrderDialog branches={branchList} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Tổng đơn (khớp bộ lọc)" value={totalCount} />
-        <StatCard label="Đang xử lý" value={processingCount} />
-        <StatCard label="Hoàn tất" value={completedCount} />
-        <StatCard label="Đã huỷ" value={cancelledCount} />
-        <StatCard
-          label="Tổng doanh số"
-          value={`${currencyFormatter.format(Math.round(totalRevenue))}đ`}
-        />
-      </div>
+      {showStats && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Tổng đơn (khớp bộ lọc)" value={totalCount} />
+          <StatCard label="Đang xử lý" value={processingCount} />
+          <StatCard label="Hoàn tất" value={completedCount} />
+          <StatCard label="Đã huỷ" value={cancelledCount} />
+          <StatCard
+            label="Tổng doanh số"
+            value={`${currencyFormatter.format(Math.round(totalRevenue))}đ`}
+          />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput

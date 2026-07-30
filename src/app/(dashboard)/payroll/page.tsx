@@ -16,6 +16,7 @@ import {
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
 import { MonthNavigator } from "./month-navigator";
+import { ExportPayrollButton } from "./export-payroll-button";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -64,7 +65,26 @@ export default async function PayrollPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bảng lương tháng</h1>
-        <MonthNavigator month={month} />
+        <div className="flex items-center gap-2">
+          <ExportPayrollButton
+            month={month}
+            rows={sortedRows.map((row) => ({
+              name: row.name,
+              branchName: (row.branchId ? branchNameById.get(row.branchId) : undefined) ?? "—",
+              baseSalary: row.baseSalary,
+              totalCommission: row.totalCommission,
+              installationPayout: row.installationPayout,
+              removalPayout: row.removalPayout,
+              supportPayout: row.supportPayout,
+              deliveryPayout: row.deliveryPayout,
+              collectionPayout: row.collectionPayout,
+              overtimePay: row.overtimePay,
+              bonus: row.bonus,
+              totalIncome: row.totalIncome,
+            }))}
+          />
+          <MonthNavigator month={month} />
+        </div>
       </div>
 
       <Card>

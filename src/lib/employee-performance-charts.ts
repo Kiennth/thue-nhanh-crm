@@ -267,3 +267,62 @@ export async function computeEmployeeMonthlyPerformance(
     };
   });
 }
+
+export interface MyMonthlyTrendPoint {
+  month: string;
+  baseSalary: number;
+  totalCommission: number;
+  bonus: number;
+  installationPayout: number;
+  removalPayout: number;
+  supportPayout: number;
+  deliveryPayout: number;
+  collectionPayout: number;
+  overtimePay: number;
+  totalIncome: number;
+  completedTaskCount: number;
+  // Tháng hiện tại chưa chốt — biểu đồ hiển thị khác + chú thích để nhân
+  // viên không hiểu nhầm là "tháng này tụt".
+  inProgress: boolean;
+}
+
+// Thu nhập của 1 nhân viên qua N tháng gần nhất (mặc định 6, tính cả tháng
+// đang chạy) — cho thẻ "Hiệu suất các tháng" ở Trang chủ của nhân viên, để
+// tự thấy mình đi lên hay đi xuống. Chỉ trả dữ liệu của đúng employeeId.
+export async function computeMyMonthlyTrend(
+  employeeId: string,
+  monthCount = 6,
+): Promise<MyMonthlyTrendPoint[]> {
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const thisMonth = currentMonth();
+
+  const perMonth = await Promise.all(
+    months.map((month) =>
+      computeEmployeeMonthlyPerformance(month, { employeeIds: [employeeId] }),
+    ),
+  );
+
+  return months.map((month, i) => {
+    const row = perMonth[i][0];
+    return {
+      month,
+      baseSalary: row?.baseSalary ?? 0,
+      totalCommission: row?.totalCommission ?? 0,
+      bonus: row?.bonus ?? 0,
+      installationPayout: row?.installationPayout ?? 0,
+      removalPayout: row?.removalPayout ?? 0,
+      supportPayout: row?.supportPayout ?? 0,
+      deliveryPayout: row?.deliveryPayout ?? 0,
+      collectionPayout: row?.collectionPayout ?? 0,
+      overtimePay: row?.overtimePay ?? 0,
+      totalIncome: row?.totalIncome ?? 0,
+      completedTaskCount: row?.completedTaskCount ?? 0,
+      inProgress: month === thisMonth,
+    };
+  });
+}
