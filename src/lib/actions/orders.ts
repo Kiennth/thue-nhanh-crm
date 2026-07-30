@@ -31,11 +31,21 @@ const OrderSchema = z
     // Bỏ trống = thu hồi tại chính chi nhánh giao (tình huống phổ biến).
     return_branch_id: z.string().uuid().optional(),
     customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
+    // Người trực tiếp đặt đơn này — độc lập với khách hàng trên hợp đồng, vì
+    // khách agency có thể có nhiều nhân sự khác nhau gọi đặt cho từng đơn.
+    orderer_name: z.string().trim().optional(),
+    orderer_phone: z.string().trim().optional(),
+    orderer_email: z
+      .union([z.literal(""), z.string().trim().email({ message: "Email người đặt không hợp lệ." })])
+      .optional(),
     order_date: z.string().min(1, { message: "Vui lòng chọn ngày." }),
   })
   .transform((data) => ({
     ...data,
     return_branch_id: data.return_branch_id ?? data.pickup_branch_id,
+    orderer_name: data.orderer_name || null,
+    orderer_phone: data.orderer_phone || null,
+    orderer_email: data.orderer_email || null,
   }));
 
 function parseOrderForm(formData: FormData) {
@@ -44,6 +54,9 @@ function parseOrderForm(formData: FormData) {
     pickup_branch_id: formData.get("pickup_branch_id"),
     return_branch_id: formData.get("return_branch_id") || undefined,
     customer_id: formData.get("customer_id"),
+    orderer_name: formData.get("orderer_name") || undefined,
+    orderer_phone: formData.get("orderer_phone") || undefined,
+    orderer_email: formData.get("orderer_email") || undefined,
     order_date: formData.get("order_date"),
   });
 }
@@ -409,6 +422,52 @@ export async function updateOrderRentalPeriod(
   return { success: true };
 }
 
+const OrderContactInfoSchema = z
+  .object({
+    customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
+    orderer_name: z.string().trim().optional(),
+    orderer_phone: z.string().trim().optional(),
+    orderer_email: z
+      .union([z.literal(""), z.string().trim().email({ message: "Email người đặt không hợp lệ." })])
+      .optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    orderer_name: data.orderer_name || null,
+    orderer_phone: data.orderer_phone || null,
+    orderer_email: data.orderer_email || null,
+  }));
+
+// Sửa nhanh khách hàng + người đặt hàng ngay tại trang xem đơn, không cần mở
+// dialog "Sửa đơn hàng" đầy đủ (vốn còn kèm mã đơn/chi nhánh/ngày).
+export async function updateOrderContactInfo(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+
+  const parsed = OrderContactInfoSchema.safeParse({
+    customer_id: formData.get("customer_id"),
+    orderer_name: formData.get("orderer_name") || undefined,
+    orderer_phone: formData.get("orderer_phone") || undefined,
+    orderer_email: formData.get("orderer_email") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("orders").update(parsed.data).eq("id", id);
+  if (error) {
+    return { error: "Không thể cập nhật thông tin đơn: " + error.message };
+  }
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${id}`);
+  return { success: true };
+}
+
 export async function deleteOrder(id: string) {
   await requireRole([...DELETE_ROLES]);
 
@@ -761,6 +820,30 @@ export async function deleteOrderEquipmentLine(id: string) {
   if (line) {
     revalidatePath(`/orders/${line.order_id}`);
   }
+}
+
+// Kéo thả sắp xếp lại thứ tự dòng hàng trong "Danh sách thiết bị" —
+// orderedLineIds là toàn bộ id dòng hàng của đơn, theo thứ tự hiển thị mới.
+export async function reorderOrderEquipmentLines(orderId: string, orderedLineIds: string[]) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const results = await Promise.all(
+    orderedLineIds.map((lineId, index) =>
+      supabase
+        .from("order_equipment")
+        .update({ position: index + 1 })
+        .eq("id", lineId)
+        .eq("order_id", orderId),
+    ),
+  );
+
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new Error("Không thể lưu thứ tự dòng hàng: " + failed.error.message);
+  }
+
+  revalidatePath(`/orders/${orderId}`);
 }
 
 // ---------------------------------------------------------------------------

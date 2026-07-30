@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -38,12 +37,14 @@ import {
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
+import { OrderLinesSortableBody } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
 import { RentalPeriodForm } from "./rental-period-form";
+import { OrderInfoForm } from "./order-info-form";
 import CloseOrderButton from "./close-order-button";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
@@ -52,6 +53,7 @@ import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
 import { PrintMenu } from "./print-menu";
+import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -82,7 +84,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     employee,
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
-    supabase.from("order_equipment").select("*").eq("order_id", id).order("created_at"),
+    supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
     supabase.from("order_tasks").select("*").eq("order_id", id),
     supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
     supabase.from("branches").select("id, name").order("name"),
@@ -111,7 +113,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // tra thẳng theo customer_id để tên/tỉ lệ cọc hiển thị đúng bất kể thứ tự.
   const { data: orderCustomer } = await supabase
     .from("customers")
-    .select("id, name, deposit_percentage")
+    .select("id, name, email, deposit_percentage")
     .eq("id", order.customer_id)
     .maybeSingle();
 
@@ -186,6 +188,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .filter((p) => p.payment_type === "deposit_refund")
     .reduce((sum, p) => sum + p.amount, 0);
   const depositHeld = depositCollected - depositRefunded;
+  // Gợi ý số tiền hoàn cọc tự bù trừ chênh lệch hoá đơn phát sinh do đơn bị
+  // sửa (đổi số lượng...) sau khi đã thu tiền — khách còn thiếu hoá đơn thì
+  // trừ bớt vào cọc hoàn, khách dư hoá đơn (đơn giảm sau khi đã trả theo giá
+  // cũ) thì cộng thêm vào cọc hoàn — gộp về 1 lần hoàn cuối thay vì phải xử
+  // lý hoá đơn và cọc thành 2 giao dịch riêng.
+  const depositRefundSuggestion = Math.max(0, depositHeld - (grandTotal - totalPaid));
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -325,6 +333,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex items-center gap-2">
           <PrintMenu orderId={order.id} />
+          <SendDocumentEmailDialog orderId={order.id} customerEmail={orderCustomer?.email ?? null} />
           <OrderDialog
             branches={branchList}
             order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
@@ -340,64 +349,53 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Cột chính: thông tin đơn, thiết bị thuê, thanh toán — chiếm 2/3 ở
-            màn lớn, giống cột chính của Booqable. */}
-        <div className="space-y-4 lg:col-span-2">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Thông tin đơn</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Chi nhánh</p>
-                  <p className="font-medium">{branchNameById.get(order.pickup_branch_id) ?? "—"}</p>
-                  {order.return_branch_id !== order.pickup_branch_id && (
-                    <p className="text-xs text-muted-foreground">
-                      Thu hồi tại: {branchNameById.get(order.return_branch_id) ?? "—"}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Khách hàng</p>
-                  {orderCustomer ? (
-                    <Link href={`/customers/${orderCustomer.id}`} className="font-medium hover:underline">
-                      {orderCustomer.name}
-                    </Link>
-                  ) : (
-                    <p className="font-medium">—</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Ngày</p>
-                  <p className="font-medium">{order.order_date}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Doanh số</p>
-                  <p className="font-medium">{currencyFormatter.format(order.total_value)}đ</p>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Thông tin đơn</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Chi nhánh</p>
+              <p className="font-medium">{branchNameById.get(order.pickup_branch_id) ?? "—"}</p>
+              {order.return_branch_id !== order.pickup_branch_id && (
+                <p className="text-xs text-muted-foreground">
+                  Thu hồi tại: {branchNameById.get(order.return_branch_id) ?? "—"}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ngày</p>
+              <p className="font-medium">{order.order_date}</p>
+            </div>
+            <OrderInfoForm
+              orderId={order.id}
+              customer={orderCustomer ? { id: orderCustomer.id, name: orderCustomer.name } : null}
+              ordererName={order.orderer_name}
+              ordererPhone={order.orderer_phone}
+              ordererEmail={order.orderer_email}
+            />
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Thời gian thuê</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RentalPeriodForm
-                  key={`${order.rental_start_at ?? ""}-${order.rental_end_at ?? ""}`}
-                  orderId={order.id}
-                  rentalStartAt={order.rental_start_at}
-                  rentalEndAt={order.rental_end_at}
-                />
-              </CardContent>
-            </Card>
-          </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Thời gian thuê</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RentalPeriodForm
+              key={`${order.rental_start_at ?? ""}-${order.rental_end_at ?? ""}`}
+              orderId={order.id}
+              rentalStartAt={order.rental_start_at}
+              rentalEndAt={order.rental_end_at}
+            />
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base">Danh sách thiết bị</CardTitle>
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base">Danh sách thiết bị</CardTitle>
               <AddOrderLineDialog
                 orderId={order.id}
                 equipmentTypes={equipmentTypes ?? []}
@@ -410,6 +408,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {canManage && <TableHead className="w-8"></TableHead>}
                       <TableHead>Hàng hoá</TableHead>
                       <TableHead>Biến thể/Sản phẩm</TableHead>
                       <TableHead>SL</TableHead>
@@ -419,82 +418,98 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {lines?.map((line) => {
-                      const type = line.equipment_type_id
-                        ? equipmentTypeById.get(line.equipment_type_id)
-                        : undefined;
-                      const isTransportLine =
-                        !!line.equipment_type_id &&
-                        line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
-                      const rawDetail = line.equipment_unit_id
-                        ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
-                        : line.equipment_instance_id
-                          ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
-                          : null;
-                      const detail = equipmentDetailLabel(type?.name, rawDetail);
-                      return (
-                        <TableRow key={line.id}>
-                          <TableCell
-                            className="max-w-[160px] truncate font-medium"
-                            title={type?.name ?? line.custom_name ?? undefined}
-                          >
-                            {type?.name ?? line.custom_name ?? "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[140px] truncate" title={detail}>
-                            {detail}
-                          </TableCell>
-                          <TableCell>
-                            {canManage && !line.equipment_instance_id ? (
-                              <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
-                            ) : (
-                              line.quantity
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {canManage ? (
-                              <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
-                            ) : (
-                              `${currencyFormatter.format(line.unit_price)}đ`
-                            )}
-                          </TableCell>
-                          <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
-                          <TableCell>
-                            {type?.payout_percentage != null || isTransportLine ? (
-                              (isTransportLine ? canAssignTransport : canManage) ? (
-                                <OrderLineEmployeeForm
-                                  lineId={line.id}
-                                  employeeId={line.employee_id}
-                                  employees={employeeList}
-                                  isTransportLine={isTransportLine}
-                                  deliveryMethod={line.delivery_method}
+                  {lines?.length ? (
+                    (() => {
+                      const lineRows = lines.map((line) => {
+                        const type = line.equipment_type_id
+                          ? equipmentTypeById.get(line.equipment_type_id)
+                          : undefined;
+                        const isTransportLine =
+                          !!line.equipment_type_id &&
+                          line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
+                        const rawDetail = line.equipment_unit_id
+                          ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
+                          : line.equipment_instance_id
+                            ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
+                            : null;
+                        const detail = equipmentDetailLabel(type?.name, rawDetail);
+                        return {
+                          id: line.id,
+                          content: (
+                            <>
+                              <TableCell
+                                className="max-w-[160px] truncate font-medium"
+                                title={type?.name ?? line.custom_name ?? undefined}
+                              >
+                                {type?.name ?? line.custom_name ?? "—"}
+                              </TableCell>
+                              <TableCell className="max-w-[140px] truncate" title={detail}>
+                                {detail}
+                              </TableCell>
+                              <TableCell>
+                                {canManage && !line.equipment_instance_id ? (
+                                  <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
+                                ) : (
+                                  line.quantity
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {canManage ? (
+                                  <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
+                                ) : (
+                                  `${currencyFormatter.format(line.unit_price)}đ`
+                                )}
+                              </TableCell>
+                              <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
+                              <TableCell>
+                                {type?.payout_percentage != null || isTransportLine ? (
+                                  (isTransportLine ? canAssignTransport : canManage) ? (
+                                    <OrderLineEmployeeForm
+                                      lineId={line.id}
+                                      employeeId={line.employee_id}
+                                      employees={employeeList}
+                                      isTransportLine={isTransportLine}
+                                      deliveryMethod={line.delivery_method}
+                                    />
+                                  ) : (
+                                    (employeeNameById.get(line.employee_id ?? "") ?? "—")
+                                  )
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <ConfirmDeleteButton
+                                  confirmMessage="Xoá dòng hàng này?"
+                                  successMessage="Đã xoá dòng hàng."
+                                  action={deleteOrderEquipmentLine}
+                                  actionArg={line.id}
                                 />
-                              ) : (
-                                (employeeNameById.get(line.employee_id ?? "") ?? "—")
-                              )
-                            ) : (
-                              "—"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <ConfirmDeleteButton
-                              confirmMessage="Xoá dòng hàng này?"
-                              successMessage="Đã xoá dòng hàng."
-                              action={deleteOrderEquipmentLine}
-                              actionArg={line.id}
-                            />
-                          </TableCell>
-                        </TableRow>
+                              </TableCell>
+                            </>
+                          ),
+                        };
+                      });
+
+                      return canManage ? (
+                        <OrderLinesSortableBody orderId={order.id} rows={lineRows} />
+                      ) : (
+                        <TableBody>
+                          {lineRows.map((row) => (
+                            <TableRow key={row.id}>{row.content}</TableRow>
+                          ))}
+                        </TableBody>
                       );
-                    })}
-                    {!lines?.length && (
+                    })()
+                  ) : (
+                    <TableBody>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell colSpan={canManage ? 8 : 7} className="text-center text-muted-foreground">
                           Chưa có dòng hàng nào.
                         </TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
+                    </TableBody>
+                  )}
                 </Table>
               </div>
 
@@ -539,238 +554,235 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base">Thanh toán</CardTitle>
-              <OrderPaymentDialog orderId={order.id} />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Cần thanh toán</p>
-                  <p className="font-medium">{currencyFormatter.format(grandTotal)}đ</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Đã thanh toán</p>
-                  <p className="font-medium">{currencyFormatter.format(totalPaid)}đ</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Còn lại</p>
-                  <p className="font-medium">{currencyFormatter.format(remaining)}đ</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Trạng thái</p>
-                  <Badge variant={remaining <= 0 ? "default" : totalPaid > 0 ? "outline" : "secondary"}>
-                    {paymentStatus}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {invoicePaymentList.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{currencyFormatter.format(payment.amount)}đ</p>
-                      <p className="text-xs text-muted-foreground">
-                        {payment.paid_at} · {PAYMENT_METHOD_LABELS[payment.method]}
-                      </p>
-                      {payment.note && (
-                        <p className="text-xs text-muted-foreground">{payment.note}</p>
-                      )}
-                    </div>
-                    {canManage && (
-                      <ConfirmDeleteButton
-                        confirmMessage="Xoá lần thanh toán này?"
-                        successMessage="Đã xoá thanh toán."
-                        action={deleteOrderPayment}
-                        actionArg={payment.id}
-                      />
-                    )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
+                  </CardTitle>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${(doneCount / TASK_TYPE_SEQUENCE.length) * 100}%` }}
+                    />
                   </div>
-                ))}
-                {!invoicePaymentList.length && (
-                  <p className="text-sm text-muted-foreground">Chưa có thanh toán nào.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </CardHeader>
+                <CardContent>
+                  <div>
+                    {TASK_TYPE_SEQUENCE.map((taskType, index) => {
+                      const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
+                      const task = taskByType.get(taskType);
+                      const isDone = !!task?.completed_date;
+                      const canComplete = earlier.every((t) => taskByType.get(t)?.completed_date);
+                      const status: "done" | "current" | "locked" = isDone
+                        ? "done"
+                        : canComplete
+                          ? "current"
+                          : "locked";
+                      const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
+                      const isLast = index === TASK_TYPE_SEQUENCE.length - 1;
+                      // Nhóm 10 khâu theo 3 giai đoạn nghiệp vụ thật (bán hàng →
+                      // vận hành → hoàn tất) để dễ định vị đang ở đâu, thay vì 1
+                      // danh sách phẳng 10 dòng.
+                      const phaseLabel =
+                        taskType === "tiep_nhan_yeu_cau"
+                          ? "Bán hàng"
+                          : taskType === "chuan_bi"
+                            ? "Vận hành"
+                            : taskType === "nghiem_thu"
+                              ? "Hoàn tất"
+                              : null;
 
-        {/* Sidebar: khâu tính khoán + tiền bạc liên quan — cọc, khoán, OT.
-            Danh sách rút gọn thành thẻ dọc thay vì bảng nhiều cột để không
-            bị bó hẹp ở cột phụ, giống khu Payments/Documents bên phải của
-            Booqable. */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
-              </CardTitle>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width]"
-                  style={{ width: `${(doneCount / TASK_TYPE_SEQUENCE.length) * 100}%` }}
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div>
-                {TASK_TYPE_SEQUENCE.map((taskType, index) => {
-                  const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
-                  const task = taskByType.get(taskType);
-                  const isDone = !!task?.completed_date;
-                  const canComplete = earlier.every((t) => taskByType.get(t)?.completed_date);
-                  const status: "done" | "current" | "locked" = isDone
-                    ? "done"
-                    : canComplete
-                      ? "current"
-                      : "locked";
-                  const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
-                  const isLast = index === TASK_TYPE_SEQUENCE.length - 1;
-                  // Nhóm 10 khâu theo 3 giai đoạn nghiệp vụ thật (bán hàng →
-                  // vận hành → hoàn tất) để dễ định vị đang ở đâu, thay vì 1
-                  // danh sách phẳng 10 dòng.
-                  const phaseLabel =
-                    taskType === "tiep_nhan_yeu_cau"
-                      ? "Bán hàng"
-                      : taskType === "chuan_bi"
-                        ? "Vận hành"
-                        : taskType === "nghiem_thu"
-                          ? "Hoàn tất"
-                          : null;
+                      const scanType =
+                        taskType === "giao_hang_ban_giao"
+                          ? "giao_hang"
+                          : taskType === "thu_hoi"
+                            ? "thu_hoi"
+                            : null;
 
-                  const scanType =
-                    taskType === "giao_hang_ban_giao"
-                      ? "giao_hang"
-                      : taskType === "thu_hoi"
-                        ? "thu_hoi"
-                        : null;
-
-                  return (
-                    <div key={taskType}>
-                      {phaseLabel && (
-                        <p className="mt-4 mb-1.5 pl-9 text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase first:mt-0">
-                          {phaseLabel}
-                        </p>
-                      )}
-                      <div className="relative flex gap-3">
-                        {!isLast && !TASK_PHASE_STARTS.has(TASK_TYPE_SEQUENCE[index + 1]) && (
-                          <div
-                            aria-hidden
-                            className="absolute top-6 bottom-0 left-[11px] w-px bg-border"
-                          />
-                        )}
-                        <div
-                          className={cn(
-                            "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
-                            status === "done" && "border-primary bg-primary text-primary-foreground",
-                            status === "current" && "border-primary text-primary ring-4 ring-primary/10",
-                            status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
-                          )}
-                        >
-                          {status === "done" ? (
-                            <Check className="size-3.5" />
-                          ) : status === "locked" ? (
-                            <Lock className="size-3" />
-                          ) : (
-                            index + 1
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1 pb-5 last:pb-0">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <OrderTaskRow
-                                orderId={order.id}
-                                taskType={taskType}
-                                label={TASK_TYPE_LABELS[taskType]}
-                                employees={employeeList}
-                                task={task}
-                                status={status}
-                              />
-                            </div>
-                            {scanType && status === "current" && (
-                              <RfidScanDialog
-                                orderId={order.id}
-                                branchId={
-                                  scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
-                                }
-                                scanType={scanType}
-                              />
-                            )}
-                          </div>
-                          {canManage && task?.employee_id && (
-                            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                              {employeeNameById.get(task.employee_id) ?? "—"}
-                              <span className="text-muted-foreground/50">·</span>
-                              {weight}% = {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
+                      return (
+                        <div key={taskType}>
+                          {phaseLabel && (
+                            <p className="mt-4 mb-1.5 pl-9 text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase first:mt-0">
+                              {phaseLabel}
                             </p>
                           )}
+                          <div className="relative flex gap-3">
+                            {!isLast && !TASK_PHASE_STARTS.has(TASK_TYPE_SEQUENCE[index + 1]) && (
+                              <div
+                                aria-hidden
+                                className="absolute top-6 bottom-0 left-[11px] w-px bg-border"
+                              />
+                            )}
+                            <div
+                              className={cn(
+                                "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
+                                status === "done" && "border-primary bg-primary text-primary-foreground",
+                                status === "current" && "border-primary text-primary ring-4 ring-primary/10",
+                                status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
+                              )}
+                            >
+                              {status === "done" ? (
+                                <Check className="size-3.5" />
+                              ) : status === "locked" ? (
+                                <Lock className="size-3" />
+                              ) : (
+                                index + 1
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1 pb-5 last:pb-0">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                  <OrderTaskRow
+                                    orderId={order.id}
+                                    taskType={taskType}
+                                    label={TASK_TYPE_LABELS[taskType]}
+                                    employees={employeeList}
+                                    task={task}
+                                    status={status}
+                                  />
+                                </div>
+                                {scanType && status === "current" && (
+                                  <RfidScanDialog
+                                    orderId={order.id}
+                                    branchId={
+                                      scanType === "giao_hang" ? order.pickup_branch_id : order.return_branch_id
+                                    }
+                                    scanType={scanType}
+                                  />
+                                )}
+                              </div>
+                              {canManage && task?.employee_id && (
+                                <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                  {employeeNameById.get(task.employee_id) ?? "—"}
+                                  <span className="text-muted-foreground/50">·</span>
+                                  {weight}% = {currencyFormatter.format(computeTaskCommission(commissionFund, weight))}đ
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
 
-          {rawDeposit > 0 && (
+              {canManage && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Khoán dự kiến</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      %hoa hồng chi nhánh: {commissionRate}% · Tổng quỹ khoán:{" "}
+                      {currencyFormatter.format(commissionFund)}đ (chỉ tính vào lương khi khâu đã hoàn
+                      thành)
+                      {poolExcludedTotal > 0 && (
+                        <>
+                          {" "}
+                          — đã loại {currencyFormatter.format(poolExcludedTotal)}đ doanh số dịch vụ trả
+                          khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) khỏi quỹ này.
+                        </>
+                      )}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {canManage && (
+                <Card>
+                  <CardHeader className="flex-row items-center justify-between">
+                    <CardTitle className="text-base">OT (tăng ca)</CardTitle>
+                    <OvertimeDialog orderId={order.id} employees={employeeList} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {(overtimeEntries ?? []).map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {employeeNameById.get(entry.employee_id) ?? "—"} ·{" "}
+                              {currencyFormatter.format(entry.amount)}đ
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {entry.entry_date}
+                              {entry.hours ? ` · ${entry.hours} giờ` : ""}
+                            </p>
+                            {entry.note && <p className="text-xs text-muted-foreground">{entry.note}</p>}
+                          </div>
+                          <ConfirmDeleteButton
+                            confirmMessage="Xoá khoản OT này?"
+                            successMessage="Đã xoá OT."
+                            action={deleteOvertimeEntry}
+                            actionArg={entry.id}
+                          />
+                        </div>
+                      ))}
+                      {!overtimeEntries?.length && (
+                        <p className="text-sm text-muted-foreground">Chưa ghi nhận OT nào.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="text-base">Tiền cọc</CardTitle>
+                <CardTitle className="text-base">Thanh toán</CardTitle>
                 <div className="flex gap-1">
-                  <OrderPaymentDialog orderId={order.id} paymentType="deposit_collect" />
-                  <OrderPaymentDialog orderId={order.id} paymentType="deposit_refund" />
+                  <OrderPaymentDialog orderId={order.id} defaultAmount={remaining} />
+                  {rawDeposit > 0 && (
+                    <>
+                      <OrderPaymentDialog
+                        orderId={order.id}
+                        paymentType="deposit_collect"
+                        defaultAmount={Math.max(totalDeposit - depositCollected, 0)}
+                      />
+                      <OrderPaymentDialog
+                        orderId={order.id}
+                        paymentType="deposit_refund"
+                        defaultAmount={depositRefundSuggestion}
+                      />
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Cọc dự kiến</p>
-                    <p className="font-medium">
-                      {customerDepositPercentage <= 0
-                        ? "Miễn cọc"
-                        : `${currencyFormatter.format(totalDeposit)}đ`}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Cần thanh toán</p>
+                    <p className="font-medium">{currencyFormatter.format(grandTotal)}đ</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Đang giữ</p>
-                    <p className="font-medium">{currencyFormatter.format(depositHeld)}đ</p>
+                    <p className="text-xs text-muted-foreground">Đã thanh toán</p>
+                    <p className="font-medium">{currencyFormatter.format(totalPaid)}đ</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Đã thu cọc</p>
-                    <p className="font-medium">{currencyFormatter.format(depositCollected)}đ</p>
+                    <p className="text-xs text-muted-foreground">Còn lại</p>
+                    <p className="font-medium">{currencyFormatter.format(remaining)}đ</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Đã hoàn cọc</p>
-                    <p className="font-medium">{currencyFormatter.format(depositRefunded)}đ</p>
+                    <p className="text-xs text-muted-foreground">Trạng thái</p>
+                    <Badge variant={remaining <= 0 ? "default" : totalPaid > 0 ? "outline" : "secondary"}>
+                      {paymentStatus}
+                    </Badge>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {customerDepositPercentage < 100 && customerDepositPercentage > 0 && (
-                    <>Khách hàng được áp tỉ lệ cọc {customerDepositPercentage}%. </>
-                  )}
-                  Thu cùng lúc với đơn (không tính VAT), hoàn lại cho khách sau khi hoàn thành khâu
-                  Nghiệm thu.
-                  {!taskByType.get("nghiem_thu")?.completed_date && depositCollected > depositRefunded && (
-                    <> Đơn chưa hoàn thành khâu Nghiệm thu.</>
-                  )}
-                </p>
 
                 <div className="space-y-2">
-                  {depositPaymentList.map((payment) => (
+                  {invoicePaymentList.map((payment) => (
                     <div
                       key={payment.id}
                       className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm"
                     >
                       <div>
-                        <p className="font-medium">
-                          {ORDER_PAYMENT_TYPE_LABELS[payment.payment_type]} ·{" "}
-                          {currencyFormatter.format(payment.amount)}đ
-                        </p>
+                        <p className="font-medium">{currencyFormatter.format(payment.amount)}đ</p>
                         <p className="text-xs text-muted-foreground">
                           {payment.paid_at} · {PAYMENT_METHOD_LABELS[payment.method]}
                         </p>
@@ -780,85 +792,103 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       </div>
                       {canManage && (
                         <ConfirmDeleteButton
-                          confirmMessage="Xoá lần cọc này?"
-                          successMessage="Đã xoá."
+                          confirmMessage="Xoá lần thanh toán này?"
+                          successMessage="Đã xoá thanh toán."
                           action={deleteOrderPayment}
                           actionArg={payment.id}
                         />
                       )}
                     </div>
                   ))}
-                  {!depositPaymentList.length && (
-                    <p className="text-sm text-muted-foreground">Chưa ghi nhận thu/hoàn cọc nào.</p>
+                  {!invoicePaymentList.length && (
+                    <p className="text-sm text-muted-foreground">Chưa có thanh toán nào.</p>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {canManage && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Khoán dự kiến</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  %hoa hồng chi nhánh: {commissionRate}% · Tổng quỹ khoán:{" "}
-                  {currencyFormatter.format(commissionFund)}đ (chỉ tính vào lương khi khâu đã hoàn
-                  thành)
-                  {poolExcludedTotal > 0 && (
-                    <>
-                      {" "}
-                      — đã loại {currencyFormatter.format(poolExcludedTotal)}đ doanh số dịch vụ trả
-                      khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) khỏi quỹ này.
-                    </>
-                  )}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {canManage && (
-            <Card>
-              <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="text-base">OT (tăng ca)</CardTitle>
-                <OvertimeDialog orderId={order.id} employees={employeeList} />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {(overtimeEntries ?? []).map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm"
-                    >
+                {rawDeposit > 0 && (
+                  <div className="space-y-4 border-t pt-4">
+                    <p className="text-sm font-medium">Tiền cọc</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
+                        <p className="text-xs text-muted-foreground">Cọc dự kiến</p>
                         <p className="font-medium">
-                          {employeeNameById.get(entry.employee_id) ?? "—"} ·{" "}
-                          {currencyFormatter.format(entry.amount)}đ
+                          {customerDepositPercentage <= 0
+                            ? "Miễn cọc"
+                            : `${currencyFormatter.format(totalDeposit)}đ`}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.entry_date}
-                          {entry.hours ? ` · ${entry.hours} giờ` : ""}
-                        </p>
-                        {entry.note && <p className="text-xs text-muted-foreground">{entry.note}</p>}
                       </div>
-                      <ConfirmDeleteButton
-                        confirmMessage="Xoá khoản OT này?"
-                        successMessage="Đã xoá OT."
-                        action={deleteOvertimeEntry}
-                        actionArg={entry.id}
-                      />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Đang giữ</p>
+                        <p className="font-medium">{currencyFormatter.format(depositHeld)}đ</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Đã thu cọc</p>
+                        <p className="font-medium">{currencyFormatter.format(depositCollected)}đ</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Đã hoàn cọc</p>
+                        <p className="font-medium">{currencyFormatter.format(depositRefunded)}đ</p>
+                      </div>
                     </div>
-                  ))}
-                  {!overtimeEntries?.length && (
-                    <p className="text-sm text-muted-foreground">Chưa ghi nhận OT nào.</p>
-                  )}
-                </div>
+                    <p className="text-xs text-muted-foreground">
+                      {customerDepositPercentage < 100 && customerDepositPercentage > 0 && (
+                        <>Khách hàng được áp tỉ lệ cọc {customerDepositPercentage}%. </>
+                      )}
+                      Thu cùng lúc với đơn (không tính VAT), hoàn lại cho khách sau khi hoàn thành khâu
+                      Nghiệm thu.
+                      {!taskByType.get("nghiem_thu")?.completed_date &&
+                        depositCollected > depositRefunded && (
+                          <> Đơn chưa hoàn thành khâu Nghiệm thu.</>
+                        )}
+                    </p>
+                    {depositRefundSuggestion !== depositHeld && (
+                      <p className="text-xs text-muted-foreground">
+                        Đơn đã bị sửa sau khi thu/hoàn cọc khiến tiền hoá đơn lệch so với ban đầu — nút
+                        &quot;Hoàn cọc&quot; tự bù trừ, gợi ý hoàn{" "}
+                        <span className="font-medium">
+                          {currencyFormatter.format(depositRefundSuggestion)}đ
+                        </span>{" "}
+                        thay vì {currencyFormatter.format(depositHeld)}đ đang giữ.
+                      </p>
+                    )}
+
+                    <div className="space-y-2">
+                      {depositPaymentList.map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {ORDER_PAYMENT_TYPE_LABELS[payment.payment_type]} ·{" "}
+                              {currencyFormatter.format(payment.amount)}đ
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {payment.paid_at} · {PAYMENT_METHOD_LABELS[payment.method]}
+                            </p>
+                            {payment.note && (
+                              <p className="text-xs text-muted-foreground">{payment.note}</p>
+                            )}
+                          </div>
+                          {canManage && (
+                            <ConfirmDeleteButton
+                              confirmMessage="Xoá lần cọc này?"
+                              successMessage="Đã xoá."
+                              action={deleteOrderPayment}
+                              actionArg={payment.id}
+                            />
+                          )}
+                        </div>
+                      ))}
+                      {!depositPaymentList.length && (
+                        <p className="text-sm text-muted-foreground">Chưa ghi nhận thu/hoàn cọc nào.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
+          </div>
     </div>
   );
 }

@@ -38,16 +38,20 @@ const SUBMIT_LABELS: Record<OrderPaymentType, string> = {
 
 const TRIGGER_LABELS: Record<OrderPaymentType, string> = {
   invoice: "Thêm",
-  deposit_collect: "Thu",
-  deposit_refund: "Hoàn",
+  deposit_collect: "Thu cọc",
+  deposit_refund: "Hoàn cọc",
 };
 
 export function OrderPaymentDialog({
   orderId,
   paymentType = "invoice",
+  defaultAmount,
 }: {
   orderId: string;
   paymentType?: OrderPaymentType;
+  // Số tiền gợi ý sẵn trong ô — đa số khách thanh toán đủ 1 lần nên điền sẵn
+  // số còn phải thu để đỡ phải gõ tay, kế toán vẫn sửa lại được nếu khác.
+  defaultAmount?: number;
 }) {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
   // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
@@ -92,12 +96,23 @@ export function OrderPaymentDialog({
 
           <div className="space-y-2">
             <Label htmlFor="amount">Số tiền</Label>
-            <Input id="amount" name="amount" type="number" min={0} step={1000} required />
+            <Input
+              // key ép input tạo lại mỗi khi mở dialog — defaultValue chỉ áp
+              // dụng lúc mount, còn lại thì cùng amount cũ dù remaining đã đổi.
+              key={open ? defaultAmount : "closed"}
+              id="amount"
+              name="amount"
+              type="number"
+              min={0}
+              step={1000}
+              defaultValue={defaultAmount && defaultAmount > 0 ? defaultAmount : undefined}
+              required
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="method">Hình thức</Label>
-            <Select name="method" defaultValue="tien_mat">
+            <Select name="method" defaultValue="chuyen_khoan">
               <SelectTrigger id="method" className="w-full">
                 <SelectValue>{(value: string) => PAYMENT_METHOD_LABELS[value as keyof typeof PAYMENT_METHOD_LABELS]}</SelectValue>
               </SelectTrigger>

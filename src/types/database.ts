@@ -342,6 +342,12 @@ export interface Database {
           pickup_branch_id: string;
           return_branch_id: string;
           customer_id: string;
+          // Người trực tiếp đặt đơn này — độc lập với khách hàng (customer_id)
+          // trên hợp đồng, vì khách agency có thể có nhiều nhân sự khác nhau
+          // gọi đặt cho từng đơn.
+          orderer_name: string | null;
+          orderer_phone: string | null;
+          orderer_email: string | null;
           order_date: string;
           total_value: number;
           status: TaskType;
@@ -361,6 +367,9 @@ export interface Database {
           pickup_branch_id: string;
           return_branch_id: string;
           customer_id: string;
+          orderer_name?: string | null;
+          orderer_phone?: string | null;
+          orderer_email?: string | null;
           order_date?: string;
           total_value?: number;
           status?: TaskType;
@@ -394,6 +403,10 @@ export interface Database {
           // tự chạy hay đặt xe dịch vụ, cùng giờ hẹn trên đơn quyết định %payout
           // (xem computeTransportPayoutPercentage() trong commission.ts).
           delivery_method: DeliveryMethod | null;
+          // Thứ tự hiển thị trong "Danh sách thiết bị" — kéo thả để sắp xếp
+          // lại; dòng mới tự nối cuối danh sách nếu không truyền (xem trigger
+          // set_order_equipment_position).
+          position: number;
           created_at: string;
         };
         Insert: {
@@ -409,6 +422,7 @@ export interface Database {
           employee_id?: string | null;
           completed_date?: string | null;
           delivery_method?: DeliveryMethod | null;
+          position?: number;
         };
         Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;
         Relationships: [];

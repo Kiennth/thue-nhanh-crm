@@ -37,6 +37,9 @@ interface OrderDialogProps {
     return_branch_id: string;
     customer_id: string;
     customer_name: string;
+    orderer_name: string | null;
+    orderer_phone: string | null;
+    orderer_email: string | null;
     order_date: string;
   };
 }
@@ -144,6 +147,38 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
               name="customer_id"
               defaultCustomer={order ? { id: order.customer_id, name: order.customer_name } : undefined}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="orderer_name">Người đặt hàng</Label>
+            <Input
+              id="orderer_name"
+              name="orderer_name"
+              placeholder="Không bắt buộc — tên người trực tiếp đặt đơn"
+              defaultValue={order?.orderer_name ?? ""}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="orderer_phone">Số điện thoại</Label>
+              <Input
+                id="orderer_phone"
+                name="orderer_phone"
+                placeholder="Không bắt buộc"
+                defaultValue={order?.orderer_phone ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="orderer_email">Email</Label>
+              <Input
+                id="orderer_email"
+                name="orderer_email"
+                type="email"
+                placeholder="Không bắt buộc"
+                defaultValue={order?.orderer_email ?? ""}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
