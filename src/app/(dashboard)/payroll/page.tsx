@@ -79,11 +79,11 @@ export default async function PayrollPage({
                 <TableHead>Chi nhánh</TableHead>
                 <TableHead className="text-right">Lương cứng</TableHead>
                 <TableHead className="text-right">Tổng khoán</TableHead>
-                <TableHead className="text-right">Phí Lắp đặt</TableHead>
-                <TableHead className="text-right">Phí Tháo dỡ</TableHead>
-                <TableHead className="text-right">Phí Support</TableHead>
-                <TableHead className="text-right">Phí Giao hàng</TableHead>
-                <TableHead className="text-right">Phí Thu hồi</TableHead>
+                <TableHead className="text-right">Lắp đặt</TableHead>
+                <TableHead className="text-right">Tháo dỡ</TableHead>
+                <TableHead className="text-right">Support</TableHead>
+                <TableHead className="text-right">Giao hàng</TableHead>
+                <TableHead className="text-right">Thu hồi</TableHead>
                 <TableHead className="text-right">OT</TableHead>
                 <TableHead className="text-right">Thưởng</TableHead>
                 <TableHead className="text-right">Tổng thu nhập</TableHead>

@@ -37,7 +37,7 @@ import {
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
-import { OrderLinesSortableBody } from "./order-lines-sortable";
+import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
@@ -405,22 +405,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {canManage && <TableHead className="w-8"></TableHead>}
-                      <TableHead>Hàng hoá</TableHead>
-                      <TableHead>Biến thể/Sản phẩm</TableHead>
-                      <TableHead>SL</TableHead>
-                      <TableHead>Đơn giá</TableHead>
-                      <TableHead>Thành tiền</TableHead>
-                      <TableHead>Người thực hiện</TableHead>
-                      <TableHead className="w-16"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  {lines?.length ? (
-                    (() => {
-                      const lineRows = lines.map((line) => {
+                {lines?.length ? (
+                  (() => {
+                    const lineRows = lines.map((line) => {
                         const type = line.equipment_type_id
                           ? equipmentTypeById.get(line.equipment_type_id)
                           : undefined;
@@ -491,26 +478,34 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         };
                       });
 
-                      return canManage ? (
-                        <OrderLinesSortableBody orderId={order.id} rows={lineRows} />
-                      ) : (
+                    return canManage ? (
+                      <OrderLinesSortableTable orderId={order.id} rows={lineRows} />
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Hàng hoá</TableHead>
+                            <TableHead>Biến thể/Sản phẩm</TableHead>
+                            <TableHead>SL</TableHead>
+                            <TableHead>Đơn giá</TableHead>
+                            <TableHead>Thành tiền</TableHead>
+                            <TableHead>Người thực hiện</TableHead>
+                            <TableHead className="w-16"></TableHead>
+                          </TableRow>
+                        </TableHeader>
                         <TableBody>
                           {lineRows.map((row) => (
                             <TableRow key={row.id}>{row.content}</TableRow>
                           ))}
                         </TableBody>
-                      );
-                    })()
-                  ) : (
-                    <TableBody>
-                      <TableRow>
-                        <TableCell colSpan={canManage ? 8 : 7} className="text-center text-muted-foreground">
-                          Chưa có dòng hàng nào.
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  )}
-                </Table>
+                      </Table>
+                    );
+                  })()
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Chưa có dòng hàng nào.
+                  </p>
+                )}
               </div>
 
               {stockShortages.length > 0 && (

@@ -57,11 +57,11 @@ function EmployeeTaskCountBarChart({ rows }: { rows: EmployeeMonthlyPerformance[
 const INCOME_COMPOSITION_CONFIG = {
   baseSalary: { label: "Lương cứng", color: "var(--chart-1)" },
   totalCommission: { label: "Khoán", color: "var(--chart-2)" },
-  installationPayout: { label: "Phí Lắp đặt", color: "var(--chart-3)" },
-  removalPayout: { label: "Phí Tháo dỡ", color: "var(--chart-6)" },
-  supportPayout: { label: "Phí Support", color: "var(--chart-7)" },
-  deliveryPayout: { label: "Phí Giao hàng", color: "var(--chart-8)" },
-  collectionPayout: { label: "Phí Thu hồi", color: "var(--chart-9)" },
+  installationPayout: { label: "Lắp đặt", color: "var(--chart-3)" },
+  removalPayout: { label: "Tháo dỡ", color: "var(--chart-6)" },
+  supportPayout: { label: "Support", color: "var(--chart-7)" },
+  deliveryPayout: { label: "Giao hàng", color: "var(--chart-8)" },
+  collectionPayout: { label: "Thu hồi", color: "var(--chart-9)" },
   overtimePay: { label: "OT", color: "var(--chart-5)" },
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
