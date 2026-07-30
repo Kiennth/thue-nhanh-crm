@@ -63,6 +63,10 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits
 // cho thứ tự đầy đủ.
 const TASK_PHASE_STARTS = new Set(["chuan_bi", "nghiem_thu"]);
 
+// Server Action gửi chứng từ qua email (render PDF bằng Chromium headless)
+// có thể chạy quá 10-15s mặc định của Vercel serverless — nới lên 60s.
+export const maxDuration = 60;
+
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
