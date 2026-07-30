@@ -116,7 +116,9 @@ export function MyPerformanceTrendCard({ points }: { points: MyMonthlyTrendPoint
                 />
               }
             />
-            <ChartLegend content={<ChartLegendContent />} />
+            <ChartLegend
+              content={<ChartLegendContent className="flex-wrap gap-x-3 gap-y-1" />}
+            />
             {STACK_KEYS.map((key) => (
               <Area
                 key={key}

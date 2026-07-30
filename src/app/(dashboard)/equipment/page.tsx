@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { ClickableTableRow } from "@/components/clickable-table-row";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -444,7 +445,7 @@ export default async function EquipmentPage({
                 : `${currencyFormatter.format(inventoryValueByTypeId.get(type.id) ?? 0)}đ`;
 
             return (
-              <TableRow key={type.id}>
+              <ClickableTableRow key={type.id} href={`/equipment/${type.id}`}>
                 <TableCell className="font-medium">
                   <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
                     {type.image_url ? (
@@ -487,7 +488,7 @@ export default async function EquipmentPage({
                     </div>
                   )}
                 </TableCell>
-              </TableRow>
+              </ClickableTableRow>
             );
           })}
           {!typeList.length && (

@@ -12,6 +12,7 @@ import {
 import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { ClickableTableRow } from "@/components/clickable-table-row";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { BranchBadge } from "@/components/branch-badge";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -265,7 +266,7 @@ export async function OrdersListSection({
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
-            <TableRow key={order.id}>
+            <ClickableTableRow key={order.id} href={`/orders/${order.id}`}>
               <TableCell className="max-w-28 truncate font-medium">
                 <Link href={`/orders/${order.id}`} className="hover:underline">
                   {order.order_code}
@@ -314,7 +315,7 @@ export async function OrdersListSection({
                   />
                 </TableCell>
               )}
-            </TableRow>
+            </ClickableTableRow>
           ))}
           {!orders.length && (
             <TableRow>
