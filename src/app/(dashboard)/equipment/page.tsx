@@ -423,35 +423,42 @@ export default async function EquipmentPage({
                   </p>
                 </div>
               </div>
+
+              {/* Cùng câu chuyện với 3 con số trên (giá trị hàng đang nằm
+                  trong kho) nên nằm chung thẻ — và quan trọng là nó KHÔNG
+                  chịu ảnh hưởng của bộ lọc thời gian ở mục "Báo cáo", để
+                  dưới đó dễ hiểu nhầm là số liệu theo kỳ đã chọn. */}
+              <div className="mt-6 border-t pt-4">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Hàng hoá chiếm nhiều vốn tồn kho nhất
+                </p>
+                <RevenueBarList
+                  points={reportSummary.topInventoryValue}
+                  labelWidthClassName="w-32"
+                />
+              </div>
             </CardContent>
           </Card>
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Báo cáo</h2>
-            <OrderDateRangeFilter
-              preset={activeRange}
-              from={rangeFrom ?? ""}
-              to={rangeTo ?? ""}
-              values={EQUIPMENT_REPORT_RANGE_VALUES}
-            />
-          </div>
 
           {canViewProductHighlights && (
-            <ProductHighlightCards
-              mostRented={reportSummary.topRentalCount}
-              flagship={reportSummary.topRevenue}
-              topMargin={reportSummary.topProfitRatio}
-            />
-          )}
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Báo cáo</h2>
+                <OrderDateRangeFilter
+                  preset={activeRange}
+                  from={rangeFrom ?? ""}
+                  to={rangeTo ?? ""}
+                  values={EQUIPMENT_REPORT_RANGE_VALUES}
+                />
+              </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Giá trị tồn kho lớn nhất</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RevenueBarList points={reportSummary.topInventoryValue} labelWidthClassName="w-32" />
-            </CardContent>
-          </Card>
+              <ProductHighlightCards
+                mostRented={reportSummary.topRentalCount}
+                flagship={reportSummary.topRevenue}
+                topMargin={reportSummary.topProfitRatio}
+              />
+            </>
+          )}
         </div>
       )}
 
