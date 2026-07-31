@@ -106,6 +106,10 @@ export default async function EquipmentPage({
   // Cửa hàng trưởng xem đúng chi nhánh mình quản lý — rộng hơn phần "Báo cáo"
   // bên dưới (chỉ MANAGE_ROLES), vì CEO yêu cầu Cửa hàng trưởng cũng thấy.
   const canViewInventoryTrend = canManageCatalog || employee?.role === "cua_hang_truong";
+  // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
+  // thông tin điều hành danh mục — CEO chốt Cửa hàng trưởng không cần biết,
+  // bạn ấy chỉ theo dõi tồn kho của kho mình.
+  const canViewProductHighlights = canManageCatalog;
   const equipmentValueOverview = canViewInventoryTrend
     ? await computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
     : null;
@@ -432,11 +436,13 @@ export default async function EquipmentPage({
             />
           </div>
 
-          <ProductHighlightCards
-            mostRented={reportSummary.topRentalCount}
-            flagship={reportSummary.topRevenue}
-            topMargin={reportSummary.topProfitRatio}
-          />
+          {canViewProductHighlights && (
+            <ProductHighlightCards
+              mostRented={reportSummary.topRentalCount}
+              flagship={reportSummary.topRevenue}
+              topMargin={reportSummary.topProfitRatio}
+            />
+          )}
 
           <Card>
             <CardHeader>
