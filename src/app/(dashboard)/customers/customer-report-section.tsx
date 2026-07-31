@@ -1,14 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import {
   buildCompanyFirstOrderMap,
@@ -21,6 +13,7 @@ import {
   findDormantCustomers,
   type CustomerReportRow,
 } from "@/lib/customer-reports";
+import { RevenueBarList } from "@/components/revenue-bar-list";
 import { NewCustomersChart } from "./new-customers-chart";
 import { ReturningRateChart } from "./returning-rate-chart";
 import type { CustomerType } from "@/types/database";
@@ -172,54 +165,51 @@ function DormantCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
         </p>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Khách hàng</TableHead>
-              <TableHead>Điện thoại</TableHead>
-              <TableHead className="text-right">Số đơn</TableHead>
-              <TableHead className="text-right">Đã chi</TableHead>
-              <TableHead className="text-right">Lần cuối</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/customers/${r.id}`} className="hover:underline">
-                    {r.name}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  {r.phone ? (
-                    <a href={`tel:${r.phone}`} className="hover:underline">
-                      {r.phone}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{r.orderCount}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {currencyFormatter.format(r.totalRevenue)}đ
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap tabular-nums">
-                  {dateFormatter.format(new Date(r.lastOrderDate!))}
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({daysSince(r.lastOrderDate!)} ngày)
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
-            {!shown.length && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  Không có khách nào bỏ lâu — mọi khách quen đều đã quay lại gần đây.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <ul className="divide-y">
+          {shown.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1">
+                <Link href={`/customers/${r.id}`} className="font-medium hover:underline">
+                  <span className="line-clamp-1">{r.name}</span>
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  {r.orderCount} đơn · đã chi {currencyFormatter.format(r.totalRevenue)}đ
+                </p>
+              </div>
+
+              {/* Số ngày im ắng là thứ quyết định gọi ai trước — cho nó một
+                  chip màu hổ phách để nổi lên khỏi hàng chữ xám. */}
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
+                style={{
+                  backgroundColor: "color-mix(in oklab, var(--chart-4) 16%, transparent)",
+                  color: "color-mix(in oklab, var(--chart-4) 75%, var(--foreground))",
+                }}
+                title={`Lần thuê gần nhất ${dateFormatter.format(new Date(r.lastOrderDate!))}`}
+              >
+                {daysSince(r.lastOrderDate!)} ngày
+              </span>
+
+              {r.phone ? (
+                <a
+                  href={`tel:${r.phone}`}
+                  className="hidden shrink-0 text-xs text-muted-foreground tabular-nums hover:underline sm:inline"
+                >
+                  {r.phone}
+                </a>
+              ) : (
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                  chưa có SĐT
+                </span>
+              )}
+            </li>
+          ))}
+          {!shown.length && (
+            <li className="py-2 text-sm text-muted-foreground">
+              Không có khách nào bỏ lâu — mọi khách quen đều đã quay lại gần đây.
+            </li>
+          )}
+        </ul>
         {dormant.length > shown.length && (
           <p className="mt-3 text-xs text-muted-foreground">
             Đang hiện {shown.length} khách chi nhiều nhất trong tổng số {dormant.length}.
@@ -256,46 +246,50 @@ export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
   );
 }
 
-function TopRevenueCard({ title, rows }: { title: string; rows: CustomerReportRow[] }) {
+// Ba bảng số cũ (mỗi bảng 3 cột × 10 dòng) đọc rất mỏi mắt và chiếm chỗ.
+// Cùng một dữ liệu, ở dạng thanh ngang thì liếc phát thấy ngay ai vượt trội,
+// mà cao chỉ còn bằng nửa. Mỗi thẻ giữ đúng MỘT màu — thanh dài ngắn mới
+// mang thông tin, màu chỉ để phân biệt thẻ này với thẻ kia.
+function CustomerRankCard({
+  title,
+  subtitle,
+  rows,
+  barColor,
+  metric,
+  emptyLabel,
+}: {
+  title: string;
+  subtitle: string;
+  rows: CustomerReportRow[];
+  barColor: string;
+  metric: "revenue" | "owed";
+  emptyLabel: string;
+}) {
+  const points = rows.map((r) => ({
+    label: r.name,
+    value: metric === "owed" ? r.totalOwed : r.totalRevenue,
+    meta: `${r.orderCount} đơn`,
+    href: `/customers/${r.id}`,
+  }));
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Khách hàng</TableHead>
-              <TableHead>Số lượng đơn</TableHead>
-              <TableHead>Doanh số</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/customers/${r.id}`} className="hover:underline">
-                    {r.name}
-                  </Link>
-                </TableCell>
-                <TableCell>{r.orderCount}</TableCell>
-                <TableCell>{currencyFormatter.format(r.totalRevenue)}đ</TableCell>
-              </TableRow>
-            ))}
-            {!rows.length && (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">
-                  Chưa có doanh số nào.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <RevenueBarList
+          points={points}
+          barColor={barColor}
+          layout="stacked"
+          emptyLabel={emptyLabel}
+        />
       </CardContent>
     </Card>
   );
 }
+
 
 export function CustomerReportSection({
   customers,
@@ -366,56 +360,34 @@ export function CustomerReportSection({
         <div className={`grid grid-cols-1 gap-4 ${showRankings ? "lg:grid-cols-3" : ""}`}>
           {showRankings && (
             <>
-              <TopRevenueCard
-                title="Top khách hàng công ty theo doanh số"
+              <CustomerRankCard
+                title="Khách công ty"
+                subtitle="Doanh số cao nhất"
                 rows={topCompanyByRevenue}
+                barColor="var(--chart-1)"
+                metric="revenue"
+                emptyLabel="Chưa có khách công ty nào phát sinh doanh số."
               />
-              <TopRevenueCard
-                title="Top khách hàng cá nhân theo doanh số"
+              <CustomerRankCard
+                title="Khách cá nhân"
+                subtitle="Doanh số cao nhất"
                 rows={topIndividualByRevenue}
+                barColor="var(--chart-3)"
+                metric="revenue"
+                emptyLabel="Chưa có khách cá nhân nào phát sinh doanh số."
               />
             </>
           )}
 
           {showDebt && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Công nợ theo khách hàng</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Khách hàng</TableHead>
-                    <TableHead>Số lượng đơn</TableHead>
-                    <TableHead>Còn nợ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {debtRows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        <Link href={`/customers/${r.id}`} className="hover:underline">
-                          {r.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{r.orderCount}</TableCell>
-                      <TableCell className="text-destructive">
-                        {currencyFormatter.format(r.totalOwed)}đ
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!debtRows.length && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground">
-                        Không có khách nào còn nợ.
-                      </TableCell>
-                    </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+            <CustomerRankCard
+              title="Công nợ"
+              subtitle="Còn nợ nhiều nhất"
+              rows={debtRows}
+              barColor="var(--destructive)"
+              metric="owed"
+              emptyLabel="Không có khách nào còn nợ."
+            />
           )}
         </div>
       )}
