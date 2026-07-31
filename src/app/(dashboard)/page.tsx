@@ -80,12 +80,13 @@ export default async function DashboardHomePage({
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
   // Trang chủ cắt theo 2 mức, CEO chốt 2026-08-01:
-  //   - Hai cụm ĐẾM tổng quát (đơn/chi nhánh/khách/loại thiết bị và cơ cấu
-  //     khách hàng) chỉ Giám đốc xem — Kế toán lẫn Admin đều không cần.
-  //   - So sánh chi nhánh + xếp hạng sản phẩm: Giám đốc và Kế toán xem,
-  //     Admin thì không (Admin đi cùng đơn hàng và hiệu suất nhân viên).
-  const canViewSystemCounters = employee.role === "giam_doc";
-  const canViewCompanyOverview = canManage && employee.role !== "admin";
+  //   - Hai cụm ĐẾM tổng quát (đơn/chi nhánh/khách/loại thiết bị, cơ cấu
+  //     khách hàng) và XẾP HẠNG SẢN PHẨM: chỉ Giám đốc. Xếp hạng sản phẩm đã
+  //     có đủ trong báo cáo ở trang Thiết bị nên không lặp lại ngoài này.
+  //   - So sánh doanh thu chi nhánh: thêm Kế toán, vì đây chính là số liệu
+  //     bán hàng/cho thuê họ tổng hợp để báo cáo lên Giám đốc.
+  const canViewDirectorSummary = employee.role === "giam_doc";
+  const canViewBranchComparison = canManage && employee.role !== "admin";
 
   const supabase = await createClient();
 
@@ -127,11 +128,11 @@ export default async function DashboardHomePage({
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    // Toàn bộ khối dưới đây chỉ nuôi 4 mục dành cho Giám đốc/Kế toán (so
-    // sánh chi nhánh, báo cáo khách hàng, xếp hạng sản phẩm). Ai không xem
-    // được thì đừng nạp: đây là hàng chục nghìn dòng, và trên Cloudflare
-    // Workers nạp thừa cỡ này chính là thứ đã làm sập trang với lỗi 1102.
-    canViewCompanyOverview
+    // Mỗi nguồn dưới đây chỉ nuôi đúng một khối, nên bám theo đúng cờ của
+    // khối đó. Ai không xem được thì đừng nạp: hàng chục nghìn dòng, và trên
+    // Cloudflare Workers nạp thừa cỡ này chính là thứ đã làm sập trang với
+    // lỗi 1102.
+    canViewBranchComparison
       ? fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>(
           (from, to) =>
             supabase
@@ -140,27 +141,27 @@ export default async function DashboardHomePage({
               .range(from, to),
         )
       : Promise.resolve([]),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase.from("equipment_types").select("id, name, product_type")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase.from("equipment_units").select("id, equipment_type_id")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase
           .from("equipment_instances")
           .select("equipment_type_id, purchase_price, disposal_price, status")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? supabase.from("equipment_stock").select("equipment_unit_id, quantity_total")
       : Promise.resolve({ data: null }),
-    canViewCompanyOverview
+    canViewDirectorSummary
       ? fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
           supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
         )
@@ -172,8 +173,8 @@ export default async function DashboardHomePage({
     }),
     processingOrdersQuery,
     // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — nay chỉ Giám đốc xem.
-    canViewSystemCounters ? fetchAllCustomersLite() : Promise.resolve([]),
-    canViewSystemCounters
+    canViewDirectorSummary ? fetchAllCustomersLite() : Promise.resolve([]),
+    canViewDirectorSummary
       ? fetchAllRows<{
           id: string;
           customer_id: string;
@@ -187,7 +188,7 @@ export default async function DashboardHomePage({
             .range(from, to),
         )
       : Promise.resolve([]),
-    canViewSystemCounters
+    canViewDirectorSummary
       ? fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
           supabase.from("order_payments").select("order_id, amount").range(from, to),
         )
@@ -298,7 +299,7 @@ export default async function DashboardHomePage({
       </div>
 
       {/* Bốn ô đếm tổng quát toàn công ty — chỉ Giám đốc. */}
-      {canViewSystemCounters && (
+      {canViewDirectorSummary && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {stats.map((stat) => (
             <Link key={stat.href} href={stat.href}>
@@ -317,7 +318,7 @@ export default async function DashboardHomePage({
         </div>
       )}
 
-      {canViewSystemCounters && (
+      {canViewDirectorSummary && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Khách hàng</h2>
@@ -349,7 +350,7 @@ export default async function DashboardHomePage({
         </div>
       )}
 
-      {canViewCompanyOverview && (
+      {canViewBranchComparison && (
         <BranchComparisonSection
           branches={branchList.data ?? []}
           orders={orderList}
@@ -362,7 +363,7 @@ export default async function DashboardHomePage({
         />
       )}
 
-      {canViewCompanyOverview && (
+      {canViewDirectorSummary && (
         <ProductHighlightCards
           mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
           flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
