@@ -40,6 +40,7 @@ import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderTotalForm } from "./order-total-form";
+import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
@@ -149,6 +150,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     ]),
   );
   const poolValue = computeOrderPoolValue(order.total_value, poolExcludedTotal);
+
+  // Chỉ dòng CHO THUÊ mới được giảm giá (dịch vụ/bán hàng giữ nguyên), nên
+  // đây là mốc để quy đổi "giảm N%" ra số tiền và để chặn giảm quá tay.
+  const rentalSubtotal = (lines ?? []).reduce((sum, line) => {
+    const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
+    return type?.product_type === "rental" ? sum + line.line_total : sum;
+  }, 0);
   const commissionRate = canManage
     ? findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, poolValue)
     : 0;
@@ -549,7 +557,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 </div>
               </div>
 
-              {canManage && <OrderTotalForm orderId={order.id} totalValue={order.total_value} />}
+              {canManage && (
+                <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+                  <OrderTotalForm orderId={order.id} totalValue={order.total_value} />
+                  <OrderDiscountForm
+                    orderId={order.id}
+                    totalValue={order.total_value}
+                    rentalSubtotal={rentalSubtotal}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
