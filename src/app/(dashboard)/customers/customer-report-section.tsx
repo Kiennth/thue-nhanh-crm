@@ -9,14 +9,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import {
   buildCustomerReportRows,
+  buildNewCustomersByMonth,
   daysSince,
   DORMANT_DAYS,
   DORMANT_MIN_ORDERS,
   findDormantCustomers,
   type CustomerReportRow,
 } from "@/lib/customer-reports";
+import { NewCustomersChart } from "./new-customers-chart";
 import type { CustomerType } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -25,6 +28,60 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" });
 // Số khách hiện trong danh sách gọi lại — đủ cho một buổi gọi, phần còn lại
 // nằm ở con số tổng ngay dưới tiêu đề.
 const DORMANT_LIST_SIZE = 10;
+
+// Bao nhiêu tháng hiển thị trên biểu đồ khách mới — 12 tháng để so được
+// cùng kỳ năm trước mà nhãn trục vẫn chưa chồng nhau.
+const NEW_CUSTOMER_MONTHS = 12;
+
+// Chi nhánh tháng này có kéo thêm được khách mới không — con số duy nhất
+// trong khối báo cáo nói về TĂNG TRƯỞNG, mấy ô còn lại chỉ đếm tồn tại.
+function NewCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
+  const points = buildNewCustomersByMonth(rows, NEW_CUSTOMER_MONTHS);
+  const thisMonth = points[points.length - 1]?.count ?? 0;
+  const lastMonth = points[points.length - 2]?.count ?? 0;
+  const delta = thisMonth - lastMonth;
+  // Trung bình các tháng TRƯỚC tháng đang chạy — tháng hiện tại còn dở nên
+  // đưa vào trung bình sẽ tự kéo mốc so sánh xuống.
+  const past = points.slice(0, -1);
+  const average = past.length ? past.reduce((s, p) => s + p.count, 0) / past.length : 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Khách mới theo tháng</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Khách có đơn đầu tiên trong tháng — tháng hiện tại tính tới hôm nay.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className="text-2xl font-semibold tabular-nums">{thisMonth}</p>
+          <p className="text-sm text-muted-foreground">khách mới tháng này</p>
+          {lastMonth > 0 && (
+            <p
+              className={`flex items-center gap-1 text-xs ${
+                delta >= 0 ? "text-primary" : "text-destructive"
+              }`}
+            >
+              {delta >= 0 ? (
+                <TrendingUp className="size-3.5" />
+              ) : (
+                <TrendingDown className="size-3.5" />
+              )}
+              {delta >= 0 ? "+" : ""}
+              {delta} so với tháng trước
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Trung bình {average.toFixed(0)} khách/tháng trong {past.length} tháng trước
+          </p>
+        </div>
+
+        <NewCustomersChart points={points} />
+      </CardContent>
+    </Card>
+  );
+}
 
 // Danh sách việc cần làm, không phải báo cáo: khách từng thuê nhiều lần mà
 // lâu rồi im ắng, kèm số điện thoại để gọi được ngay mà không phải mở từng
@@ -121,7 +178,9 @@ export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       <StatCard label="Tổng khách hàng" value={rows.length} />
       <StatCard label="Cá nhân / Doanh nghiệp" value={`${individualCount} / ${companyCount}`} />
-      <StatCard label="Khách mới (1 đơn)" value={newCount} />
+      {/* Không đặt tên "Khách mới": đây là khách CHƯA TỪNG quay lại tính từ
+          đầu đến giờ, khác hẳn "khách mới trong tháng" ở thẻ xu hướng. */}
+      <StatCard label="Khách chưa quay lại (1 đơn)" value={newCount} />
       <StatCard label="Khách quay lại (2+ đơn)" value={returningCount} />
     </div>
   );
@@ -210,6 +269,8 @@ export function CustomerReportSection({
       <h2 className="text-lg font-semibold">Báo cáo khách hàng</h2>
 
       <CustomerOverviewTiles rows={rows} />
+
+      <NewCustomersCard rows={rows} />
 
       <DormantCustomersCard rows={rows} />
 

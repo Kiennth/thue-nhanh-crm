@@ -10,8 +10,39 @@ export interface CustomerReportRow {
   totalRevenue: number;
   totalPaid: number;
   totalOwed: number;
-  // Ngày đặt của đơn gần nhất (chưa huỷ) — null nếu khách chưa từng có đơn.
+  // Ngày đặt của đơn đầu tiên / gần nhất (chưa huỷ) — null nếu khách chưa
+  // từng có đơn. Đơn đầu tiên chính là lúc khách "đến" với chi nhánh.
+  firstOrderDate: string | null;
   lastOrderDate: string | null;
+}
+
+export interface NewCustomerPoint {
+  month: string;
+  count: number;
+}
+
+// Đếm khách MỚI theo tháng = tháng có đơn ĐẦU TIÊN. Lưu ý khi xem theo chi
+// nhánh: rows đã lọc sẵn về đơn của chi nhánh đó, nên "mới" ở đây nghĩa là
+// mới với chi nhánh — một khách quen của kho khác vẫn tính là mới.
+export function buildNewCustomersByMonth(
+  rows: CustomerReportRow[],
+  monthCount: number,
+  today = new Date(),
+): NewCustomerPoint[] {
+  const months: string[] = [];
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  const countByMonth = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.firstOrderDate) continue;
+    const key = r.firstOrderDate.slice(0, 7);
+    countByMonth.set(key, (countByMonth.get(key) ?? 0) + 1);
+  }
+
+  return months.map((month) => ({ month, count: countByMonth.get(month) ?? 0 }));
 }
 
 // Khách "nguội": đã quen thuê (từ 2 đơn trở lên) nhưng lâu rồi không quay
@@ -76,6 +107,10 @@ export function buildCustomerReportRows(
     );
     const totalPaid = custOrders.reduce((sum, o) => sum + (paidByOrderId.get(o.id) ?? 0), 0);
 
+    const firstOrderDate = custOrders.reduce<string | null>(
+      (earliest, o) => (earliest === null || o.order_date < earliest ? o.order_date : earliest),
+      null,
+    );
     const lastOrderDate = custOrders.reduce<string | null>(
       (latest, o) => (latest === null || o.order_date > latest ? o.order_date : latest),
       null,
@@ -90,6 +125,7 @@ export function buildCustomerReportRows(
       totalRevenue,
       totalPaid,
       totalOwed: Math.max(0, totalRevenue - totalPaid),
+      firstOrderDate,
       lastOrderDate,
     };
   });
