@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/table";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import {
+  buildCompanyFirstOrderMap,
   buildCustomerReportRows,
   buildNewCustomersByMonth,
+  buildReturningRateByMonth,
   daysSince,
   DORMANT_DAYS,
   DORMANT_MIN_ORDERS,
@@ -20,6 +22,7 @@ import {
   type CustomerReportRow,
 } from "@/lib/customer-reports";
 import { NewCustomersChart } from "./new-customers-chart";
+import { ReturningRateChart } from "./returning-rate-chart";
 import type { CustomerType } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -35,8 +38,14 @@ const NEW_CUSTOMER_MONTHS = 12;
 
 // Chi nhánh tháng này có kéo thêm được khách mới không — con số duy nhất
 // trong khối báo cáo nói về TĂNG TRƯỞNG, mấy ô còn lại chỉ đếm tồn tại.
-function NewCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
-  const points = buildNewCustomersByMonth(rows, NEW_CUSTOMER_MONTHS);
+function NewCustomersCard({
+  rows,
+  companyFirstOrder,
+}: {
+  rows: CustomerReportRow[];
+  companyFirstOrder: Map<string, string>;
+}) {
+  const points = buildNewCustomersByMonth(rows, NEW_CUSTOMER_MONTHS, companyFirstOrder);
   const thisMonth = points[points.length - 1]?.count ?? 0;
   const lastMonth = points[points.length - 2]?.count ?? 0;
   const delta = thisMonth - lastMonth;
@@ -50,7 +59,7 @@ function NewCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
       <CardHeader>
         <CardTitle className="text-base">Khách mới theo tháng</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Khách có đơn đầu tiên trong tháng — tháng hiện tại tính tới hôm nay.
+          Khách lần đầu thuê của công ty — tháng hiện tại tính tới hôm nay.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -78,6 +87,61 @@ function NewCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
         </div>
 
         <NewCustomersChart points={points} />
+      </CardContent>
+    </Card>
+  );
+}
+
+// Cùng cặp với thẻ khách mới: một bên đo kéo được người lạ vào, bên này đo
+// giữ được người cũ ở lại. Tỉ lệ theo TỪNG THÁNG nên nhúc nhích thật, khác
+// ô "Khách quay lại (2+ đơn)" cộng dồn từ đầu gần như đứng yên.
+function ReturningRateCard({
+  orders,
+  companyFirstOrder,
+}: {
+  orders: { customer_id: string; order_date: string; cancelled_at: string | null }[];
+  companyFirstOrder: Map<string, string>;
+}) {
+  const points = buildReturningRateByMonth(orders, NEW_CUSTOMER_MONTHS, companyFirstOrder);
+  const current = points[points.length - 1];
+  const previous = points[points.length - 2];
+  const delta =
+    current?.rate != null && previous?.rate != null ? current.rate - previous.rate : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Tỉ lệ khách quay lại theo tháng</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Trong số khách có thuê trong tháng, bao nhiêu phần trăm đã từng thuê trước đó.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className="text-2xl font-semibold tabular-nums">
+            {current?.rate != null ? `${current.rate.toFixed(0)}%` : "—"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {current ? `${current.returningCount}/${current.activeCount} khách tháng này` : ""}
+          </p>
+          {delta !== null && (
+            <p
+              className={`flex items-center gap-1 text-xs ${
+                delta >= 0 ? "text-primary" : "text-destructive"
+              }`}
+            >
+              {delta >= 0 ? (
+                <TrendingUp className="size-3.5" />
+              ) : (
+                <TrendingDown className="size-3.5" />
+              )}
+              {delta >= 0 ? "+" : ""}
+              {delta.toFixed(0)} điểm so với tháng trước
+            </p>
+          )}
+        </div>
+
+        <ReturningRateChart points={points} />
       </CardContent>
     </Card>
   );
@@ -181,7 +245,13 @@ export function CustomerOverviewTiles({ rows }: { rows: CustomerReportRow[] }) {
       {/* Không đặt tên "Khách mới": đây là khách CHƯA TỪNG quay lại tính từ
           đầu đến giờ, khác hẳn "khách mới trong tháng" ở thẻ xu hướng. */}
       <StatCard label="Khách chưa quay lại (1 đơn)" value={newCount} />
-      <StatCard label="Khách quay lại (2+ đơn)" value={returningCount} />
+      <StatCard label="Khách quay lại (2+ đơn)" value={returningCount}>
+        {rows.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {((returningCount / rows.length) * 100).toFixed(0)}% tổng số khách
+          </p>
+        )}
+      </StatCard>
     </div>
   );
 }
@@ -231,11 +301,12 @@ export function CustomerReportSection({
   customers,
   orders,
   payments,
+  companyFirstOrder: companyFirstOrderProp,
   showRankings = true,
 }: {
-  // Xếp hạng khách theo doanh số và bảng công nợ là việc của Giám đốc/Admin/
-  // Kế toán — CEO chốt Cửa hàng trưởng không cần nhìn, bạn ấy chỉ cần số
-  // lượng/cơ cấu khách của chi nhánh mình.
+  // Xếp hạng khách theo doanh số, công nợ và danh sách khách nguội là việc
+  // của Giám đốc/Admin/Kế toán — CEO chốt Cửa hàng trưởng không cần nhìn,
+  // bạn ấy chỉ cần số lượng/cơ cấu và tăng trưởng khách của chi nhánh mình.
   showRankings?: boolean;
   customers: { id: string; name: string; customer_type: CustomerType }[];
   orders: {
@@ -246,8 +317,13 @@ export function CustomerReportSection({
     cancelled_at: string | null;
   }[];
   payments: { order_id: string; amount: number }[];
+  // Ngày thuê đầu tiên của từng khách trên TOÀN CÔNG TY. Người xem toàn hệ
+  // thống thì suy ra được từ chính `orders`; người bị RLS giới hạn theo chi
+  // nhánh phải được trang truyền vào (xem fetchCompanyFirstOrderDates).
+  companyFirstOrder?: Map<string, string>;
 }) {
   const rows = buildCustomerReportRows(customers, orders, payments);
+  const companyFirstOrder = companyFirstOrderProp ?? buildCompanyFirstOrderMap(orders);
 
   const topCompanyByRevenue = [...rows]
     .filter((r) => r.customerType === "company" && r.totalRevenue > 0)
@@ -270,9 +346,14 @@ export function CustomerReportSection({
 
       <CustomerOverviewTiles rows={rows} />
 
-      <NewCustomersCard rows={rows} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <NewCustomersCard rows={rows} companyFirstOrder={companyFirstOrder} />
+        <ReturningRateCard orders={orders} companyFirstOrder={companyFirstOrder} />
+      </div>
 
-      <DormantCustomersCard rows={rows} />
+      {/* Khách nguội nằm cùng nhóm quyền với xếp hạng doanh số: CEO chốt tạm
+          thời chỉ Giám đốc/Admin/Kế toán xem, chưa mở cho Cửa hàng trưởng. */}
+      {showRankings && <DormantCustomersCard rows={rows} />}
 
       {showRankings && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

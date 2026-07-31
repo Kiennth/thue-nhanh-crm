@@ -15,7 +15,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { buildCustomerReportRows } from "@/lib/customer-reports";
+import { buildCompanyFirstOrderMap, buildCustomerReportRows } from "@/lib/customer-reports";
+import { fetchCompanyFirstOrderDates } from "@/lib/customer-first-order";
 import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
@@ -122,6 +123,14 @@ export default async function CustomersPage({
   const allCustomers = branchCustomerIds
     ? allCustomersRaw.filter((c) => branchCustomerIds.has(c.id))
     : allCustomersRaw;
+  // "Khách mới" phải là mới với CẢ CÔNG TY. Người xem toàn hệ thống đã có đủ
+  // đơn trong ordersRaw; Cửa hàng trưởng bị RLS cắt về chi nhánh mình nên
+  // phải hỏi riêng qua service-role, nếu không khách quen của kho khác sẽ bị
+  // đếm nhầm thành khách mới.
+  const companyFirstOrder = branchId
+    ? await fetchCompanyFirstOrderDates()
+    : buildCompanyFirstOrderMap(ordersRaw);
+
   const branchOrderIds = branchId ? new Set(orders.map((o) => o.id)) : null;
   const payments = branchOrderIds
     ? paymentsRaw.filter((p) => branchOrderIds.has(p.order_id))
@@ -179,6 +188,7 @@ export default async function CustomersPage({
         customers={allCustomers}
         orders={orders}
         payments={payments}
+        companyFirstOrder={companyFirstOrder}
         showRankings={!branchId}
       />
 
