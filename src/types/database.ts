@@ -475,6 +475,48 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["order_payments"]["Insert"]>;
         Relationships: [];
       };
+      expense_categories: {
+        Row: {
+          id: string;
+          name: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["expense_categories"]["Insert"]>;
+        Relationships: [];
+      };
+      expenses: {
+        Row: {
+          id: string;
+          branch_id: string;
+          category_id: string;
+          amount: number;
+          expense_date: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          branch_id: string;
+          category_id: string;
+          amount: number;
+          expense_date: string;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
+        Relationships: [];
+      };
       overtime_entries: {
         Row: {
           id: string;

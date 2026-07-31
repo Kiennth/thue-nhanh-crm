@@ -31,6 +31,9 @@ export const EQUIPMENT_WRITE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan"
 // từ chính bảng bậc/trọng số này — nhưng SỬA thì vẫn chỉ Giám đốc (các
 // action trong actions/commission.ts đều chốt DIRECTOR_ONLY).
 export const COMMISSION_VIEW_ROLES: UserRole[] = ["giam_doc", "ke_toan"];
+// Chi phí vận hành: Giám đốc/Admin/Kế toán toàn hệ thống; Cửa hàng trưởng
+// nhập và xem đúng kho mình (RLS + check trong actions/expenses.ts).
+export const EXPENSE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
 
 export interface NavItem {
   href: string;
@@ -91,5 +94,10 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/payroll",
     label: "Bảng lương",
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
+  },
+  {
+    href: "/expenses",
+    label: "Chi phí",
+    roles: [...EXPENSE_ROLES],
   },
 ];
