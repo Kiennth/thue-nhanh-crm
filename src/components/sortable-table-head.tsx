@@ -12,10 +12,14 @@ export function SortableTableHead({
   sortKey,
   label,
   className,
+  align = "left",
 }: {
   sortKey: string;
   label: string;
   className?: string;
+  // Cột số tiền canh phải để khớp với ô dữ liệu bên dưới — khi đó mũi tên
+  // nằm TRƯỚC nhãn, để mép phải của chữ thẳng hàng với mép phải của số.
+  align?: "left" | "right";
 }) {
   const router = useRouter();
   const { start } = useTopLoader();
@@ -43,18 +47,32 @@ export function SortableTableHead({
     router.push(query ? `${pathname}?${query}` : pathname);
   }
 
+  const arrow =
+    isActive && activeDir === "desc" ? (
+      <ArrowDown className="size-3 shrink-0" />
+    ) : (
+      <ArrowUp className={isActive ? "size-3 shrink-0" : "size-3 shrink-0 text-muted-foreground/40"} />
+    );
+
   return (
     <TableHead className={className}>
       <button
         type="button"
         onClick={handleClick}
-        className="flex items-center gap-1 hover:text-foreground"
+        className={`flex w-full items-center gap-1 hover:text-foreground ${
+          align === "right" ? "justify-end" : ""
+        }`}
       >
-        {label}
-        {isActive && activeDir === "desc" ? (
-          <ArrowDown className="size-3" />
+        {align === "right" ? (
+          <>
+            {arrow}
+            {label}
+          </>
         ) : (
-          <ArrowUp className={isActive ? "size-3" : "size-3 text-muted-foreground/40"} />
+          <>
+            {label}
+            {arrow}
+          </>
         )}
       </button>
     </TableHead>

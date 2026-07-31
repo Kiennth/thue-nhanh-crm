@@ -148,16 +148,16 @@ export default async function PayrollPage({
               <TableRow>
                 <SortableTableHead sortKey="name" label="Nhân viên" />
                 <TableHead>Chi nhánh</TableHead>
-                <SortableTableHead sortKey="baseSalary" label="Lương cứng" />
-                <SortableTableHead sortKey="totalCommission" label="Tổng khoán" />
-                <SortableTableHead sortKey="installationPayout" label="Lắp đặt" />
-                <SortableTableHead sortKey="removalPayout" label="Tháo dỡ" />
-                <SortableTableHead sortKey="supportPayout" label="Support" />
-                <SortableTableHead sortKey="deliveryPayout" label="Giao hàng" />
-                <SortableTableHead sortKey="collectionPayout" label="Thu hồi" />
-                <SortableTableHead sortKey="overtimePay" label="OT" />
-                <SortableTableHead sortKey="bonus" label="Thưởng" />
-                <SortableTableHead sortKey="totalIncome" label="Tổng thu nhập" />
+                <SortableTableHead sortKey="baseSalary" label="Lương cứng" align="right" />
+                <SortableTableHead sortKey="totalCommission" label="Tổng khoán" align="right" />
+                <SortableTableHead sortKey="installationPayout" label="Lắp đặt" align="right" />
+                <SortableTableHead sortKey="removalPayout" label="Tháo dỡ" align="right" />
+                <SortableTableHead sortKey="supportPayout" label="Support" align="right" />
+                <SortableTableHead sortKey="deliveryPayout" label="Giao hàng" align="right" />
+                <SortableTableHead sortKey="collectionPayout" label="Thu hồi" align="right" />
+                <SortableTableHead sortKey="overtimePay" label="OT" align="right" />
+                <SortableTableHead sortKey="bonus" label="Thưởng" align="right" />
+                <SortableTableHead sortKey="totalIncome" label="Tổng thu nhập" align="right" />
               </TableRow>
             </TableHeader>
             <TableBody>
