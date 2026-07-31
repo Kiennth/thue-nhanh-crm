@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-geist-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,25 +53,39 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ============================================================
+   INDUSTRIAL SKEUOMORPHISM — "chassis nhựa công nghiệp"
+   Nguồn sáng cố định: trên-trái 45° — mọi shadow/highlight đều
+   suy ra từ đây. Light-mode only theo design system.
+   ============================================================ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #e0e5ec; /* chassis — nhựa ABS xám mát, Level 0 */
+  --foreground: #2d3436; /* mực than chì */
+  --card: #e0e5ec; /* panel cùng chất liệu chassis, nổi bằng shadow */
+  --card-foreground: #2d3436;
+  --popover: #e8ecf2;
+  --popover-foreground: #2d3436;
+  --primary: #ff4757; /* safety orange/Braun red — CHỈ cho hành động chính */
+  --primary-foreground: #ffffff;
+  --secondary: #e0e5ec;
+  --secondary-foreground: #2d3436;
+  --muted: #d1d9e6; /* vùng lõm (recessed) */
+  --muted-foreground: #4a5568;
+  --accent: #d1d9e6;
+  --accent-foreground: #2d3436;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #babecc; /* nửa tối của cặp shadow neumorphic */
+  --border-light: #ffffff; /* nửa sáng */
+  --input: #d1d9e6;
+  --ring: #ff4757;
+  /* Hệ shadow neumorphic — chữ ký thị giác của style */
+  --shadow-card: 8px 8px 16px #babecc, -8px -8px 16px #ffffff;
+  --shadow-floating: 12px 12px 24px #babecc, -12px -12px 24px #ffffff,
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5);
+  --shadow-pressed: inset 6px 6px 12px #babecc, inset -6px -6px 12px #ffffff;
+  --shadow-recessed: inset 4px 4px 8px #babecc, inset -4px -4px 8px #ffffff;
+  --shadow-sharp: 4px 4px 8px rgba(0, 0, 0, 0.15), -1px -1px 1px rgba(255, 255, 255, 0.8);
+  --glow-accent: 0 0 10px 2px rgba(255, 71, 87, 0.6);
   /* Bảng màu categorical cho biểu đồ (10 màu, thứ tự cố định) — đã kiểm định
      qua dataviz skill (ΔE CVD/normal-vision/contrast đều đạt) cho nền trắng
      của app. Thứ tự: xanh dương/cam/ngọc/vàng/hồng/xanh lá/tím/đỏ/lam/nâu. */
@@ -97,15 +111,15 @@
   --chart-8-fg: oklch(0.145 0 0);
   --chart-9-fg: oklch(0.145 0 0);
   --chart-10-fg: oklch(0.985 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 1rem; /* nhựa ép khuôn — cạnh mềm, không sắc */
+  --sidebar: #e0e5ec;
+  --sidebar-foreground: #2d3436;
+  --sidebar-primary: #ff4757;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d1d9e6;
+  --sidebar-accent-foreground: #2d3436;
+  --sidebar-border: #babecc;
+  --sidebar-ring: #ff4757;
 }
 
 .dark {
@@ -165,8 +179,133 @@
   }
   body {
     @apply bg-background text-foreground;
+    position: relative;
+  }
+  /* Noise overlay — vân nhựa mờ phủ toàn trang (fractal noise SVG inline,
+     không request ngoài). pointer-events none để không cản click. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.22;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ============================================================
+   Lớp "vật lý hoá" các component gốc (shadcn data-slot) — mọi
+   trang tự nhận diện mạo mới mà không sửa từng file component.
+   ============================================================ */
+@layer components {
+  /* Card = panel bắt vít lên chassis (Level +1) */
+  [data-slot="card"] {
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Input/textarea = rãnh lõm khoét vào bề mặt (Level -1) */
+  [data-slot="input"],
+  [data-slot="textarea"] {
+    border: none;
+    background: var(--background);
+    box-shadow: var(--shadow-recessed);
+    font-family: var(--font-mono);
+  }
+  [data-slot="input"]:focus-visible,
+  [data-slot="textarea"]:focus-visible {
+    box-shadow: var(--shadow-recessed), 0 0 0 2px var(--primary);
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
+  /* Select trigger + combobox input đồng bộ kiểu rãnh lõm */
+  [data-slot="select-trigger"] {
+    border: none;
+    background: var(--background);
+    box-shadow: var(--shadow-recessed);
+  }
+
+  /* Nút = phím bấm vật lý. Nhấn xuống: tụt 2px + shadow đảo chiều vào trong */
+  [data-slot="button"] {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    transition: all 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  [data-slot="button"].bg-primary {
+    box-shadow: 4px 4px 8px rgba(166, 50, 60, 0.4), -4px -4px 8px rgba(255, 100, 110, 0.35);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  [data-slot="button"].border-border,
+  [data-slot="button"].bg-secondary {
+    border: none;
+    background: var(--background);
+    box-shadow: 5px 5px 10px #babecc, -5px -5px 10px #ffffff;
+  }
+  [data-slot="button"]:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: var(--shadow-pressed);
+  }
+
+  /* Bảng: header như nhãn in trên vỏ máy, dòng như khe dữ liệu */
+  [data-slot="table-head"] {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+  }
+  [data-slot="table-row"]:hover {
+    background: rgba(209, 217, 230, 0.45);
+  }
+
+  /* Dialog/popover = module tháo rời đặt nổi lên trên */
+  [data-slot="dialog-content"],
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="popover-content"] {
+    border: none;
+    background: var(--popover);
+    box-shadow: 16px 16px 32px rgba(163, 177, 198, 0.7), -12px -12px 24px rgba(255, 255, 255, 0.9);
+  }
+
+  /* Badge = tem dập nổi */
+  [data-slot="badge"] {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    box-shadow: 2px 2px 4px #babecc, -2px -2px 4px #ffffff;
+    border: none;
+  }
+
+  /* Tiêu đề trang: chữ khắc chìm — highlight trắng hắt dưới chân chữ */
+  h1,
+  h2 {
+    text-shadow: 0 1px 0 #ffffff;
+    letter-spacing: -0.02em;
+  }
+
+  /* Số liệu luôn dùng mono — cảm giác màn hình đo đạc. Mono rộng hơn Inter
+     nhiều nên hạ cỡ + siết tracking để không tràn lưới cột có sẵn. */
+  .tabular-nums {
+    font-family: var(--font-mono);
+  }
+  /* !important vì layer utilities của Tailwind (.text-2xl) nằm SAU layer
+     components nên thắng cascade nếu không ép. */
+  [data-slot="card"] .text-2xl {
+    font-family: var(--font-mono);
+    font-size: 1.2rem !important;
+    letter-spacing: -0.05em !important;
+  }
+  [data-slot="card"] .text-3xl {
+    font-family: var(--font-mono);
+    font-size: 1.55rem !important;
+    letter-spacing: -0.05em !important;
   }
 }

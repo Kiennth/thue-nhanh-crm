@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const geistSans = Geist({
+// Industrial Skeuomorphism: Inter (humanist, trung tính kiểu Dieter Rams) +
+// JetBrains Mono cho mọi số liệu/nhãn kỹ thuật. Giữ nguyên tên biến
+// --font-geist-* để khỏi sửa @theme mapping trong globals.css.
+const interSans = Inter({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
 });
 
-const geistMono = Geist_Mono({
+const jetbrainsMono = JetBrains_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${interSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <NextTopLoader
