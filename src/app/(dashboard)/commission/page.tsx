@@ -10,7 +10,7 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { DIRECTOR_ONLY } from "@/lib/roles";
+import { COMMISSION_VIEW_ROLES } from "@/lib/roles";
 import { deleteBonusTier, deleteCommissionTier } from "@/lib/actions/commission";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { CommissionTierDialog } from "./commission-tier-dialog";
@@ -20,10 +20,10 @@ import { TaskWeightRow } from "./task-weight-row";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function CommissionPage() {
-  const employee = await requireRole([...DIRECTOR_ONLY]);
-  // Trước đây Admin/Kế toán vào xem được nhưng không sửa; giờ trang chỉ còn
-  // Giám đốc nên biến này luôn đúng — giữ lại để JSX bên dưới khỏi phải sửa
-  // và để mở lại quyền chỉ-xem sau này chỉ cần đổi đúng dòng requireRole.
+  // Kế toán vào XEM được (bảng lương tính ra từ đúng các bậc/trọng số này),
+  // nhưng chỉ Giám đốc mới sửa — canManage gác toàn bộ nút thêm/sửa/xoá bên
+  // dưới, và các action cũng tự chốt DIRECTOR_ONLY một lần nữa.
+  const employee = await requireRole([...COMMISSION_VIEW_ROLES]);
   const canManage = employee.role === "giam_doc";
 
   const supabase = await createClient();

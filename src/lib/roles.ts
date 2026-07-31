@@ -27,6 +27,10 @@ export const BRANCH_SCOPED_ROLES: UserRole[] = ["cua_hang_truong", "ky_thuat_sal
 // Ai được SỬA thiết bị (tồn kho/mua/thanh lý/chuyển kho) — Cửa hàng trưởng
 // có quyền mới này (giới hạn chi nhánh mình), Kỹ thuật/Sale vẫn chỉ xem.
 export const EQUIPMENT_WRITE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
+// Ai được XEM chính sách khoán: Kế toán phải đọc được vì bảng lương tính ra
+// từ chính bảng bậc/trọng số này — nhưng SỬA thì vẫn chỉ Giám đốc (các
+// action trong actions/commission.ts đều chốt DIRECTOR_ONLY).
+export const COMMISSION_VIEW_ROLES: UserRole[] = ["giam_doc", "ke_toan"];
 
 export interface NavItem {
   href: string;
@@ -53,7 +57,7 @@ export const SETTINGS_ITEMS: NavItem[] = [
   {
     href: "/commission",
     label: "Chính sách khoán",
-    roles: [...DIRECTOR_ONLY],
+    roles: [...COMMISSION_VIEW_ROLES],
   },
   {
     href: "/pricing-templates",
