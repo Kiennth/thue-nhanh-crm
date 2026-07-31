@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { BranchBadge } from "@/components/branch-badge";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import {
@@ -25,13 +26,35 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits
 // không nằm trong danh sách này (nếu phát sinh sau) xếp cuối theo tên.
 const BRANCH_ORDER = ["Hà Nội", "TP HCM", "Đà Nẵng", "HQ"];
 
+// Các cột số tiền trong bảng chi tiết đều sắp xếp được — key trùng luôn tên
+// trường trong EmployeeMonthlyPerformance để đỡ phải map thủ công.
+const NUMERIC_SORT_KEYS = [
+  "baseSalary",
+  "totalCommission",
+  "installationPayout",
+  "removalPayout",
+  "supportPayout",
+  "deliveryPayout",
+  "collectionPayout",
+  "overtimePay",
+  "bonus",
+  "totalIncome",
+] as const;
+type NumericSortKey = (typeof NUMERIC_SORT_KEYS)[number];
+type SortKey = NumericSortKey | "name";
+function isSortKey(value: string): value is SortKey {
+  return value === "name" || (NUMERIC_SORT_KEYS as readonly string[]).includes(value);
+}
+
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; sort?: string; dir?: string }>;
 }) {
-  const { month: monthParam } = await searchParams;
+  const { month: monthParam, sort, dir } = await searchParams;
   const month = monthParam ?? currentMonth();
+  const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
+  const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const viewer = await getCurrentEmployee();
   if (!viewer) return null;
@@ -63,6 +86,13 @@ export default async function PayrollPage({
     return idx === -1 ? BRANCH_ORDER.length : idx;
   };
   const sortedRows = [...rows].sort((a, b) => {
+    // Có chọn cột để sắp xếp → bỏ qua gom nhóm theo chi nhánh, so trực tiếp
+    // trên cột đó (tên thì so chuỗi tiếng Việt, còn lại là số tiền).
+    if (activeSort) {
+      const dirMult = activeDir === "asc" ? 1 : -1;
+      if (activeSort === "name") return dirMult * a.name.localeCompare(b.name, "vi");
+      return dirMult * (a[activeSort] - b[activeSort]);
+    }
     const branchDiff = branchSortIndex(a.branchId) - branchSortIndex(b.branchId);
     if (branchDiff !== 0) return branchDiff;
     return a.name.localeCompare(b.name, "vi");
@@ -116,18 +146,18 @@ export default async function PayrollPage({
           <Table className="tabular-nums">
             <TableHeader>
               <TableRow>
-                <TableHead>Nhân viên</TableHead>
+                <SortableTableHead sortKey="name" label="Nhân viên" />
                 <TableHead>Chi nhánh</TableHead>
-                <TableHead className="text-right">Lương cứng</TableHead>
-                <TableHead className="text-right">Tổng khoán</TableHead>
-                <TableHead className="text-right">Lắp đặt</TableHead>
-                <TableHead className="text-right">Tháo dỡ</TableHead>
-                <TableHead className="text-right">Support</TableHead>
-                <TableHead className="text-right">Giao hàng</TableHead>
-                <TableHead className="text-right">Thu hồi</TableHead>
-                <TableHead className="text-right">OT</TableHead>
-                <TableHead className="text-right">Thưởng</TableHead>
-                <TableHead className="text-right">Tổng thu nhập</TableHead>
+                <SortableTableHead sortKey="baseSalary" label="Lương cứng" />
+                <SortableTableHead sortKey="totalCommission" label="Tổng khoán" />
+                <SortableTableHead sortKey="installationPayout" label="Lắp đặt" />
+                <SortableTableHead sortKey="removalPayout" label="Tháo dỡ" />
+                <SortableTableHead sortKey="supportPayout" label="Support" />
+                <SortableTableHead sortKey="deliveryPayout" label="Giao hàng" />
+                <SortableTableHead sortKey="collectionPayout" label="Thu hồi" />
+                <SortableTableHead sortKey="overtimePay" label="OT" />
+                <SortableTableHead sortKey="bonus" label="Thưởng" />
+                <SortableTableHead sortKey="totalIncome" label="Tổng thu nhập" />
               </TableRow>
             </TableHeader>
             <TableBody>
