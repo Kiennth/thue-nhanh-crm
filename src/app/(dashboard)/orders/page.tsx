@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/dal";
+import { createClient } from "@/lib/supabase/server";
 import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { OrdersOverviewSection } from "./orders-overview-section";
 import { OrdersListSection } from "./orders-list-section";
@@ -15,15 +16,34 @@ export default async function OrdersPage({
     sort?: string;
     dir?: string;
     search?: string;
+    scope?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir, search } = await searchParams;
+  const { status, range, from, to, page, sort, dir, search, scope } = await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
+
+  // Cửa hàng trưởng: mặc định chỉ thấy đơn kho mình để tập trung đúng việc,
+  // nhưng chủ động chuyển sang "tất cả chi nhánh" khi cần xem/hỗ trợ kho
+  // khác (RLS đã cho đọc — xem 20260731000000_branch_manager_reads_all_orders).
+  // Tổng quan phía trên KHÔNG đổi theo lựa chọn này: số của kho mình vẫn là
+  // số của kho mình.
+  const isBranchManager = employee.role === "cua_hang_truong";
+  const viewingAllBranches = isBranchManager && scope === "all";
+  const listBranchId = viewingAllBranches ? null : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
   // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
   const canViewAggregates = employee.role !== "ky_thuat_sales";
+
+  // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
+  // chung — chỉ cần khi có ô chọn đó.
+  let branchName: string | null = null;
+  if (isBranchManager && branchId) {
+    const supabase = await createClient();
+    const { data } = await supabase.from("branches").select("name").eq("id", branchId).maybeSingle();
+    branchName = data?.name ?? null;
+  }
 
   return (
     <div className="space-y-6">
@@ -37,9 +57,17 @@ export default async function OrdersPage({
         sort={sort}
         dir={dir}
         search={search}
-        branchId={branchId}
+        branchId={listBranchId}
         canDelete={canManage}
-        showStats={canViewAggregates}
+        // Mở rộng ra toàn hệ thống thì ẩn dãy thẻ thống kê: cửa hàng trưởng
+        // được XEM đơn kho khác để hỗ trợ, nhưng không được đọc tổng quan
+        // toàn công ty (tổng đơn, tổng doanh số) — đúng ranh giới CEO đặt.
+        showStats={canViewAggregates && !viewingAllBranches}
+        branchScope={
+          isBranchManager && branchName
+            ? { value: viewingAllBranches ? "all" : "branch", branchName }
+            : undefined
+        }
       />
     </div>
   );

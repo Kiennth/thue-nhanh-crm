@@ -30,6 +30,7 @@ import type { TaskType } from "@/types/database";
 import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
+import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
@@ -116,6 +117,7 @@ export async function OrdersListSection({
   branchId,
   canDelete,
   showStats = true,
+  branchScope,
 }: {
   status?: string;
   range?: string;
@@ -130,6 +132,9 @@ export async function OrdersListSection({
   // Kỹ thuật/Sales không được xem số liệu tổng hợp — ẩn cả dãy thẻ thống kê
   // (đếm đơn + tổng doanh số); việc hằng ngày của họ chỉ cần bảng danh sách.
   showStats?: boolean;
+  // Chỉ Cửa hàng trưởng có: chọn xem đơn kho mình (mặc định) hay toàn hệ
+  // thống. Vắng mặt thì không hiện ô chọn — phạm vi do role quyết định cứng.
+  branchScope?: { value: "branch" | "all"; branchName: string };
 }) {
   const activeStatus = status ?? "all";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
@@ -249,6 +254,9 @@ export async function OrdersListSection({
         />
         <OrderStatusFilter value={activeStatus} />
         <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
+        {branchScope && (
+          <OrderBranchScopeFilter value={branchScope.value} branchName={branchScope.branchName} />
+        )}
       </div>
 
       <Table>
