@@ -17,6 +17,7 @@ import {
 } from "@/lib/employee-performance-charts";
 import { MonthNavigator } from "./month-navigator";
 import { ExportPayrollButton } from "./export-payroll-button";
+import { PayrollOverview } from "./payroll-overview";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -42,9 +43,15 @@ export default async function PayrollPage({
       ? { branchId: viewer.branch_id }
       : { employeeIds: [viewer.id] };
 
+  // Tháng liền trước — chỉ dùng để tính % biến động quỹ lương ở thẻ tổng quan.
+  const [yearStr, monthStr] = month.split("-");
+  const prevDate = new Date(Number(yearStr), Number(monthStr) - 2, 1);
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+
   const supabase = await createClient();
-  const [rows, { data: branches }] = await Promise.all([
+  const [rows, prevRows, { data: branches }] = await Promise.all([
     computeEmployeeMonthlyPerformance(month, performanceOptions),
+    computeEmployeeMonthlyPerformance(prevMonth, performanceOptions),
     supabase.from("branches").select("id, name"),
   ]);
 
@@ -63,9 +70,9 @@ export default async function PayrollPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Bảng lương tháng</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ExportPayrollButton
             month={month}
             rows={sortedRows.map((row) => ({
@@ -87,9 +94,11 @@ export default async function PayrollPage({
         </div>
       </div>
 
+      <PayrollOverview rows={sortedRows} prevRows={prevRows} month={month} />
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Tháng {month}</CardTitle>
+          <CardTitle className="text-base">Bảng chi tiết — Tháng {month}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table className="tabular-nums">

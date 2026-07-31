@@ -66,7 +66,7 @@ const INCOME_COMPOSITION_CONFIG = {
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
 
-function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthlyPerformance[] }) {
+export function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthlyPerformance[] }) {
   return (
     <ChartContainer
       config={INCOME_COMPOSITION_CONFIG}
@@ -80,7 +80,9 @@ function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthlyPerform
         <ChartTooltip
           content={<ChartTooltipContent formatter={(value) => `${currencyFormatter.format(Number(value))}đ`} />}
         />
-        <ChartLegend content={<ChartLegendContent />} />
+        {/* flex-wrap: 9 hạng mục không đủ chỗ 1 hàng ở màn hẹp, không wrap
+            thì nhãn bị cắt mất chữ. */}
+        <ChartLegend content={<ChartLegendContent className="flex-wrap gap-x-3 gap-y-1" />} />
         <Bar dataKey="baseSalary" stackId="income" fill="var(--color-baseSalary)" radius={[0, 0, 0, 0]} />
         <Bar dataKey="totalCommission" stackId="income" fill="var(--color-totalCommission)" />
         <Bar dataKey="installationPayout" stackId="income" fill="var(--color-installationPayout)" />
