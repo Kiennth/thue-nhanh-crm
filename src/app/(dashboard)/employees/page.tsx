@@ -9,21 +9,25 @@ import {
 } from "@/components/ui/table";
 import { BranchBadge } from "@/components/branch-badge";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentEmployee } from "@/lib/dal";
-import { MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
+import { requireRole } from "@/lib/dal";
+import { DIRECTOR_ONLY, MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
 import { EmployeeDialog } from "./employee-dialog";
 import { ToggleActiveButton } from "./toggle-active-button";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export default async function EmployeesPage() {
+  // Trang này trước chỉ ẩn/hiện nút theo vai trò, không chặn ai vào — gõ
+  // thẳng URL là đọc được lương cứng của cả công ty. CEO chốt 2026-08-01
+  // quản lý nhân sự chỉ còn Giám đốc, nên chặn ngay từ cửa.
+  const currentEmployee = await requireRole([...DIRECTOR_ONLY]);
+
   const supabase = await createClient();
-  const [{ data: employees }, { data: branches }, currentEmployee] = await Promise.all([
+  const [{ data: employees }, { data: branches }] = await Promise.all([
     supabase.from("employees").select("*").order("name"),
     supabase.from("branches").select("id, name").order("name"),
-    getCurrentEmployee(),
   ]);
 
-  const isHr = !!currentEmployee && HR_ROLES.includes(currentEmployee.role);
+  const isHr = HR_ROLES.includes(currentEmployee.role);
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 

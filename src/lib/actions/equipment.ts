@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { DIRECTOR_ONLY, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 
 type EquipmentTypeInsert = Database["public"]["Tables"]["equipment_types"]["Insert"];
@@ -799,7 +799,7 @@ export async function createPricingTemplate(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const parsed = PricingTemplateSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) {
@@ -819,7 +819,7 @@ export async function createPricingTemplate(
 }
 
 export async function deletePricingTemplate(id: string) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const supabase = await createClient();
   const { error } = await supabase.from("pricing_templates").delete().eq("id", id);
@@ -848,7 +848,7 @@ export async function createPricingTier(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const parsed = PricingTierSchema.safeParse({
     template_id: formData.get("template_id"),
@@ -874,7 +874,7 @@ export async function createPricingTier(
 }
 
 export async function deletePricingTier(id: string) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const supabase = await createClient();
   const { error } = await supabase.from("pricing_template_tiers").delete().eq("id", id);

@@ -43,20 +43,22 @@ export const SETTINGS_ITEMS: NavItem[] = [
     label: "Chi nhánh",
     roles: [...DIRECTOR_ONLY],
   },
+  // Ba mục dưới đây động tới nhân sự, tiền công và giá bán — CEO chốt
+  // 2026-08-01 chỉ Giám đốc được vào, kể cả Admin và Kế toán.
   {
     href: "/employees",
     label: "Nhân viên",
-    roles: [...MANAGE_ROLES],
+    roles: [...DIRECTOR_ONLY],
   },
   {
     href: "/commission",
     label: "Chính sách khoán",
-    roles: [...MANAGE_ROLES],
+    roles: [...DIRECTOR_ONLY],
   },
   {
     href: "/pricing-templates",
     label: "Bảng giá mẫu",
-    roles: [...MANAGE_ROLES],
+    roles: [...DIRECTOR_ONLY],
   },
   {
     href: "/activity",

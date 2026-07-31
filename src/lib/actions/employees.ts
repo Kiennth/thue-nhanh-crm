@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
-import { MANAGE_ROLES as HR_ROLES } from "@/lib/roles";
+import { DIRECTOR_ONLY } from "@/lib/roles";
 
 const employeeShape = {
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
@@ -27,7 +27,7 @@ export async function createEmployee(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...HR_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const parsed = CreateEmployeeSchema.safeParse({
     name: formData.get("name"),
@@ -77,7 +77,7 @@ export async function updateEmployee(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...HR_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const parsed = UpdateEmployeeSchema.safeParse({
     name: formData.get("name"),
@@ -106,7 +106,7 @@ export async function updateEmployee(
 }
 
 export async function setEmployeeActive(id: string, isActive: boolean) {
-  await requireRole([...HR_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const supabase = await createClient();
   const { error } = await supabase

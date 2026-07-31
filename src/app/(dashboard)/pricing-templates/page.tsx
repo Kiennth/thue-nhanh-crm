@@ -10,13 +10,13 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { DIRECTOR_ONLY } from "@/lib/roles";
 import { deletePricingTemplate } from "@/lib/actions/equipment";
 import { PricingTemplateDialog } from "../equipment/pricing-template-dialog";
 import { PricingTemplateTiersDialog } from "../equipment/pricing-template-tiers-dialog";
 
 export default async function PricingTemplatesPage() {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...DIRECTOR_ONLY]);
 
   const supabase = await createClient();
   const [{ data: templates }, { data: tiers }] = await Promise.all([

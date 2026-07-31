@@ -9,18 +9,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentEmployee } from "@/lib/dal";
+import { requireRole } from "@/lib/dal";
+import { DIRECTOR_ONLY } from "@/lib/roles";
 import { BranchDialog } from "./branch-dialog";
 import { DeleteBranchButton } from "./delete-branch-button";
 
 export default async function BranchesPage() {
-  const supabase = await createClient();
-  const [{ data: branches }, employee] = await Promise.all([
-    supabase.from("branches").select("*").order("name"),
-    getCurrentEmployee(),
-  ]);
+  // Menu đã để mục này riêng cho Giám đốc, nhưng trang lại không chặn ai —
+  // gõ thẳng URL là vào. Chặn cho khớp với menu.
+  const employee = await requireRole([...DIRECTOR_ONLY]);
 
-  const isDirector = employee?.role === "giam_doc";
+  const supabase = await createClient();
+  const { data: branches } = await supabase.from("branches").select("*").order("name");
+
+  const isDirector = employee.role === "giam_doc";
 
   return (
     <div className="space-y-4">
