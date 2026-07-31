@@ -79,10 +79,12 @@ export default async function DashboardHomePage({
   // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
-  // Admin làm việc CÙNG đơn hàng: theo dõi đơn, hỗ trợ cửa hàng trưởng và
-  // nhân viên cửa hàng, xem hiệu suất nhân viên. Bức tranh kinh doanh toàn
-  // công ty (tổng quan hệ thống, báo cáo khách hàng, so sánh chi nhánh, xếp
-  // hạng sản phẩm) là việc của Giám đốc/Kế toán — CEO chốt 2026-08-01.
+  // Trang chủ cắt theo 2 mức, CEO chốt 2026-08-01:
+  //   - Hai cụm ĐẾM tổng quát (đơn/chi nhánh/khách/loại thiết bị và cơ cấu
+  //     khách hàng) chỉ Giám đốc xem — Kế toán lẫn Admin đều không cần.
+  //   - So sánh chi nhánh + xếp hạng sản phẩm: Giám đốc và Kế toán xem,
+  //     Admin thì không (Admin đi cùng đơn hàng và hiệu suất nhân viên).
+  const canViewSystemCounters = employee.role === "giam_doc";
   const canViewCompanyOverview = canManage && employee.role !== "admin";
 
   const supabase = await createClient();
@@ -169,9 +171,9 @@ export default async function DashboardHomePage({
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
     processingOrdersQuery,
-    // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — cũng chỉ Giám đốc/Kế toán.
-    canViewCompanyOverview ? fetchAllCustomersLite() : Promise.resolve([]),
-    canViewCompanyOverview
+    // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — nay chỉ Giám đốc xem.
+    canViewSystemCounters ? fetchAllCustomersLite() : Promise.resolve([]),
+    canViewSystemCounters
       ? fetchAllRows<{
           id: string;
           customer_id: string;
@@ -185,7 +187,7 @@ export default async function DashboardHomePage({
             .range(from, to),
         )
       : Promise.resolve([]),
-    canViewCompanyOverview
+    canViewSystemCounters
       ? fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
           supabase.from("order_payments").select("order_id, amount").range(from, to),
         )
@@ -295,9 +297,8 @@ export default async function DashboardHomePage({
         />
       </div>
 
-      {/* Số liệu tổng quát toàn công ty — chỉ Giám đốc/Kế toán; Admin, Cửa
-          hàng trưởng, Sale/Kỹ thuật không thấy. */}
-      {canViewCompanyOverview && (
+      {/* Bốn ô đếm tổng quát toàn công ty — chỉ Giám đốc. */}
+      {canViewSystemCounters && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {stats.map((stat) => (
             <Link key={stat.href} href={stat.href}>
@@ -316,7 +317,7 @@ export default async function DashboardHomePage({
         </div>
       )}
 
-      {canViewCompanyOverview && (
+      {canViewSystemCounters && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Khách hàng</h2>
