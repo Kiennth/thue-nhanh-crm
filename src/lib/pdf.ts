@@ -11,6 +11,19 @@ import type { PrintDocType } from "@/lib/print-docs";
 const isCloudflareWorkers =
   typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
 
+// Import "mờ" — che specifier khỏi static analysis để esbuild của OpenNext
+// không cố bundle puppeteer/@sparticuz vào worker (bundle sẽ fail vì các
+// dynamic import nội bộ của puppeteer). Node runtime thật vẫn import bình
+// thường lúc chạy; trên Workers không bao giờ tới được đây nhờ guard trên.
+const opaqueImport = new Function("m", "return import(m)") as <T>(m: string) => Promise<T>;
+
+interface ChromiumModule {
+  default: { args: string[]; executablePath(): Promise<string> };
+}
+interface PuppeteerModule {
+  default: { launch(options: Record<string, unknown>): Promise<Browser> };
+}
+
 // Vercel (serverless) không có Chrome hệ thống và cũng không chứa nổi bản
 // Chromium đầy đủ của puppeteer — dùng @sparticuz/chromium (bản nén cho
 // serverless) + puppeteer-core. Local/dev/VPS vẫn dùng puppeteer đầy đủ.
@@ -23,8 +36,8 @@ async function launchBrowser(): Promise<Browser> {
   }
   if (process.env.VERCEL) {
     const [{ default: chromium }, { default: puppeteerCore }] = await Promise.all([
-      import("@sparticuz/chromium"),
-      import("puppeteer-core"),
+      opaqueImport<ChromiumModule>("@sparticuz/chromium"),
+      opaqueImport<PuppeteerModule>("puppeteer-core"),
     ]);
     return puppeteerCore.launch({
       args: chromium.args,
@@ -32,8 +45,8 @@ async function launchBrowser(): Promise<Browser> {
       headless: true,
     });
   }
-  const { default: puppeteer } = await import("puppeteer");
-  return puppeteer.launch({ headless: true }) as unknown as Promise<Browser>;
+  const { default: puppeteer } = await opaqueImport<PuppeteerModule>("puppeteer");
+  return puppeteer.launch({ headless: true });
 }
 
 // Xuất PDF trang in chứng từ (/orders/[id]/print?type=...) bằng Chromium

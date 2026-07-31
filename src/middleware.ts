@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // Next.js 16 đổi tên "Middleware" thành "Proxy" (chức năng không đổi).
 // Chỉ làm optimistic check + refresh session cookie ở đây — RLS ở Postgres
 // mới là lớp bảo vệ dữ liệu thật sự.
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
