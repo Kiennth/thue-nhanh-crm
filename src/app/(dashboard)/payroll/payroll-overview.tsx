@@ -17,10 +17,14 @@ export function PayrollOverview({
   rows,
   prevRows,
   month,
+  branchName,
 }: {
   rows: EmployeeMonthlyPerformance[];
   prevRows: EmployeeMonthlyPerformance[];
   month: string;
+  // Có giá trị khi người xem bị giới hạn theo chi nhánh (Cửa hàng trưởng) —
+  // ghi thẳng tên kho vào nhãn để không hiểu nhầm là số toàn công ty.
+  branchName?: string;
 }) {
   if (!rows.length) return null;
 
@@ -35,11 +39,13 @@ export function PayrollOverview({
   const baseTotal = rows.reduce((sum, r) => sum + r.baseSalary, 0);
   const variablePct = total > 0 ? ((total - baseTotal) / total) * 100 : 0;
 
+  const scopeLabel = branchName ? `kho ${branchName}` : "toàn công ty";
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Tổng quỹ lương tháng"
+          label={`Tổng quỹ lương — ${scopeLabel}`}
           value={`${currencyFormatter.format(total)}đ`}
         >
           {deltaPct !== null && (
@@ -62,7 +68,7 @@ export function PayrollOverview({
         <StatCard label="Số nhân viên tính lương" value={headcount}>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="size-3.5" />
-            Đang hoạt động trong tháng {month}
+            {branchName ? `Thuộc ${branchName}` : "Toàn công ty"} · tháng {month}
           </p>
         </StatCard>
 

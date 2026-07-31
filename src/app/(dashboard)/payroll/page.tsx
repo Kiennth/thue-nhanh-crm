@@ -94,7 +94,18 @@ export default async function PayrollPage({
         </div>
       </div>
 
-      <PayrollOverview rows={sortedRows} prevRows={prevRows} month={month} />
+      <PayrollOverview
+        rows={sortedRows}
+        prevRows={prevRows}
+        month={month}
+        branchName={
+          // Cửa hàng trưởng: ghi rõ tên kho lên thẻ số liệu; Giám đốc/Kế
+          // toán xem toàn công ty nên để trống.
+          viewer.role === "cua_hang_truong" && viewer.branch_id
+            ? branchNameById.get(viewer.branch_id)
+            : undefined
+        }
+      />
 
       <Card>
         <CardHeader>
