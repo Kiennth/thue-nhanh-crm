@@ -23,7 +23,8 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-11">
+        {/* Mono số rộng hơn sans — tối đa 6 cột rồi wrap, tránh đè chữ. */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-6">
           <div>
             <p className="text-xs text-muted-foreground">Lương cứng</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.baseSalary)}đ</p>

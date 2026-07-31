@@ -205,10 +205,25 @@
 @layer components {
   /* Card = panel bắt vít lên chassis (Level +1) */
   [data-slot="card"] {
+    position: relative;
     border: none;
     border-radius: var(--radius);
     box-shadow: var(--shadow-card);
     transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* Ốc vít 4 góc — chi tiết "gia công" ký danh của style, render bằng radial
+     gradient nên không tốn phần tử DOM nào. */
+  [data-slot="card"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image:
+      radial-gradient(circle at 12px 12px, rgba(0, 0, 0, 0.14) 2px, rgba(255, 255, 255, 0.55) 2.6px, transparent 3.6px),
+      radial-gradient(circle at calc(100% - 12px) 12px, rgba(0, 0, 0, 0.14) 2px, rgba(255, 255, 255, 0.55) 2.6px, transparent 3.6px),
+      radial-gradient(circle at 12px calc(100% - 12px), rgba(0, 0, 0, 0.14) 2px, rgba(255, 255, 255, 0.55) 2.6px, transparent 3.6px),
+      radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), rgba(0, 0, 0, 0.14) 2px, rgba(255, 255, 255, 0.55) 2.6px, transparent 3.6px);
   }
 
   /* Input/textarea = rãnh lõm khoét vào bề mặt (Level -1) */
@@ -289,6 +304,16 @@
   h2 {
     text-shadow: 0 1px 0 #ffffff;
     letter-spacing: -0.02em;
+  }
+
+  /* Touch target ≥44px trên thiết bị cảm ứng (WCAG 2.5.5) — chỉ áp cho
+     pointer: coarse nên mật độ desktop giữ nguyên. */
+  @media (pointer: coarse) {
+    [data-slot="button"],
+    [data-slot="input"],
+    [data-slot="select-trigger"] {
+      min-height: 44px;
+    }
   }
 
   /* Số liệu luôn dùng mono — cảm giác màn hình đo đạc. Mono rộng hơn Inter
