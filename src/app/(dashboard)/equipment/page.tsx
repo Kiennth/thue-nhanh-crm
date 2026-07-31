@@ -102,14 +102,16 @@ export default async function EquipmentPage({
   const employee = await getCurrentEmployee();
   const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
-  // Xu hướng giá trị thiết bị: Giám đốc/Admin/Kế toán xem toàn hệ thống,
-  // Cửa hàng trưởng xem đúng chi nhánh mình quản lý — rộng hơn phần "Báo cáo"
-  // bên dưới (chỉ MANAGE_ROLES), vì CEO yêu cầu Cửa hàng trưởng cũng thấy.
-  const canViewInventoryTrend = canManageCatalog || employee?.role === "cua_hang_truong";
+  // Admin VẪN quản trị danh mục (thêm/sửa/xoá hàng hoá, tồn kho) nhưng không
+  // xem bức tranh tài sản của công ty: giá trị thiết bị theo thời gian, tổng
+  // quan tồn kho, xếp hạng sản phẩm — CEO chốt 2026-08-01.
+  const canViewEquipmentReports = canManageCatalog && employee?.role !== "admin";
+  // Xu hướng giá trị thiết bị + tổng quan tồn kho: Giám đốc/Kế toán xem toàn
+  // hệ thống, Cửa hàng trưởng xem đúng kho mình quản lý.
+  const canViewInventoryTrend = canViewEquipmentReports || employee?.role === "cua_hang_truong";
   // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
-  // thông tin điều hành danh mục — CEO chốt Cửa hàng trưởng không cần biết,
-  // bạn ấy chỉ theo dõi tồn kho của kho mình.
-  const canViewProductHighlights = canManageCatalog;
+  // thông tin điều hành danh mục — Cửa hàng trưởng và Admin không cần biết.
+  const canViewProductHighlights = canViewEquipmentReports;
   const equipmentValueOverview = canViewInventoryTrend
     ? await computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
     : null;
