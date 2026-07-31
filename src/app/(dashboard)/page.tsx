@@ -18,7 +18,7 @@ import {
   type DateRangePreset,
 } from "@/lib/date-range-presets";
 import { fetchAllCustomersLite } from "@/lib/customers";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
 import { expandRecurring } from "@/lib/recurring-expenses";
 import {
@@ -89,6 +89,21 @@ export default async function DashboardHomePage({
   const canViewDirectorSummary = employee.role === "giam_doc";
   const canViewBranchComparison = canManage && employee.role !== "admin";
 
+  // So sánh chi nhánh chỉ đọc lại đúng 3 mốc Ngày/Tháng/Năm đang chọn
+  // (revenueForDay/Month/Year lọc trong JS) — trước đây fetch NGUYÊN bảng
+  // orders all-time (10.020 dòng, 11 lượt gọi tuần tự) chỉ để dùng 3 mốc đó.
+  // Lấy khoảng bao trọn cả 3 mốc (thường cùng 1 năm, nhưng người dùng có thể
+  // chọn ngày/tháng khác năm với ô Năm) — cắt còn đúng phần dữ liệu cần.
+  const comparisonRangeStart = [`${day}`, `${month}-01`, `${year}-01-01`].sort()[0];
+  const comparisonRangeEndExclusive = (() => {
+    const [y, m] = month.split("-").map(Number);
+    const nextMonthOfMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    const dayAfter = new Date(day);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    const dayAfterStr = dayAfter.toISOString().slice(0, 10);
+    return [dayAfterStr, nextMonthOfMonth, `${Number(year) + 1}-01-01`].sort().reverse()[0];
+  })();
+
   const supabase = await createClient();
 
   let processingOrdersQuery = supabase
@@ -143,6 +158,11 @@ export default async function DashboardHomePage({
               // (chưa lệch số vì hệ thống hiện có 0 đơn huỷ, nhưng lãi/lỗ
               // thì phải đúng từ gốc).
               .is("cancelled_at", null)
+              // BranchComparisonSection chỉ đọc lại đúng 3 mốc Ngày/Tháng/
+              // Năm đang chọn — trước đây fetch NGUYÊN bảng orders all-time
+              // (10.020 dòng) chỉ để dùng khoảng này.
+              .gte("order_date", comparisonRangeStart)
+              .lt("order_date", comparisonRangeEndExclusive)
               .range(from, to),
         )
       : Promise.resolve([]),
@@ -166,9 +186,15 @@ export default async function DashboardHomePage({
     canViewDirectorSummary
       ? supabase.from("equipment_stock").select("equipment_unit_id, quantity_total")
       : Promise.resolve({ data: null }),
+    // Xếp hạng sản phẩm CỐ Ý là all-time (không date-bound được như So sánh
+    // chi nhánh) — bảng này 30.000+ dòng nên dùng bản phân trang song song
+    // thay vì fetchAllRows tuần tự (đo trên trang Thiết bị: cùng truy vấn,
+    // tuần tự mất 14s).
     canViewDirectorSummary
-      ? fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
-          supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
+      ? fetchAllRowsFast<{ equipment_type_id: string | null; line_total: number }>(
+          (from, to) =>
+            supabase.from("order_equipment").select("equipment_type_id, line_total").order("id").range(from, to),
+          () => supabase.from("order_equipment").select("*", { count: "exact", head: true }),
         )
       : Promise.resolve([]),
     getOrdersToHandle(branchId, HANDLE_LIMIT, {
@@ -179,18 +205,25 @@ export default async function DashboardHomePage({
     processingOrdersQuery,
     // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — nay chỉ Giám đốc xem.
     canViewDirectorSummary ? fetchAllCustomersLite() : Promise.resolve([]),
+    // Cần TOÀN BỘ lịch sử để phân loại khách mới/quay lại đúng nghĩa (dựa
+    // trên đơn đầu tiên của khách, không giới hạn theo kỳ) — không date-bound
+    // được, nên cắt thời gian chờ bằng cách phân trang song song thay vì
+    // tuần tự (10.020 dòng ≈ 11 trang).
     canViewDirectorSummary
-      ? fetchAllRows<{
+      ? fetchAllRowsFast<{
           id: string;
           customer_id: string;
           total_value: number;
           order_date: string;
           cancelled_at: string | null;
-        }>((from, to) =>
-          supabase
-            .from("orders")
-            .select("id, customer_id, total_value, order_date, cancelled_at")
-            .range(from, to),
+        }>(
+          (from, to) =>
+            supabase
+              .from("orders")
+              .select("id, customer_id, total_value, order_date, cancelled_at")
+              .order("id")
+              .range(from, to),
+          () => supabase.from("orders").select("*", { count: "exact", head: true }),
         )
       : Promise.resolve([]),
     canViewDirectorSummary

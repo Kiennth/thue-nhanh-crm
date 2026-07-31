@@ -18,7 +18,7 @@ import { SortableTableHead } from "@/components/sortable-table-head";
 import { ProductHighlightCards } from "@/components/dashboard-cards";
 import { RevenueBarList, type RevenuePoint } from "@/components/revenue-bar-list";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType } from "@/lib/actions/equipment";
 import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
@@ -112,82 +112,110 @@ export default async function EquipmentPage({
   // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
   // thông tin điều hành danh mục — Cửa hàng trưởng và Admin không cần biết.
   const canViewProductHighlights = canViewEquipmentReports;
-  const equipmentValueOverview = canViewInventoryTrend
-    ? await computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
-    : null;
-
-  // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
-  // nhãn ghép từ 2 cột, Tồn kho là tổng suy ra từ equipment_units/stock hoặc
-  // equipment_instances) — lấy TOÀN BỘ loại hàng khớp tìm kiếm, tính/lọc/sắp/
-  // phân trang gộp 1 lần trong JS.
-  const allTypes = await fetchAllRows<EquipmentTypeRow>((from, to) => {
-    let q = supabase.from("equipment_types").select("*");
-    if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
-    return q.range(from, to);
-  });
-
-  const { data: templates } = await supabase.from("pricing_templates").select("*").order("name");
-  const templateList = templates ?? [];
-  const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
-
-  const rentalOrSaleTypeIds = allTypes
-    .filter((t) => t.product_type === "sale" || (t.product_type === "rental" && t.tracking_type === "quantity"))
-    .map((t) => t.id);
-  const individualTypeIds = allTypes
-    .filter((t) => t.product_type === "rental" && t.tracking_type === "individual")
-    .map((t) => t.id);
-
-  const [units, instanceCounts] = await Promise.all([
-    rentalOrSaleTypeIds.length
-      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
-          supabase
-            .from("equipment_units")
-            .select("id, equipment_type_id")
-            .in("equipment_type_id", rentalOrSaleTypeIds)
-            .range(from, to),
-        )
-      : Promise.resolve([]),
-    individualTypeIds.length
-      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) => {
-          let q = supabase
-            .from("equipment_instances")
-            .select("id, equipment_type_id")
-            .in("equipment_type_id", individualTypeIds);
-          // Cùng nguyên tắc như equipment_stock: chỉ đếm máy thật đang ở
-          // chi nhánh mình với role bị giới hạn theo chi nhánh.
-          if (!canManageCatalog && employee?.branch_id) {
-            q = q.eq("branch_id", employee.branch_id);
-          }
-          return q.range(from, to);
-        })
-      : Promise.resolve([]),
-  ]);
-  const unitIds = units.map((u) => u.id);
   // Cửa hàng trưởng/Kỹ thuật-Sale chỉ đếm tồn kho của ĐÚNG chi nhánh mình —
   // Giám đốc/Admin/Kế toán cộng gộp toàn hệ thống.
   const stockBranchId = canManageCatalog ? null : (employee?.branch_id ?? null);
-  const stock = unitIds.length
-    ? await fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) => {
-        let q = supabase
-          .from("equipment_stock")
-          .select("equipment_unit_id, quantity_total")
-          .in("equipment_unit_id", unitIds);
-        if (stockBranchId) q = q.eq("branch_id", stockBranchId);
-        return q.range(from, to);
-      })
-    : [];
 
-  const unitTypeById = new Map(units.map((u) => [u.id, u.equipment_type_id]));
-  const stockTotalByTypeId = new Map<string, number>();
-  for (const row of stock) {
-    const typeId = unitTypeById.get(row.equipment_unit_id);
-    if (!typeId) continue;
-    stockTotalByTypeId.set(typeId, (stockTotalByTypeId.get(typeId) ?? 0) + row.quantity_total);
-  }
-  const instanceCountByTypeId = new Map<string, number>();
-  for (const inst of instanceCounts) {
-    instanceCountByTypeId.set(inst.equipment_type_id, (instanceCountByTypeId.get(inst.equipment_type_id) ?? 0) + 1);
-  }
+  // Trước đây trang này fetch theo 3 CHẶNG TUẦN TỰ (giá trị tồn kho đứng một
+  // mình → allTypes đứng một mình → units/instances/stock → rồi mới tới khối
+  // báo cáo) — mỗi chặng chờ chặng trước xong mới bắt đầu, cộng dồn lại là
+  // trang chậm nhất hệ thống (~15s). Không truy vấn nào trong số này phụ
+  // thuộc kết quả của truy vấn khác (branchOrderIds chỉ cần stockBranchId,
+  // baseReports chỉ cần dữ liệu thô) nên gộp hết vào 1 Promise.all — thời
+  // gian chờ giờ bằng đúng truy vấn CHẬM NHẤT (order_equipment) thay vì
+  // tổng của cả 4 chặng.
+  //
+  // Đồng thời vá luôn 1 lỗi số liệu ẩn: equipment_types/units/instances/
+  // purchases/disposals/stock trước đây gọi trực tiếp KHÔNG qua fetchAllRows
+  // — Supabase âm thầm cắt còn 1.000 dòng, không báo lỗi. equipment_instances
+  // hiện có 1.766 dòng nên "Tổng giá trị tồn kho"/"Số thiết bị đang giữ" đã
+  // tính thiếu ~766 máy suốt thời gian qua. Các bảng còn lại hiện dưới 1.000
+  // dòng nên chưa lộ, nhưng bọc sẵn cho an toàn khi dữ liệu lớn lên.
+  const [
+    allTypes,
+    { data: templates },
+    equipmentValueOverview,
+    { data: reportTypes },
+    reportUnits,
+    reportInstances,
+    purchases,
+    disposals,
+    reportStock,
+    allOrderLines,
+    branchOrderIdList,
+  ] = await Promise.all([
+    // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
+    // nhãn ghép từ 2 cột, Tồn kho lấy từ baseReports) — lấy TOÀN BỘ loại
+    // hàng khớp tìm kiếm, tính/lọc/sắp/phân trang gộp 1 lần trong JS.
+    fetchAllRows<EquipmentTypeRow>((from, to) => {
+      let q = supabase.from("equipment_types").select("*");
+      if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
+      return q.range(from, to);
+    }),
+    supabase.from("pricing_templates").select("*").order("name"),
+    canViewInventoryTrend
+      ? computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
+      : Promise.resolve(null),
+    // Giá trị tồn kho = giá VỐN mua vào (bình quân gia quyền) x số lượng còn
+    // giữ — KHÔNG phải giá thuê x số lượng. Tính 1 lần cho TOÀN BỘ danh mục,
+    // dùng cho cả cột trong bảng (mọi vai trò đều thấy) lẫn phần "Báo cáo"
+    // bên dưới — thay cho việc trước đây fetch riêng units/instances/stock
+    // một lần nữa chỉ để tính mỗi cột "Tồn kho".
+    supabase.from("equipment_types").select("id, name, product_type").order("name"),
+    fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
+      supabase.from("equipment_units").select("id, equipment_type_id").range(from, to),
+    ),
+    fetchAllRows<{
+      equipment_type_id: string;
+      purchase_price: number | null;
+      disposal_price: number | null;
+      status: Database["public"]["Tables"]["equipment_instances"]["Row"]["status"];
+    }>((from, to) => {
+      let q = supabase
+        .from("equipment_instances")
+        .select("equipment_type_id, purchase_price, disposal_price, status");
+      if (stockBranchId) q = q.eq("branch_id", stockBranchId);
+      return q.range(from, to);
+    }),
+    fetchAllRows<{ equipment_unit_id: string; quantity: number; unit_cost: number }>((from, to) =>
+      supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost").range(from, to),
+    ),
+    fetchAllRows<{ equipment_unit_id: string; quantity: number; unit_price: number }>((from, to) =>
+      supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price").range(from, to),
+    ),
+    fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) => {
+      let q = supabase.from("equipment_stock").select("equipment_unit_id, quantity_total");
+      if (stockBranchId) q = q.eq("branch_id", stockBranchId);
+      return q.range(from, to);
+    }),
+    // Bảng lớn nhất trang này (30.000+ dòng) — đo bằng preview_logs, tự
+    // phân trang tuần tự tốn ~14s một mình. .order("id") để bắn các trang
+    // song song an toàn (xem fetchAllRowsFast).
+    fetchAllRowsFast<OrderLineInput & { order_id: string }>(
+      (from, to) =>
+        supabase
+          .from("order_equipment")
+          .select("equipment_type_id, line_total, order_id")
+          .order("id")
+          .range(from, to),
+      () => supabase.from("order_equipment").select("*", { count: "exact", head: true }),
+    ),
+    // Cửa hàng trưởng: doanh thu/lượt thuê chỉ tính trên đơn của chi nhánh
+    // mình — chỉ cần fetch khi có stockBranchId, không phụ thuộc gì khác
+    // trong khối này nên nằm ngay trong đợt gọi đầu tiên.
+    stockBranchId
+      ? fetchAllRows<{ id: string }>((from, to) =>
+          supabase
+            .from("orders")
+            .select("id")
+            .or(`pickup_branch_id.eq.${stockBranchId},return_branch_id.eq.${stockBranchId}`)
+            .range(from, to),
+        )
+      : Promise.resolve(null),
+  ]);
+
+  const templateList = templates ?? [];
+  const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
 
   function trackingTypeLabel(t: EquipmentTypeRow) {
     return t.tracking_type ? TRACKING_TYPE_LABELS[t.tracking_type] : "—";
@@ -197,77 +225,31 @@ export default async function EquipmentPage({
     if (t.pricing_method === "flat_fee") return PRICING_METHOD_LABELS.flat_fee;
     return templateNameById.get(t.pricing_template_id ?? "") ?? PRICING_METHOD_LABELS.pricing_structure;
   }
-  function stockValue(t: EquipmentTypeRow): number {
-    if (t.product_type === "service") return -1;
-    if (t.product_type === "rental" && t.tracking_type === "individual") {
-      return instanceCountByTypeId.get(t.id) ?? 0;
-    }
-    return stockTotalByTypeId.get(t.id) ?? 0;
-  }
 
-  // Giá trị tồn kho = giá VỐN mua vào (bình quân gia quyền) x số lượng còn
-  // giữ — KHÔNG phải giá thuê x số lượng (giá thuê là doanh thu tiềm năng,
-  // không phải giá trị tài sản đang có). Tính 1 lần cho TOÀN BỘ danh mục —
-  // dùng cho cả cột trong bảng (mọi vai trò đều thấy) lẫn phần "Báo cáo" bên
-  // dưới (chỉ MANAGE_ROLES).
-  const [
-    { data: reportTypes },
-    { data: reportUnits },
-    { data: reportInstances },
-    { data: purchases },
-    { data: disposals },
-    { data: reportStock },
-    allOrderLines,
-  ] = await Promise.all([
-    supabase.from("equipment_types").select("id, name, product_type").order("name"),
-    supabase.from("equipment_units").select("id, equipment_type_id"),
-    (() => {
-      const q = supabase
-        .from("equipment_instances")
-        .select("equipment_type_id, purchase_price, disposal_price, status");
-      return stockBranchId ? q.eq("branch_id", stockBranchId) : q;
-    })(),
-    supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
-    supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-    (() => {
-      const q = supabase.from("equipment_stock").select("equipment_unit_id, quantity_total");
-      return stockBranchId ? q.eq("branch_id", stockBranchId) : q;
-    })(),
-    fetchAllRows<OrderLineInput & { order_id: string }>((from, to) =>
-      supabase.from("order_equipment").select("equipment_type_id, line_total, order_id").range(from, to),
-    ),
-  ]);
-
-  // Cửa hàng trưởng: doanh thu/lượt thuê chỉ tính trên đơn của chi nhánh mình.
-  const branchOrderIds = stockBranchId
-    ? new Set(
-        (
-          await fetchAllRows<{ id: string }>((from, to) =>
-            supabase
-              .from("orders")
-              .select("id")
-              .or(`pickup_branch_id.eq.${stockBranchId},return_branch_id.eq.${stockBranchId}`)
-              .range(from, to),
-          )
-        ).map((o) => o.id),
-      )
-    : null;
+  const branchOrderIds = branchOrderIdList ? new Set(branchOrderIdList.map((o) => o.id)) : null;
   const scopedOrderLines = branchOrderIds
     ? allOrderLines.filter((l) => branchOrderIds.has(l.order_id))
     : allOrderLines;
   const reportTypeList = reportTypes ?? [];
   const baseReports = computeEquipmentTypeReports(
     reportTypeList,
-    reportUnits ?? [],
-    reportInstances ?? [],
-    purchases ?? [],
-    disposals ?? [],
-    reportStock ?? [],
+    reportUnits,
+    reportInstances,
+    purchases,
+    disposals,
+    reportStock,
     scopedOrderLines,
   );
   const inventoryValueByTypeId = new Map(
     reportTypeList.map((t) => [t.id, baseReports.get(t.id)?.currentInventoryValue ?? 0]),
   );
+  // Cột "Tồn kho" — dịch vụ không có khái niệm tồn kho (-1 = ẩn cột), còn
+  // lại lấy thẳng từ baseReports (đã gộp cả units-theo-số-lượng lẫn
+  // instances-theo-máy trong computeEquipmentTypeReports).
+  function stockValue(t: EquipmentTypeRow): number {
+    if (t.product_type === "service") return -1;
+    return baseReports.get(t.id)?.currentStockQty ?? 0;
+  }
 
   const dirMult = activeDir === "asc" ? 1 : -1;
   const sortedTypes = [...allTypes].sort((a, b) => {
@@ -336,11 +318,11 @@ export default async function EquipmentPage({
           const filteredOrderLines = scopedOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
           return computeEquipmentTypeReports(
             reportTypeList,
-            reportUnits ?? [],
-            reportInstances ?? [],
-            purchases ?? [],
-            disposals ?? [],
-            reportStock ?? [],
+            reportUnits,
+            reportInstances,
+            purchases,
+            disposals,
+            reportStock,
             filteredOrderLines,
           );
         })()
@@ -349,8 +331,8 @@ export default async function EquipmentPage({
 
     const totalInventoryValue = reportRows.reduce((sum, r) => sum + r.report.currentInventoryValue, 0);
     const totalUnitsInStock =
-      (reportStock ?? []).reduce((sum, s) => sum + s.quantity_total, 0) +
-      (reportInstances ?? []).filter((i) => i.status !== "disposed").length;
+      reportStock.reduce((sum, s) => sum + s.quantity_total, 0) +
+      reportInstances.filter((i) => i.status !== "disposed").length;
 
     reportSummary = {
       totalInventoryValue,
@@ -488,8 +470,8 @@ export default async function EquipmentPage({
               type.product_type === "service"
                 ? "—"
                 : type.tracking_type === "individual"
-                  ? `${instanceCountByTypeId.get(type.id) ?? 0} sản phẩm`
-                  : `${stockTotalByTypeId.get(type.id) ?? 0}`;
+                  ? `${stockValue(type)} sản phẩm`
+                  : `${stockValue(type)}`;
 
             const stockValueDisplay =
               type.product_type === "service"

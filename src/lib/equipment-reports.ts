@@ -36,6 +36,11 @@ export interface EquipmentTypeReport {
   revenue: number;
   rentalCount: number;
   currentInventoryValue: number;
+  // Số lượng còn giữ — tách khỏi currentInventoryValue vì giá trị cần giá vốn
+  // (thường thiếu dữ liệu) còn số lượng thì luôn tính được. Trang Thiết bị
+  // dùng trường này để sắp xếp cột Tồn kho thay vì tự fetch lại units/
+  // instances/stock riêng một lần nữa.
+  currentStockQty: number;
   profit: number;
   // Tỉ suất lợi nhuận = tổng tiền đã thu về (doanh thu + thanh lý) / tiền đã
   // bỏ ra mua — KHÔNG trừ giá vốn, nên luôn >= 0 (0% = chưa thu lại đồng nào,
@@ -123,6 +128,7 @@ export function computeEquipmentTypeReports(
     let purchaseCost = 0;
     let disposalProceeds = 0;
     let currentInventoryValue = 0;
+    let currentStockQty = 0;
 
     for (const unitId of unitIds) {
       const unitPurchases = purchasesByUnit.get(unitId) ?? [];
@@ -134,12 +140,16 @@ export function computeEquipmentTypeReports(
       disposalProceeds += unitDisposals.reduce((sum, d) => sum + d.quantity * d.unit_price, 0);
       const totalQty = unitStock.reduce((sum, row) => sum + row.quantity_total, 0);
       currentInventoryValue += totalQty * avgCost;
+      currentStockQty += totalQty;
     }
 
     for (const inst of typeInstances) {
       if (inst.purchase_price) purchaseCost += inst.purchase_price;
       if (inst.status === "disposed" && inst.disposal_price) disposalProceeds += inst.disposal_price;
-      if (inst.status !== "disposed" && inst.purchase_price) currentInventoryValue += inst.purchase_price;
+      if (inst.status !== "disposed") {
+        if (inst.purchase_price) currentInventoryValue += inst.purchase_price;
+        currentStockQty += 1;
+      }
     }
 
     const revenue = revenueByType.get(type.id) ?? 0;
@@ -154,6 +164,7 @@ export function computeEquipmentTypeReports(
       revenue,
       rentalCount,
       currentInventoryValue,
+      currentStockQty,
       profit,
       profitRatio,
     });

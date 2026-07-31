@@ -27,6 +27,48 @@ export async function fetchAllRows<T>(
   return all;
 }
 
+// Số trang bắn song song 1 đợt — đủ để cắt thời gian chờ xuống nhiều lần mà
+// không mở quá nhiều kết nối cùng lúc tới Postgres (bể connection pool) hay
+// chạm giới hạn subrequest đồng thời của Cloudflare Workers.
+const PARALLEL_BATCH = 8;
+
+// Bản NHANH của fetchAllRows — dùng khi bảng có thể vượt xa 1.000 dòng và
+// đang là điểm nghẽn thật sự (đo bằng preview_logs, không đoán). fetchAllRows
+// gọi TUẦN TỰ nên 1 bảng 30.000 dòng tốn ~30 lượt gọi nối đuôi nhau — với
+// order_equipment đo được đúng đây là nguyên nhân trang Thiết bị mất 14s.
+//
+// count và data tách thành 2 tham số riêng — LẦN ĐẦU thử gộp { count: "exact" }
+// ngay trong buildQuery khiến MỌI trang (cả 31 trang) đều phải tính lại count
+// (COUNT(*) không hề rẻ), kết quả trang chậm ĐI từ 14s lên 30s. Giờ chỉ tính
+// count đúng 1 lần, song song với trang đầu tiên.
+//
+// ĐIỀU KIỆN BẮT BUỘC để dùng hàm này (khác fetchAllRows): buildQuery phải có
+// .order(cột_ổn_định) — ví dụ .order("id"). Phân trang bằng range() không có
+// ORDER BY là KHÔNG xác định thứ tự vật lý giữa các lần gọi, bắn song song
+// lúc đó có thể trùng hoặc sót dòng.
+export async function fetchAllRowsFast<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
+  getCount: () => PromiseLike<{ count: number | null }>,
+  chunk = DEFAULT_CHUNK,
+): Promise<T[]> {
+  const [{ count }, first] = await Promise.all([getCount(), buildQuery(0, chunk - 1)]);
+  const firstData = first.data ?? [];
+  // Không biết tổng số dòng, hoặc trang đầu đã là trang cuối — không có gì
+  // để bắn song song thêm, trả thẳng kết quả đã có.
+  if (count == null || firstData.length < chunk) return firstData;
+
+  const remainingStarts: number[] = [];
+  for (let from = chunk; from < count; from += chunk) remainingStarts.push(from);
+
+  const all = [...firstData];
+  for (let i = 0; i < remainingStarts.length; i += PARALLEL_BATCH) {
+    const batch = remainingStarts.slice(i, i + PARALLEL_BATCH);
+    const results = await Promise.all(batch.map((from) => buildQuery(from, from + chunk - 1)));
+    for (const r of results) all.push(...(r.data ?? []));
+  }
+  return all;
+}
+
 // Mỗi UUID trong .in() tốn ~39 ký tự trên URL; 100 cái ≈ 3,9KB — vẫn dưới hạn
 // độ dài URL của PostgREST/proxy, mà chỉ cần 2 lượt gọi cho 1 tháng bận.
 const DEFAULT_ID_CHUNK = 100;
