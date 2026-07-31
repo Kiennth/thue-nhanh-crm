@@ -3,11 +3,24 @@ import { cookies } from "next/headers";
 import type { Browser } from "puppeteer-core";
 import type { PrintDocType } from "@/lib/print-docs";
 
+// Cloudflare Workers chạy trong V8 isolate (không có child_process/filesystem
+// cho binary ngoài) — Puppeteer/Chromium KHÔNG thể chạy ở đây dù đã bật
+// nodejs_compat. Chặn sớm với thông báo rõ ràng thay vì lỗi mơ hồ lúc runtime.
+// Cách nhận diện chuẩn theo tài liệu Cloudflare: navigator.userAgent cố định
+// là "Cloudflare-Workers".
+const isCloudflareWorkers =
+  typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+
 // Vercel (serverless) không có Chrome hệ thống và cũng không chứa nổi bản
 // Chromium đầy đủ của puppeteer — dùng @sparticuz/chromium (bản nén cho
 // serverless) + puppeteer-core. Local/dev/VPS vẫn dùng puppeteer đầy đủ.
 // Nhớ set env PUPPETEER_SKIP_DOWNLOAD=1 trên Vercel để build khỏi tải Chrome.
 async function launchBrowser(): Promise<Browser> {
+  if (isCloudflareWorkers) {
+    throw new Error(
+      "Xuất PDF chưa hỗ trợ trên hạ tầng Cloudflare Workers hiện tại (Puppeteer cần môi trường Node.js đầy đủ). Cần dùng dịch vụ render PDF ngoài (vd Browser Rendering API của Cloudflare) hoặc host phần này trên nền tảng Node.js server.",
+    );
+  }
   if (process.env.VERCEL) {
     const [{ default: chromium }, { default: puppeteerCore }] = await Promise.all([
       import("@sparticuz/chromium"),
