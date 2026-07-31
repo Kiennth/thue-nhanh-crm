@@ -9,10 +9,105 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { buildCustomerReportRows, type CustomerReportRow } from "@/lib/customer-reports";
+import {
+  buildCustomerReportRows,
+  daysSince,
+  DORMANT_DAYS,
+  DORMANT_MIN_ORDERS,
+  findDormantCustomers,
+  type CustomerReportRow,
+} from "@/lib/customer-reports";
 import type { CustomerType } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" });
+
+// Số khách hiện trong danh sách gọi lại — đủ cho một buổi gọi, phần còn lại
+// nằm ở con số tổng ngay dưới tiêu đề.
+const DORMANT_LIST_SIZE = 10;
+
+// Danh sách việc cần làm, không phải báo cáo: khách từng thuê nhiều lần mà
+// lâu rồi im ắng, kèm số điện thoại để gọi được ngay mà không phải mở từng
+// hồ sơ.
+function DormantCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
+  const dormant = findDormantCustomers(rows);
+  const shown = dormant.slice(0, DORMANT_LIST_SIZE);
+  const lostRevenue = dormant.reduce((sum, r) => sum + r.totalRevenue, 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Khách nguội cần gọi lại</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Từng thuê {DORMANT_MIN_ORDERS}+ lần nhưng đã hơn {DORMANT_DAYS} ngày không quay lại
+          {dormant.length > 0 && (
+            <>
+              {" "}
+              — <span className="font-medium text-foreground">{dormant.length} khách</span>, từng
+              mang về {currencyFormatter.format(lostRevenue)}đ
+            </>
+          )}
+          .
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Khách hàng</TableHead>
+              <TableHead>Điện thoại</TableHead>
+              <TableHead className="text-right">Số đơn</TableHead>
+              <TableHead className="text-right">Đã chi</TableHead>
+              <TableHead className="text-right">Lần cuối</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shown.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium">
+                  <Link href={`/customers/${r.id}`} className="hover:underline">
+                    {r.name}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  {r.phone ? (
+                    <a href={`tel:${r.phone}`} className="hover:underline">
+                      {r.phone}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{r.orderCount}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {currencyFormatter.format(r.totalRevenue)}đ
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap tabular-nums">
+                  {dateFormatter.format(new Date(r.lastOrderDate!))}
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({daysSince(r.lastOrderDate!)} ngày)
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+            {!shown.length && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  Không có khách nào bỏ lâu — mọi khách quen đều đã quay lại gần đây.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        {dormant.length > shown.length && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Đang hiện {shown.length} khách chi nhiều nhất trong tổng số {dormant.length}.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // 4 thẻ tóm tắt — dùng chung cho báo cáo đầy đủ ở /customers và khối tóm tắt
 // condensed trên Trang chủ.
@@ -115,6 +210,8 @@ export function CustomerReportSection({
       <h2 className="text-lg font-semibold">Báo cáo khách hàng</h2>
 
       <CustomerOverviewTiles rows={rows} />
+
+      <DormantCustomersCard rows={rows} />
 
       {showRankings && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
