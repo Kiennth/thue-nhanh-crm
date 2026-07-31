@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentEmployee } from "@/lib/dal";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { CustomerDialog } from "../customer-dialog";
@@ -45,15 +47,28 @@ export default async function CustomerDetailPage({
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
   const supabase = await createClient();
 
+  const viewer = await getCurrentEmployee();
+  // Cửa hàng trưởng chỉ xem lịch sử đơn của khách TẠI chi nhánh mình; khách
+  // chưa từng có đơn ở đây thì coi như không tồn tại (404) — khớp với danh
+  // sách khách hàng đã lọc theo chi nhánh.
+  const branchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+
   const [{ data: customer }, { data: orders }] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("orders")
-      .select("id, order_code, pickup_branch_id, return_branch_id, rental_start_at, rental_end_at, total_value, status, completed_at, cancelled_at")
-      .eq("customer_id", id)
-      .order("order_date", { ascending: false }),
+    (() => {
+      const q = supabase
+        .from("orders")
+        .select("id, order_code, pickup_branch_id, return_branch_id, rental_start_at, rental_end_at, total_value, status, completed_at, cancelled_at")
+        .eq("customer_id", id);
+      return (
+        branchId
+          ? q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`)
+          : q
+      ).order("order_date", { ascending: false });
+    })(),
   ]);
   if (!customer) notFound();
+  if (branchId && !(orders ?? []).length) notFound();
 
   const dirMult = activeDir === "asc" ? 1 : -1;
   const orderList = [...(orders ?? [])].sort((a, b) => {

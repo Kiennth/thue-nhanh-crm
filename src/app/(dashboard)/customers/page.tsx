@@ -12,6 +12,8 @@ import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
 import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentEmployee } from "@/lib/dal";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
 import type { CustomerType } from "@/types/database";
@@ -63,7 +65,14 @@ export default async function CustomersPage({
   // Postgres theo các cột này. Lấy TOÀN BỘ khách hàng + đơn hàng (đằng nào
   // cũng cần đủ cho khối báo cáo phía trên), lọc/sắp/phân trang gộp 1 lần
   // trong JS thay vì query riêng cho bảng danh sách.
-  const [allCustomers, orders, payments] = await Promise.all([
+  // Cửa hàng trưởng chỉ thấy khách hàng ĐÃ TỪNG phát sinh đơn ở chi nhánh
+  // mình — bảng customers dùng chung toàn hệ thống nên phải suy ra qua đơn
+  // hàng (tính cả chiều giao lẫn chiều thu hồi, khớp cách lọc ở /orders).
+  const viewer = await getCurrentEmployee();
+  const branchId =
+    viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+
+  const [allCustomersRaw, ordersRaw, paymentsRaw] = await Promise.all([
     fetchAllRows<{
       id: string;
       name: string;
@@ -89,16 +98,34 @@ export default async function CustomersPage({
       total_value: number;
       order_date: string;
       cancelled_at: string | null;
+      pickup_branch_id: string;
+      return_branch_id: string;
     }>((from, to) =>
       supabase
         .from("orders")
-        .select("id, customer_id, total_value, order_date, cancelled_at")
+        .select(
+          "id, customer_id, total_value, order_date, cancelled_at, pickup_branch_id, return_branch_id",
+        )
         .range(from, to),
     ),
     fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
       supabase.from("order_payments").select("order_id, amount").range(from, to),
     ),
   ]);
+
+  const orders = branchId
+    ? ordersRaw.filter(
+        (o) => o.pickup_branch_id === branchId || o.return_branch_id === branchId,
+      )
+    : ordersRaw;
+  const branchCustomerIds = branchId ? new Set(orders.map((o) => o.customer_id)) : null;
+  const allCustomers = branchCustomerIds
+    ? allCustomersRaw.filter((c) => branchCustomerIds.has(c.id))
+    : allCustomersRaw;
+  const branchOrderIds = branchId ? new Set(orders.map((o) => o.id)) : null;
+  const payments = branchOrderIds
+    ? paymentsRaw.filter((p) => branchOrderIds.has(p.order_id))
+    : paymentsRaw;
 
   const reportById = new Map(
     buildCustomerReportRows(allCustomers, orders, payments).map((r) => [r.id, r]),
