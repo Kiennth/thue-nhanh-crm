@@ -175,7 +175,12 @@ export default async function CustomersPage({
         <CustomerDialog />
       </div>
 
-      <CustomerReportSection customers={allCustomers} orders={orders} payments={payments} />
+      <CustomerReportSection
+        customers={allCustomers}
+        orders={orders}
+        payments={payments}
+        showRankings={!branchId}
+      />
 
       <div className="space-y-3">
         <SearchInput

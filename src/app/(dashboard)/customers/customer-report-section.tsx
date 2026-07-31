@@ -77,7 +77,12 @@ export function CustomerReportSection({
   customers,
   orders,
   payments,
+  showRankings = true,
 }: {
+  // Xếp hạng khách theo doanh số và bảng công nợ là việc của Giám đốc/Admin/
+  // Kế toán — CEO chốt Cửa hàng trưởng không cần nhìn, bạn ấy chỉ cần số
+  // lượng/cơ cấu khách của chi nhánh mình.
+  showRankings?: boolean;
   customers: { id: string; name: string; customer_type: CustomerType }[];
   orders: {
     id: string;
@@ -111,49 +116,51 @@ export function CustomerReportSection({
 
       <CustomerOverviewTiles rows={rows} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <TopRevenueCard title="Top khách hàng công ty theo doanh số" rows={topCompanyByRevenue} />
-        <TopRevenueCard title="Top khách hàng cá nhân theo doanh số" rows={topIndividualByRevenue} />
+      {showRankings && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <TopRevenueCard title="Top khách hàng công ty theo doanh số" rows={topCompanyByRevenue} />
+          <TopRevenueCard title="Top khách hàng cá nhân theo doanh số" rows={topIndividualByRevenue} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Công nợ theo khách hàng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Khách hàng</TableHead>
-                  <TableHead>Số lượng đơn</TableHead>
-                  <TableHead>Còn nợ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {debtRows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/customers/${r.id}`} className="hover:underline">
-                        {r.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{r.orderCount}</TableCell>
-                    <TableCell className="text-destructive">
-                      {currencyFormatter.format(r.totalOwed)}đ
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!debtRows.length && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Công nợ theo khách hàng</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      Không có khách nào còn nợ.
-                    </TableCell>
+                    <TableHead>Khách hàng</TableHead>
+                    <TableHead>Số lượng đơn</TableHead>
+                    <TableHead>Còn nợ</TableHead>
                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {debtRows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/customers/${r.id}`} className="hover:underline">
+                          {r.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{r.orderCount}</TableCell>
+                      <TableCell className="text-destructive">
+                        {currencyFormatter.format(r.totalOwed)}đ
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!debtRows.length && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
+                        Không có khách nào còn nợ.
+                      </TableCell>
+                    </TableRow>
                 )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
