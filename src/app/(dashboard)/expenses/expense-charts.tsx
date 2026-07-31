@@ -12,23 +12,7 @@ import {
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
-// Hạng mục -> màu gán theo sort_order CỐ ĐỊNH (Thuê nhà luôn chart-1, Điện
-// luôn chart-2...) — đổi bộ lọc hay thiếu hạng mục cũng không được nhảy màu,
-// vì màu đi theo hạng mục chứ không theo vị trí trong dữ liệu hiện có.
-const CATEGORY_COLOR_SLOTS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-7)",
-  "var(--chart-9)",
-  "var(--chart-10)",
-];
-
-export function categoryColor(index: number): string {
-  return CATEGORY_COLOR_SLOTS[index % CATEGORY_COLOR_SLOTS.length];
-}
+import { categoryColor } from "./expense-colors";
 
 export interface BranchExpensePoint {
   branch: string;
@@ -43,10 +27,12 @@ export function BranchExpenseChart({
   categories,
 }: {
   points: BranchExpensePoint[];
-  categories: { id: string; name: string }[];
+  // color tuỳ chọn cho hạng mục "ảo" (quỹ lương tự tính) — hạng mục thật vẫn
+  // ăn màu theo thứ tự cố định.
+  categories: { id: string; name: string; color?: string }[];
 }) {
   const config = Object.fromEntries(
-    categories.map((c, i) => [c.id, { label: c.name, color: categoryColor(i) }]),
+    categories.map((c, i) => [c.id, { label: c.name, color: c.color ?? categoryColor(i) }]),
   ) satisfies ChartConfig;
 
   return (

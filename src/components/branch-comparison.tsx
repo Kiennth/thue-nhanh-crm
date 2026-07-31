@@ -29,6 +29,7 @@ export function BranchComparisonSection({
   isToday,
   isThisMonth,
   isThisYear,
+  profit,
 }: {
   branches: { id: string; name: string }[];
   // Doanh thu ghi nhận theo chi nhánh giao (chi nhánh "sở hữu" đơn).
@@ -39,6 +40,12 @@ export function BranchComparisonSection({
   isToday: boolean;
   isThisMonth: boolean;
   isThisYear: boolean;
+  // Chi phí vận hành + quỹ lương của THÁNG đang chọn, gom sẵn theo chi nhánh
+  // — có thì hiện thêm khối Lãi gộp (doanh thu tháng − 2 khoản này).
+  profit?: {
+    operatingByBranch: Map<string, number>;
+    payrollByBranch: Map<string, number>;
+  };
 }) {
   const rows = branches.map((branch) => {
     const branchOrders = orders.filter((o) => o.pickup_branch_id === branch.id);
@@ -106,6 +113,119 @@ export function BranchComparisonSection({
           </CardContent>
         </Card>
       </div>
+
+      {profit && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {isThisMonth
+                ? "Lãi gộp tháng này theo chi nhánh"
+                : `Lãi gộp tháng ${month.split("-")[1]}/${month.split("-")[0]} theo chi nhánh`}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Lãi = doanh thu (chưa VAT) − chi phí vận hành − quỹ lương tự tính từ Bảng lương.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Chi nhánh</TableHead>
+                  <TableHead className="text-right">Doanh thu</TableHead>
+                  <TableHead className="text-right">Chi phí vận hành</TableHead>
+                  <TableHead className="text-right">Quỹ lương</TableHead>
+                  <TableHead className="text-right">Lãi gộp</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  const profitRows = rows
+                    .map((r) => {
+                      const operating = profit.operatingByBranch.get(r.branch.id) ?? 0;
+                      const payroll = profit.payrollByBranch.get(r.branch.id) ?? 0;
+                      return {
+                        branch: r.branch,
+                        revenue: r.month,
+                        operating,
+                        payroll,
+                        net: r.month - operating - payroll,
+                      };
+                    })
+                    // Chi nhánh không phát sinh gì cả (HQ chỉ có lương thì
+                    // VẪN phát sinh) mới ẩn khỏi bảng.
+                    .filter((r) => r.revenue !== 0 || r.operating !== 0 || r.payroll !== 0)
+                    .sort((a, b) => b.net - a.net);
+                  const sum = profitRows.reduce(
+                    (acc, r) => ({
+                      revenue: acc.revenue + r.revenue,
+                      operating: acc.operating + r.operating,
+                      payroll: acc.payroll + r.payroll,
+                      net: acc.net + r.net,
+                    }),
+                    { revenue: 0, operating: 0, payroll: 0, net: 0 },
+                  );
+                  return (
+                    <>
+                      {profitRows.map((r) => (
+                        <TableRow key={r.branch.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <BranchBadge name={r.branch.name} />
+                              {r.branch.name}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(r.revenue)}đ
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(r.operating)}đ
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(r.payroll)}đ
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-medium tabular-nums ${
+                              r.net < 0 ? "text-destructive" : ""
+                            }`}
+                          >
+                            {currencyFormatter.format(r.net)}đ
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {!profitRows.length && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            Tháng này chưa có doanh thu, chi phí hay lương nào.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {profitRows.length > 0 && (
+                        <TableRow className="font-medium">
+                          <TableCell>Tổng cộng</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(sum.revenue)}đ
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(sum.operating)}đ
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currencyFormatter.format(sum.payroll)}đ
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums ${sum.net < 0 ? "text-destructive" : ""}`}
+                          >
+                            {currencyFormatter.format(sum.net)}đ
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })()}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

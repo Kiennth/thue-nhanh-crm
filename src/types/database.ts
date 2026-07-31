@@ -16,6 +16,7 @@ export type OrderPaymentType = "invoice" | "deposit_collect" | "deposit_refund";
 export type RfidTagStatus = "in_stock" | "with_customer";
 export type RfidScanType = "giao_hang" | "thu_hoi";
 export type DeliveryMethod = "self_ride" | "external_service";
+export type RecurringFrequency = "monthly" | "quarterly" | "yearly";
 
 export type TaskType =
   | "tiep_nhan_yeu_cau"
@@ -515,6 +516,34 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
+        Relationships: [];
+      };
+      recurring_expenses: {
+        Row: {
+          id: string;
+          branch_id: string;
+          category_id: string;
+          amount: number;
+          frequency: RecurringFrequency;
+          start_date: string;
+          end_date: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          branch_id: string;
+          category_id: string;
+          amount: number;
+          frequency?: RecurringFrequency;
+          start_date: string;
+          end_date?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["recurring_expenses"]["Insert"]>;
         Relationships: [];
       };
       overtime_entries: {

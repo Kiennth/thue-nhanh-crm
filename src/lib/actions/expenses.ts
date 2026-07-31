@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { EXPENSE_ROLES } from "@/lib/roles";
+import { coveredPairsInMonth } from "@/lib/recurring-expenses";
 
 export type ActionState = { error: string } | { success: true } | undefined;
 
@@ -108,6 +109,101 @@ export async function deleteExpense(id: string): Promise<void> {
   revalidatePath("/expenses");
 }
 
+const RecurringExpenseSchema = z
+  .object({
+    branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+    category_id: z.string().uuid({ message: "Vui lòng chọn hạng mục." }),
+    amount: z.coerce.number().positive({ message: "Số tiền phải lớn hơn 0." }),
+    frequency: z.enum(["monthly", "quarterly", "yearly"]),
+    start_date: z.string().min(1, { message: "Vui lòng chọn ngày bắt đầu." }),
+    end_date: z.string().optional(),
+    note: z.string().trim().optional(),
+  })
+  .refine((d) => !d.end_date || d.end_date >= d.start_date, {
+    message: "Ngày kết thúc phải sau ngày bắt đầu.",
+    path: ["end_date"],
+  });
+
+function parseRecurringForm(formData: FormData) {
+  return RecurringExpenseSchema.safeParse({
+    branch_id: formData.get("branch_id"),
+    category_id: formData.get("category_id"),
+    amount: formData.get("amount"),
+    frequency: formData.get("frequency"),
+    start_date: formData.get("start_date"),
+    end_date: formData.get("end_date") || undefined,
+    note: formData.get("note") || undefined,
+  });
+}
+
+export async function createRecurringExpense(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = parseRecurringForm(formData);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const { employee, error: accessError } = await requireExpenseAccess(parsed.data.branch_id);
+  if (accessError) return { error: accessError };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("recurring_expenses").insert({
+    ...parsed.data,
+    end_date: parsed.data.end_date ?? null,
+    created_by: employee.id,
+  });
+  if (error) {
+    return { error: "Không thể tạo chi phí định kỳ: " + error.message };
+  }
+
+  revalidatePath("/expenses");
+  return { success: true };
+}
+
+export async function updateRecurringExpense(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = parseRecurringForm(formData);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const { error: accessError } = await requireExpenseAccess(parsed.data.branch_id);
+  if (accessError) return { error: accessError };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("recurring_expenses")
+    .update({ ...parsed.data, end_date: parsed.data.end_date ?? null })
+    .eq("id", id);
+  if (error) {
+    return { error: "Không thể sửa chi phí định kỳ: " + error.message };
+  }
+
+  revalidatePath("/expenses");
+  return { success: true };
+}
+
+export async function deleteRecurringExpense(id: string): Promise<void> {
+  await requireRole([...EXPENSE_ROLES]);
+
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("recurring_expenses")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (error) {
+    throw new Error("Không thể xoá chi phí định kỳ: " + error.message);
+  }
+  if (!count) {
+    throw new Error("Không tìm thấy chi phí định kỳ (hoặc bạn không có quyền xoá).");
+  }
+
+  revalidatePath("/expenses");
+}
+
 // "Chép từ tháng trước": đổ lại toàn bộ khoản chi tháng trước vào tháng này
 // (giữ chi nhánh/hạng mục/số tiền/ghi chú, dời ngày sang tháng này) để kế
 // toán chỉ phải sửa lại con số điện nước. Cố tình KHÔNG làm khoản lặp tự
@@ -137,9 +233,26 @@ export async function copyExpensesFromPreviousMonth(month: string): Promise<Acti
   if (readError) {
     return { error: "Không đọc được chi phí tháng trước: " + readError.message };
   }
-  if (!prevRows?.length) {
-    return { error: `Tháng ${prev} chưa có khoản chi nào để chép.` };
+
+  // Bỏ qua các cặp (chi nhánh, hạng mục) đã có ĐỊNH KỲ hoạt động trong tháng
+  // đích — nếu không sẽ vừa tự ghi vừa chép tay ra 2 dòng tiền nhà.
+  const { data: recurringDefs } = await supabase
+    .from("recurring_expenses")
+    .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note");
+  const covered = coveredPairsInMonth(recurringDefs ?? [], month);
+  const copyable = (prevRows ?? []).filter(
+    (r) => !covered.has(`${r.branch_id}:${r.category_id}`),
+  );
+  const skipped = (prevRows?.length ?? 0) - copyable.length;
+
+  if (!copyable.length) {
+    return {
+      error: skipped
+        ? `Tháng ${prev} chỉ có các khoản đã nằm trong chi phí định kỳ — không có gì để chép.`
+        : `Tháng ${prev} chưa có khoản chi nào để chép.`,
+    };
   }
+  const prevRowsToUse = copyable;
 
   // Đã có dòng trong tháng này thì không chép đè — tránh bấm 2 lần ra 2 bộ.
   const nextMonth = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
@@ -152,7 +265,7 @@ export async function copyExpensesFromPreviousMonth(month: string): Promise<Acti
     return { error: `Tháng ${month} đã có ${existing} khoản chi — chép nữa sẽ bị trùng.` };
   }
 
-  const inserts = prevRows.map((r) => ({
+  const inserts = prevRowsToUse.map((r) => ({
     branch_id: r.branch_id,
     category_id: r.category_id,
     amount: r.amount,

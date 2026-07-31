@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import type { RecurringExpenseDef } from "@/lib/recurring-expenses";
 
 export interface ExpenseRow {
   id: string;
@@ -25,6 +26,9 @@ export interface ExpenseData {
   periodRows: ExpenseRow[];
   previousPeriodRows: ExpenseRow[];
   trendRows: ExpenseRow[];
+  // Định nghĩa chi phí định kỳ (RLS đã lọc theo kho cho cửa hàng trưởng) —
+  // trang tự "trải" ra từng kỳ bằng expandRecurring.
+  recurringDefs: RecurringExpenseDef[];
 }
 
 export type ExpensePeriod = "month" | "quarter" | "year";
@@ -86,7 +90,7 @@ export async function fetchExpenseData(
   const trendStart = new Date(y, m - 12, 1);
   const trendStartStr = `${trendStart.getFullYear()}-${String(trendStart.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const [categories, periodRows, previousPeriodRows, trendRows] = await Promise.all([
+  const [categories, periodRows, previousPeriodRows, trendRows, recurringDefs] = await Promise.all([
     supabase
       .from("expense_categories")
       .select("id, name, sort_order")
@@ -118,9 +122,14 @@ export async function fetchExpenseData(
         .lt("expense_date", range.end)
         .range(from, to),
     ),
+    supabase
+      .from("recurring_expenses")
+      .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note")
+      .order("start_date")
+      .then((r) => (r.data ?? []) as RecurringExpenseDef[]),
   ]);
 
-  return { categories, periodRows, previousPeriodRows, trendRows, range };
+  return { categories, periodRows, previousPeriodRows, trendRows, recurringDefs, range };
 }
 
 export function sumAmount(rows: { amount: number }[]): number {

@@ -20,6 +20,7 @@ import {
 import { fetchAllCustomersLite } from "@/lib/customers";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { buildCustomerReportRows } from "@/lib/customer-reports";
+import { expandRecurring } from "@/lib/recurring-expenses";
 import {
   computeEmployeeMonthlyPerformance,
   computeMyMonthlyTrend,
@@ -138,6 +139,10 @@ export default async function DashboardHomePage({
             supabase
               .from("orders")
               .select("pickup_branch_id, order_date, total_value")
+              // Đơn huỷ không phải doanh thu — trước đây thiếu điều kiện này
+              // (chưa lệch số vì hệ thống hiện có 0 đơn huỷ, nhưng lãi/lỗ
+              // thì phải đúng từ gốc).
+              .is("cancelled_at", null)
               .range(from, to),
         )
       : Promise.resolve([]),
@@ -214,6 +219,52 @@ export default async function DashboardHomePage({
 
   const orderList = orders ?? [];
   const typeList = types ?? [];
+
+  // Lãi gộp theo chi nhánh của THÁNG đang so sánh = doanh thu − chi phí vận
+  // hành (bảng expenses) − quỹ lương (tự lấy từ Bảng lương, CEO chốt). Chỉ
+  // tính khi người xem thấy khối So sánh chi nhánh.
+  let branchProfit: {
+    operatingByBranch: Map<string, number>;
+    payrollByBranch: Map<string, number>;
+  } | null = null;
+  if (canViewBranchComparison) {
+    const [my, mm] = month.split("-").map(Number);
+    const nextMonth = mm === 12 ? `${my + 1}-01` : `${my}-${String(mm + 1).padStart(2, "0")}`;
+    const [{ data: monthExpenses }, { data: recurringDefs }, payrollRows] = await Promise.all([
+      supabase
+        .from("expenses")
+        .select("branch_id, amount")
+        .gte("expense_date", `${month}-01`)
+        .lt("expense_date", `${nextMonth}-01`),
+      supabase
+        .from("recurring_expenses")
+        .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note"),
+      // Tháng so sánh trùng tháng biểu đồ hiệu suất (mặc định) thì dùng lại
+      // kết quả đã tính, khỏi chạy lại cả cụm truy vấn lương.
+      month === chartMonth && employeeRows
+        ? Promise.resolve(employeeRows)
+        : computeEmployeeMonthlyPerformance(month),
+    ]);
+    const operatingByBranch = new Map<string, number>();
+    // Khoản nhập tay + khoản định kỳ trải vào đúng tháng này (thuê nhà,
+    // trả góp...) — thiếu vế sau thì chi phí vận hành trên bảng lãi luôn 0.
+    const monthOperatingRows = [
+      ...(monthExpenses ?? []),
+      ...expandRecurring(recurringDefs ?? [], [month]),
+    ];
+    for (const e of monthOperatingRows) {
+      operatingByBranch.set(
+        e.branch_id,
+        (operatingByBranch.get(e.branch_id) ?? 0) + Number(e.amount),
+      );
+    }
+    const payrollByBranch = new Map<string, number>();
+    for (const r of payrollRows) {
+      if (!r.branchId) continue;
+      payrollByBranch.set(r.branchId, (payrollByBranch.get(r.branchId) ?? 0) + r.totalIncome);
+    }
+    branchProfit = { operatingByBranch, payrollByBranch };
+  }
   // Chỉ Giám đốc/Admin/Kế toán xem khối "Cho thuê nhiều nhất / Sản phẩm chủ
   // lực / Tỉ suất lợi nhuận" ở trang chủ nên báo cáo này luôn ở phạm vi toàn
   // hệ thống — Cửa hàng trưởng xem bản theo kho chi nhánh ở trang Thiết bị.
@@ -360,6 +411,7 @@ export default async function DashboardHomePage({
           isToday={day === defaults.day}
           isThisMonth={month === defaults.month}
           isThisYear={year === defaults.year}
+          profit={branchProfit ?? undefined}
         />
       )}
 
