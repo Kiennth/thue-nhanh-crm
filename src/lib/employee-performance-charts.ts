@@ -1,6 +1,12 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRows, fetchRowsByIds } from "@/lib/supabase/fetch-all";
+import {
+  ORDER_COLUMNS,
+  ORDER_LINE_COLUMNS,
+  type OrderLineRow,
+  type OrderRow,
+} from "@/lib/payroll-rows";
 import {
   computeLineDirectPayout,
   computeOrderCommissionFund,
@@ -15,7 +21,7 @@ import {
   TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
-import type { DeliveryMethod, TaskType } from "@/types/database";
+import type { TaskType } from "@/types/database";
 import { MANAGE_ROLES } from "@/lib/roles";
 
 export { MANAGE_ROLES };
@@ -87,7 +93,7 @@ export async function computeEmployeeMonthlyPerformance(
     { data: taskWeights },
     { data: bonusTiers },
     { data: equipmentTypes },
-    allOrderLines,
+    linesCompletedInMonth,
     overtimeInMonth,
   ] = await Promise.all([
     employeesQuery,
@@ -105,17 +111,12 @@ export async function computeEmployeeMonthlyPerformance(
     admin.from("task_weights").select("task_type, weight_percentage"),
     admin.from("bonus_tiers").select("branch_id, threshold_amount, bonus_amount"),
     admin.from("equipment_types").select("id, payout_percentage"),
-    fetchAllRows<{
-      order_id: string;
-      equipment_type_id: string | null;
-      employee_id: string | null;
-      completed_date: string | null;
-      line_total: number;
-      delivery_method: DeliveryMethod | null;
-    }>((from, to) =>
+    fetchAllRows<OrderLineRow>((from, to) =>
       admin
         .from("order_equipment")
-        .select("order_id, equipment_type_id, employee_id, completed_date, line_total, delivery_method")
+        .select(ORDER_LINE_COLUMNS)
+        .gte("completed_date", start)
+        .lt("completed_date", end)
         .range(from, to),
     ),
     fetchAllRows<{ employee_id: string; amount: number }>((from, to) =>
@@ -130,22 +131,30 @@ export async function computeEmployeeMonthlyPerformance(
 
   const employeeList = employees ?? [];
 
-  // Không lọc orders bằng .in(id, orderIds) — 1 tháng bận có thể liên quan
-  // hàng nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL của
-  // PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
-  const allOrders = await fetchAllRows<{
-    id: string;
-    total_value: number;
-    pickup_branch_id: string;
-    rental_start_at: string | null;
-    rental_end_at: string | null;
-  }>((from, to) =>
-    admin
-      .from("orders")
-      .select("id, total_value, pickup_branch_id, rental_start_at, rental_end_at")
-      .range(from, to),
-  );
-  const orderById = new Map(allOrders.map((o) => [o.id, o]));
+  // Chỉ 2 nhóm đơn ảnh hưởng tới lương tháng này: đơn có KHÂU hoàn thành trong
+  // tháng, và đơn có DÒNG dịch vụ/vận chuyển hoàn thành trong tháng. Với mỗi
+  // đơn đó cần đủ TOÀN BỘ dòng hàng (để trừ phần khoán trực tiếp ra khỏi quỹ
+  // khoán theo khâu) — nhưng chỉ của những đơn đó thôi.
+  //
+  // Trước đây chỗ này nạp NGUYÊN bảng order_equipment + orders rồi lọc trong
+  // JS: 40.000+ dòng cho 1 tháng chỉ có ~190 đơn liên quan. Trên Cloudflare
+  // Workers số đó vượt hạn mức CPU/bộ nhớ → cả trang chết với lỗi 1102.
+  const relevantOrderIds = [
+    ...new Set([
+      ...tasksInMonth.map((t) => t.order_id),
+      ...linesCompletedInMonth.map((l) => l.order_id),
+    ]),
+  ];
+
+  const [allOrderLines, relevantOrders] = await Promise.all([
+    fetchRowsByIds<OrderLineRow>(relevantOrderIds, (ids, from, to) =>
+      admin.from("order_equipment").select(ORDER_LINE_COLUMNS).in("order_id", ids).range(from, to),
+    ),
+    fetchRowsByIds<OrderRow>(relevantOrderIds, (ids, from, to) =>
+      admin.from("orders").select(ORDER_COLUMNS).in("id", ids).range(from, to),
+    ),
+  ]);
+  const orderById = new Map(relevantOrders.map((o) => [o.id, o]));
 
   // Dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ thuật...) —
   // loại khỏi quỹ khoán theo khâu của CẢ đơn (không giới hạn theo tháng, vì

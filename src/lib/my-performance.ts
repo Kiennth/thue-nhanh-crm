@@ -1,6 +1,12 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRows, fetchRowsByIds } from "@/lib/supabase/fetch-all";
+import {
+  ORDER_COLUMNS,
+  ORDER_LINE_COLUMNS,
+  type OrderLineRow,
+  type OrderRow,
+} from "@/lib/payroll-rows";
 import {
   computeLineDirectPayout,
   computeOrderCommissionFund,
@@ -14,7 +20,7 @@ import {
   TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
-import type { DeliveryMethod, TaskType } from "@/types/database";
+import type { TaskType } from "@/types/database";
 
 function currentMonthRange() {
   const now = new Date();
@@ -63,7 +69,7 @@ export async function computeMyPerformance(
   const { start, end, label } = currentMonthRange();
   const admin = createAdminClient();
 
-  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }, { data: equipmentTypes }, allOrderLines, overtimeInMonth] =
+  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }, { data: equipmentTypes }, myLinesInMonth, overtimeInMonth] =
     await Promise.all([
       fetchAllRows<{ task_type: TaskType; order_id: string }>((from, to) =>
         admin
@@ -81,17 +87,13 @@ export async function computeMyPerformance(
         ? admin.from("bonus_tiers").select("*").eq("branch_id", branchId).order("tier_number")
         : Promise.resolve({ data: [] as { tier_number: number; threshold_amount: number; bonus_amount: number }[] }),
       admin.from("equipment_types").select("id, payout_percentage"),
-      fetchAllRows<{
-        order_id: string;
-        equipment_type_id: string | null;
-        employee_id: string | null;
-        completed_date: string | null;
-        line_total: number;
-        delivery_method: DeliveryMethod | null;
-      }>((from, to) =>
+      fetchAllRows<OrderLineRow>((from, to) =>
         admin
           .from("order_equipment")
-          .select("order_id, equipment_type_id, employee_id, completed_date, line_total, delivery_method")
+          .select(ORDER_LINE_COLUMNS)
+          .eq("employee_id", employeeId)
+          .gte("completed_date", start)
+          .lt("completed_date", end)
           .range(from, to),
       ),
       fetchAllRows<{ amount: number }>((from, to) =>
@@ -105,22 +107,25 @@ export async function computeMyPerformance(
       ),
     ]);
 
-  // Không lọc orders bằng .in(id, orderIds) — nhân viên bận có thể liên quan
-  // hàng trăm/nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL
-  // của PostgREST. Lấy toàn bộ orders (phân trang) rồi tra bằng Map.
-  const allOrders = await fetchAllRows<{
-    id: string;
-    total_value: number;
-    pickup_branch_id: string;
-    rental_start_at: string | null;
-    rental_end_at: string | null;
-  }>((from, to) =>
-    admin
-      .from("orders")
-      .select("id, total_value, pickup_branch_id, rental_start_at, rental_end_at")
-      .range(from, to),
-  );
-  const orderById = new Map(allOrders.map((o) => [o.id, o]));
+  // Chỉ những đơn nhân viên này có khâu hoàn thành trong tháng, hoặc có dòng
+  // dịch vụ/vận chuyển do chính bạn ấy làm xong trong tháng. Với mỗi đơn đó
+  // mới cần đủ toàn bộ dòng hàng (để trừ khoán trực tiếp khỏi quỹ khoán khâu).
+  //
+  // Trước đây nạp NGUYÊN bảng order_equipment + orders rồi lọc trong JS — trên
+  // Cloudflare Workers vượt hạn mức CPU/bộ nhớ, cả trang chết với lỗi 1102.
+  const relevantOrderIds = [
+    ...new Set([...taskList.map((t) => t.order_id), ...myLinesInMonth.map((l) => l.order_id)]),
+  ];
+
+  const [allOrderLines, relevantOrders] = await Promise.all([
+    fetchRowsByIds<OrderLineRow>(relevantOrderIds, (ids, from, to) =>
+      admin.from("order_equipment").select(ORDER_LINE_COLUMNS).in("order_id", ids).range(from, to),
+    ),
+    fetchRowsByIds<OrderRow>(relevantOrderIds, (ids, from, to) =>
+      admin.from("orders").select(ORDER_COLUMNS).in("id", ids).range(from, to),
+    ),
+  ]);
+  const orderById = new Map(relevantOrders.map((o) => [o.id, o]));
 
   // Dòng dịch vụ trả khoán trực tiếp — loại khỏi quỹ khoán theo khâu của cả
   // đơn (không giới hạn theo tháng), tính riêng phần trả trực tiếp trong

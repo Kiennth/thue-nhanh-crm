@@ -26,3 +26,25 @@ export async function fetchAllRows<T>(
   }
   return all;
 }
+
+// Mỗi UUID trong .in() tốn ~39 ký tự trên URL; 100 cái ≈ 3,9KB — vẫn dưới hạn
+// độ dài URL của PostgREST/proxy, mà chỉ cần 2 lượt gọi cho 1 tháng bận.
+const DEFAULT_ID_CHUNK = 100;
+
+// Nạp mọi dòng thuộc về một tập ID cho trước, cắt tập ID thành nhiều lượt gọi
+// để URL không quá dài, và vẫn phân trang trong từng lượt. Dùng thay cho việc
+// nạp NGUYÊN bảng rồi lọc trong JS — trên Cloudflare Workers, nạp cả bảng vừa
+// đốt hết hạn mức CPU/bộ nhớ vừa vượt số subrequest cho phép (lỗi 1102).
+export async function fetchRowsByIds<T>(
+  ids: readonly string[],
+  buildQuery: (idChunk: string[], from: number, to: number) => PromiseLike<{ data: T[] | null }>,
+  idChunk = DEFAULT_ID_CHUNK,
+): Promise<T[]> {
+  if (!ids.length) return [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += idChunk) chunks.push(ids.slice(i, i + idChunk));
+  const results = await Promise.all(
+    chunks.map((c) => fetchAllRows<T>((from, to) => buildQuery(c, from, to))),
+  );
+  return results.flat();
+}
