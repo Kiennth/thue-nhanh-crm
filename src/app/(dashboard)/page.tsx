@@ -79,6 +79,11 @@ export default async function DashboardHomePage({
   // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
+  // Admin làm việc CÙNG đơn hàng: theo dõi đơn, hỗ trợ cửa hàng trưởng và
+  // nhân viên cửa hàng, xem hiệu suất nhân viên. Bức tranh kinh doanh toàn
+  // công ty (tổng quan hệ thống, báo cáo khách hàng, so sánh chi nhánh, xếp
+  // hạng sản phẩm) là việc của Giám đốc/Kế toán — CEO chốt 2026-08-01.
+  const canViewCompanyOverview = canManage && employee.role !== "admin";
 
   const supabase = await createClient();
 
@@ -120,42 +125,71 @@ export default async function DashboardHomePage({
     supabase.from("branches").select("id, name").order("name"),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>((from, to) =>
-      supabase.from("orders").select("pickup_branch_id, order_date, total_value").range(from, to),
-    ),
-    supabase.from("equipment_types").select("id, name, product_type"),
-    supabase.from("equipment_units").select("id, equipment_type_id"),
-    supabase
-      .from("equipment_instances")
-      .select("equipment_type_id, purchase_price, disposal_price, status"),
-    supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
-    supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-    supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
-    fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
-      supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
-    ),
+    // Toàn bộ khối dưới đây chỉ nuôi 4 mục dành cho Giám đốc/Kế toán (so
+    // sánh chi nhánh, báo cáo khách hàng, xếp hạng sản phẩm). Ai không xem
+    // được thì đừng nạp: đây là hàng chục nghìn dòng, và trên Cloudflare
+    // Workers nạp thừa cỡ này chính là thứ đã làm sập trang với lỗi 1102.
+    canViewCompanyOverview
+      ? fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>(
+          (from, to) =>
+            supabase
+              .from("orders")
+              .select("pickup_branch_id, order_date, total_value")
+              .range(from, to),
+        )
+      : Promise.resolve([]),
+    canViewCompanyOverview
+      ? supabase.from("equipment_types").select("id, name, product_type")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? supabase.from("equipment_units").select("id, equipment_type_id")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? supabase
+          .from("equipment_instances")
+          .select("equipment_type_id, purchase_price, disposal_price, status")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? supabase.from("equipment_stock").select("equipment_unit_id, quantity_total")
+      : Promise.resolve({ data: null }),
+    canViewCompanyOverview
+      ? fetchAllRows<{ equipment_type_id: string | null; line_total: number }>((from, to) =>
+          supabase.from("order_equipment").select("equipment_type_id, line_total").range(from, to),
+        )
+      : Promise.resolve([]),
     getOrdersToHandle(branchId, HANDLE_LIMIT, {
       delivery: upcomingDateRange,
       collection: returningDateRange,
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
     processingOrdersQuery,
-    fetchAllCustomersLite(),
-    fetchAllRows<{
-      id: string;
-      customer_id: string;
-      total_value: number;
-      order_date: string;
-      cancelled_at: string | null;
-    }>((from, to) =>
-      supabase
-        .from("orders")
-        .select("id, customer_id, total_value, order_date, cancelled_at")
-        .range(from, to),
-    ),
-    fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
-      supabase.from("order_payments").select("order_id, amount").range(from, to),
-    ),
+    // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — cũng chỉ Giám đốc/Kế toán.
+    canViewCompanyOverview ? fetchAllCustomersLite() : Promise.resolve([]),
+    canViewCompanyOverview
+      ? fetchAllRows<{
+          id: string;
+          customer_id: string;
+          total_value: number;
+          order_date: string;
+          cancelled_at: string | null;
+        }>((from, to) =>
+          supabase
+            .from("orders")
+            .select("id, customer_id, total_value, order_date, cancelled_at")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    canViewCompanyOverview
+      ? fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
+          supabase.from("order_payments").select("order_id, amount").range(from, to),
+        )
+      : Promise.resolve([]),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
     canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
@@ -261,9 +295,9 @@ export default async function DashboardHomePage({
         />
       </div>
 
-      {/* Số liệu tổng quát toàn công ty — chỉ ban quản lý (giam_doc/admin/
-          ke_toan) được xem; Sale/Kỹ thuật, Cửa hàng trưởng không thấy. */}
-      {canManage && (
+      {/* Số liệu tổng quát toàn công ty — chỉ Giám đốc/Kế toán; Admin, Cửa
+          hàng trưởng, Sale/Kỹ thuật không thấy. */}
+      {canViewCompanyOverview && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {stats.map((stat) => (
             <Link key={stat.href} href={stat.href}>
@@ -282,7 +316,7 @@ export default async function DashboardHomePage({
         </div>
       )}
 
-      {canManage && (
+      {canViewCompanyOverview && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Khách hàng</h2>
@@ -314,7 +348,7 @@ export default async function DashboardHomePage({
         </div>
       )}
 
-      {canManage && (
+      {canViewCompanyOverview && (
         <BranchComparisonSection
           branches={branchList.data ?? []}
           orders={orderList}
@@ -327,7 +361,7 @@ export default async function DashboardHomePage({
         />
       )}
 
-      {canManage && (
+      {canViewCompanyOverview && (
         <ProductHighlightCards
           mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
           flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}

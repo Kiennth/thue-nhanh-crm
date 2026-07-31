@@ -155,7 +155,9 @@ export function EmployeePerformanceChartsSection({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Hiệu suất nhân viên</h2>
-          <p className="text-sm text-muted-foreground">Chỉ Admin/Kế toán xem được — theo tháng đang chọn.</p>
+          <p className="text-sm text-muted-foreground">
+            Chỉ Giám đốc/Admin/Kế toán xem được — theo tháng đang chọn.
+          </p>
         </div>
         <PeriodPicker paramName="chartMonth" type="month" value={chartMonth} label="Chọn tháng biểu đồ" />
       </div>
