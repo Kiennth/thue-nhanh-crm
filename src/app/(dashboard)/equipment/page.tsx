@@ -142,24 +142,33 @@ export default async function EquipmentPage({
         )
       : Promise.resolve([]),
     individualTypeIds.length
-      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
-          supabase
+      ? fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) => {
+          let q = supabase
             .from("equipment_instances")
             .select("id, equipment_type_id")
-            .in("equipment_type_id", individualTypeIds)
-            .range(from, to),
-        )
+            .in("equipment_type_id", individualTypeIds);
+          // Cùng nguyên tắc như equipment_stock: chỉ đếm máy thật đang ở
+          // chi nhánh mình với role bị giới hạn theo chi nhánh.
+          if (!canManageCatalog && employee?.branch_id) {
+            q = q.eq("branch_id", employee.branch_id);
+          }
+          return q.range(from, to);
+        })
       : Promise.resolve([]),
   ]);
   const unitIds = units.map((u) => u.id);
+  // Cửa hàng trưởng/Kỹ thuật-Sale chỉ đếm tồn kho của ĐÚNG chi nhánh mình —
+  // Giám đốc/Admin/Kế toán cộng gộp toàn hệ thống.
+  const stockBranchId = canManageCatalog ? null : (employee?.branch_id ?? null);
   const stock = unitIds.length
-    ? await fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) =>
-        supabase
+    ? await fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) => {
+        let q = supabase
           .from("equipment_stock")
           .select("equipment_unit_id, quantity_total")
-          .in("equipment_unit_id", unitIds)
-          .range(from, to),
-      )
+          .in("equipment_unit_id", unitIds);
+        if (stockBranchId) q = q.eq("branch_id", stockBranchId);
+        return q.range(from, to);
+      })
     : [];
 
   const unitTypeById = new Map(units.map((u) => [u.id, u.equipment_type_id]));
@@ -206,14 +215,40 @@ export default async function EquipmentPage({
   ] = await Promise.all([
     supabase.from("equipment_types").select("id, name, product_type").order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
-    supabase.from("equipment_instances").select("equipment_type_id, purchase_price, disposal_price, status"),
+    (() => {
+      const q = supabase
+        .from("equipment_instances")
+        .select("equipment_type_id, purchase_price, disposal_price, status");
+      return stockBranchId ? q.eq("branch_id", stockBranchId) : q;
+    })(),
     supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost"),
     supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price"),
-    supabase.from("equipment_stock").select("equipment_unit_id, quantity_total"),
+    (() => {
+      const q = supabase.from("equipment_stock").select("equipment_unit_id, quantity_total");
+      return stockBranchId ? q.eq("branch_id", stockBranchId) : q;
+    })(),
     fetchAllRows<OrderLineInput & { order_id: string }>((from, to) =>
       supabase.from("order_equipment").select("equipment_type_id, line_total, order_id").range(from, to),
     ),
   ]);
+
+  // Cửa hàng trưởng: doanh thu/lượt thuê chỉ tính trên đơn của chi nhánh mình.
+  const branchOrderIds = stockBranchId
+    ? new Set(
+        (
+          await fetchAllRows<{ id: string }>((from, to) =>
+            supabase
+              .from("orders")
+              .select("id")
+              .or(`pickup_branch_id.eq.${stockBranchId},return_branch_id.eq.${stockBranchId}`)
+              .range(from, to),
+          )
+        ).map((o) => o.id),
+      )
+    : null;
+  const scopedOrderLines = branchOrderIds
+    ? allOrderLines.filter((l) => branchOrderIds.has(l.order_id))
+    : allOrderLines;
   const reportTypeList = reportTypes ?? [];
   const baseReports = computeEquipmentTypeReports(
     reportTypeList,
@@ -222,7 +257,7 @@ export default async function EquipmentPage({
     purchases ?? [],
     disposals ?? [],
     reportStock ?? [],
-    allOrderLines,
+    scopedOrderLines,
   );
   const inventoryValueByTypeId = new Map(
     reportTypeList.map((t) => [t.id, baseReports.get(t.id)?.currentInventoryValue ?? 0]),
@@ -272,7 +307,9 @@ export default async function EquipmentPage({
     topInventoryValue: RevenuePoint[];
   } | null = null;
 
-  if (canManageCatalog) {
+  // Cửa hàng trưởng cũng xem được báo cáo này, nhưng mọi số liệu bên trong
+  // đã bị lọc sẵn về đúng kho/đơn hàng chi nhánh mình (stockBranchId ở trên).
+  if (canViewInventoryTrend) {
     // Doanh thu/số lượt thuê/tỉ suất lợi nhuận lọc theo ngày đặt đơn (order_date)
     // khi có chọn khoảng thời gian — order_equipment không có cột ngày riêng
     // nên phải lấy trước tập order_id khớp khoảng ngày rồi lọc theo đó. Giá
@@ -290,7 +327,7 @@ export default async function EquipmentPage({
               .range(from, to),
           );
           const orderIdsInRange = new Set(ordersInRange.map((o) => o.id));
-          const filteredOrderLines = allOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
+          const filteredOrderLines = scopedOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
           return computeEquipmentTypeReports(
             reportTypeList,
             reportUnits ?? [],
