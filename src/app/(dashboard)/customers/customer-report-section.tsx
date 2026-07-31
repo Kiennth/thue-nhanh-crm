@@ -303,11 +303,18 @@ export function CustomerReportSection({
   payments,
   companyFirstOrder: companyFirstOrderProp,
   showRankings = true,
+  showDormant = true,
+  showDebt = true,
 }: {
-  // Xếp hạng khách theo doanh số, công nợ và danh sách khách nguội là việc
-  // của Giám đốc/Admin/Kế toán — CEO chốt Cửa hàng trưởng không cần nhìn,
-  // bạn ấy chỉ cần số lượng/cơ cấu và tăng trưởng khách của chi nhánh mình.
+  // Ba khối này bật/tắt độc lập vì CEO chia quyền khác nhau cho từng vai trò:
+  //   - Cửa hàng trưởng: không xem cả ba, chỉ cần số lượng/cơ cấu và tăng
+  //     trưởng khách của chi nhánh mình.
+  //   - Admin: giữ CÔNG NỢ (cần để đôn đốc thu tiền cùng đơn hàng), bỏ xếp
+  //     hạng doanh số và danh sách khách nguội.
+  //   - Giám đốc/Kế toán: xem đủ.
   showRankings?: boolean;
+  showDormant?: boolean;
+  showDebt?: boolean;
   customers: { id: string; name: string; customer_type: CustomerType }[];
   orders: {
     id: string;
@@ -351,15 +358,26 @@ export function CustomerReportSection({
         <ReturningRateCard orders={orders} companyFirstOrder={companyFirstOrder} />
       </div>
 
-      {/* Khách nguội nằm cùng nhóm quyền với xếp hạng doanh số: CEO chốt tạm
-          thời chỉ Giám đốc/Admin/Kế toán xem, chưa mở cho Cửa hàng trưởng. */}
-      {showRankings && <DormantCustomersCard rows={rows} />}
+      {showDormant && <DormantCustomersCard rows={rows} />}
 
-      {showRankings && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <TopRevenueCard title="Top khách hàng công ty theo doanh số" rows={topCompanyByRevenue} />
-          <TopRevenueCard title="Top khách hàng cá nhân theo doanh số" rows={topIndividualByRevenue} />
+      {(showRankings || showDebt) && (
+        // Bỏ xếp hạng thì chỉ còn công nợ — để nguyên 3 cột sẽ thành một thẻ
+        // hẹp tí trơ trọi, nên khi đó cho nó chiếm cả hàng.
+        <div className={`grid grid-cols-1 gap-4 ${showRankings ? "lg:grid-cols-3" : ""}`}>
+          {showRankings && (
+            <>
+              <TopRevenueCard
+                title="Top khách hàng công ty theo doanh số"
+                rows={topCompanyByRevenue}
+              />
+              <TopRevenueCard
+                title="Top khách hàng cá nhân theo doanh số"
+                rows={topIndividualByRevenue}
+              />
+            </>
+          )}
 
+          {showDebt && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Công nợ theo khách hàng</CardTitle>
@@ -398,6 +416,7 @@ export function CustomerReportSection({
             </Table>
           </CardContent>
         </Card>
+          )}
         </div>
       )}
     </div>

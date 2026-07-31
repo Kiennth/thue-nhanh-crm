@@ -72,6 +72,7 @@ export default async function CustomersPage({
   const viewer = await getCurrentEmployee();
   const branchId =
     viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+  const isAdmin = viewer?.role === "admin";
 
   const [allCustomersRaw, ordersRaw, paymentsRaw] = await Promise.all([
     fetchAllRows<{
@@ -189,7 +190,11 @@ export default async function CustomersPage({
         orders={orders}
         payments={payments}
         companyFirstOrder={companyFirstOrder}
-        showRankings={!branchId}
+        // Admin đi cùng đơn hàng nên vẫn cần công nợ để đôn đốc thu tiền,
+        // nhưng không cần xếp hạng doanh số hay danh sách khách nguội.
+        showRankings={!branchId && !isAdmin}
+        showDormant={!branchId && !isAdmin}
+        showDebt={!branchId}
       />
 
       <div className="space-y-3">
