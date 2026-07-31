@@ -105,6 +105,7 @@ export default async function PayrollPage({
             ? branchNameById.get(viewer.branch_id)
             : undefined
         }
+        branchNameById={branchNameById}
       />
 
       <Card>

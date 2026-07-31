@@ -2,6 +2,7 @@ import { TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { EmployeeIncomeCompositionChart } from "../employee-performance-charts";
+import { BranchPayrollChart, type BranchPayrollPoint } from "./branch-payroll-chart";
 import type { EmployeeMonthlyPerformance } from "@/lib/employee-performance-charts";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -18,6 +19,7 @@ export function PayrollOverview({
   prevRows,
   month,
   branchName,
+  branchNameById,
 }: {
   rows: EmployeeMonthlyPerformance[];
   prevRows: EmployeeMonthlyPerformance[];
@@ -25,6 +27,8 @@ export function PayrollOverview({
   // Có giá trị khi người xem bị giới hạn theo chi nhánh (Cửa hàng trưởng) —
   // ghi thẳng tên kho vào nhãn để không hiểu nhầm là số toàn công ty.
   branchName?: string;
+  // Chỉ cần khi xem toàn công ty, để tách quỹ lương theo từng chi nhánh.
+  branchNameById?: Map<string, string>;
 }) {
   if (!rows.length) return null;
 
@@ -40,6 +44,24 @@ export function PayrollOverview({
   const variablePct = total > 0 ? ((total - baseTotal) / total) * 100 : 0;
 
   const scopeLabel = branchName ? `kho ${branchName}` : "toàn công ty";
+
+  // Xem toàn công ty: gom quỹ lương theo chi nhánh để thấy nơi nào tốn nhất.
+  // Cửa hàng trưởng chỉ có 1 chi nhánh nên khối này tự ẩn.
+  const branchPoints: BranchPayrollPoint[] = (() => {
+    if (branchName || !branchNameById) return [];
+    const byBranch = new Map<string, { total: number; headcount: number }>();
+    for (const row of rows) {
+      const label = (row.branchId ? branchNameById.get(row.branchId) : undefined) ?? "Chưa gán";
+      const cur = byBranch.get(label) ?? { total: 0, headcount: 0 };
+      byBranch.set(label, {
+        total: cur.total + row.totalIncome,
+        headcount: cur.headcount + 1,
+      });
+    }
+    return [...byBranch.entries()]
+      .map(([branch, v]) => ({ branch, ...v }))
+      .sort((a, b) => b.total - a.total);
+  })();
 
   return (
     <div className="space-y-4">
@@ -85,6 +107,20 @@ export function PayrollOverview({
           </p>
         </StatCard>
       </div>
+
+      {branchPoints.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Quỹ lương theo chi nhánh</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Tổng chi lương tháng {month} của từng chi nhánh — di chuột để xem kèm số nhân viên.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <BranchPayrollChart points={branchPoints} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
