@@ -1,3 +1,4 @@
+import { vnNow } from "@/lib/vn-time";
 import type { DeliveryMethod, TaskType } from "@/types/database";
 
 export interface CommissionTierInput {
@@ -118,8 +119,14 @@ export const DELIVERY_NOTE_TYPE_IDS = new Set([
 const BUSINESS_HOURS_START_MINUTES = 8 * 60 + 30; // 8:30
 const BUSINESS_HOURS_END_MINUTES = 17 * 60 + 30; // 17:30
 
+// dateTimeIso đọc qua vnNow() (xem src/lib/vn-time.ts) thay vì
+// new Date().getHours()/getMinutes() trực tiếp — local getter đọc theo múi
+// giờ HỆ ĐIỀU HÀNH đang chạy code, không phải giờ Việt Nam. Máy dev (Asia/
+// Ho_Chi_Minh) và Cloudflare Workers (UTC) từng cho 2 kết quả khác nhau với
+// CÙNG một giờ hẹn, khiến %khoán vận chuyển lật giữa 50%/100% theo nơi chạy
+// code — không phải theo giờ hẹn thật.
 function isWithinBusinessHours(dateTimeIso: string): boolean {
-  const d = new Date(dateTimeIso);
+  const d = vnNow(new Date(dateTimeIso));
   const minutes = d.getHours() * 60 + d.getMinutes();
   return minutes >= BUSINESS_HOURS_START_MINUTES && minutes <= BUSINESS_HOURS_END_MINUTES;
 }

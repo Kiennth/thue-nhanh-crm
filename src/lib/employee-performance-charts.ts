@@ -7,6 +7,7 @@ import {
   type OrderLineRow,
   type OrderRow,
 } from "@/lib/payroll-rows";
+import { vnNow } from "@/lib/vn-time";
 import {
   computeLineDirectPayout,
   computeOrderCommissionFund,
@@ -37,7 +38,7 @@ export function getMonthRange(month: string) {
 }
 
 export function currentMonth() {
-  const now = new Date();
+  const now = vnNow();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -337,7 +338,7 @@ export async function computeMyMonthlyTrend(
   employeeId: string,
   monthCount = 6,
 ): Promise<MyMonthlyTrendPoint[]> {
-  const now = new Date();
+  const now = vnNow();
   const months: string[] = [];
   for (let i = monthCount - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);

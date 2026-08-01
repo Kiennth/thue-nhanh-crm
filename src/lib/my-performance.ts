@@ -7,6 +7,7 @@ import {
   type OrderLineRow,
   type OrderRow,
 } from "@/lib/payroll-rows";
+import { vnNow } from "@/lib/vn-time";
 import {
   computeLineDirectPayout,
   computeOrderCommissionFund,
@@ -23,7 +24,7 @@ import {
 import type { TaskType } from "@/types/database";
 
 function currentMonthRange() {
-  const now = new Date();
+  const now = vnNow();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
