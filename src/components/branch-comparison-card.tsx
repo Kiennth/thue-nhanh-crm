@@ -4,14 +4,6 @@ import { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -174,57 +166,34 @@ export function BranchComparisonCard({
             </div>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Chi nhánh</TableHead>
-                <TableHead className="text-right">Doanh thu</TableHead>
-                <TableHead className="text-right">% đóng góp</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((r) => (
-                <TableRow key={r.branchId}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor:
-                            r[period] > 0 ? `var(--chart-${r.colorIndex + 1})` : "var(--muted)",
-                        }}
-                      />
-                      <BranchBadge name={r.branchName} />
-                      {r.branchName}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {currencyFormatter.format(r[period])}đ
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {total > 0 ? `${((r[period] / total) * 100).toFixed(0)}%` : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!sorted.length && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    Chưa có chi nhánh nào.
-                  </TableCell>
-                </TableRow>
-              )}
-              {sorted.length > 0 && (
-                <TableRow className="font-medium">
-                  <TableCell>Tổng cộng</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {currencyFormatter.format(total)}đ
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{total > 0 ? "100%" : "—"}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          {/* Chú giải kiêm số liệu — không có nó thì màu trên vòng không
+              biết của chi nhánh nào (danh tính không được phép chỉ dựa vào
+              màu), và mất luôn chỗ đọc số chính xác. Tổng đã nằm giữa vòng. */}
+          <ul className="space-y-2.5">
+            {sorted.map((r) => (
+              <li key={r.branchId} className="flex items-center gap-2 text-sm">
+                <span
+                  aria-hidden
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      r[period] > 0 ? `var(--chart-${r.colorIndex + 1})` : "var(--muted)",
+                  }}
+                />
+                <BranchBadge name={r.branchName} />
+                <span className="truncate">{r.branchName}</span>
+                <span className="ml-auto shrink-0 font-medium tabular-nums">
+                  {currencyFormatter.format(r[period])}đ
+                </span>
+                <span className="w-10 shrink-0 text-right text-muted-foreground tabular-nums">
+                  {total > 0 ? `${((r[period] / total) * 100).toFixed(0)}%` : "—"}
+                </span>
+              </li>
+            ))}
+            {!sorted.length && (
+              <li className="text-sm text-muted-foreground">Chưa có chi nhánh nào.</li>
+            )}
+          </ul>
         </div>
       </CardContent>
     </Card>
