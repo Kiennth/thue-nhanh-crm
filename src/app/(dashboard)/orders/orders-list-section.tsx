@@ -17,7 +17,7 @@ import { CustomerAvatar } from "@/components/customer-avatar";
 import { BranchBadge } from "@/components/branch-badge";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { deleteOrder } from "@/lib/actions/orders";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import {
@@ -79,8 +79,9 @@ function ordersQueryWithFilters<Q extends string>(
   supabase: SupabaseServerClient,
   selectColumns: Q,
   { branchId, activeStatus, dateRange }: OrderFilters,
+  options?: { count: "exact"; head: boolean },
 ) {
-  let q = supabase.from("orders").select(selectColumns);
+  let q = supabase.from("orders").select(selectColumns, options);
   if (branchId) {
     q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
   }
@@ -149,26 +150,39 @@ export async function OrdersListSection({
   // Sắp xếp theo Khách hàng/Doanh số/Trạng thái không thể đẩy hết xuống
   // Postgres (tên khách phải join qua bảng customers, trạng thái là suy ra
   // từ 3 cột) — lấy TOÀN BỘ đơn khớp bộ lọc (đằng nào cũng cần đủ để tính
-  // thẻ tổng kết phía trên), lọc/sắp/phân trang gộp 1 lần trong JS.
+  // thẻ tổng kết phía trên), lọc/sắp/phân trang gộp 1 lần trong JS. ~10.000
+  // dòng nên phân trang SONG SONG — bản tuần tự là một nửa nguyên nhân
+  // /orders sập 503 trên Cloudflare cho vai Giám đốc.
+  //
+  // Bảng customers chỉ cần NGUYÊN bảng khi phải khớp/sắp theo tên khách trên
+  // toàn bộ đơn (đang tìm kiếm, hoặc sắp theo cột Khách hàng) — còn mặc định
+  // chỉ cần tên của ≤20 khách đang hiện, nạp sau khi đã cắt trang.
+  const needAllCustomers = activeSearch !== "" || activeSort === "customer";
   const [allOrders, { data: branches }, allCustomers] = await Promise.all([
-    fetchAllRows<OrderRow>((rangeFrom, rangeTo) =>
-      ordersQueryWithFilters(
-        supabase,
-        "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, total_value, status, order_date, completed_at, cancelled_at",
-        filters,
-      )
-        .order("id")
-        .range(rangeFrom, rangeTo),
+    fetchAllRowsFast<OrderRow>(
+      (rangeFrom, rangeTo) =>
+        ordersQueryWithFilters(
+          supabase,
+          "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, total_value, status, order_date, completed_at, cancelled_at",
+          filters,
+        )
+          .order("id")
+          .range(rangeFrom, rangeTo),
+      () => ordersQueryWithFilters(supabase, "*", filters, { count: "exact", head: true }),
     ),
     supabase.from("branches").select("id, name").order("name"),
-    fetchAllRows<{ id: string; name: string }>((rangeFrom, rangeTo) =>
-      supabase.from("customers").select("id, name").range(rangeFrom, rangeTo),
-    ),
+    needAllCustomers
+      ? fetchAllRowsFast<{ id: string; name: string }>(
+          (rangeFrom, rangeTo) =>
+            supabase.from("customers").select("id, name").order("id").range(rangeFrom, rangeTo),
+          () => supabase.from("customers").select("*", { count: "exact", head: true }),
+        )
+      : Promise.resolve(null),
   ]);
 
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
-  const customerNameById = new Map(allCustomers.map((c) => [c.id, c.name]));
+  const customerNameById = new Map((allCustomers ?? []).map((c) => [c.id, c.name]));
 
   // Tìm theo mã đơn hoặc tên khách hàng — lọc trên tập đã khớp
   // chi nhánh/trạng thái/khoảng ngày, áp trước khi tính thẻ tổng kết để các
@@ -223,6 +237,15 @@ export async function OrdersListSection({
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
   const orders = sortedOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  if (!needAllCustomers && orders.length) {
+    const pageCustomerIds = [...new Set(orders.map((o) => o.customer_id))];
+    const { data: pageCustomers } = await supabase
+      .from("customers")
+      .select("id, name")
+      .in("id", pageCustomerIds);
+    for (const c of pageCustomers ?? []) customerNameById.set(c.id, c.name);
+  }
 
   return (
     <div className="space-y-4">

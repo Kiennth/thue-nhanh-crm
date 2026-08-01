@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 
-const CHUNK = 1000;
 const WEEK_TREND_COUNT = 8;
 const MONTH_TREND_COUNT = 6;
 const YEAR_TREND_COUNT = 5;
@@ -80,29 +80,36 @@ function shiftYears(d: Date, years: number) {
   return new Date(d.getFullYear() + years, d.getMonth(), d.getDate());
 }
 
-// Supabase/PostgREST giới hạn 1.000 dòng mỗi lần gọi — cần TOÀN BỘ đơn (chưa
-// huỷ) để tính thống kê/xu hướng theo thời gian, không chỉ trang hiện tại.
+// Cần TOÀN BỘ đơn (chưa huỷ) để tính thống kê/xu hướng theo thời gian — xu
+// hướng 5 năm không date-bound được. ~10.000 dòng ≈ 11 trang, nên phân trang
+// SONG SONG: bản tuần tự trước đây là một nửa nguyên nhân /orders sập 503
+// (Worker exceeded resource limits) trên Cloudflare cho vai Giám đốc.
 async function fetchNonCancelledOrders(branchId: string | null): Promise<LiteOrder[]> {
   const supabase = await createClient();
-  const all: LiteOrder[] = [];
-  let from = 0;
-  while (true) {
-    let q = supabase
-      .from("orders")
-      .select("order_date, total_value")
-      .is("cancelled_at", null)
-      .order("id")
-      .range(from, from + CHUNK - 1);
-    if (branchId) {
-      q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
-    }
-    const { data } = await q;
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < CHUNK) break;
-    from += CHUNK;
-  }
-  return all;
+  return fetchAllRowsFast<LiteOrder>(
+    (from, to) => {
+      let q = supabase
+        .from("orders")
+        .select("order_date, total_value")
+        .is("cancelled_at", null)
+        .order("id")
+        .range(from, to);
+      if (branchId) {
+        q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
+      }
+      return q;
+    },
+    () => {
+      let q = supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .is("cancelled_at", null);
+      if (branchId) {
+        q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
+      }
+      return q;
+    },
+  );
 }
 
 function sumInRange(orders: LiteOrder[], start: Date, end: Date) {
