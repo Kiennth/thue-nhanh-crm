@@ -23,12 +23,14 @@ export interface BranchPeriodRow {
   // Tuần (Thứ 2 → CN) chứa ngày đang chọn.
   week: number;
   month: number;
+  // Tháng liền trước tháng đang chọn.
+  prevMonth: number;
   year: number;
   // Trọn năm liền trước năm đang chọn — để đối chiếu nhanh với năm nay.
   prevYear: number;
 }
 
-type PeriodKey = "day" | "week" | "month" | "year" | "prevYear";
+type PeriodKey = "day" | "week" | "month" | "prevMonth" | "year" | "prevYear";
 
 export function BranchComparisonCard({
   rows,
@@ -45,10 +47,13 @@ export function BranchComparisonCard({
   // "Hôm nay" đầu ngày thường 0đ chưa nói lên gì.
   const [period, setPeriod] = useState<PeriodKey>("month");
 
+  // Thứ tự từ hẹp tới rộng, kỳ hiện tại đứng trước kỳ đối chiếu của nó:
+  // Ngày → Tuần → Tháng → Tháng trước → Năm → Năm trước.
   const periodTabs: { key: PeriodKey; label: string }[] = [
     { key: "day", label: "Hôm nay" },
     { key: "week", label: "Tuần này" },
     { key: "month", label: "Tháng này" },
+    { key: "prevMonth", label: "Tháng trước" },
     { key: "year", label: "Năm nay" },
     { key: "prevYear", label: "Năm trước" },
   ];
@@ -87,12 +92,12 @@ export function BranchComparisonCard({
               </button>
             ))}
           </div>
-          {/* Tuần đi theo ngày đang chọn — chọn ngày nào là xem tuần đó. Năm
-              trước đi theo ô chọn năm (= năm đang chọn trừ 1). */}
+          {/* Tuần đi theo ngày đang chọn — chọn ngày nào là xem tuần đó.
+              Tháng trước / Năm trước đi theo ô chọn tháng / năm (trừ 1). */}
           {(period === "day" || period === "week") && (
             <PeriodPicker paramName="day" type="date" value={day} label="Chọn ngày" />
           )}
-          {period === "month" && (
+          {(period === "month" || period === "prevMonth") && (
             <PeriodPicker paramName="month" type="month" value={month} label="Chọn tháng" />
           )}
           {(period === "year" || period === "prevYear") && (
