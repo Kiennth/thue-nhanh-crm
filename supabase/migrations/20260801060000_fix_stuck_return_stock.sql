@@ -35,10 +35,19 @@ update public.equipment_stock set quantity_picked_up = quantity_picked_up - 4, q
 update public.equipment_stock set quantity_picked_up = quantity_picked_up - 1, quantity_in_stock = quantity_in_stock + 1
   where equipment_unit_id = 'b3c28cc1-bae5-476b-9007-dca935a02c31' and branch_id = 'a877af86-9936-4dc2-b257-95bb49026cd0';
 
--- BQ11779 — 1 dòng equipment_instance_id (điện thoại theo dõi riêng lẻ)
+-- BQ11779 — 1 dòng equipment_instance_id. Máy này thuộc loại "Samsung
+-- Galaxy A16 4G" — 1 trong 81 loại hàng bị lỗi tracking_type='quantity'
+-- nhưng vẫn còn instance mồ côi (đã fix bug đếm trùng do việc này ở lần
+-- trước). Trigger equipment_instances_check_tracking chặn UPDATE trên
+-- instance của loại "quantity" — tắt tạm để trả đúng dữ liệu vật lý (máy đã
+-- về kho thật), bật lại ngay sau, không đụng gì đến logic/dữ liệu khác.
+alter table public.equipment_instances disable trigger equipment_instances_check_tracking;
+
 update public.equipment_instances
   set status = 'available', branch_id = 'a877af86-9936-4dc2-b257-95bb49026cd0'
   where id = '7fe28009-3fc7-43f0-8f9a-8c761a4d540c';
+
+alter table public.equipment_instances enable trigger equipment_instances_check_tracking;
 
 update public.orders set return_stock_transferred_at = now()
   where order_code = 'BQ11779' and return_stock_transferred_at is null;
