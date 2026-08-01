@@ -47,7 +47,7 @@ export default async function BranchDashboardPage({
         .eq("pickup_branch_id", id)
         .range(from, to),
     ),
-    supabase.from("equipment_types").select("id, name, product_type"),
+    supabase.from("equipment_types").select("id, name, product_type, tracking_type"),
     supabase.from("equipment_units").select("id, equipment_type_id"),
     supabase
       .from("equipment_instances")

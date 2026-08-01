@@ -22,6 +22,7 @@ interface DisposalRow {
 }
 
 interface InstanceRow {
+  equipment_type_id: string;
   purchase_price: number | null;
   purchase_date: string | null;
   disposal_date: string | null;
@@ -172,7 +173,7 @@ export async function computeEquipmentValueOverview(
 ): Promise<EquipmentValueOverview> {
   const supabase = await createClient();
 
-  const [purchases, disposals, instances] = await Promise.all([
+  const [purchases, disposals, rawInstances, individualTypes] = await Promise.all([
     fetchAllRows<PurchaseRow>((from, to) => {
       let q = supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost, purchase_date");
       if (branchId) q = q.eq("branch_id", branchId);
@@ -184,11 +185,21 @@ export async function computeEquipmentValueOverview(
       return q.range(from, to);
     }),
     fetchAllRows<InstanceRow>((from, to) => {
-      let q = supabase.from("equipment_instances").select("purchase_price, purchase_date, disposal_date");
+      let q = supabase
+        .from("equipment_instances")
+        .select("equipment_type_id, purchase_price, purchase_date, disposal_date");
       if (branchId) q = q.eq("branch_id", branchId);
       return q.range(from, to);
     }),
+    supabase.from("equipment_types").select("id").eq("tracking_type", "individual"),
   ]);
+
+  // equipment_instances chỉ áp dụng cho tracking_type='individual' — vài loại
+  // hàng cũ bị đổi sang 'quantity' mà không dọn hết instance cũ (lỗi dữ liệu
+  // có từ trước, xem migration 20260728000000). Lọc bỏ instance mồ côi để
+  // không cộng đè lên giá trị đã tính từ units/equipment_purchases.
+  const individualTypeIds = new Set((individualTypes.data ?? []).map((t) => t.id));
+  const instances = rawInstances.filter((i) => individualTypeIds.has(i.equipment_type_id));
 
   const purchasesByUnit = new Map<string, PurchaseRow[]>();
   for (const p of purchases) {

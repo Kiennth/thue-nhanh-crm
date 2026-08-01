@@ -1,4 +1,4 @@
-import type { EquipmentInstanceStatus, ProductType } from "@/types/database";
+import type { EquipmentInstanceStatus, ProductType, TrackingType } from "@/types/database";
 
 export interface PurchaseInput {
   equipment_unit_id: string;
@@ -68,7 +68,7 @@ export function computeWeightedAverageCost(
 //   - profitRatio = (revenue + disposalProceeds) / purchaseCost (không trừ giá
 //     vốn nên luôn >= 0 — null nếu chưa có giá vốn)
 export function computeEquipmentTypeReports(
-  types: { id: string; product_type: ProductType }[],
+  types: { id: string; product_type: ProductType; tracking_type: TrackingType | null }[],
   units: { id: string; equipment_type_id: string }[],
   instances: InstanceInput[],
   purchases: PurchaseInput[],
@@ -143,12 +143,19 @@ export function computeEquipmentTypeReports(
       currentStockQty += totalQty;
     }
 
-    for (const inst of typeInstances) {
-      if (inst.purchase_price) purchaseCost += inst.purchase_price;
-      if (inst.status === "disposed" && inst.disposal_price) disposalProceeds += inst.disposal_price;
-      if (inst.status !== "disposed") {
-        if (inst.purchase_price) currentInventoryValue += inst.purchase_price;
-        currentStockQty += 1;
+    // equipment_instances chỉ áp dụng cho tracking_type='individual' (ép ở
+    // tầng DB bằng trigger) — nhưng vài loại hàng cũ bị đổi tracking_type
+    // sang 'quantity' mà không dọn hết instance cũ (lỗi dữ liệu có từ trước,
+    // xem migration 20260728000000). Bỏ qua instance mồ côi khi tính báo cáo
+    // để không cộng đè lên số liệu units/stock đã tính ở trên.
+    if (type.tracking_type === "individual") {
+      for (const inst of typeInstances) {
+        if (inst.purchase_price) purchaseCost += inst.purchase_price;
+        if (inst.status === "disposed" && inst.disposal_price) disposalProceeds += inst.disposal_price;
+        if (inst.status !== "disposed") {
+          if (inst.purchase_price) currentInventoryValue += inst.purchase_price;
+          currentStockQty += 1;
+        }
       }
     }
 

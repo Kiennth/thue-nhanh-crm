@@ -162,7 +162,7 @@ export default async function EquipmentPage({
     // dùng cho cả cột trong bảng (mọi vai trò đều thấy) lẫn phần "Báo cáo"
     // bên dưới — thay cho việc trước đây fetch riêng units/instances/stock
     // một lần nữa chỉ để tính mỗi cột "Tồn kho".
-    supabase.from("equipment_types").select("id, name, product_type").order("name"),
+    supabase.from("equipment_types").select("id, name, product_type, tracking_type").order("name"),
     fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
       supabase.from("equipment_units").select("id, equipment_type_id").range(from, to),
     ),
@@ -331,9 +331,11 @@ export default async function EquipmentPage({
     const reportRows = reportTypeList.map((type) => ({ type, report: reports.get(type.id)! }));
 
     const totalInventoryValue = reportRows.reduce((sum, r) => sum + r.report.currentInventoryValue, 0);
-    const totalUnitsInStock =
-      reportStock.reduce((sum, s) => sum + s.quantity_total, 0) +
-      reportInstances.filter((i) => i.status !== "disposed").length;
+    // Lấy từ currentStockQty (đã tính theo units/stock cho tracking_type=
+    // quantity, hoặc instances cho individual) thay vì cộng thẳng reportStock
+    // + reportInstances — cộng thẳng sẽ đếm trùng cho vài loại hàng cũ bị đổi
+    // tracking_type mà chưa dọn hết equipment_instances (xem equipment-reports.ts).
+    const totalUnitsInStock = reportRows.reduce((sum, r) => sum + r.report.currentStockQty, 0);
 
     reportSummary = {
       totalInventoryValue,

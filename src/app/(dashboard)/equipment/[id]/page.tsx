@@ -120,7 +120,12 @@ export default async function EquipmentDetailPage({
     showUnitsBlock
       ? supabase.from("equipment_units").select("*").eq("equipment_type_id", id).order("brand_model")
       : Promise.resolve({ data: [] as EquipmentUnitRow[] }),
-    isRentalIndividual
+    // Tab "Lịch sử thuê" cần tra identifier_code kể cả khi loại hàng đang
+    // tracking_type='quantity' — vài loại cũ bị đổi tracking_type mà chưa dọn
+    // hết equipment_instances, nên dòng thuê lịch sử vẫn trỏ vào instance
+    // thật (xem equipment-reports.ts). Bảng "Tồn kho" vẫn chỉ hiện khi
+    // isRentalIndividual (isRentalIndividual && ... bên dưới).
+    isRentalIndividual || activeTab === "rentals"
       ? supabase.from("equipment_instances").select("*").eq("equipment_type_id", id).order("identifier_code")
       : Promise.resolve({ data: [] as EquipmentInstanceRow[] }),
   ]);
