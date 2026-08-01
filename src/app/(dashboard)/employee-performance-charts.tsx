@@ -11,7 +11,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { PeriodPicker } from "@/components/period-picker";
+import { ProfitPeriodTabs } from "@/components/profit-period-tabs";
+import type { ProfitPeriod } from "@/lib/profit-period";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import type { EmployeeMonthlyPerformance } from "@/lib/employee-performance-charts";
 
@@ -155,10 +156,10 @@ type PerformanceViewKey = (typeof PERFORMANCE_VIEWS)[number]["key"];
 
 export function EmployeePerformanceChartsSection({
   rows,
-  chartMonth,
+  profitPeriod,
 }: {
   rows: EmployeeMonthlyPerformance[];
-  chartMonth: string;
+  profitPeriod: ProfitPeriod;
 }) {
   const [view, setView] = useState<PerformanceViewKey>("income");
   const taskRows = rows.map((r) => ({ ...r, ...r.taskTypeCounts }));
@@ -167,12 +168,7 @@ export function EmployeePerformanceChartsSection({
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-        <div>
-          <CardTitle className="text-base">Hiệu suất nhân viên — {viewLabel}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Chỉ Giám đốc/Admin/Kế toán xem được — theo tháng đang chọn.
-          </p>
-        </div>
+        <CardTitle className="text-base">Hiệu suất nhân viên — {viewLabel}</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg bg-muted p-1">
             {PERFORMANCE_VIEWS.map((tab) => (
@@ -190,7 +186,9 @@ export function EmployeePerformanceChartsSection({
               </button>
             ))}
           </div>
-          <PeriodPicker paramName="chartMonth" type="month" value={chartMonth} label="Chọn tháng biểu đồ" />
+          {/* Dùng chung kỳ với card Lợi nhuận gộp (CEO chốt 2026-08-01) — đổi
+              tháng/năm ở đó thì khối này tự theo, không cần ô chọn riêng. */}
+          <ProfitPeriodTabs value={profitPeriod} />
         </div>
       </CardHeader>
       <CardContent>

@@ -20,7 +20,7 @@ import { expandRecurring } from "@/lib/recurring-expenses";
 import {
   computeEmployeeMonthlyPerformance,
   computeMyMonthlyTrend,
-  currentMonth,
+  sumEmployeePerformanceAcrossMonths,
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
 import { MyPerformanceCard } from "./my-performance-card";
@@ -43,7 +43,6 @@ export default async function DashboardHomePage({
     day?: string;
     month?: string;
     year?: string;
-    chartMonth?: string;
     profitPeriod?: string;
     upcomingRange?: string;
     returningRange?: string;
@@ -56,7 +55,6 @@ export default async function DashboardHomePage({
   const day = params.day || defaults.day;
   const month = params.month || defaults.month;
   const year = params.year || defaults.year;
-  const chartMonth = params.chartMonth || currentMonth();
   const profitPeriod: ProfitPeriod =
     params.profitPeriod && isProfitPeriod(params.profitPeriod) ? params.profitPeriod : "month";
   const upcomingRangePreset: DateRangePreset =
@@ -102,12 +100,35 @@ export default async function DashboardHomePage({
 
   const supabase = await createClient();
 
+  // Hiệu suất nhân viên VÀ Lợi nhuận gộp dùng CHUNG 1 kỳ (profitPeriod, CEO
+  // chốt 2026-08-01) — Năm nay/Năm trước cộng dồn TỪNG THÁNG (cộng thưởng đã
+  // tính đúng của từng tháng thay vì tính lại trên tổng năm — bậc thưởng chỉ
+  // có ý nghĩa xét theo tổng khoán TRONG THÁNG); Năm hiện tại dừng ở tháng
+  // hiện tại (YTD) để khớp vế doanh thu và không cộng trước chi phí định kỳ
+  // của tháng chưa tới.
+  const nextMonthOf = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  };
+  let profitMonths: string[] = [month];
+  if (profitPeriod === "prevMonth") {
+    profitMonths = [previousMonthOf(month)];
+  } else if (profitPeriod === "year" || profitPeriod === "prevYear") {
+    const profitYear = profitPeriod === "year" ? Number(year) : Number(year) - 1;
+    const lastMonth =
+      String(profitYear) === defaults.year ? Number(defaults.month.split("-")[1]) : 12;
+    profitMonths = Array.from(
+      { length: lastMonth },
+      (_, i) => `${profitYear}-${String(i + 1).padStart(2, "0")}`,
+    );
+  }
+
   const [
     branchList,
     orders,
     ordersToHandle,
     myPerformance,
-    employeeRows,
+    payrollByMonth,
     myTrend,
     branchOrdersOverview,
   ] = await Promise.all([
@@ -136,7 +157,9 @@ export default async function DashboardHomePage({
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
-    canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
+    canManage
+      ? Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m)))
+      : Promise.resolve(null),
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
     // khối biểu đồ hiệu suất toàn công ty riêng).
     canManage ? Promise.resolve(null) : computeMyMonthlyTrend(employee.id),
@@ -147,36 +170,22 @@ export default async function DashboardHomePage({
       : Promise.resolve(null),
   ]);
 
-  // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn (tháng này / tháng trước /
-  // năm nay / năm trước) = doanh thu − chi phí vận hành (bảng expenses) − quỹ
-  // lương (tự lấy từ Bảng lương, CEO chốt). Kỳ năm là cộng dồn TỪNG THÁNG
-  // (tối đa 12 lượt tính bảng lương, chạy song song — chấp nhận được từ khi
-  // RLS đã sửa initplan); năm hiện tại chỉ cộng tới tháng hiện tại (YTD) để
-  // khớp vế doanh thu và không ghi trước chi phí định kỳ của tháng chưa tới.
+  const employeeRows = payrollByMonth
+    ? payrollByMonth.length === 1
+      ? payrollByMonth[0]
+      : sumEmployeePerformanceAcrossMonths(payrollByMonth)
+    : null;
+
+  // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
+  // hành (bảng expenses) − quỹ lương. payrollByMonth đã tính sẵn ở trên (dùng
+  // chung với khối Hiệu suất nhân viên) nên ở đây chỉ cần gom chi phí + cộng
+  // quỹ lương theo chi nhánh.
   let branchProfit: {
     operatingByBranch: Map<string, number>;
     payrollByBranch: Map<string, number>;
   } | null = null;
   if (canViewBranchComparison) {
-    const nextMonthOf = (ym: string) => {
-      const [y, m] = ym.split("-").map(Number);
-      return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-    };
-    let profitMonths: string[];
-    if (profitPeriod === "month") {
-      profitMonths = [month];
-    } else if (profitPeriod === "prevMonth") {
-      profitMonths = [previousMonthOf(month)];
-    } else {
-      const profitYear = profitPeriod === "year" ? Number(year) : Number(year) - 1;
-      const lastMonth =
-        String(profitYear) === defaults.year ? Number(defaults.month.split("-")[1]) : 12;
-      profitMonths = Array.from(
-        { length: lastMonth },
-        (_, i) => `${profitYear}-${String(i + 1).padStart(2, "0")}`,
-      );
-    }
-    const [{ data: periodExpenses }, { data: recurringDefs }, payrollByMonth] = await Promise.all([
+    const [{ data: periodExpenses }, { data: recurringDefs }] = await Promise.all([
       supabase
         .from("expenses")
         .select("branch_id, amount")
@@ -185,15 +194,6 @@ export default async function DashboardHomePage({
       supabase
         .from("recurring_expenses")
         .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note"),
-      Promise.all(
-        profitMonths.map((m) =>
-          // Tháng trùng tháng biểu đồ hiệu suất (mặc định) thì dùng lại kết
-          // quả đã tính, khỏi chạy lại cả cụm truy vấn lương.
-          m === chartMonth && employeeRows
-            ? Promise.resolve(employeeRows)
-            : computeEmployeeMonthlyPerformance(m),
-        ),
-      ),
     ]);
     const operatingByBranch = new Map<string, number>();
     // Khoản nhập tay + khoản định kỳ trải vào từng tháng của kỳ (thuê nhà,
@@ -209,7 +209,7 @@ export default async function DashboardHomePage({
       );
     }
     const payrollByBranch = new Map<string, number>();
-    for (const r of payrollByMonth.flat()) {
+    for (const r of (payrollByMonth ?? []).flat()) {
       if (!r.branchId) continue;
       payrollByBranch.set(r.branchId, (payrollByBranch.get(r.branchId) ?? 0) + r.totalIncome);
     }
@@ -297,7 +297,7 @@ export default async function DashboardHomePage({
       )}
 
       {canManage && employeeRows && (
-        <EmployeePerformanceChartsSection rows={employeeRows} chartMonth={chartMonth} />
+        <EmployeePerformanceChartsSection rows={employeeRows} profitPeriod={profitPeriod} />
       )}
     </div>
   );

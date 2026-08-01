@@ -277,6 +277,41 @@ export async function computeEmployeeMonthlyPerformance(
   });
 }
 
+// Cộng dồn hiệu suất NHIỀU tháng thành 1 dòng/nhân viên — dùng cho kỳ Năm
+// nay/Năm trước ở Trang chủ. CỘNG thưởng đã tính đúng của TỪNG tháng thay vì
+// tính lại trên tổng năm — bậc thưởng (bonus_tiers) vốn chỉ có ý nghĩa xét
+// theo tổng khoán TRONG THÁNG, tính trên tổng năm sẽ ra con số sai bản chất.
+export function sumEmployeePerformanceAcrossMonths(
+  monthlyRows: EmployeeMonthlyPerformance[][],
+): EmployeeMonthlyPerformance[] {
+  const byEmployee = new Map<string, EmployeeMonthlyPerformance>();
+  for (const rows of monthlyRows) {
+    for (const r of rows) {
+      const existing = byEmployee.get(r.id);
+      if (!existing) {
+        byEmployee.set(r.id, { ...r, taskTypeCounts: { ...r.taskTypeCounts } });
+        continue;
+      }
+      existing.baseSalary += r.baseSalary;
+      existing.totalCommission += r.totalCommission;
+      existing.bonus += r.bonus;
+      existing.installationPayout += r.installationPayout;
+      existing.removalPayout += r.removalPayout;
+      existing.supportPayout += r.supportPayout;
+      existing.deliveryPayout += r.deliveryPayout;
+      existing.collectionPayout += r.collectionPayout;
+      existing.overtimePay += r.overtimePay;
+      existing.totalIncome += r.totalIncome;
+      existing.completedTaskCount += r.completedTaskCount;
+      for (const [taskType, count] of Object.entries(r.taskTypeCounts)) {
+        const key = taskType as TaskType;
+        existing.taskTypeCounts[key] = (existing.taskTypeCounts[key] ?? 0) + (count ?? 0);
+      }
+    }
+  }
+  return [...byEmployee.values()];
+}
+
 export interface MyMonthlyTrendPoint {
   month: string;
   baseSalary: number;
