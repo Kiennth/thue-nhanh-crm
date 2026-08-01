@@ -978,11 +978,33 @@ export async function upsertOrderTask(
   // chi nhánh thu hồi (kèm chuyển kho + lịch sử nếu khác chi nhánh giao). Cả
   // 2 function đều idempotent qua timestamp trên orders — khâu bị mở lại rồi
   // hoàn thành lại không cộng/trừ kho lần nữa.
+  //
+  // Lỗi ở đây KHÔNG được nuốt im lặng nữa — trước đây throw ra bị bỏ qua nên
+  // khâu vẫn báo lưu thành công dù tồn kho không hề nhúc nhích (đã gặp thật ở
+  // BQ11779/BQ32, xem migration 20260801060000_fix_stuck_return_stock.sql).
+  // Khâu vẫn giữ nguyên completed_date (đúng thực tế đã xảy ra), chỉ báo lỗi
+  // để người dùng biết mà kiểm tra tay thay vì tưởng đã trả/trừ kho xong.
   if (parsed.data.completed && parsed.data.task_type === "giao_hang_ban_giao") {
-    await supabase.rpc("deliver_order_stock", { p_order_id: parsed.data.order_id });
+    const { error: deliverError } = await supabase.rpc("deliver_order_stock", {
+      p_order_id: parsed.data.order_id,
+    });
+    if (deliverError) {
+      revalidatePath(`/orders/${parsed.data.order_id}`);
+      return {
+        error: "Đã lưu khâu, nhưng trừ tồn kho thất bại: " + deliverError.message + " — cần kiểm tra tay.",
+      };
+    }
   }
   if (parsed.data.completed && parsed.data.task_type === "nhap_kho_bao_tri") {
-    await supabase.rpc("return_order_stock", { p_order_id: parsed.data.order_id });
+    const { error: returnError } = await supabase.rpc("return_order_stock", {
+      p_order_id: parsed.data.order_id,
+    });
+    if (returnError) {
+      revalidatePath(`/orders/${parsed.data.order_id}`);
+      return {
+        error: "Đã lưu khâu, nhưng trả tồn kho thất bại: " + returnError.message + " — cần kiểm tra tay.",
+      };
+    }
   }
 
   revalidatePath(`/orders/${parsed.data.order_id}`);
