@@ -10,7 +10,6 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { PeriodPicker } from "@/components/period-picker";
-import { BranchBadge } from "@/components/branch-badge";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -113,9 +112,11 @@ export function BranchComparisonCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[260px_1fr]">
-          <div className="relative mx-auto">
-            <ChartContainer config={chartConfig} className="aspect-square h-[220px]">
+        <div className="flex justify-center">
+          <div className="relative">
+            {/* Hộp rộng hơn vòng để nhãn tên chi nhánh đứng ngoài lát không
+                bị cắt chữ. */}
+            <ChartContainer config={chartConfig} className="aspect-auto h-[240px] w-[400px] max-w-full">
               <PieChart>
                 {/* Số tuyệt đối + (%) nằm ngay trong donut qua tooltip khi rê
                     chuột — CEO chốt bỏ cột số ở chú giải, ví dụ mẫu:
@@ -146,11 +147,16 @@ export function BranchComparisonCard({
                   }
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={62}
-                  outerRadius={92}
+                  innerRadius={58}
+                  outerRadius={86}
                   paddingAngle={slices.length > 1 ? 2 : 0}
                   strokeWidth={0}
                   isAnimationActive={slices.length > 0}
+                  // Tên chi nhánh dán thẳng cạnh lát (CEO bỏ chú giải ngoài);
+                  // lát dưới 4% không đủ chỗ — tooltip lo phần đó.
+                  label={({ name, percent }) =>
+                    slices.length && (percent ?? 0) >= 0.04 ? String(name) : ""
+                  }
                 >
                   {slices.length ? (
                     slices.map((r) => (
@@ -170,27 +176,6 @@ export function BranchComparisonCard({
             </div>
           </div>
 
-          {/* Chú giải chỉ còn danh tính (chấm màu + tên) — số tuyệt đối và %
-              đã dời vào tooltip của donut, tổng nằm giữa vòng. */}
-          <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:flex-col lg:items-start lg:gap-y-2.5">
-            {sorted.map((r) => (
-              <li key={r.branchId} className="flex items-center gap-2 text-sm">
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      r[period] > 0 ? `var(--chart-${r.colorIndex + 1})` : "var(--muted)",
-                  }}
-                />
-                <BranchBadge name={r.branchName} />
-                <span className="truncate">{r.branchName}</span>
-              </li>
-            ))}
-            {!sorted.length && (
-              <li className="text-sm text-muted-foreground">Chưa có chi nhánh nào.</li>
-            )}
-          </ul>
         </div>
       </CardContent>
     </Card>
