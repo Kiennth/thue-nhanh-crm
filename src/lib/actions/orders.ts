@@ -9,6 +9,7 @@ import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-prici
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { DELIVERY_NOTE_TYPE_IDS, TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
+import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 
 const DELETE_ROLES = MANAGE_ROLES;
 
@@ -351,7 +352,7 @@ export async function assignOrderLineEmployee(
     .from("order_equipment")
     .update({
       employee_id: parsed.data.employee_id ?? null,
-      completed_date: parsed.data.employee_id ? new Date().toISOString().slice(0, 10) : null,
+      completed_date: parsed.data.employee_id ? vnTodayString() : null,
       delivery_method:
         isTransportLine && parsed.data.employee_id ? (parsed.data.delivery_method ?? null) : null,
     })
@@ -658,7 +659,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
     return { error: "Không đọc được dòng hàng gốc: " + linesError.message };
   }
 
-  const today = new Date();
+  const today = vnNow();
   const { data: newOrder, error: insertError } = await supabase
     .from("orders")
     .insert({
@@ -666,7 +667,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       pickup_branch_id: source.pickup_branch_id,
       return_branch_id: source.return_branch_id,
       customer_id: source.customer_id,
-      order_date: today.toISOString().slice(0, 10),
+      order_date: formatVNDate(today),
       rental_start_at: source.rental_start_at,
       rental_end_at: source.rental_end_at,
       created_by: employee.id,
@@ -962,7 +963,7 @@ export async function upsertOrderTask(
       employee_id: parsed.data.employee_id ?? null,
       note: parsed.data.note ?? null,
       has_issue: parsed.data.has_issue ?? false,
-      completed_date: parsed.data.completed ? new Date().toISOString().slice(0, 10) : null,
+      completed_date: parsed.data.completed ? vnTodayString() : null,
     },
     { onConflict: "order_id,task_type" },
   );

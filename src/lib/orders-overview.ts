@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
+import { vnNow } from "@/lib/vn-time";
 
 const WEEK_TREND_COUNT = 8;
 const MONTH_TREND_COUNT = 6;
@@ -302,7 +303,7 @@ function buildYearTrend(orders: LiteOrder[], today: Date): TrendPoint[] {
 // sách (luôn là bức tranh toàn cảnh, chỉ giới hạn theo chi nhánh).
 export async function computeOrdersOverview(
   branchId: string | null,
-  now = new Date(),
+  now = vnNow(),
 ): Promise<OrdersOverview> {
   const orders = await fetchNonCancelledOrders(branchId);
   const today = toDateOnly(now);

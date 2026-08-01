@@ -1,4 +1,5 @@
 import { VAT_RATE } from "@/lib/order-labels";
+import { formatVNDate, vnNow, vnStartOfDay } from "@/lib/vn-time";
 import type { CustomerType } from "@/types/database";
 
 export interface CustomerReportRow {
@@ -45,7 +46,7 @@ export function buildNewCustomersByMonth(
   rows: CustomerReportRow[],
   monthCount: number,
   companyFirstOrder: Map<string, string>,
-  today = new Date(),
+  today = vnNow(),
 ): NewCustomerPoint[] {
   const months: string[] = [];
   for (let i = monthCount - 1; i >= 0; i--) {
@@ -75,11 +76,14 @@ export const DORMANT_MIN_ORDERS = 2;
 
 export function findDormantCustomers(
   rows: CustomerReportRow[],
-  today = new Date(),
+  today = vnNow(),
 ): CustomerReportRow[] {
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - DORMANT_DAYS);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // KHÔNG dùng toISOString() ở đây — cutoff là Date "giả" (đã qua vnNow()),
+  // giờ-trong-ngày còn sót lại có thể lệch qua ranh giới UTC. Đọc thẳng bằng
+  // local getter (formatVNDate) mới đúng ngày VN.
+  const cutoffStr = formatVNDate(cutoff);
   return rows
     .filter(
       (r) =>
@@ -110,7 +114,7 @@ export function buildReturningRateByMonth(
   // Mốc "cũ/mới" lấy trên toàn công ty cho khớp với cách đếm khách mới —
   // khách quen của kho khác ghé đây lần đầu vẫn là khách cũ của công ty.
   companyFirstOrder: Map<string, string>,
-  today = new Date(),
+  today = vnNow(),
 ): ReturningRatePoint[] {
   const active = orders.filter((o) => !o.cancelled_at);
 
@@ -146,8 +150,12 @@ export function buildReturningRateByMonth(
   });
 }
 
-export function daysSince(dateStr: string, today = new Date()): number {
-  return Math.floor((today.getTime() - new Date(dateStr).getTime()) / 86_400_000);
+// So sánh THỜI ĐIỂM THẬT (không dùng vnNow() — epoch của nó đã bị dịch, cộng
+// trừ trực tiếp sẽ sai) — quy "hôm nay" về đúng 00:00 giờ VN của ngày hôm
+// nay rồi trừ epoch thật với dateStr.
+export function daysSince(dateStr: string, todayReal: Date = new Date()): number {
+  const startOfTodayVN = vnStartOfDay(formatVNDate(vnNow(todayReal)));
+  return Math.floor((startOfTodayVN.getTime() - new Date(dateStr).getTime()) / 86_400_000);
 }
 
 // Doanh số/công nợ chỉ tính trên đơn CHƯA huỷ — đơn huỷ không tính là doanh

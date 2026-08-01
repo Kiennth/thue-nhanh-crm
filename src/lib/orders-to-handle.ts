@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import type { DateRange } from "@/lib/date-range-presets";
+import { vnEndOfDay, vnStartOfDay } from "@/lib/vn-time";
 import type { TaskType } from "@/types/database";
 
 export interface OrderToHandle {
@@ -30,11 +31,14 @@ function statusIndex(status: TaskType) {
 
 // range.start/end là "YYYY-MM-DD" (biên bao gồm cả 2 đầu, theo đúng quy ước
 // của computeDateRange) — actionDate là timestamptz, so theo mốc ngày giờ.
+// Dùng offset +07:00 tường minh (vnStartOfDay/vnEndOfDay) — chuỗi
+// "...T00:00:00" không offset bị ECMAScript hiểu theo GIỜ RUNTIME (UTC trên
+// Cloudflare Workers), không phải giờ VN.
 function isWithinDateRange(actionDate: string, range: DateRange | null): boolean {
   if (!range) return true;
   const date = new Date(actionDate);
-  const start = new Date(`${range.start}T00:00:00`);
-  const end = new Date(`${range.end}T23:59:59.999`);
+  const start = vnStartOfDay(range.start);
+  const end = vnEndOfDay(range.end);
   return date >= start && date <= end;
 }
 

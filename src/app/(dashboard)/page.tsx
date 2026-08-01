@@ -5,6 +5,7 @@ import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { todayParts } from "@/lib/dashboard-reports";
+import { vnNow } from "@/lib/vn-time";
 import { computeOrdersOverview } from "@/lib/orders-overview";
 import { PeriodStatCards } from "./orders/period-stat-cards";
 import { OrdersTrendChart } from "./orders/orders-trend-chart";
@@ -61,7 +62,7 @@ export default async function DashboardHomePage({
     params.returningRange && isDateRangePreset(params.returningRange) ? params.returningRange : "all";
   const upcomingLateActive = params.upcomingLate === "1";
   const returningLateActive = params.returningLate === "1";
-  const now = new Date();
+  const now = vnNow();
   const upcomingDateRange = computeDateRange(upcomingRangePreset, now);
   const returningDateRange = computeDateRange(returningRangePreset, now);
 

@@ -19,6 +19,7 @@ import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { deleteOrder } from "@/lib/actions/orders";
+import { vnNow } from "@/lib/vn-time";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import {
   computeDateRange,
@@ -139,7 +140,7 @@ export async function OrdersListSection({
 }) {
   const activeStatus = status ?? "all";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
-  const dateRange = computeDateRange(activeRange, new Date(), { from, to });
+  const dateRange = computeDateRange(activeRange, vnNow(), { from, to });
   const filters: OrderFilters = { branchId, activeStatus, dateRange };
   const activeSort: OrderSortKey | null = sort && isOrderSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";

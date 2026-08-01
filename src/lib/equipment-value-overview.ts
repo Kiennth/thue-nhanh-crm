@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { computeWeightedAverageCost } from "@/lib/equipment-reports";
+import { vnNow } from "@/lib/vn-time";
 
 const WEEK_TREND_COUNT = 8;
 const MONTH_TREND_COUNT = 6;
@@ -167,7 +168,7 @@ function buildYearTrend(ctx: BalanceContext, today: Date): EquipmentValueTrendPo
 // Kế toán), branchId cụ thể → chỉ chi nhánh đó (Cửa hàng trưởng).
 export async function computeEquipmentValueOverview(
   branchId: string | null,
-  now = new Date(),
+  now = vnNow(),
 ): Promise<EquipmentValueOverview> {
   const supabase = await createClient();
 

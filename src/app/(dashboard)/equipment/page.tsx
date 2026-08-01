@@ -23,6 +23,7 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType } from "@/lib/actions/equipment";
 import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
 import { computeEquipmentValueOverview } from "@/lib/equipment-value-overview";
+import { vnNow } from "@/lib/vn-time";
 import {
   computeDateRange,
   DATE_RANGE_PRESET_OPTIONS,
@@ -96,7 +97,7 @@ export default async function EquipmentPage({
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
-  const reportDateRange = computeDateRange(activeRange, new Date(), { from: rangeFrom, to: rangeTo });
+  const reportDateRange = computeDateRange(activeRange, vnNow(), { from: rangeFrom, to: rangeTo });
 
   const supabase = await createClient();
   const employee = await getCurrentEmployee();

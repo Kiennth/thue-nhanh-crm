@@ -1,7 +1,10 @@
-// Chuỗi ngày/tháng/năm hiện tại theo giờ máy chủ — dùng làm giá trị mặc định
-// cho các ô chọn kỳ trên dashboard (chỉ gọi từ Server Component).
+import { vnNow } from "@/lib/vn-time";
+
+// Chuỗi ngày/tháng/năm hiện tại theo GIỜ VN (không phải giờ máy chủ — trên
+// Cloudflare Workers máy chủ luôn chạy UTC) — dùng làm giá trị mặc định cho
+// các ô chọn kỳ trên dashboard (chỉ gọi từ Server Component).
 export function todayParts() {
-  const now = new Date();
+  const now = vnNow();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
