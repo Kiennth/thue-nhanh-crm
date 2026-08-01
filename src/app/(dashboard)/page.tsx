@@ -1,12 +1,9 @@
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProductHighlightCards } from "@/components/dashboard-cards";
 import { BranchComparisonSection } from "@/components/branch-comparison";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { todayParts } from "@/lib/dashboard-reports";
-import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeOrdersOverview } from "@/lib/orders-overview";
 import { PeriodStatCards } from "./orders/period-stat-cards";
 import { OrdersTrendChart } from "./orders/orders-trend-chart";
@@ -17,9 +14,7 @@ import {
   DATE_RANGE_PRESET_OPTIONS,
   type DateRangePreset,
 } from "@/lib/date-range-presets";
-import { fetchAllCustomersLite } from "@/lib/customers";
-import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
-import { buildCustomerReportRows } from "@/lib/customer-reports";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { expandRecurring } from "@/lib/recurring-expenses";
 import {
   computeEmployeeMonthlyPerformance,
@@ -32,7 +27,6 @@ import { MyPerformanceTrendCard } from "./my-performance-trend-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
-import { CustomerOverviewTiles } from "./customers/customer-report-section";
 import { EmployeePerformanceChartsSection } from "./employee-performance-charts";
 
 const HANDLE_LIMIT = 5;
@@ -80,13 +74,11 @@ export default async function DashboardHomePage({
   // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
-  // Trang chủ cắt theo 2 mức, CEO chốt 2026-08-01:
-  //   - Hai cụm ĐẾM tổng quát (đơn/chi nhánh/khách/loại thiết bị, cơ cấu
-  //     khách hàng) và XẾP HẠNG SẢN PHẨM: chỉ Giám đốc. Xếp hạng sản phẩm đã
-  //     có đủ trong báo cáo ở trang Thiết bị nên không lặp lại ngoài này.
-  //   - So sánh doanh thu chi nhánh: thêm Kế toán, vì đây chính là số liệu
-  //     bán hàng/cho thuê họ tổng hợp để báo cáo lên Giám đốc.
-  const canViewDirectorSummary = employee.role === "giam_doc";
+  // Trang chủ chỉ giữ chỉ số HIỆN THỜI (CEO chốt 2026-08-01): hiệu suất cá
+  // nhân, đơn cần xử lý, so sánh chi nhánh tháng này. Các khối đếm tổng, cơ
+  // cấu khách hàng, xếp hạng sản phẩm đã trả về đúng trang Khách hàng /
+  // Thiết bị — bản cũ nạp ~50.000 dòng all-time chỉ để vẽ mấy khối đó, là
+  // thứ khiến trang chủ Giám đốc mất 15s trên Cloudflare Workers.
   const canViewBranchComparison = canManage && employee.role !== "admin";
 
   // So sánh chi nhánh chỉ đọc lại đúng 3 mốc Ngày/Tháng/Năm đang chọn
@@ -106,48 +98,16 @@ export default async function DashboardHomePage({
 
   const supabase = await createClient();
 
-  let processingOrdersQuery = supabase
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .is("completed_at", null)
-    .is("cancelled_at", null);
-  if (branchId) {
-    processingOrdersQuery = processingOrdersQuery.or(
-      `pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`,
-    );
-  }
-
   const [
-    branches,
     branchList,
-    customersCount,
-    equipmentTypes,
     orders,
-    { data: types },
-    { data: units },
-    { data: instances },
-    { data: purchases },
-    { data: disposals },
-    { data: stock },
-    orderLines,
     ordersToHandle,
-    { count: processingCount },
-    customersLite,
-    customerOrders,
-    customerPayments,
     myPerformance,
     employeeRows,
     myTrend,
     branchOrdersOverview,
   ] = await Promise.all([
-    supabase.from("branches").select("*", { count: "exact", head: true }),
     supabase.from("branches").select("id, name").order("name"),
-    supabase.from("customers").select("*", { count: "exact", head: true }),
-    supabase.from("equipment_types").select("*", { count: "exact", head: true }),
-    // Mỗi nguồn dưới đây chỉ nuôi đúng một khối, nên bám theo đúng cờ của
-    // khối đó. Ai không xem được thì đừng nạp: hàng chục nghìn dòng, và trên
-    // Cloudflare Workers nạp thừa cỡ này chính là thứ đã làm sập trang với
-    // lỗi 1102.
     canViewBranchComparison
       ? fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>(
           (from, to) =>
@@ -166,71 +126,11 @@ export default async function DashboardHomePage({
               .range(from, to),
         )
       : Promise.resolve([]),
-    canViewDirectorSummary
-      ? supabase.from("equipment_types").select("id, name, product_type")
-      : Promise.resolve({ data: null }),
-    canViewDirectorSummary
-      ? supabase.from("equipment_units").select("id, equipment_type_id")
-      : Promise.resolve({ data: null }),
-    canViewDirectorSummary
-      ? supabase
-          .from("equipment_instances")
-          .select("equipment_type_id, purchase_price, disposal_price, status")
-      : Promise.resolve({ data: null }),
-    canViewDirectorSummary
-      ? supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost")
-      : Promise.resolve({ data: null }),
-    canViewDirectorSummary
-      ? supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price")
-      : Promise.resolve({ data: null }),
-    canViewDirectorSummary
-      ? supabase.from("equipment_stock").select("equipment_unit_id, quantity_total")
-      : Promise.resolve({ data: null }),
-    // Xếp hạng sản phẩm CỐ Ý là all-time (không date-bound được như So sánh
-    // chi nhánh) — bảng này 30.000+ dòng nên dùng bản phân trang song song
-    // thay vì fetchAllRows tuần tự (đo trên trang Thiết bị: cùng truy vấn,
-    // tuần tự mất 14s).
-    canViewDirectorSummary
-      ? fetchAllRowsFast<{ equipment_type_id: string | null; line_total: number }>(
-          (from, to) =>
-            supabase.from("order_equipment").select("equipment_type_id, line_total").order("id").range(from, to),
-          () => supabase.from("order_equipment").select("*", { count: "exact", head: true }),
-        )
-      : Promise.resolve([]),
     getOrdersToHandle(branchId, HANDLE_LIMIT, {
       delivery: upcomingDateRange,
       collection: returningDateRange,
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
-    processingOrdersQuery,
-    // Ba nguồn này chỉ để dựng 4 ô "Khách hàng" — nay chỉ Giám đốc xem.
-    canViewDirectorSummary ? fetchAllCustomersLite() : Promise.resolve([]),
-    // Cần TOÀN BỘ lịch sử để phân loại khách mới/quay lại đúng nghĩa (dựa
-    // trên đơn đầu tiên của khách, không giới hạn theo kỳ) — không date-bound
-    // được, nên cắt thời gian chờ bằng cách phân trang song song thay vì
-    // tuần tự (10.020 dòng ≈ 11 trang).
-    canViewDirectorSummary
-      ? fetchAllRowsFast<{
-          id: string;
-          customer_id: string;
-          total_value: number;
-          order_date: string;
-          cancelled_at: string | null;
-        }>(
-          (from, to) =>
-            supabase
-              .from("orders")
-              .select("id, customer_id, total_value, order_date, cancelled_at")
-              .order("id")
-              .range(from, to),
-          () => supabase.from("orders").select("*", { count: "exact", head: true }),
-        )
-      : Promise.resolve([]),
-    canViewDirectorSummary
-      ? fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
-          supabase.from("order_payments").select("order_id, amount").range(from, to),
-        )
-      : Promise.resolve([]),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
     canManage ? computeEmployeeMonthlyPerformance(chartMonth) : Promise.resolve(null),
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
@@ -242,16 +142,6 @@ export default async function DashboardHomePage({
       ? computeOrdersOverview(branchId)
       : Promise.resolve(null),
   ]);
-
-  const stats = [
-    { label: "Đơn hàng đang xử lý", count: processingCount ?? 0, href: "/orders" },
-    { label: "Chi nhánh", count: branches.count ?? 0, href: "/branches" },
-    { label: "Khách hàng", count: customersCount.count ?? 0, href: "/customers" },
-    { label: "Loại thiết bị", count: equipmentTypes.count ?? 0, href: "/equipment" },
-  ];
-
-  const orderList = orders ?? [];
-  const typeList = types ?? [];
 
   // Lãi gộp theo chi nhánh của THÁNG đang so sánh = doanh thu − chi phí vận
   // hành (bảng expenses) − quỹ lương (tự lấy từ Bảng lương, CEO chốt). Chỉ
@@ -298,41 +188,6 @@ export default async function DashboardHomePage({
     }
     branchProfit = { operatingByBranch, payrollByBranch };
   }
-  // Chỉ Giám đốc/Admin/Kế toán xem khối "Cho thuê nhiều nhất / Sản phẩm chủ
-  // lực / Tỉ suất lợi nhuận" ở trang chủ nên báo cáo này luôn ở phạm vi toàn
-  // hệ thống — Cửa hàng trưởng xem bản theo kho chi nhánh ở trang Thiết bị.
-  const reports = computeEquipmentTypeReports(
-    typeList,
-    units ?? [],
-    instances ?? [],
-    purchases ?? [],
-    disposals ?? [],
-    stock ?? [],
-    orderLines ?? [],
-  );
-  const rows = typeList.map((type) => ({ type, report: reports.get(type.id)! }));
-
-  const mostRented = rows
-    .filter((r) => r.type.product_type === "rental")
-    .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
-    .filter((r) => r.report.rentalCount > 0)
-    .slice(0, 5);
-
-  const flagship = [...rows]
-    .sort((a, b) => b.report.revenue - a.report.revenue)
-    .filter((r) => r.report.revenue > 0)
-    .slice(0, 5);
-
-  const topMargin = rows
-    .filter((r) => r.report.profitRatio !== null)
-    .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
-    .slice(0, 5);
-
-  const customerReportRows = buildCustomerReportRows(
-    customersLite ?? [],
-    customerOrders ?? [],
-    customerPayments ?? [],
-  );
 
   return (
     <div className="space-y-6">
@@ -382,38 +237,6 @@ export default async function DashboardHomePage({
         />
       </div>
 
-      {/* Bốn ô đếm tổng quát toàn công ty — chỉ Giám đốc. */}
-      {canViewDirectorSummary && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {stats.map((stat) => (
-            <Link key={stat.href} href={stat.href}>
-              <Card className="transition-colors hover:bg-muted/50">
-                <CardHeader>
-                  <CardTitle className="text-sm font-normal text-muted-foreground">
-                    {stat.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-semibold">{stat.count}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {canViewDirectorSummary && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Khách hàng</h2>
-            <Link href="/customers" className="text-xs text-muted-foreground hover:underline">
-              Xem báo cáo đầy đủ →
-            </Link>
-          </div>
-          <CustomerOverviewTiles rows={customerReportRows} />
-        </div>
-      )}
-
       {/* Cửa hàng trưởng: tổng quan đơn hàng của đúng chi nhánh mình. */}
       {branchOrdersOverview && (
         <div className="space-y-4">
@@ -437,7 +260,7 @@ export default async function DashboardHomePage({
       {canViewBranchComparison && (
         <BranchComparisonSection
           branches={branchList.data ?? []}
-          orders={orderList}
+          orders={orders}
           day={day}
           month={month}
           year={year}
@@ -445,17 +268,6 @@ export default async function DashboardHomePage({
           isThisMonth={month === defaults.month}
           isThisYear={year === defaults.year}
           profit={branchProfit ?? undefined}
-        />
-      )}
-
-      {canViewDirectorSummary && (
-        <ProductHighlightCards
-          mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
-          flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
-          topMargin={topMargin.map((r) => ({
-            label: r.type.name,
-            value: (r.report.profitRatio ?? 0) * 100,
-          }))}
         />
       )}
 
