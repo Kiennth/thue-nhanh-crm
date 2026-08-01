@@ -23,8 +23,17 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Mono số rộng hơn sans — tối đa 6 cột rồi wrap, tránh đè chữ. */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-6">
+        {/* 5 số chính luôn hiện, Tổng thu nhập đứng đầu; 6 khoản khoán dịch
+            vụ chi tiết chỉ hiện khi CÓ phát sinh trong tháng — hàng dài ô 0đ
+            không nói lên gì, ẩn đi là card tự co còn 1 hàng (CEO chốt
+            2026-08-01). Số chi tiết đầy đủ vẫn luôn có ở Bảng lương. */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+          <div>
+            <p className="text-xs text-muted-foreground">Tổng thu nhập</p>
+            <p className="text-2xl font-semibold text-primary">
+              {currencyFormatter.format(perf.totalIncome)}đ
+            </p>
+          </div>
           <div>
             <p className="text-xs text-muted-foreground">Lương cứng</p>
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.baseSalary)}đ</p>
@@ -34,38 +43,8 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
             <p className="text-2xl font-semibold">{currencyFormatter.format(perf.totalCommission)}đ</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Lắp đặt</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.installationPayout)}đ</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Tháo dỡ</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.removalPayout)}đ</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Support</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.supportPayout)}đ</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Giao hàng</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.deliveryPayout)}đ</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Thu hồi</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.collectionPayout)}đ</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">OT</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.overtimePay)}đ</p>
-          </div>
-          <div>
             <p className="text-xs text-muted-foreground">Thưởng đạt được</p>
-            <p className="text-2xl font-semibold text-primary">
-              {currencyFormatter.format(perf.bonus)}đ
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Tổng thu nhập</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.totalIncome)}đ</p>
+            <p className="text-2xl font-semibold">{currencyFormatter.format(perf.bonus)}đ</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Khâu đã hoàn thành</p>
@@ -74,6 +53,23 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
               {perf.completedTaskCount}
             </p>
           </div>
+          {(
+            [
+              ["Lắp đặt", perf.installationPayout],
+              ["Tháo dỡ", perf.removalPayout],
+              ["Support", perf.supportPayout],
+              ["Giao hàng", perf.deliveryPayout],
+              ["Thu hồi", perf.collectionPayout],
+              ["OT", perf.overtimePay],
+            ] as const
+          )
+            .filter(([, value]) => value > 0)
+            .map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-2xl font-semibold">{currencyFormatter.format(value)}đ</p>
+              </div>
+            ))}
         </div>
 
         {perf.tiers.length > 0 && (
