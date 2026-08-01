@@ -20,7 +20,6 @@ import { expandRecurring } from "@/lib/recurring-expenses";
 import {
   computeEmployeeMonthlyPerformance,
   computeMyMonthlyTrend,
-  sumEmployeePerformanceAcrossMonths,
   MANAGE_ROLES,
 } from "@/lib/employee-performance-charts";
 import { MyPerformanceCard } from "./my-performance-card";
@@ -28,7 +27,6 @@ import { MyPerformanceTrendCard } from "./my-performance-trend-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
-import { EmployeePerformanceChartsSection } from "./employee-performance-charts";
 
 const HANDLE_LIMIT = 5;
 
@@ -100,12 +98,10 @@ export default async function DashboardHomePage({
 
   const supabase = await createClient();
 
-  // Hiệu suất nhân viên VÀ Lợi nhuận gộp dùng CHUNG 1 kỳ (profitPeriod, CEO
-  // chốt 2026-08-01) — Năm nay/Năm trước cộng dồn TỪNG THÁNG (cộng thưởng đã
-  // tính đúng của từng tháng thay vì tính lại trên tổng năm — bậc thưởng chỉ
-  // có ý nghĩa xét theo tổng khoán TRONG THÁNG); Năm hiện tại dừng ở tháng
-  // hiện tại (YTD) để khớp vế doanh thu và không cộng trước chi phí định kỳ
-  // của tháng chưa tới.
+  // Kỳ của khối Lợi nhuận gộp — Năm nay/Năm trước cộng dồn quỹ lương TỪNG
+  // THÁNG (bậc thưởng chỉ có ý nghĩa xét theo tổng khoán TRONG THÁNG); Năm
+  // hiện tại dừng ở tháng hiện tại (YTD) để khớp vế doanh thu và không cộng
+  // trước chi phí định kỳ của tháng chưa tới.
   const nextMonthOf = (ym: string) => {
     const [y, m] = ym.split("-").map(Number);
     return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
@@ -157,7 +153,10 @@ export default async function DashboardHomePage({
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
     computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
-    canManage
+    // Chỉ khối Lợi nhuận gộp cần bảng lương theo tháng — khối Hiệu suất nhân
+    // viên đã bỏ khỏi trang chủ (CEO chốt 2026-08-01: số liệu đủ đầy ở Bảng
+    // lương rồi, không cần lặp lại).
+    canViewBranchComparison
       ? Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m)))
       : Promise.resolve(null),
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
@@ -170,16 +169,9 @@ export default async function DashboardHomePage({
       : Promise.resolve(null),
   ]);
 
-  const employeeRows = payrollByMonth
-    ? payrollByMonth.length === 1
-      ? payrollByMonth[0]
-      : sumEmployeePerformanceAcrossMonths(payrollByMonth)
-    : null;
-
   // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
-  // hành (bảng expenses) − quỹ lương. payrollByMonth đã tính sẵn ở trên (dùng
-  // chung với khối Hiệu suất nhân viên) nên ở đây chỉ cần gom chi phí + cộng
-  // quỹ lương theo chi nhánh.
+  // hành (bảng expenses) − quỹ lương. payrollByMonth đã tính sẵn ở trên nên
+  // ở đây chỉ cần gom chi phí + cộng quỹ lương theo chi nhánh.
   let branchProfit: {
     operatingByBranch: Map<string, number>;
     payrollByBranch: Map<string, number>;
@@ -294,10 +286,6 @@ export default async function DashboardHomePage({
           profit={branchProfit ?? undefined}
           profitPeriod={profitPeriod}
         />
-      )}
-
-      {canManage && employeeRows && (
-        <EmployeePerformanceChartsSection rows={employeeRows} profitPeriod={profitPeriod} />
       )}
     </div>
   );
