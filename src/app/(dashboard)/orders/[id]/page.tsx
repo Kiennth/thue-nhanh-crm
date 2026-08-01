@@ -32,6 +32,7 @@ import {
   computePoolExcludedTotal,
   computeTaskCommission,
   findTaskWeight,
+  DELIVERY_NOTE_TYPE_IDS,
   TRANSPORT_LINE_CATEGORY_BY_TYPE_ID,
   type PoolExcludedLineInput,
 } from "@/lib/commission";
@@ -39,11 +40,11 @@ import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
-import { OrderTotalForm } from "./order-total-form";
 import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
+import { OrderLineNoteForm } from "./order-line-note-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import { OrderInfoForm } from "./order-info-form";
 import CloseOrderButton from "./close-order-button";
@@ -426,6 +427,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         const isTransportLine =
                           !!line.equipment_type_id &&
                           line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
+                        // 4 SKU giao/thu hồi (xe máy + ô tô) — ô ghi chú địa
+                        // chỉ + SĐT nhận/trả hàng, độc lập với việc gán nhân
+                        // viên/tính khoán ở trên.
+                        const showDeliveryNote =
+                          !!line.equipment_type_id && DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id);
                         const rawDetail = line.equipment_unit_id
                           ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
                           : line.equipment_instance_id
@@ -461,21 +467,33 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               </TableCell>
                               <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
                               <TableCell>
-                                {type?.payout_percentage != null || isTransportLine ? (
-                                  (isTransportLine ? canAssignTransport : canManage) ? (
-                                    <OrderLineEmployeeForm
-                                      lineId={line.id}
-                                      employeeId={line.employee_id}
-                                      employees={employeeList}
-                                      isTransportLine={isTransportLine}
-                                      deliveryMethod={line.delivery_method}
-                                    />
+                                <div className="flex flex-col items-start gap-1.5">
+                                  {type?.payout_percentage != null || isTransportLine ? (
+                                    (isTransportLine ? canAssignTransport : canManage) ? (
+                                      <OrderLineEmployeeForm
+                                        lineId={line.id}
+                                        employeeId={line.employee_id}
+                                        employees={employeeList}
+                                        isTransportLine={isTransportLine}
+                                        deliveryMethod={line.delivery_method}
+                                      />
+                                    ) : (
+                                      (employeeNameById.get(line.employee_id ?? "") ?? "—")
+                                    )
                                   ) : (
-                                    (employeeNameById.get(line.employee_id ?? "") ?? "—")
-                                  )
-                                ) : (
-                                  "—"
-                                )}
+                                    !showDeliveryNote && "—"
+                                  )}
+                                  {showDeliveryNote &&
+                                    (canAssignTransport ? (
+                                      <OrderLineNoteForm lineId={line.id} note={line.note} />
+                                    ) : (
+                                      line.note && (
+                                        <p className="max-w-[160px] text-xs whitespace-pre-wrap text-muted-foreground">
+                                          {line.note}
+                                        </p>
+                                      )
+                                    ))}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <ConfirmDeleteButton
@@ -559,7 +577,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
               {canManage && (
                 <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
-                  <OrderTotalForm orderId={order.id} totalValue={order.total_value} />
                   <OrderDiscountForm
                     orderId={order.id}
                     totalValue={order.total_value}

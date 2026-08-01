@@ -404,6 +404,9 @@ export interface Database {
           // tự chạy hay đặt xe dịch vụ, cùng giờ hẹn trên đơn quyết định %payout
           // (xem computeTransportPayoutPercentage() trong commission.ts).
           delivery_method: DeliveryMethod | null;
+          // Ghi chú tự do — hiện dùng cho 4 dòng phí vận chuyển (giao/thu hồi
+          // bằng xe máy hoặc ô tô) để ghi địa chỉ + SĐT nhận/trả hàng.
+          note: string | null;
           // Thứ tự hiển thị trong "Danh sách thiết bị" — kéo thả để sắp xếp
           // lại; dòng mới tự nối cuối danh sách nếu không truyền (xem trigger
           // set_order_equipment_position).
@@ -423,6 +426,7 @@ export interface Database {
           employee_id?: string | null;
           completed_date?: string | null;
           delivery_method?: DeliveryMethod | null;
+          note?: string | null;
           position?: number;
         };
         Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;

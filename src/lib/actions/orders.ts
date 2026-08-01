@@ -8,7 +8,7 @@ import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
-import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
+import { DELIVERY_NOTE_TYPE_IDS, TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 
 const DELETE_ROLES = MANAGE_ROLES;
 
@@ -359,6 +359,63 @@ export async function assignOrderLineEmployee(
 
   if (error) {
     return { error: "Không thể gán nhân viên: " + error.message };
+  }
+
+  revalidatePath(`/orders/${line.order_id}`);
+  return { success: true };
+}
+
+const OrderLineNoteSchema = z.object({
+  note: z.string().max(500, { message: "Ghi chú tối đa 500 ký tự." }).optional(),
+});
+
+// Ghi chú tự do cho 4 dòng phí vận chuyển (giao/thu hồi bằng xe máy hoặc ô
+// tô) — chỗ điền địa chỉ + SĐT nhận/trả hàng. Tách khỏi
+// assignOrderLineEmployee vì độc lập hoàn toàn với việc gán nhân viên/tính
+// khoán (2 dòng ô tô hiện còn CHƯA gán nhân viên được — xem comment tại
+// assignOrderLineEmployee — nhưng vẫn cần ghi chú được như thường).
+// Quyền giống hệt gán nhân viên dòng vận chuyển: CHT/Kỹ thuật-Sale tự điền
+// được (theo yêu cầu CEO), không giới hạn Admin/Kế toán/Giám đốc.
+export async function updateOrderLineNote(
+  lineId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const viewer = await getCurrentEmployee();
+  if (!viewer) {
+    redirect("/");
+  }
+
+  const parsed = OrderLineNoteSchema.safeParse({ note: formData.get("note") || undefined });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: line, error: lineError } = await supabase
+    .from("order_equipment")
+    .select("order_id, equipment_type_id")
+    .eq("id", lineId)
+    .single();
+
+  if (lineError || !line) {
+    return { error: "Không tìm thấy dòng hàng." };
+  }
+  if (!line.equipment_type_id || !DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id)) {
+    return { error: "Dòng hàng này không phải dịch vụ vận chuyển." };
+  }
+  const allowedRoles = [...MANAGE_ROLES, ...BRANCH_SCOPED_ROLES];
+  if (!allowedRoles.includes(viewer.role)) {
+    return { error: "Bạn không có quyền ghi chú dòng hàng này." };
+  }
+
+  const { error } = await supabase
+    .from("order_equipment")
+    .update({ note: parsed.data.note?.trim() || null })
+    .eq("id", lineId);
+
+  if (error) {
+    return { error: "Không thể lưu ghi chú: " + error.message };
   }
 
   revalidatePath(`/orders/${line.order_id}`);

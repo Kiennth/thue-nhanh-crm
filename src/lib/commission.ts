@@ -104,6 +104,17 @@ export const TRANSPORT_LINE_CATEGORY_BY_TYPE_ID: Record<string, TransportLineCat
   "13c85fe0-8b13-4d76-9df5-a20b19598cc9": "collection", // Phí thu hồi bằng xe máy | Bike Collection
 };
 
+// 4 SKU phí vận chuyển (giao/thu hồi bằng xe máy HOẶC ô tô) — nơi trang chi
+// tiết đơn hiện ô ghi chú địa chỉ + SĐT nhận/trả hàng (CEO chốt 2026-08-01).
+// CỐ Ý tách khỏi TRANSPORT_LINE_CATEGORY_BY_TYPE_ID: 2 dòng ô tô chưa có
+// payout_percentage lẫn %payout động, nên KHÔNG tham gia tính khoán — set
+// này chỉ phục vụ hiển thị/quyền ghi chú, không đụng gì tới lương.
+export const DELIVERY_NOTE_TYPE_IDS = new Set([
+  ...Object.keys(TRANSPORT_LINE_CATEGORY_BY_TYPE_ID),
+  "ce4a5f88-8daa-47c2-92fc-196d1fc321db", // Phí dịch vụ giao hàng bằng ô tô | Car Delivery
+  "1a53924a-a070-44b0-9441-3f09042af7e7", // Phí dịch vụ thu hồi hàng bằng Ô tô | Car Collection
+]);
+
 const BUSINESS_HOURS_START_MINUTES = 8 * 60 + 30; // 8:30
 const BUSINESS_HOURS_END_MINUTES = 17 * 60 + 30; // 17:30
 
