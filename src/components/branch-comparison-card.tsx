@@ -78,7 +78,7 @@ export function BranchComparisonCard({
           ? "Doanh thu tháng này"
           : `Doanh thu tháng ${month.split("-")[1]}/${month.split("-")[0]}`
         : isThisYear
-          ? "Doanh thu năm nay"
+          ? "Tổng quan"
           : `Doanh thu năm ${year}`;
 
   const sorted = [...rows].sort((a, b) => b[period] - a[period]);
