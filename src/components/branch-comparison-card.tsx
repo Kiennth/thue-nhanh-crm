@@ -117,6 +117,9 @@ export function BranchComparisonCard({
           <div className="relative mx-auto">
             <ChartContainer config={chartConfig} className="aspect-square h-[220px]">
               <PieChart>
+                {/* Số tuyệt đối + (%) nằm ngay trong donut qua tooltip khi rê
+                    chuột — CEO chốt bỏ cột số ở chú giải, ví dụ mẫu:
+                    "Hà Nội 2.436.257.018đ (41%)". */}
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -125,7 +128,8 @@ export function BranchComparisonCard({
                         <div className="flex w-full items-center justify-between gap-3">
                           <span className="text-muted-foreground">{name}</span>
                           <span className="font-medium tabular-nums">
-                            {currencyFormatter.format(Number(value))}đ
+                            {currencyFormatter.format(Number(value))}đ (
+                            {total > 0 ? Math.round((Number(value) / total) * 100) : 0}%)
                           </span>
                         </div>
                       )}
@@ -166,10 +170,9 @@ export function BranchComparisonCard({
             </div>
           </div>
 
-          {/* Chú giải kiêm số liệu — không có nó thì màu trên vòng không
-              biết của chi nhánh nào (danh tính không được phép chỉ dựa vào
-              màu), và mất luôn chỗ đọc số chính xác. Tổng đã nằm giữa vòng. */}
-          <ul className="space-y-2.5">
+          {/* Chú giải chỉ còn danh tính (chấm màu + tên) — số tuyệt đối và %
+              đã dời vào tooltip của donut, tổng nằm giữa vòng. */}
+          <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:flex-col lg:items-start lg:gap-y-2.5">
             {sorted.map((r) => (
               <li key={r.branchId} className="flex items-center gap-2 text-sm">
                 <span
@@ -182,12 +185,6 @@ export function BranchComparisonCard({
                 />
                 <BranchBadge name={r.branchName} />
                 <span className="truncate">{r.branchName}</span>
-                <span className="ml-auto shrink-0 font-medium tabular-nums">
-                  {currencyFormatter.format(r[period])}đ
-                </span>
-                <span className="w-10 shrink-0 text-right text-muted-foreground tabular-nums">
-                  {total > 0 ? `${((r[period] / total) * 100).toFixed(0)}%` : "—"}
-                </span>
               </li>
             ))}
             {!sorted.length && (
