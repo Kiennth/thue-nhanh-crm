@@ -81,12 +81,12 @@ export default async function DashboardHomePage({
   // thứ khiến trang chủ Giám đốc mất 15s trên Cloudflare Workers.
   const canViewBranchComparison = canManage && employee.role !== "admin";
 
-  // So sánh chi nhánh chỉ đọc lại đúng 3 mốc Ngày/Tháng/Năm đang chọn
-  // (revenueForDay/Month/Year lọc trong JS) — trước đây fetch NGUYÊN bảng
-  // orders all-time (10.020 dòng, 11 lượt gọi tuần tự) chỉ để dùng 3 mốc đó.
-  // Lấy khoảng bao trọn cả 3 mốc (thường cùng 1 năm, nhưng người dùng có thể
-  // chọn ngày/tháng khác năm với ô Năm) — cắt còn đúng phần dữ liệu cần.
-  const comparisonRangeStart = [`${day}`, `${month}-01`, `${year}-01-01`].sort()[0];
+  // So sánh chi nhánh chỉ đọc lại các mốc Ngày/Tuần/Tháng/Năm/Năm-trước đang
+  // chọn (lọc trong JS) — trước đây fetch NGUYÊN bảng orders all-time
+  // (10.020 dòng, 11 lượt gọi tuần tự) chỉ để dùng mấy mốc đó. Biên dưới lùi
+  // về 1/1 của NĂM TRƯỚC: nuôi tab "Năm trước", và tiện thể bao luôn tuần
+  // vắt qua đầu năm (ngày 1-3/1 có thể thuộc tuần bắt đầu cuối tháng 12).
+  const comparisonRangeStart = [`${day}`, `${month}-01`, `${Number(year) - 1}-01-01`].sort()[0];
   const comparisonRangeEndExclusive = (() => {
     const [y, m] = month.split("-").map(Number);
     const nextMonthOfMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
@@ -264,9 +264,6 @@ export default async function DashboardHomePage({
           day={day}
           month={month}
           year={year}
-          isToday={day === defaults.day}
-          isThisMonth={month === defaults.month}
-          isThisYear={year === defaults.year}
           profit={branchProfit ?? undefined}
         />
       )}

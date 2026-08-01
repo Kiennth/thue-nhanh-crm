@@ -20,34 +20,26 @@ export interface BranchPeriodRow {
   // thu — đổi kỳ xem thì Hà Nội vẫn giữ nguyên màu của Hà Nội.
   colorIndex: number;
   day: number;
+  // Tuần (Thứ 2 → CN) chứa ngày đang chọn.
+  week: number;
   month: number;
   year: number;
+  // Trọn năm liền trước năm đang chọn — để đối chiếu nhanh với năm nay.
+  prevYear: number;
 }
 
-type PeriodKey = "day" | "month" | "year";
-
-// "2026-08-01" → "1/8/2026" cho tiêu đề khi xem một ngày khác hôm nay.
-function formatDayLabel(day: string) {
-  const [y, m, d] = day.split("-");
-  return `${Number(d)}/${Number(m)}/${y}`;
-}
+type PeriodKey = "day" | "week" | "month" | "year" | "prevYear";
 
 export function BranchComparisonCard({
   rows,
   day,
   month,
   year,
-  isToday,
-  isThisMonth,
-  isThisYear,
 }: {
   rows: BranchPeriodRow[];
   day: string;
   month: string;
   year: string;
-  isToday: boolean;
-  isThisMonth: boolean;
-  isThisYear: boolean;
 }) {
   // CEO chốt 2026-08-01: mặc định xem theo tháng — nhịp điều hành chính;
   // "Hôm nay" đầu ngày thường 0đ chưa nói lên gì.
@@ -55,22 +47,15 @@ export function BranchComparisonCard({
 
   const periodTabs: { key: PeriodKey; label: string }[] = [
     { key: "day", label: "Hôm nay" },
+    { key: "week", label: "Tuần này" },
     { key: "month", label: "Tháng này" },
     { key: "year", label: "Năm nay" },
+    { key: "prevYear", label: "Năm trước" },
   ];
 
-  const periodTitle =
-    period === "day"
-      ? isToday
-        ? "Doanh thu hôm nay"
-        : `Doanh thu ngày ${formatDayLabel(day)}`
-      : period === "month"
-        ? isThisMonth
-          ? "Doanh thu tháng này"
-          : `Doanh thu tháng ${month.split("-")[1]}/${month.split("-")[0]}`
-        : isThisYear
-          ? "Tổng quan"
-          : `Doanh thu năm ${year}`;
+  // Tiêu đề ngắn gọn (CEO chốt) — kỳ đang xem đã hiện rõ trên nút chuyển và
+  // ô chọn ngày/tháng/năm ngay cạnh, không cần nhắc lại trong tên card.
+  const periodTitle = period === "year" ? "Tổng quan" : "Doanh thu";
 
   const sorted = [...rows].sort((a, b) => b[period] - a[period]);
   const total = rows.reduce((sum, r) => sum + r[period], 0);
@@ -84,7 +69,7 @@ export function BranchComparisonCard({
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-        <CardTitle className="text-base">So sánh chi nhánh — {periodTitle}</CardTitle>
+        <CardTitle className="text-base">{periodTitle}</CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg bg-muted p-1">
             {periodTabs.map((tab) => (
@@ -102,11 +87,15 @@ export function BranchComparisonCard({
               </button>
             ))}
           </div>
-          {period === "day" && <PeriodPicker paramName="day" type="date" value={day} label="Chọn ngày" />}
+          {/* Tuần đi theo ngày đang chọn — chọn ngày nào là xem tuần đó. Năm
+              trước đi theo ô chọn năm (= năm đang chọn trừ 1). */}
+          {(period === "day" || period === "week") && (
+            <PeriodPicker paramName="day" type="date" value={day} label="Chọn ngày" />
+          )}
           {period === "month" && (
             <PeriodPicker paramName="month" type="month" value={month} label="Chọn tháng" />
           )}
-          {period === "year" && (
+          {(period === "year" || period === "prevYear") && (
             <PeriodPicker paramName="year" type="number" value={year} label="Chọn năm" />
           )}
         </div>
