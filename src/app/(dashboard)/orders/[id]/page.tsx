@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,12 @@ import {
   TASK_TYPE_SEQUENCE,
   VAT_RATE,
 } from "@/lib/order-labels";
-import { equipmentDetailLabel } from "@/lib/equipment-labels";
+import { equipmentDetailLabel, RENTAL_PERIOD_UNIT_LABELS } from "@/lib/equipment-labels";
+import {
+  computeRentalDurationInUnit,
+  findApplicableTier,
+  type PricingTierInput,
+} from "@/lib/rental-pricing";
 import {
   findCommissionRate,
   computeOrderCommissionFund,
@@ -38,6 +44,7 @@ import {
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
+import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderDiscountForm } from "./order-discount-form";
@@ -47,7 +54,6 @@ import { OrderLineEmployeeForm } from "./order-line-employee-form";
 import { OrderLineNoteForm } from "./order-line-note-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import { OrderInfoForm } from "./order-info-form";
-import CloseOrderButton from "./close-order-button";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
 import { ReopenOrderButton } from "./reopen-order-button";
@@ -84,6 +90,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: equipmentUnits },
     { data: equipmentInstances },
     { data: equipmentStock },
+    { data: pricingTiers },
     { data: commissionTiers },
     { data: taskWeights },
     { data: overtimeEntries },
@@ -97,13 +104,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("employees_public").select("id, name").order("name"),
     supabase
       .from("equipment_types")
-      .select("id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage")
+      .select(
+        "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url",
+      )
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
     supabase
       .from("equipment_instances")
       .select("id, equipment_type_id, identifier_code, status"),
     supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
+    supabase
+      .from("pricing_template_tiers")
+      .select("template_id, min_duration, duration_unit, discount_percentage"),
     supabase.from("commission_tiers").select("*"),
     supabase.from("task_weights").select("*"),
     supabase.from("overtime_entries").select("*").eq("order_id", id).order("entry_date", { ascending: false }),
@@ -135,10 +147,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
+  // Số biến thể của từng loại hàng — loại chỉ có 1 biến thể thì cột "Biến
+  // thể/Sản phẩm" ẩn tên biến thể (không phân biệt gì thêm, chỉ lặp tên SP).
+  const unitCountByType = new Map<string, number>();
+  for (const u of equipmentUnits ?? []) {
+    unitCountByType.set(u.equipment_type_id, (unitCountByType.get(u.equipment_type_id) ?? 0) + 1);
+  }
 
   const taskByType = new Map((tasks ?? []).map((t) => [t.task_type, t]));
   const doneCount = (tasks ?? []).filter((t) => t.completed_date).length;
-  const allDone = doneCount === TASK_TYPE_SEQUENCE.length;
 
   // Doanh số các dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ
   // thuật...) loại khỏi giá trị dùng để tra bậc %hoa hồng/tính quỹ khoán
@@ -307,6 +324,54 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     activeDemandByUnit.set(row.equipment_unit_id, list);
   }
 
+  // Bảng giá mẫu theo template — nuôi dòng diễn giải "charge" dưới giá thuê
+  // (giá gốc × số kỳ · bậc giảm), kiểu cột Charge của Booqable.
+  const tiersByTemplate = new Map<string, PricingTierInput[]>();
+  for (const t of pricingTiers ?? []) {
+    const list = tiersByTemplate.get(t.template_id) ?? [];
+    list.push(t);
+    tiersByTemplate.set(t.template_id, list);
+  }
+
+  // Diễn giải giá thuê mặc định của 1 dòng hàng: số kỳ tính từ khung thời gian
+  // thuê của ĐƠN + bậc giảm đang áp — trả null với dòng không phải cho thuê
+  // hoặc đơn chưa có khung thời gian (khi đó chỉ hiện số tiền như cũ).
+  const orderRentalStartAt = order.rental_start_at;
+  const orderRentalEndAt = order.rental_end_at;
+  function describeCharge(type: (NonNullable<typeof equipmentTypes>)[number], unitPrice: number) {
+    if (
+      type.product_type !== "rental" ||
+      !type.rental_period_unit ||
+      !orderRentalStartAt ||
+      !orderRentalEndAt
+    )
+      return null;
+    const duration = computeRentalDurationInUnit(
+      orderRentalStartAt,
+      orderRentalEndAt,
+      type.rental_period_unit,
+    );
+    const tier =
+      type.pricing_method === "pricing_structure" && type.pricing_template_id
+        ? findApplicableTier(
+            tiersByTemplate.get(type.pricing_template_id) ?? [],
+            type.rental_period_unit,
+            duration,
+          )
+        : null;
+    const defaultUnitPrice =
+      Math.round(type.price * duration * (1 - (tier?.discount_percentage ?? 0) / 100) * 100) / 100;
+    return {
+      duration,
+      unitLabel: RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit],
+      basePrice: type.price,
+      tier,
+      // Giá lưu trên dòng lệch giá tính mặc định → đã được sửa tay.
+      isCustom: Math.abs(defaultUnitPrice - unitPrice) > 0.5,
+      defaultUnitPrice,
+    };
+  }
+
   const stockShortages = [...demandByUnit.entries()]
     .map(([unitId, thisOrderDemand]) => {
       const unit = equipmentUnitById.get(unitId);
@@ -330,6 +395,53 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       };
     })
     .filter((s) => s.shortage > 0);
+  const shortageByUnit = new Map(stockShortages.map((s) => [s.unitId, s]));
+
+  // Chip xanh "còn N" (học Booqable "N left"): số còn dư tại chi nhánh sau
+  // khi trừ MỌI nhu cầu đang mở — chỉ tính cho biến thể không bị thiếu.
+  const stockLeftByUnit = new Map<string, number>();
+  for (const [unitId] of demandByUnit) {
+    if (shortageByUnit.has(unitId)) continue;
+    const totalDemand = (activeDemandByUnit.get(unitId) ?? []).reduce(
+      (sum, e) => sum + e.quantity,
+      0,
+    );
+    stockLeftByUnit.set(unitId, (availableByUnit.get(unitId) ?? 0) - totalDemand);
+  }
+
+  // Danh sách thêm nhanh (ô search kiểu Booqable) — trải phẳng: loại nhiều
+  // biến thể → 1 dòng/biến thể; theo dõi riêng lẻ → 1 dòng/máy sẵn có; còn
+  // lại 1 dòng/loại (server tự chọn/tạo biến thể mặc định).
+  const unitsByType = new Map<string, { id: string; brand_model: string }[]>();
+  for (const u of equipmentUnits ?? []) {
+    const list = unitsByType.get(u.equipment_type_id) ?? [];
+    list.push(u);
+    unitsByType.set(u.equipment_type_id, list);
+  }
+  const quickAddOptions = (equipmentTypes ?? []).flatMap((t) => {
+    if (t.product_type === "rental" && t.tracking_type === "individual") {
+      return (equipmentInstances ?? [])
+        .filter((i) => i.equipment_type_id === t.id && i.status === "available")
+        .map((i) => ({
+          key: `i-${i.id}`,
+          label: `${t.name} — ${i.identifier_code}`,
+          imageUrl: t.image_url,
+          equipmentTypeId: t.id,
+          equipmentInstanceId: i.id,
+        }));
+    }
+    const units = unitsByType.get(t.id) ?? [];
+    if (units.length > 1) {
+      return units.map((u) => ({
+        key: `u-${u.id}`,
+        label: `${t.name} — ${u.brand_model}`,
+        imageUrl: t.image_url,
+        equipmentTypeId: t.id,
+        equipmentUnitId: u.id,
+      }));
+    }
+    return [{ key: `t-${t.id}`, label: t.name, imageUrl: t.image_url, equipmentTypeId: t.id }];
+  });
 
   return (
     <div className="space-y-4">
@@ -352,11 +464,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
           />
           <DuplicateOrderButton orderId={order.id} />
+          {/* Không còn nút "Hoàn tất đơn" — đơn tự hoàn tất khi đủ 10 khâu
+              (trigger auto_complete_order). */}
           {!order.completed_at && !order.cancelled_at && (
-            <>
-              <CloseOrderButton orderId={order.id} disabled={!allDone} />
-              <CancelOrderButton orderId={order.id} />
-            </>
+            <CancelOrderButton orderId={order.id} />
           )}
           {order.completed_at && canManage && <ReopenOrderButton orderId={order.id} />}
         </div>
@@ -413,10 +524,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 orderId={order.id}
                 equipmentTypes={equipmentTypes ?? []}
                 equipmentUnits={equipmentUnits ?? []}
-                equipmentInstances={equipmentInstances ?? []}
+                // Dialog chỉ cho chọn máy sẵn có — lọc trước khi truyền,
+                // đỡ serialize cả nghìn máy đang thuê/bảo trì vào payload
+                // (bảng hiển thị vẫn dùng danh sách đầy đủ ở trên).
+                equipmentInstances={(equipmentInstances ?? []).filter(
+                  (i) => i.status === "available",
+                )}
               />
             </CardHeader>
             <CardContent className="space-y-4">
+              {!order.completed_at && !order.cancelled_at && (
+                <QuickAddProductSearch orderId={order.id} options={quickAddOptions} />
+              )}
               <div className="overflow-x-auto">
                 {lines?.length ? (
                   (() => {
@@ -437,32 +556,106 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           : line.equipment_instance_id
                             ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
                             : null;
-                        const detail = equipmentDetailLabel(type?.name, rawDetail);
+                        const detail = equipmentDetailLabel(type?.name, rawDetail, {
+                          soleVariant:
+                            !!line.equipment_unit_id &&
+                            !!type &&
+                            unitCountByType.get(type.id) === 1,
+                        });
+                        const shortage = line.equipment_unit_id
+                          ? shortageByUnit.get(line.equipment_unit_id)
+                          : undefined;
+                        const charge = type ? describeCharge(type, line.unit_price) : null;
                         return {
                           id: line.id,
                           content: (
                             <>
                               <TableCell
-                                className="max-w-[160px] truncate font-medium"
+                                className="max-w-[200px] font-medium"
                                 title={type?.name ?? line.custom_name ?? undefined}
                               >
-                                {type?.name ?? line.custom_name ?? "—"}
+                                <div className="flex items-center gap-2">
+                                  {type?.image_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
+                                    <img
+                                      src={type.image_url}
+                                      alt=""
+                                      className="size-8 shrink-0 rounded object-cover"
+                                    />
+                                  ) : (
+                                    <span className="bg-muted size-8 shrink-0 rounded" />
+                                  )}
+                                  <span className="truncate">
+                                    {type ? (
+                                      <Link
+                                        href={`/equipment/${type.id}`}
+                                        className="underline-offset-2 hover:underline"
+                                      >
+                                        {type.name}
+                                      </Link>
+                                    ) : (
+                                      (line.custom_name ?? "—")
+                                    )}
+                                  </span>
+                                </div>
                               </TableCell>
                               <TableCell className="max-w-[140px] truncate" title={detail}>
                                 {detail}
                               </TableCell>
                               <TableCell>
-                                {canManage && !line.equipment_instance_id ? (
-                                  <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
-                                ) : (
-                                  line.quantity
-                                )}
+                                <div className="flex items-center gap-1.5">
+                                  {canManage && !line.equipment_instance_id ? (
+                                    <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
+                                  ) : (
+                                    line.quantity
+                                  )}
+                                  {!shortage &&
+                                    line.equipment_unit_id &&
+                                    stockLeftByUnit.has(line.equipment_unit_id) && (
+                                      <span
+                                        className="shrink-0 cursor-default rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400"
+                                        title="Số còn dư trong kho sau khi trừ mọi đơn đang giữ hàng"
+                                      >
+                                        còn {stockLeftByUnit.get(line.equipment_unit_id)}
+                                      </span>
+                                    )}
+                                  {shortage && (
+                                    <span
+                                      className="shrink-0 cursor-default rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-destructive"
+                                      title={`Trong kho còn ${shortage.available}, tổng nhu cầu các đơn chưa giao ${shortage.totalDemand}${
+                                        shortage.otherOrders.length > 0
+                                          ? ` — đơn khác đang giữ: ${shortage.otherOrders
+                                              .map(([code, qty]) => `${code} (${qty})`)
+                                              .join(", ")}`
+                                          : ""
+                                      }`}
+                                    >
+                                      thiếu {shortage.shortage}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 {canManage ? (
                                   <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
                                 ) : (
                                   `${currencyFormatter.format(line.unit_price)}đ`
+                                )}
+                                {charge && (
+                                  <p className="mt-0.5 text-xs whitespace-nowrap text-muted-foreground">
+                                    {currencyFormatter.format(charge.basePrice)}đ/{charge.unitLabel} ×{" "}
+                                    {charge.duration} {charge.unitLabel}
+                                    {charge.tier &&
+                                      ` · gói ≥${charge.tier.min_duration} ${charge.unitLabel} −${charge.tier.discount_percentage}%`}
+                                  </p>
+                                )}
+                                {charge?.isCustom && (
+                                  <p
+                                    className="mt-0.5 text-xs whitespace-nowrap text-amber-600 dark:text-amber-500"
+                                    title={`Giá theo gói mặc định: ${currencyFormatter.format(charge.defaultUnitPrice)}đ`}
+                                  >
+                                    Giá tuỳ chỉnh
+                                  </p>
                                 )}
                               </TableCell>
                               <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
@@ -517,7 +710,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             <TableHead>Hàng hoá</TableHead>
                             <TableHead>Biến thể/Sản phẩm</TableHead>
                             <TableHead>SL</TableHead>
-                            <TableHead>Đơn giá</TableHead>
+                            <TableHead>Giá thuê</TableHead>
                             <TableHead>Thành tiền</TableHead>
                             <TableHead>Người thực hiện</TableHead>
                             <TableHead className="w-16"></TableHead>

@@ -539,23 +539,6 @@ export async function deleteOrder(id: string) {
   revalidatePath("/orders");
 }
 
-export async function closeOrder(id: string) {
-  await requireRole([...ALL_ROLES]);
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("orders")
-    .update({ completed_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    throw new Error("Không thể đóng đơn: " + error.message);
-  }
-
-  revalidatePath("/orders");
-  revalidatePath(`/orders/${id}`);
-}
-
 // Mở lại đơn đã hoàn tất — chỉ Admin/Kế toán. Đưa status về đúng khâu hiện
 // tại theo order_tasks (khâu sớm nhất chưa hoàn thành, hoặc khâu cuối nếu đã
 // xong hết) thay vì dựa vào giá trị status cũ — vì trigger sync_order_status
@@ -716,7 +699,9 @@ async function computeLineForEquipmentType(
 ) {
   const { data: equipmentType, error: typeError } = await supabase
     .from("equipment_types")
-    .select("product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id")
+    .select(
+      "name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id",
+    )
     .eq("id", equipmentTypeId)
     .single();
 
@@ -781,9 +766,10 @@ export async function addOrderEquipmentLine(
     .eq("id", parsed.data.order_id)
     .single();
 
+  let equipmentType;
   let computed;
   try {
-    ({ computed } = await computeLineForEquipmentType(
+    ({ equipmentType, computed } = await computeLineForEquipmentType(
       supabase,
       parsed.data.equipment_type_id,
       order?.rental_start_at ?? null,
@@ -794,10 +780,48 @@ export async function addOrderEquipmentLine(
     return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
   }
 
+  // Hàng bán/cho thuê theo số lượng bắt buộc gắn biến thể (tồn kho bám theo
+  // equipment_units — trigger check_order_equipment_line chặn nếu thiếu).
+  // Đa số loại hàng thực tế chỉ có 0-1 biến thể nên client không bắt chọn
+  // nữa: 1 biến thể thì tự dùng, CHƯA có thì tự tạo ngầm biến thể mặc định
+  // trùng tên sản phẩm — qua admin client vì RLS chỉ cho Giám đốc/Admin/Kế
+  // toán ghi equipment_units, còn đây là ghi sổ hệ thống, an toàn cho mọi
+  // role được phép thêm dòng hàng.
+  let equipmentUnitId = parsed.data.equipment_unit_id ?? null;
+  const needsUnit =
+    equipmentType.product_type === "sale" ||
+    (equipmentType.product_type === "rental" && equipmentType.tracking_type === "quantity");
+  if (needsUnit && !equipmentUnitId) {
+    const { data: units } = await supabase
+      .from("equipment_units")
+      .select("id")
+      .eq("equipment_type_id", parsed.data.equipment_type_id);
+    if (units && units.length === 1) {
+      equipmentUnitId = units[0].id;
+    } else if (units && units.length > 1) {
+      return { error: "Loại hàng này có nhiều biến thể — vui lòng chọn biến thể cụ thể." };
+    } else {
+      // RPC security definer (không phải admin client) — xem ghi chú trong
+      // migration 20260802020000: import @supabase/supabase-js thuần vào
+      // orders.ts từng làm sập Worker (eval bị Cloudflare chặn ngay lúc nạp
+      // module, trước khi code chạy tới).
+      const { data: newUnitId, error: unitError } = await supabase.rpc(
+        "ensure_default_equipment_unit",
+        { p_equipment_type_id: parsed.data.equipment_type_id },
+      );
+      if (unitError || !newUnitId) {
+        return {
+          error: "Không tạo được biến thể mặc định cho loại hàng này: " + (unitError?.message ?? ""),
+        };
+      }
+      equipmentUnitId = newUnitId;
+    }
+  }
+
   const { error } = await supabase.from("order_equipment").insert({
     order_id: parsed.data.order_id,
     equipment_type_id: parsed.data.equipment_type_id,
-    equipment_unit_id: parsed.data.equipment_unit_id ?? null,
+    equipment_unit_id: equipmentUnitId,
     equipment_instance_id: parsed.data.equipment_instance_id ?? null,
     quantity: parsed.data.quantity,
     unit_price: computed.unitPrice,

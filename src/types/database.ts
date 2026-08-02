@@ -721,6 +721,27 @@ export interface Database {
         };
         Returns: void;
       };
+      // Hai RPC tổng hợp cho trang /customers — trả jsonb (typed lỏng, page
+      // tự ép kiểu sang CustomerReportData/khối danh sách).
+      customer_page_report: {
+        Args: { p_branch_id?: string | null };
+        Returns: unknown;
+      };
+      customer_page_list: {
+        Args: {
+          p_branch_id?: string | null;
+          p_search?: string | null;
+          p_sort?: string;
+          p_dir?: string;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: unknown;
+      };
+      ensure_default_equipment_unit: {
+        Args: { p_equipment_type_id: string };
+        Returns: string;
+      };
       record_equipment_purchase: {
         Args: {
           p_equipment_unit_id: string;

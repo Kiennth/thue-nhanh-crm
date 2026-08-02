@@ -46,8 +46,17 @@ export const EQUIPMENT_INSTANCE_STATUS_LABELS: Record<EquipmentInstanceStatus, s
 export function equipmentDetailLabel(
   typeName: string | null | undefined,
   detail: string | null | undefined,
+  options?: {
+    // Loại hàng chỉ có đúng 1 biến thể → tên biến thể không phân biệt gì
+    // thêm, ẩn luôn kể cả khi đặt khác tên sản phẩm ("Apple Pencil Pro" /
+    // "Bút cảm ứng Apple Pencil Pro"). Chỉ áp cho biến thể (equipment_units)
+    // — mã sản phẩm riêng lẻ (identifier_code) vẫn luôn hiện vì đó là thông
+    // tin bàn giao thật.
+    soleVariant?: boolean;
+  },
 ): string {
   if (!detail) return "—";
+  if (options?.soleVariant) return "—";
   if (typeName && detail.trim().toLowerCase() === typeName.trim().toLowerCase()) return "—";
   return detail;
 }

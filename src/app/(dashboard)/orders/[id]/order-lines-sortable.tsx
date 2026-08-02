@@ -46,6 +46,17 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
   const [order, setOrder] = useState(() => rows.map((r) => r.id));
   const contentById = new Map(rows.map((r) => [r.id, r.content]));
 
+  // State chỉ khởi tạo lúc mount, nhưng danh sách dòng có thể đổi NGOÀI bảng
+  // này (thêm dòng qua dialog, xoá dòng → server revalidate) — đối chiếu lại
+  // mỗi lần render: dòng server không còn thì bỏ, dòng mới nối vào cuối, thứ
+  // tự người dùng đang kéo giữ nguyên. Không làm vậy thì dòng mới thêm không
+  // hiện ra cho tới khi refresh trang.
+  const serverIds = rows.map((r) => r.id);
+  const displayOrder = [
+    ...order.filter((id) => contentById.has(id)),
+    ...serverIds.filter((id) => !order.includes(id)),
+  ];
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -55,13 +66,14 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    setOrder((prev) => {
-      const oldIndex = prev.indexOf(String(active.id));
-      const newIndex = prev.indexOf(String(over.id));
-      const next = arrayMove(prev, oldIndex, newIndex);
-      reorderOrderEquipmentLines(orderId, next).catch(() => setOrder(prev));
-      return next;
-    });
+    // Kéo thả tính trên displayOrder (đã gồm dòng mới thêm) chứ không phải
+    // state thô — state thô có thể thiếu dòng mới/thừa dòng đã xoá.
+    const prev = displayOrder;
+    const oldIndex = prev.indexOf(String(active.id));
+    const newIndex = prev.indexOf(String(over.id));
+    const next = arrayMove(prev, oldIndex, newIndex);
+    reorderOrderEquipmentLines(orderId, next).catch(() => setOrder(prev));
+    setOrder(next);
   }
 
   return (
@@ -80,15 +92,15 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
             <TableHead>Hàng hoá</TableHead>
             <TableHead>Biến thể/Sản phẩm</TableHead>
             <TableHead>SL</TableHead>
-            <TableHead>Đơn giá</TableHead>
+            <TableHead>Giá thuê</TableHead>
             <TableHead>Thành tiền</TableHead>
             <TableHead>Người thực hiện</TableHead>
             <TableHead className="w-16"></TableHead>
           </TableRow>
         </TableHeader>
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+        <SortableContext items={displayOrder} strategy={verticalListSortingStrategy}>
           <TableBody>
-            {order.map((id) => (
+            {displayOrder.map((id) => (
               <SortableLineRow key={id} id={id}>
                 {contentById.get(id)}
               </SortableLineRow>

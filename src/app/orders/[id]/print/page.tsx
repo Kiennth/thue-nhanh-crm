@@ -59,6 +59,12 @@ export default async function OrderPrintPage({
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
+  // Loại hàng chỉ có 1 biến thể → ẩn tên biến thể trên chứng từ (chỉ lặp
+  // tên sản phẩm) — cùng quy tắc với trang chi tiết đơn.
+  const unitCountByType = new Map<string, number>();
+  for (const u of equipmentUnits ?? []) {
+    unitCountByType.set(u.equipment_type_id, (unitCountByType.get(u.equipment_type_id) ?? 0) + 1);
+  }
 
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
@@ -132,7 +138,12 @@ export default async function OrderPrintPage({
                 : line.equipment_instance_id
                   ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
                   : null;
-              const detail = equipmentDetailLabel(equipmentType?.name, rawDetail);
+              const detail = equipmentDetailLabel(equipmentType?.name, rawDetail, {
+                soleVariant:
+                  !!line.equipment_unit_id &&
+                  !!equipmentType &&
+                  unitCountByType.get(equipmentType.id) === 1,
+              });
               return (
                 <tr key={line.id} className="border-b border-neutral-200">
                   <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>

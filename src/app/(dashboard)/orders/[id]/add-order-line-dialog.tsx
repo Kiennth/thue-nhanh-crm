@@ -207,31 +207,34 @@ export function AddOrderLineDialog({
             )}
           </div>
 
-          {isQuantityBased && (
+          {/* Đa số loại hàng chỉ có 0-1 biến thể — ẩn ô này đi: 1 biến thể
+              thì tự chọn (hidden input), 0 biến thể thì server tự tạo ngầm
+              biến thể mặc định trùng tên sản phẩm. Chỉ hiện selector khi có
+              nhiều biến thể thật để chọn. */}
+          {isQuantityBased && unitOptions.length === 1 && (
+            <input type="hidden" name="equipment_unit_id" value={unitOptions[0].id} />
+          )}
+          {isQuantityBased && unitOptions.length > 1 && (
             <div className="space-y-2">
               <Label htmlFor="equipment_unit_id">Biến thể</Label>
-              {unitOptions.length ? (
-                <Select
-                  name="equipment_unit_id"
-                  value={unitId}
-                  onValueChange={(value) => setUnitId(value ?? "")}
-                >
-                  <SelectTrigger id="equipment_unit_id" className="w-full">
-                    <SelectValue placeholder="Chọn biến thể">
-                      {(value: string) => unitOptions.find((u) => u.id === value)?.brand_model}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {unitOptions.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.brand_model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-sm text-muted-foreground">Chưa có biến thể nào.</p>
-              )}
+              <Select
+                name="equipment_unit_id"
+                value={unitId}
+                onValueChange={(value) => setUnitId(value ?? "")}
+              >
+                <SelectTrigger id="equipment_unit_id" className="w-full">
+                  <SelectValue placeholder="Chọn biến thể">
+                    {(value: string) => unitOptions.find((u) => u.id === value)?.brand_model}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {unitOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.brand_model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
