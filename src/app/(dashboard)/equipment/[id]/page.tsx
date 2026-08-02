@@ -115,9 +115,15 @@ export default async function EquipmentDetailPage({
   const isSale = type.product_type === "sale";
   const isService = type.product_type === "service";
   const showUnitsBlock = isRentalQuantity || isSale;
+  // Hàng serialize giờ CŨNG có thể có biến thể (tuỳ chọn, xem migration
+  // 20260802040000) — nhưng khác quantity/sale, biến thể của hàng serialize
+  // KHÔNG có bảng tồn kho/mua/thanh lý riêng (equipment_stock) đi kèm, vì tồn
+  // kho của nó chính là danh sách máy bên dưới. Nên tách cờ riêng thay vì
+  // gộp vào showUnitsBlock.
+  const showVariantsForIndividual = isRentalIndividual;
 
   const [{ data: units }, { data: instances }] = await Promise.all([
-    showUnitsBlock
+    showUnitsBlock || showVariantsForIndividual
       ? supabase.from("equipment_units").select("*").eq("equipment_type_id", id).order("brand_model")
       : Promise.resolve({ data: [] as EquipmentUnitRow[] }),
     // Tab "Lịch sử thuê" cần tra identifier_code kể cả khi loại hàng đang
@@ -491,10 +497,53 @@ export default async function EquipmentDetailPage({
 
           {isRentalIndividual && (
             <>
+              {/* Biến thể TUỲ CHỌN cho hàng serialize — không có bảng tồn
+                  kho/mua/thanh lý đi kèm như biến thể của hàng quantity, chỉ
+                  đơn thuần là nhãn để nhóm các máy có cùng cấu hình bán hàng
+                  (VD iPad Wi-Fi vs Wi-Fi+5G). Ẩn hẳn khi chưa ai tạo biến
+                  thể nào — đa số loại hàng sẽ không cần tới khối này. */}
+              {(unitList.length > 0 || canManageCatalog) && (
+                <div className="space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Biến thể</p>
+                    {canManageCatalog && <EquipmentUnitDialog equipmentTypeId={type.id} />}
+                  </div>
+                  {unitList.length > 0 ? (
+                    <ul className="divide-y">
+                      {unitList.map((unit) => (
+                        <li
+                          key={unit.id}
+                          className="flex items-center justify-between gap-2 py-1.5 text-sm first:pt-0 last:pb-0"
+                        >
+                          <span>{unit.brand_model}</span>
+                          {canManageCatalog && (
+                            <div className="flex items-center gap-1">
+                              <EquipmentUnitDialog equipmentTypeId={type.id} unit={unit} />
+                              <ConfirmDeleteButton
+                                confirmMessage={`Xoá biến thể "${unit.brand_model}"?`}
+                                successMessage="Đã xoá biến thể."
+                                action={deleteEquipmentUnit}
+                                actionArg={unit.id}
+                              />
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Chưa có biến thể nào — loại hàng này chỉ có 1 cấu hình, mỗi máy dưới đây độc
+                      lập theo serial riêng.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mã định danh</TableHead>
+                    {unitList.length > 0 && <TableHead>Biến thể</TableHead>}
                     <SortableTableHead sortKey="branch" label="Chi nhánh" />
                     <SortableTableHead sortKey="status" label="Trạng thái" />
                     <TableHead>Ghi chú</TableHead>
@@ -507,6 +556,13 @@ export default async function EquipmentDetailPage({
                     return (
                       <TableRow key={inst.id}>
                         <TableCell className="font-medium">{inst.identifier_code}</TableCell>
+                        {unitList.length > 0 && (
+                          <TableCell>
+                            {inst.equipment_unit_id
+                              ? (unitById.get(inst.equipment_unit_id)?.brand_model ?? "—")
+                              : "—"}
+                          </TableCell>
+                        )}
                         <TableCell>{branchNameById.get(inst.branch_id ?? "") ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant={INSTANCE_STATUS_VARIANT[inst.status]}>
@@ -526,6 +582,7 @@ export default async function EquipmentDetailPage({
                               <EquipmentInstanceDialog
                                 equipmentTypeId={type.id}
                                 branches={branchList}
+                                units={unitList}
                                 instance={inst}
                               />
                               {inst.status !== "disposed" && (
@@ -548,7 +605,12 @@ export default async function EquipmentDetailPage({
                   })}
                   {!instances?.length && (
                     <TableRow>
-                      <TableCell colSpan={canManageStock ? 5 : 4} className="text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={
+                          (canManageStock ? 5 : 4) + (unitList.length > 0 ? 1 : 0)
+                        }
+                        className="text-center text-muted-foreground"
+                      >
                         Chưa có sản phẩm nào.
                       </TableCell>
                     </TableRow>
@@ -557,7 +619,11 @@ export default async function EquipmentDetailPage({
               </Table>
 
               {canManageStock && (
-                <EquipmentInstanceDialog equipmentTypeId={type.id} branches={branchList} />
+                <EquipmentInstanceDialog
+                  equipmentTypeId={type.id}
+                  branches={branchList}
+                  units={unitList}
+                />
               )}
             </>
           )}

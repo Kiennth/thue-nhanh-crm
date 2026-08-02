@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
-import { equipmentDetailLabel } from "@/lib/equipment-labels";
+import { equipmentDetailLabel, equipmentInstanceLabel } from "@/lib/equipment-labels";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
 import { PrintButton } from "./print-button";
@@ -44,7 +44,9 @@ export default async function OrderPrintPage({
     supabase.from("branches").select("id, name"),
     supabase.from("equipment_types").select("id, name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
-    supabase.from("equipment_instances").select("id, equipment_type_id, identifier_code"),
+    supabase
+      .from("equipment_instances")
+      .select("id, equipment_type_id, equipment_unit_id, identifier_code"),
   ]);
 
   if (!order) notFound();
@@ -133,10 +135,18 @@ export default async function OrderPrintPage({
               const equipmentType = line.equipment_type_id
                 ? equipmentTypeById.get(line.equipment_type_id)
                 : undefined;
+              const lineInstance = line.equipment_instance_id
+                ? equipmentInstanceById.get(line.equipment_instance_id)
+                : undefined;
               const rawDetail = line.equipment_unit_id
                 ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
-                : line.equipment_instance_id
-                  ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
+                : lineInstance
+                  ? equipmentInstanceLabel(
+                      lineInstance.equipment_unit_id
+                        ? equipmentUnitById.get(lineInstance.equipment_unit_id)?.brand_model
+                        : null,
+                      lineInstance.identifier_code,
+                    )
                   : null;
               const detail = equipmentDetailLabel(equipmentType?.name, rawDetail, {
                 soleVariant:

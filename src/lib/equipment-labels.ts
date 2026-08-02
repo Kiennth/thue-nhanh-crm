@@ -43,6 +43,17 @@ export const EQUIPMENT_INSTANCE_STATUS_LABELS: Record<EquipmentInstanceStatus, s
 // trùng y hệt cột "Hàng hoá". Hàm này ẩn phần trùng lặp đó, không đụng dữ
 // liệu gốc — biến thể thật sự khác tên (vd LG/TCL/Hisense) vẫn hiện bình
 // thường.
+// Nhãn hiển thị cho 1 máy serialize — biến thể (nếu có) đứng trước serial để
+// phân biệt lúc 1 loại hàng có nhiều cấu hình bán hàng (VD iPad Wi-Fi vs
+// Wi-Fi+5G, mỗi máy vẫn giữ mã định danh riêng). Đa số máy chưa gán biến
+// thể nào — lúc đó chỉ hiện đúng mã định danh như trước giờ.
+export function equipmentInstanceLabel(
+  unitBrandModel: string | null | undefined,
+  identifierCode: string,
+): string {
+  return unitBrandModel ? `${unitBrandModel} — ${identifierCode}` : identifierCode;
+}
+
 export function equipmentDetailLabel(
   typeName: string | null | undefined,
   detail: string | null | undefined,

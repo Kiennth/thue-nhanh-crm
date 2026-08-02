@@ -25,7 +25,11 @@ import {
   TASK_TYPE_SEQUENCE,
   VAT_RATE,
 } from "@/lib/order-labels";
-import { equipmentDetailLabel, RENTAL_PERIOD_UNIT_LABELS } from "@/lib/equipment-labels";
+import {
+  equipmentDetailLabel,
+  equipmentInstanceLabel,
+  RENTAL_PERIOD_UNIT_LABELS,
+} from "@/lib/equipment-labels";
 import {
   computeRentalDurationInUnit,
   findApplicableTier,
@@ -111,7 +115,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
     supabase
       .from("equipment_instances")
-      .select("id, equipment_type_id, identifier_code, status"),
+      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status"),
     supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
     supabase
       .from("pricing_template_tiers")
@@ -422,13 +426,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     if (t.product_type === "rental" && t.tracking_type === "individual") {
       return (equipmentInstances ?? [])
         .filter((i) => i.equipment_type_id === t.id && i.status === "available")
-        .map((i) => ({
-          key: `i-${i.id}`,
-          label: `${t.name} — ${i.identifier_code}`,
-          imageUrl: t.image_url,
-          equipmentTypeId: t.id,
-          equipmentInstanceId: i.id,
-        }));
+        .map((i) => {
+          // Đa số máy chưa gán biến thể (equipment_unit_id null) — lúc đó
+          // nhãn giữ nguyên như trước, chỉ tên loại + serial.
+          const unitName = i.equipment_unit_id
+            ? equipmentUnitById.get(i.equipment_unit_id)?.brand_model
+            : null;
+          return {
+            key: `i-${i.id}`,
+            label: `${t.name} — ${equipmentInstanceLabel(unitName, i.identifier_code)}`,
+            imageUrl: t.image_url,
+            equipmentTypeId: t.id,
+            equipmentInstanceId: i.id,
+          };
+        });
     }
     const units = unitsByType.get(t.id) ?? [];
     if (units.length > 1) {
@@ -551,10 +562,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         // viên/tính khoán ở trên.
                         const showDeliveryNote =
                           !!line.equipment_type_id && DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id);
+                        const lineInstance = line.equipment_instance_id
+                          ? equipmentInstanceById.get(line.equipment_instance_id)
+                          : undefined;
                         const rawDetail = line.equipment_unit_id
                           ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
-                          : line.equipment_instance_id
-                            ? equipmentInstanceById.get(line.equipment_instance_id)?.identifier_code
+                          : lineInstance
+                            ? equipmentInstanceLabel(
+                                lineInstance.equipment_unit_id
+                                  ? equipmentUnitById.get(lineInstance.equipment_unit_id)?.brand_model
+                                  : null,
+                                lineInstance.identifier_code,
+                              )
                             : null;
                         const detail = equipmentDetailLabel(type?.name, rawDetail, {
                           soleVariant:

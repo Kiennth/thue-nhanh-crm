@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { addCustomOrderLine, addOrderEquipmentLine } from "@/lib/actions/orders";
+import { equipmentInstanceLabel } from "@/lib/equipment-labels";
 import type { ProductType, TrackingType } from "@/types/database";
 
 interface EquipmentTypeOption {
@@ -38,6 +39,8 @@ interface EquipmentUnitOption {
 interface EquipmentInstanceOption {
   id: string;
   equipment_type_id: string;
+  // Biến thể tuỳ chọn — null với đa số máy (xem migration 20260802040000).
+  equipment_unit_id: string | null;
   identifier_code: string;
   status: string;
 }
@@ -80,6 +83,13 @@ export function AddOrderLineDialog({
   const unitOptions = useMemo(
     () => equipmentUnits.filter((u) => u.equipment_type_id === equipmentTypeId),
     [equipmentUnits, equipmentTypeId],
+  );
+  // Không lọc theo equipmentTypeId — chỉ dùng để tra tên biến thể của từng
+  // máy serialize (đa số máy sẽ không có biến thể, tra ra undefined là bình
+  // thường).
+  const unitById = useMemo(
+    () => new Map(equipmentUnits.map((u) => [u.id, u])),
+    [equipmentUnits],
   );
   const instanceOptions = useMemo(
     () =>
@@ -249,17 +259,27 @@ export function AddOrderLineDialog({
                 >
                   <SelectTrigger id="equipment_instance_id" className="w-full">
                     <SelectValue placeholder="Chọn sản phẩm">
-                      {(value: string) =>
-                        instanceOptions.find((i) => i.id === value)?.identifier_code
-                      }
+                      {(value: string) => {
+                        const inst = instanceOptions.find((i) => i.id === value);
+                        if (!inst) return undefined;
+                        const unitName = inst.equipment_unit_id
+                          ? unitById.get(inst.equipment_unit_id)?.brand_model
+                          : null;
+                        return equipmentInstanceLabel(unitName, inst.identifier_code);
+                      }}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {instanceOptions.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>
-                        {i.identifier_code}
-                      </SelectItem>
-                    ))}
+                    {instanceOptions.map((i) => {
+                      const unitName = i.equipment_unit_id
+                        ? unitById.get(i.equipment_unit_id)?.brand_model
+                        : null;
+                      return (
+                        <SelectItem key={i.id} value={i.id}>
+                          {equipmentInstanceLabel(unitName, i.identifier_code)}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (

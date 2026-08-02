@@ -29,11 +29,23 @@ interface Branch {
   name: string;
 }
 
+interface UnitOption {
+  id: string;
+  brand_model: string;
+}
+
+// Biến thể tuỳ chọn — đa số loại hàng chưa cần (danh sách rỗng thì ẩn hẳn ô
+// này, xem bên dưới). "Không có biến thể" là sentinel để rewrite thành rỗng
+// trước khi gửi, cùng pattern với order-line-employee-form.tsx.
+const NO_VARIANT = "__no_variant__";
+
 interface EquipmentInstanceDialogProps {
   equipmentTypeId: string;
   branches: Branch[];
+  units: UnitOption[];
   instance?: {
     id: string;
+    equipment_unit_id: string | null;
     identifier_code: string;
     branch_id: string | null;
     status: EquipmentInstanceStatus;
@@ -46,6 +58,7 @@ interface EquipmentInstanceDialogProps {
 export function EquipmentInstanceDialog({
   equipmentTypeId,
   branches,
+  units,
   instance,
 }: EquipmentInstanceDialogProps) {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
@@ -67,6 +80,9 @@ export function EquipmentInstanceDialog({
 
   function handleSubmit(formData: FormData) {
     setError(null);
+    if (formData.get("equipment_unit_id") === NO_VARIANT) {
+      formData.delete("equipment_unit_id");
+    }
     startTransition(async () => {
       const result = instance
         ? await updateEquipmentInstance(instance.id, undefined, formData)
@@ -106,6 +122,34 @@ export function EquipmentInstanceDialog({
               required
             />
           </div>
+
+          {units.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="equipment_unit_id">Biến thể</Label>
+              <Select
+                name="equipment_unit_id"
+                defaultValue={instance?.equipment_unit_id ?? NO_VARIANT}
+              >
+                <SelectTrigger id="equipment_unit_id" className="w-full">
+                  <SelectValue placeholder="Không có biến thể">
+                    {(value: string) =>
+                      value === NO_VARIANT
+                        ? "Không có biến thể"
+                        : (units.find((u) => u.id === value)?.brand_model ?? "—")
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_VARIANT}>Không có biến thể</SelectItem>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.brand_model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="branch_id">Chi nhánh</Label>

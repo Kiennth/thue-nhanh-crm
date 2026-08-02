@@ -514,6 +514,12 @@ export async function transferEquipmentStock(
 
 const EquipmentInstanceSchema = z.object({
   equipment_type_id: z.string().uuid(),
+  // Biến thể TUỲ CHỌN — đa số máy vẫn không cần (mỗi serial độc lập như
+  // trước); chỉ điền khi loại hàng thật sự có nhiều cấu hình bán hàng khác
+  // nhau (VD iPad Wi-Fi vs Wi-Fi+5G). nullable (không phải optional) vì form
+  // luôn gửi field này — rỗng nghĩa là "bỏ gán biến thể", phải ghi đè thành
+  // null chứ không phải bỏ qua không đụng tới.
+  equipment_unit_id: z.string().uuid().nullable(),
   identifier_code: z.string().trim().min(1, { message: "Mã định danh không được để trống." }),
   branch_id: z.string().uuid().optional(),
   status: z.enum(["available", "rented", "maintenance"]),
@@ -523,8 +529,10 @@ const EquipmentInstanceSchema = z.object({
 });
 
 function parseEquipmentInstanceForm(formData: FormData) {
+  const rawUnit = formData.get("equipment_unit_id");
   return EquipmentInstanceSchema.safeParse({
     equipment_type_id: formData.get("equipment_type_id"),
+    equipment_unit_id: rawUnit ? rawUnit : null,
     identifier_code: formData.get("identifier_code"),
     branch_id: formData.get("branch_id") || undefined,
     status: formData.get("status"),

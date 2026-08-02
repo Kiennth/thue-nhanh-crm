@@ -193,6 +193,10 @@ export interface Database {
         Row: {
           id: string;
           equipment_type_id: string;
+          // Biến thể TUỲ CHỌN — null nghĩa là loại hàng này chưa cần phân
+          // biến thể, mỗi serial vẫn độc lập như trước (xem migration
+          // 20260802040000).
+          equipment_unit_id: string | null;
           identifier_code: string;
           branch_id: string | null;
           status: EquipmentInstanceStatus;
@@ -207,6 +211,7 @@ export interface Database {
         Insert: {
           id?: string;
           equipment_type_id: string;
+          equipment_unit_id?: string | null;
           identifier_code: string;
           branch_id?: string | null;
           status?: EquipmentInstanceStatus;
