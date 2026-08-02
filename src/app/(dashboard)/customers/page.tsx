@@ -14,13 +14,10 @@ import { CustomerAvatar } from "@/components/customer-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { buildCompanyFirstOrderMap, buildCustomerReportRows } from "@/lib/customer-reports";
-import { fetchCompanyFirstOrderDates } from "@/lib/customer-first-order";
 import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
-import { CustomerReportSection } from "./customer-report-section";
+import { CustomerReportSection, type CustomerReportData } from "./customer-report-section";
 import { SortableTableHead } from "@/components/sortable-table-head";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
@@ -48,6 +45,23 @@ interface CustomerRow {
   totalRevenue: number;
 }
 
+// Dòng thô từ RPC customer_page_list — cột customers + 2 cột tổng hợp
+// (snake_case theo SQL).
+interface CustomerListRpcRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  address: string | null;
+  customer_type: CustomerType;
+  tax_code: string | null;
+  deposit_percentage: number;
+  created_at: string;
+  order_count: number;
+  total_revenue: number;
+}
+
 export default async function CustomersPage({
   searchParams,
 }: {
@@ -61,122 +75,65 @@ export default async function CustomersPage({
 
   const supabase = await createClient();
 
-  // Số lượng đơn/doanh số là giá trị suy ra (join orders/payments), không
-  // phải cột trong bảng customers — không thể .order()/.range() ở tầng
-  // Postgres theo các cột này. Lấy TOÀN BỘ khách hàng + đơn hàng (đằng nào
-  // cũng cần đủ cho khối báo cáo phía trên), lọc/sắp/phân trang gộp 1 lần
-  // trong JS thay vì query riêng cho bảng danh sách.
-  // Cửa hàng trưởng chỉ thấy khách hàng ĐÃ TỪNG phát sinh đơn ở chi nhánh
-  // mình — bảng customers dùng chung toàn hệ thống nên phải suy ra qua đơn
-  // hàng (tính cả chiều giao lẫn chiều thu hồi, khớp cách lọc ở /orders).
+  // Cửa hàng trưởng/Kỹ thuật-Sales chỉ thấy khách từng phát sinh đơn ở chi
+  // nhánh mình (RPC lọc theo pickup/return branch, khớp cách lọc ở /orders).
   const viewer = await getCurrentEmployee();
-  const branchId =
-    viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+  const branchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
   const isAdmin = viewer?.role === "admin";
 
-  const [allCustomersRaw, ordersRaw, paymentsRaw] = await Promise.all([
-    fetchAllRows<{
-      id: string;
-      name: string;
-      phone: string | null;
-      email: string | null;
-      notes: string | null;
-      address: string | null;
-      customer_type: CustomerType;
-      tax_code: string | null;
-      deposit_percentage: number;
-      created_at: string;
-    }>((from, to) =>
-      supabase
-        .from("customers")
-        .select(
-          "id, name, phone, email, notes, address, customer_type, tax_code, deposit_percentage, created_at",
-        )
-        .range(from, to),
-    ),
-    fetchAllRows<{
-      id: string;
-      customer_id: string;
-      total_value: number;
-      order_date: string;
-      cancelled_at: string | null;
-      pickup_branch_id: string;
-      return_branch_id: string;
-    }>((from, to) =>
-      supabase
-        .from("orders")
-        .select(
-          "id, customer_id, total_value, order_date, cancelled_at, pickup_branch_id, return_branch_id",
-        )
-        .range(from, to),
-    ),
-    fetchAllRows<{ order_id: string; amount: number }>((from, to) =>
-      supabase.from("order_payments").select("order_id, amount").range(from, to),
-    ),
+  // Toàn bộ tổng hợp (thống kê, biểu đồ, xếp hạng, công nợ) + danh sách phân
+  // trang đều tính trong Postgres qua 2 RPC — trước đây trang này kéo ~21.000
+  // dòng thô (5.5k khách + 10k đơn + 6k thanh toán, ~24 lượt gọi) về Worker
+  // chỉ để cộng trừ ra vài chục con số, giờ chỉ nhận đúng phần hiển thị.
+  // security definer + guard nhân viên trong hàm (xem migration
+  // 20260802010000) vì mốc "khách mới với cả công ty" cần đọc đơn mọi chi
+  // nhánh trong khi RLS cắt orders theo chi nhánh với role thường.
+  const [reportRes, listRes] = await Promise.all([
+    supabase.rpc("customer_page_report", { p_branch_id: branchId }),
+    supabase.rpc("customer_page_list", {
+      p_branch_id: branchId,
+      p_search: activeSearch || null,
+      p_sort: activeSort ?? "created_at",
+      p_dir: activeDir,
+      p_page: requestedPage,
+      p_page_size: PAGE_SIZE,
+    }),
   ]);
 
-  const orders = branchId
-    ? ordersRaw.filter(
-        (o) => o.pickup_branch_id === branchId || o.return_branch_id === branchId,
-      )
-    : ordersRaw;
-  const branchCustomerIds = branchId ? new Set(orders.map((o) => o.customer_id)) : null;
-  const allCustomers = branchCustomerIds
-    ? allCustomersRaw.filter((c) => branchCustomerIds.has(c.id))
-    : allCustomersRaw;
-  // "Khách mới" phải là mới với CẢ CÔNG TY. Người xem toàn hệ thống đã có đủ
-  // đơn trong ordersRaw; Cửa hàng trưởng bị RLS cắt về chi nhánh mình nên
-  // phải hỏi riêng qua service-role, nếu không khách quen của kho khác sẽ bị
-  // đếm nhầm thành khách mới.
-  const companyFirstOrder = branchId
-    ? await fetchCompanyFirstOrderDates()
-    : buildCompanyFirstOrderMap(ordersRaw);
+  const rawReport = (reportRes.data ?? {}) as Partial<CustomerReportData> & { error?: string };
+  const reportData: CustomerReportData = {
+    stats: rawReport.stats ?? {
+      totalCustomers: 0,
+      individualCount: 0,
+      companyCount: 0,
+      withOrders: 0,
+      returning2Plus: 0,
+    },
+    // jsonb_agg trả null (không phải mảng rỗng) khi không có dòng nào.
+    monthlyNew: rawReport.monthlyNew ?? [],
+    returningRate: rawReport.returningRate ?? [],
+    topCompanies: rawReport.topCompanies ?? [],
+    debt: rawReport.debt ?? [],
+  };
 
-  const branchOrderIds = branchId ? new Set(orders.map((o) => o.id)) : null;
-  const payments = branchOrderIds
-    ? paymentsRaw.filter((p) => branchOrderIds.has(p.order_id))
-    : paymentsRaw;
-
-  const reportById = new Map(
-    buildCustomerReportRows(allCustomers, orders, payments).map((r) => [r.id, r]),
-  );
-  const allRows: CustomerRow[] = allCustomers.map((c) => ({
-    ...c,
-    orderCount: reportById.get(c.id)?.orderCount ?? 0,
-    totalRevenue: reportById.get(c.id)?.totalRevenue ?? 0,
-  }));
-
-  const searchLower = activeSearch.toLowerCase();
-  const filteredRows = activeSearch
-    ? allRows.filter(
-        (r) =>
-          r.name.toLowerCase().includes(searchLower) || (r.phone ?? "").toLowerCase().includes(searchLower),
-      )
-    : allRows;
-
-  const sortedRows = [...filteredRows].sort((a, b) => {
-    const dirMult = activeDir === "asc" ? 1 : -1;
-    switch (activeSort) {
-      case "name":
-        return dirMult * a.name.localeCompare(b.name, "vi");
-      case "customer_type":
-        return (
-          dirMult *
-          CUSTOMER_TYPE_LABELS[a.customer_type].localeCompare(CUSTOMER_TYPE_LABELS[b.customer_type], "vi")
-        );
-      case "orderCount":
-        return dirMult * (a.orderCount - b.orderCount);
-      case "totalRevenue":
-        return dirMult * (a.totalRevenue - b.totalRevenue);
-      default:
-        return b.created_at.localeCompare(a.created_at);
-    }
-  });
-
-  const safeTotalCount = sortedRows.length;
+  const rawList = (listRes.data ?? {}) as { totalCount?: number; rows?: CustomerListRpcRow[] };
+  const safeTotalCount = rawList.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(safeTotalCount / PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
-  const customerList = sortedRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const customerList: CustomerRow[] = (rawList.rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    email: r.email,
+    notes: r.notes,
+    address: r.address,
+    customer_type: r.customer_type,
+    tax_code: r.tax_code,
+    deposit_percentage: r.deposit_percentage,
+    created_at: r.created_at,
+    orderCount: Number(r.order_count),
+    totalRevenue: Number(r.total_revenue),
+  }));
 
   return (
     <div className="space-y-6">
@@ -186,10 +143,7 @@ export default async function CustomersPage({
       </div>
 
       <CustomerReportSection
-        customers={allCustomers}
-        orders={orders}
-        payments={payments}
-        companyFirstOrder={companyFirstOrder}
+        data={reportData}
         // Admin đi cùng đơn hàng nên vẫn cần công nợ để đôn đốc thu tiền,
         // nhưng không cần xếp hạng doanh số hay danh sách khách nguội.
         showRankings={!branchId && !isAdmin}
