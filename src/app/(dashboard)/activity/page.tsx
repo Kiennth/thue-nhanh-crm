@@ -12,10 +12,15 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { ACTIVITY_ACTION_LABELS, ACTIVITY_TABLE_LABELS, getActivityRecordLabel } from "@/lib/activity-labels";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { ActivityTableFilter } from "./activity-table-filter";
 
 const PAGE_SIZE = 50;
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: VN_TIME_ZONE,
+});
 
 const ACTION_BADGE_VARIANT: Record<"insert" | "update" | "delete", "default" | "secondary" | "destructive"> = {
   insert: "default",

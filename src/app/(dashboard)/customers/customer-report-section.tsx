@@ -10,6 +10,7 @@ import {
   type NewCustomerPoint,
 } from "@/lib/customer-reports";
 import { NewCustomersCard, ReturningRateCard } from "./customer-trend-cards";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
 // vài chục dòng) — thay cho việc kéo 21k dòng thô về rồi cộng trừ trong JS.
@@ -29,7 +30,7 @@ export interface CustomerReportData {
 import { RevenueBarList } from "@/components/revenue-bar-list";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" });
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeZone: VN_TIME_ZONE });
 
 // Số khách hiện trong danh sách gọi lại — đủ cho một buổi gọi, phần còn lại
 // nằm ở con số tổng ngay dưới tiêu đề.

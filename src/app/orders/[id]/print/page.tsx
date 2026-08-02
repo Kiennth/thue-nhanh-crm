@@ -4,13 +4,18 @@ import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { equipmentDetailLabel, equipmentInstanceLabel } from "@/lib/equipment-labels";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
 import { PrintButton } from "./print-button";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
+const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: VN_TIME_ZONE,
+});
 
 const PRINT_DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
 

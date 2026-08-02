@@ -44,9 +44,10 @@ import {
 import { categoryColor } from "./expense-colors";
 import { ExpenseDialog } from "./expense-dialog";
 import { CopyLastMonthButton, ExpensePeriodFilter } from "./expense-toolbar";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" });
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeZone: VN_TIME_ZONE });
 
 const SORT_KEYS = ["expense_date", "amount"] as const;
 type SortKey = (typeof SORT_KEYS)[number];

@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
@@ -54,7 +55,7 @@ type RfidTagRow = {
 };
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateFormatter = new Intl.DateTimeFormat("vi-VN");
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", { timeZone: VN_TIME_ZONE });
 
 const INSTANCE_STATUS_VARIANT = {
   available: "default",

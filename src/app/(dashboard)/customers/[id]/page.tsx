@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { CustomerDialog } from "../customer-dialog";
 import { DeleteCustomerButton } from "../delete-customer-button";
@@ -26,7 +27,11 @@ const DEPOSIT_PERCENTAGE_LABELS: Record<number, string> = {
 };
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
+const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: VN_TIME_ZONE,
+});
 
 const ORDER_SORT_KEYS = ["rental_start_at", "rental_end_at", "total_value"] as const;
 type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];

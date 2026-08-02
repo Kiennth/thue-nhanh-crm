@@ -32,9 +32,14 @@ import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
+const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: VN_TIME_ZONE,
+});
 const PAGE_SIZE = 20;
 
 function isTaskType(value: string): value is TaskType {

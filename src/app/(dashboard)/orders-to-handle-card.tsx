@@ -4,9 +4,14 @@ import { Truck, PackageCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BranchBadge } from "@/components/branch-badge";
 import type { OrderToHandle } from "@/lib/orders-to-handle";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { CountdownTimer } from "./countdown-timer";
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: VN_TIME_ZONE,
+});
 
 function OrderCountdownList({
   title,
