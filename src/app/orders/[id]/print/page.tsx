@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
@@ -37,19 +38,36 @@ export default async function OrderPrintPage({
     { data: branches },
     { data: equipmentTypes },
     { data: equipmentUnits },
-    { data: equipmentInstances },
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("created_at"),
     supabase.from("branches").select("id, name"),
     supabase.from("equipment_types").select("id, name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
-    supabase
-      .from("equipment_instances")
-      .select("id, equipment_type_id, equipment_unit_id, identifier_code"),
   ]);
 
   if (!order) notFound();
+
+  // equipment_instances đã hơn 1.700 dòng — Supabase/PostgREST chặn CỨNG ở
+  // 1.000 dòng/lần gọi kể cả khi request .range() rộng hơn (không lỗi, chỉ
+  // âm thầm cắt bớt). Trang in chỉ cần đúng các máy được dòng đơn này tham
+  // chiếu nên tra thẳng theo ID thay vì nạp nguyên bảng — đảm bảo đúng bất
+  // kể tổng số máy trong hệ thống, cũng nhẹ hơn nhiều cho 1 trang in.
+  const instanceIds = [
+    ...new Set((lines ?? []).map((l) => l.equipment_instance_id).filter((v): v is string => !!v)),
+  ];
+  const equipmentInstances = await fetchRowsByIds<{
+    id: string;
+    equipment_type_id: string;
+    equipment_unit_id: string | null;
+    identifier_code: string;
+  }>(instanceIds, (idChunk, from, to) =>
+    supabase
+      .from("equipment_instances")
+      .select("id, equipment_type_id, equipment_unit_id, identifier_code")
+      .in("id", idChunk)
+      .range(from, to),
+  );
 
   const { data: customer } = await supabase
     .from("customers")

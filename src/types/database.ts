@@ -363,6 +363,11 @@ export interface Database {
           rental_end_at: string | null;
           delivery_stock_moved_at: string | null;
           return_stock_transferred_at: string | null;
+          // Ghi đè cọc dự kiến cho riêng đơn này (bỏ qua deposit_amount catalog
+          // x % cọc khách hàng) — null nghĩa là tính bình thường như trước giờ.
+          // Dùng cho các trường hợp hiếm: đơn cũ bị đổi sang sản phẩm khác có
+          // cọc khác lúc dọn danh mục, nhưng khách chưa từng được yêu cầu cọc.
+          deposit_override_amount: number | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -385,6 +390,7 @@ export interface Database {
           rental_end_at?: string | null;
           delivery_stock_moved_at?: string | null;
           return_stock_transferred_at?: string | null;
+          deposit_override_amount?: number | null;
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;

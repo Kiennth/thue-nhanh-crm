@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
@@ -92,7 +93,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: employees },
     { data: equipmentTypes },
     { data: equipmentUnits },
-    { data: equipmentInstances },
     { data: equipmentStock },
     { data: pricingTiers },
     { data: commissionTiers },
@@ -113,9 +113,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       )
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
-    supabase
-      .from("equipment_instances")
-      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status"),
     supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
     supabase
       .from("pricing_template_tiers")
@@ -129,6 +126,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (!order) {
     notFound();
   }
+
+  // equipment_instances đã hơn 1.700 dòng (mỗi máy serialize là 1 dòng) —
+  // Supabase/PostgREST chặn CỨNG ở 1.000 dòng/lần gọi kể cả khi request
+  // .range() rộng hơn (không lỗi, chỉ âm thầm cắt bớt), nên phải phân trang
+  // bằng fetchAllRows để lấy đủ toàn bộ, tránh 1 phần catalog "biến mất"
+  // khỏi ô tìm nhanh và tên biến thể của dòng hàng cũ hiện "—".
+  const equipmentInstances = await fetchAllRows<{
+    id: string;
+    equipment_type_id: string;
+    equipment_unit_id: string | null;
+    identifier_code: string;
+    status: string;
+  }>((from, to) =>
+    supabase
+      .from("equipment_instances")
+      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status")
+      .range(from, to),
+  );
 
   // Danh sách customers ở trên bị Supabase giới hạn 1.000 dòng (nay có hơn
   // 5.800 khách hàng) nên không đảm bảo chứa đúng khách của đơn này — luôn
@@ -210,7 +225,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }, 0);
   const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
   const totalDeposit =
-    Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+    // So sánh lỏng (!= thay vì !==): cột này migration mới thêm, có thể
+    // chưa lên production nếu đợt deploy chạy trước lúc db push xong — lúc
+    // đó Postgres trả undefined (không phải null), phải coi 2 giá trị này
+    // như nhau (đều nghĩa là "chưa override, tính như cũ").
+    order.deposit_override_amount != null
+      ? order.deposit_override_amount
+      : Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
 
   const depositPaymentList = (payments ?? [])
     .filter((p) => p.payment_type === "deposit_collect" || p.payment_type === "deposit_refund")
