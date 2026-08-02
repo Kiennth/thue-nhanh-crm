@@ -560,6 +560,9 @@ export async function createEquipmentInstance(
   const { error } = await supabase.from("equipment_instances").insert(parsed.data);
 
   if (error) {
+    if (error.message.includes("equipment_instances_identifier_code_key")) {
+      return { error: "Không thể tạo sản phẩm trùng số SERIAL!!!" };
+    }
     return { error: "Không thể tạo sản phẩm: " + error.message };
   }
 
@@ -589,6 +592,9 @@ export async function updateEquipmentInstance(
     .eq("id", id);
 
   if (error) {
+    if (error.message.includes("equipment_instances_identifier_code_key")) {
+      return { error: "Không thể cập nhật sản phẩm trùng số SERIAL!!!" };
+    }
     return { error: "Không thể cập nhật sản phẩm: " + error.message };
   }
 
