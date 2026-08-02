@@ -29,7 +29,9 @@ import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-hand
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
 
-const HANDLE_LIMIT = 5;
+// Trang chủ hiện tối đa 10 đơn mỗi khối "Đơn hàng sắp tới"/"Đơn hàng sắp về"
+// (CEO chốt 2026-08-02, áp dụng cho mọi phân quyền).
+const HANDLE_LIMIT = 10;
 
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
@@ -161,8 +163,11 @@ export default async function DashboardHomePage({
       ? Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m)))
       : Promise.resolve(null),
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
-    // khối biểu đồ hiệu suất toàn công ty riêng).
-    canManage ? Promise.resolve(null) : computeMyMonthlyTrend(employee.id),
+    // khối biểu đồ hiệu suất toàn công ty riêng). Bỏ luôn cho Kỹ thuật/Sales:
+    // tính 6 tháng payroll riêng lẻ quá nặng, kéo trang chủ chậm hẳn.
+    canManage || employee.role === "ky_thuat_sales"
+      ? Promise.resolve(null)
+      : computeMyMonthlyTrend(employee.id),
     // Tổng quan đơn hàng (Tuần/Tháng/Năm + xu hướng) của RIÊNG chi nhánh mà
     // Cửa hàng trưởng phụ trách — Giám đốc đã có khối So sánh chi nhánh.
     isBranchManager && branchId

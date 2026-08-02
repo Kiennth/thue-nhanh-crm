@@ -47,7 +47,10 @@ export default async function OrdersPage({
 
   return (
     <div className="space-y-6">
-      <OrdersOverviewSection branchId={branchId} showAggregates={canViewAggregates} />
+      {/* Kỹ thuật/Sales không được xem số liệu tổng hợp — section tổng quan
+          giờ chỉ còn thống kê + xu hướng nên ẩn hẳn với role này (2 thẻ đơn
+          sắp tới/sắp về đã dời hết về trang chủ). */}
+      {canViewAggregates && <OrdersOverviewSection branchId={branchId} />}
       <OrdersListSection
         status={status}
         range={range}

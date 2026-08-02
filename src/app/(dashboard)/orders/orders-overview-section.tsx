@@ -1,43 +1,19 @@
-import { getOrdersToHandle } from "@/lib/orders-to-handle";
 import { computeOrdersOverview } from "@/lib/orders-overview";
-import { UpcomingDeliveriesCard, PendingCollectionsCard } from "../orders-to-handle-card";
 import { PeriodStatCards } from "./period-stat-cards";
 import { OrdersTrendChart } from "./orders-trend-chart";
 
-const HANDLE_LIMIT = 5;
-
-// Toàn cảnh đơn hàng: quá khứ (xu hướng), hiện tại (thống kê kỳ này), tương
-// lai (đơn sắp tới/sắp về), và dự đoán (chiếu theo tốc độ hiện tại cho phần
-// còn lại của kỳ) — không phụ thuộc bộ lọc trạng thái/thời gian của bảng
-// danh sách bên dưới.
-export async function OrdersOverviewSection({
-  branchId,
-  showAggregates = true,
-}: {
-  branchId: string | null;
-  // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số kỳ, xu hướng) —
-  // chỉ giữ 2 thẻ đơn sắp tới/sắp về là việc phải làm hằng ngày.
-  showAggregates?: boolean;
-}) {
-  const [ordersToHandle, overview] = await Promise.all([
-    getOrdersToHandle(branchId, HANDLE_LIMIT),
-    showAggregates ? computeOrdersOverview(branchId) : Promise.resolve(null),
-  ]);
+// Toàn cảnh đơn hàng: quá khứ (xu hướng) + hiện tại (thống kê kỳ này) — không
+// phụ thuộc bộ lọc trạng thái/thời gian của bảng danh sách bên dưới. Hai thẻ
+// "Đơn sắp tới/sắp về" đã bỏ khỏi trang này (CEO chốt 2026-08-02): trang chủ
+// hiện y hệt (tối đa 10 đơn/thẻ) cho mọi role rồi, để cả hai nơi là trùng lặp.
+export async function OrdersOverviewSection({ branchId }: { branchId: string | null }) {
+  const overview = await computeOrdersOverview(branchId);
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UpcomingDeliveriesCard orders={ordersToHandle.upcomingDeliveries} hideViewAllLink />
-        <PendingCollectionsCard orders={ordersToHandle.pendingCollections} hideViewAllLink />
-      </div>
+      <PeriodStatCards week={overview.week} month={overview.month} year={overview.year} />
 
-      {overview && (
-        <>
-          <PeriodStatCards week={overview.week} month={overview.month} year={overview.year} />
-
-          <OrdersTrendChart trend={overview.trend} />
-        </>
-      )}
+      <OrdersTrendChart trend={overview.trend} />
     </div>
   );
 }
