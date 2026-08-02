@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
@@ -57,6 +58,12 @@ type RfidTagRow = {
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", { timeZone: VN_TIME_ZONE });
 
+// Trước đây tab "Lịch sử thuê" chỉ .limit(50) không phân trang — sản phẩm
+// nào có trên 50 lượt thuê thì các đơn cũ hơn biến mất khỏi màn hình dù
+// vẫn còn nguyên trong DB (phát hiện qua đối chiếu với Booqable, thiếu hẳn
+// lịch sử 2024). Chuyển sang phân trang thật giống trang Nhật ký hoạt động.
+const RENTAL_PAGE_SIZE = 50;
+
 const INSTANCE_STATUS_VARIANT = {
   available: "default",
   rented: "secondary",
@@ -93,11 +100,12 @@ export default async function EquipmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ tab?: string; sort?: string; dir?: string; page?: string }>;
 }) {
   const { id } = await params;
-  const { tab, sort, dir } = await searchParams;
+  const { tab, sort, dir, page: pageParam } = await searchParams;
   const activeTab: Tab = tab === "history" ? "history" : tab === "rentals" ? "rentals" : "stock";
+  const requestedRentalPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
@@ -173,6 +181,16 @@ export default async function EquipmentDetailPage({
   // dòng order_equipment của loại hàng này trước, rồi tra ngược sang
   // orders/customers (không dùng nested select — codebase này join tay bằng
   // Map cho nhất quán với các trang khác).
+  const { count: rentalTotalCount } =
+    activeTab === "rentals"
+      ? await supabase
+          .from("order_equipment")
+          .select("id", { count: "exact", head: true })
+          .eq("equipment_type_id", id)
+      : { count: 0 };
+  const rentalTotalPages = Math.max(1, Math.ceil((rentalTotalCount ?? 0) / RENTAL_PAGE_SIZE));
+  const rentalPage = Math.min(requestedRentalPage, rentalTotalPages);
+
   const { data: rentalLines } =
     activeTab === "rentals"
       ? await supabase
@@ -180,7 +198,7 @@ export default async function EquipmentDetailPage({
           .select("id, order_id, equipment_instance_id, equipment_unit_id, quantity, line_total")
           .eq("equipment_type_id", id)
           .order("created_at", { ascending: false })
-          .limit(50)
+          .range((rentalPage - 1) * RENTAL_PAGE_SIZE, rentalPage * RENTAL_PAGE_SIZE - 1)
       : { data: [] as { id: string; order_id: string; equipment_instance_id: string | null; equipment_unit_id: string | null; quantity: number; line_total: number }[] };
 
   const rentalOrderIds = [...new Set((rentalLines ?? []).map((l) => l.order_id))];
@@ -679,6 +697,14 @@ export default async function EquipmentDetailPage({
             </Table>
           </CardContent>
         </Card>
+      )}
+      {activeTab === "rentals" && (
+        <PaginationControls
+          page={rentalPage}
+          totalPages={rentalTotalPages}
+          totalCount={rentalTotalCount ?? 0}
+          itemLabel="lượt thuê"
+        />
       )}
 
       {activeTab === "history" && (
