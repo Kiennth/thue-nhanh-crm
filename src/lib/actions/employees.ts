@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
 import { DIRECTOR_ONLY } from "@/lib/roles";
+import { getSiteUrl } from "@/lib/site-url";
 
 const employeeShape = {
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
@@ -44,7 +45,7 @@ export async function createEmployee(
   const { email, branch_id, ...rest } = parsed.data;
   const admin = createAdminClient();
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = await getSiteUrl();
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     email,
     { redirectTo: `${siteUrl}/login` },

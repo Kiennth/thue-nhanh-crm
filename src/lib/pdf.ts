@@ -1,13 +1,18 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { Browser } from "puppeteer-core";
+import puppeteerCloudflare from "@cloudflare/puppeteer";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getSiteUrl } from "@/lib/site-url";
 import type { PrintDocType } from "@/lib/print-docs";
 
 // Cloudflare Workers chạy trong V8 isolate (không có child_process/filesystem
-// cho binary ngoài) — Puppeteer/Chromium KHÔNG thể chạy ở đây dù đã bật
-// nodejs_compat. Chặn sớm với thông báo rõ ràng thay vì lỗi mơ hồ lúc runtime.
-// Cách nhận diện chuẩn theo tài liệu Cloudflare: navigator.userAgent cố định
-// là "Cloudflare-Workers".
+// cho binary ngoài) — Puppeteer/Chromium thường KHÔNG thể chạy ở đây dù đã
+// bật nodejs_compat. Trên Workers dùng binding BROWSER (Cloudflare Browser
+// Rendering — @cloudflare/puppeteer điều khiển 1 Chromium thật chạy phía
+// Cloudflare qua RPC, không cần binary local) thay vì Puppeteer đầy đủ. Cách
+// nhận diện chuẩn theo tài liệu Cloudflare: navigator.userAgent cố định là
+// "Cloudflare-Workers".
 const isCloudflareWorkers =
   typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
 
@@ -15,7 +20,17 @@ const isCloudflareWorkers =
 // không cố bundle puppeteer/@sparticuz vào worker (bundle sẽ fail vì các
 // dynamic import nội bộ của puppeteer). Node runtime thật vẫn import bình
 // thường lúc chạy; trên Workers không bao giờ tới được đây nhờ guard trên.
-const opaqueImport = new Function("m", "return import(m)") as <T>(m: string) => Promise<T>;
+//
+// LAZY — không dựng Function() ở top-level module. `new Function` là code-gen
+// từ chuỗi, bị Cloudflare Workers chặn cứng (EvalError) NGAY LÚC NẠP MODULE,
+// trước khi bất kỳ dòng code nào trong file chạy — kể cả guard
+// isCloudflareWorkers phía trên cũng không kịp chặn vì nó chỉ chặn ở
+// runtime, còn eval bị chặn ở compile-time của isolate. Từng làm sập toàn bộ
+// Server Action nào lỡ import chung route với file này (mọi action trên
+// /orders/[id] dùng chung 1 chunk với SendDocumentEmailDialog).
+function opaqueImport<T>(m: string): Promise<T> {
+  return (new Function("m", "return import(m)") as (m: string) => Promise<T>)(m);
+}
 
 interface ChromiumModule {
   default: { args: string[]; executablePath(): Promise<string> };
@@ -30,9 +45,11 @@ interface PuppeteerModule {
 // Nhớ set env PUPPETEER_SKIP_DOWNLOAD=1 trên Vercel để build khỏi tải Chrome.
 async function launchBrowser(): Promise<Browser> {
   if (isCloudflareWorkers) {
-    throw new Error(
-      "Xuất PDF chưa hỗ trợ trên hạ tầng Cloudflare Workers hiện tại (Puppeteer cần môi trường Node.js đầy đủ). Cần dùng dịch vụ render PDF ngoài (vd Browser Rendering API của Cloudflare) hoặc host phần này trên nền tảng Node.js server.",
-    );
+    const { env } = await getCloudflareContext({ async: true });
+    // @cloudflare/puppeteer trả về Browser tương thích API với puppeteer-core
+    // (newPage/pdf/close) — ép kiểu để dùng chung phần render bên dưới.
+    const browser = await puppeteerCloudflare.launch(env.BROWSER);
+    return browser as unknown as Browser;
   }
   if (process.env.VERCEL) {
     const [{ default: chromium }, { default: puppeteerCore }] = await Promise.all([
@@ -56,7 +73,7 @@ export async function renderOrderDocumentPdf(
   orderId: string,
   docType: PrintDocType,
 ): Promise<Buffer> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const baseUrl = await getSiteUrl();
   const url = `${baseUrl}/orders/${orderId}/print?type=${docType}`;
   const cookieStore = await cookies();
   const targetUrl = new URL(url);

@@ -4,8 +4,19 @@
   "name": "thue-nhanh-crm",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
+  // Địa chỉ chính thức của CRM — zone thuenhanh.vn nằm trên Cloudflare,
+  // custom domain tự lo DNS + SSL cho subdomain này khi deploy.
+  "routes": [{ "pattern": "crm.thuenhanh.vn", "custom_domain": true }],
+  // Giữ địa chỉ *.workers.dev chạy song song (mặc định bị tắt khi có custom
+  // domain) — dự phòng lúc DNS trục trặc và để test không đụng domain chính.
+  "workers_dev": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
-  }
+  },
+  // Render PDF chứng từ (hợp đồng/báo giá/biên bản) qua trình duyệt headless
+  // của Cloudflare — Puppeteer thường không chạy được trong Workers isolate,
+  // binding này expose 1 trình duyệt thật ở phía Cloudflare cho @cloudflare/
+  // puppeteer điều khiển từ xa. Xem src/lib/pdf.ts.
+  "browser": { "binding": "BROWSER" }
 }

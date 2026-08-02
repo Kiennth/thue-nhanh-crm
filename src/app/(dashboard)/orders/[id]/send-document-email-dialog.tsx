@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Mail } from "lucide-react";
 import {
   Dialog,
@@ -37,6 +37,14 @@ export function SendDocumentEmailDialog({
   const [success, setSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
   const [docType, setDocType] = useState<PrintDocType>("contract");
+
+  // Gửi xong tự đóng dialog — vẫn nán lại đủ để người dùng thấy dòng xác
+  // nhận trước khi biến mất, không bắt bấm Close tay.
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setOpen(false), 1200);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   function handleSubmit(formData: FormData) {
     setError(null);
