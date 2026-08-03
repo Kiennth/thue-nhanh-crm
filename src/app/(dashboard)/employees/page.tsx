@@ -24,7 +24,7 @@ export default async function EmployeesPage() {
   const supabase = await createClient();
   const [{ data: employees }, { data: branches }] = await Promise.all([
     supabase.from("employees").select("*").order("name"),
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name").order("position"),
   ]);
 
   const isHr = HR_ROLES.includes(currentEmployee.role);

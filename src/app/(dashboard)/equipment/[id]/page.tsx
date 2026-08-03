@@ -114,7 +114,7 @@ export default async function EquipmentDetailPage({
   const [{ data: type }, { data: templates }, { data: branches }, employee] = await Promise.all([
     supabase.from("equipment_types").select("*").eq("id", id).maybeSingle(),
     supabase.from("pricing_templates").select("*").order("name"),
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name, position").order("position"),
     getCurrentEmployee(),
   ]);
   if (!type) notFound();
@@ -228,6 +228,7 @@ export default async function EquipmentDetailPage({
   const branchList = branches ?? [];
   const templateList = templates ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
+  const branchPositionById = new Map(branchList.map((b, idx) => [b.id, b.position ?? idx]));
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
 
   const stockByUnit = new Map<string, NonNullable<typeof stock>>();
@@ -235,6 +236,12 @@ export default async function EquipmentDetailPage({
     const list = stockByUnit.get(row.equipment_unit_id) ?? [];
     list.push(row);
     stockByUnit.set(row.equipment_unit_id, list);
+  }
+  // Chi nhánh hiển thị theo thứ tự cố định (Hà Nội > TP HCM > Đà Nẵng >
+  // HQ, xem branches.position) thay vì thứ tự trả về ngẫu nhiên của
+  // equipment_stock.
+  for (const list of stockByUnit.values()) {
+    list.sort((a, b) => (branchPositionById.get(a.branch_id) ?? 0) - (branchPositionById.get(b.branch_id) ?? 0));
   }
 
   const rfidTagsByUnit = new Map<string, NonNullable<typeof rfidTags>>();

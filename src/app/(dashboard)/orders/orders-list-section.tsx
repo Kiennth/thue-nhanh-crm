@@ -176,7 +176,7 @@ export async function OrdersListSection({
           .range(rangeFrom, rangeTo),
       () => ordersQueryWithFilters(supabase, "*", filters, { count: "exact", head: true }),
     ),
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name").order("position"),
     needAllCustomers
       ? fetchAllRowsFast<{ id: string; name: string }>(
           (rangeFrom, rangeTo) =>

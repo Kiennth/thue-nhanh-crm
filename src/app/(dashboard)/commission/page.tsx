@@ -29,7 +29,7 @@ export default async function CommissionPage() {
   const supabase = await createClient();
   const [{ data: branches }, { data: commissionTiers }, { data: bonusTiers }, { data: taskWeights }] =
     await Promise.all([
-      supabase.from("branches").select("id, name").order("name"),
+      supabase.from("branches").select("id, name").order("position"),
       supabase.from("commission_tiers").select("*").order("tier_number"),
       supabase.from("bonus_tiers").select("*").order("tier_number"),
       supabase.from("task_weights").select("*"),

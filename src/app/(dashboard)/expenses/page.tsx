@@ -91,7 +91,7 @@ export default async function ExpensesPage({
 
   const supabase = await createClient();
   const [{ data: branches }, data, payrollRows, prevPayrollRows] = await Promise.all([
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name").order("position"),
     fetchExpenseData(period, month),
     period === "month"
       ? computeEmployeeMonthlyPerformance(month, payrollOptions)

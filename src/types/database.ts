@@ -39,6 +39,10 @@ export interface Database {
           name: string;
           min_wage_region: string | null;
           is_active: boolean;
+          // Thứ tự hiển thị cố định (Hà Nội > TP HCM > Đà Nẵng > HQ) — null
+          // nghĩa là chưa gán, xếp cuối cùng (NULLS LAST mặc định của
+          // ORDER BY ... ASC).
+          position: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -47,6 +51,7 @@ export interface Database {
           name: string;
           min_wage_region?: string | null;
           is_active?: boolean;
+          position?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["branches"]["Insert"]>;
         Relationships: [];

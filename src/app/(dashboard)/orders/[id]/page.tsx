@@ -104,7 +104,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
     supabase.from("order_tasks").select("*").eq("order_id", id),
     supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name").order("position"),
     supabase.from("employees_public").select("id, name").order("name"),
     supabase
       .from("equipment_types")

@@ -20,7 +20,7 @@ export default async function BranchesPage() {
   const employee = await requireRole([...DIRECTOR_ONLY]);
 
   const supabase = await createClient();
-  const { data: branches } = await supabase.from("branches").select("*").order("name");
+  const { data: branches } = await supabase.from("branches").select("*").order("position");
 
   const isDirector = employee.role === "giam_doc";
 

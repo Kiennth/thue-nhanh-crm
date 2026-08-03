@@ -131,7 +131,7 @@ export default async function DashboardHomePage({
     myTrend,
     branchOrdersOverview,
   ] = await Promise.all([
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name").order("position"),
     canViewBranchComparison
       ? fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>(
           (from, to) =>
