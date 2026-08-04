@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 import { Truck, PackageCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { BranchBadge } from "@/components/branch-badge";
 import type { OrderToHandle } from "@/lib/orders-to-handle";
 import { groupOrdersByDay } from "@/lib/order-day-groups";
@@ -13,6 +14,11 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeStyle: "short",
   timeZone: VN_TIME_ZONE,
 });
+
+// Mỗi cụm ngày 1 màu trong dải categorical --chart-1..10 (đã kiểm định
+// sáng/tối, dùng chung với BranchBadge) — xoay vòng theo thứ tự cụm để các
+// ngày liền nhau nổi bật, dễ phân biệt khi lướt nhanh.
+const DAY_GROUP_COLOR_VARS = Array.from({ length: 10 }, (_, i) => `--chart-${i + 1}`);
 
 function OrderCountdownList({
   title,
@@ -54,30 +60,43 @@ function OrderCountdownList({
       </CardHeader>
       <CardContent className="space-y-3">
         {!orders.length && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
-        {groups.map((group) => (
-          <div key={group.dateStr} className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">
-              {group.dateLabel} · {group.orders.length} đơn
-            </p>
-            {group.orders.map((order) => (
-              <Link
-                key={order.id}
-                href={`/orders/${order.id}`}
-                className="flex items-center justify-between rounded-lg border p-2 text-sm transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{order.orderCode}</span>
-                  <span className="text-muted-foreground">{order.customerName}</span>
-                  <BranchBadge name={order.branchName} />
-                </div>
-                <div className="flex flex-col items-end">
-                  <CountdownTimer targetDate={order.actionDate} />
-                  <span className="text-xs text-muted-foreground">{dateFormatter.format(new Date(order.actionDate))}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ))}
+        {groups.map((group, i) => {
+          const colorVar = DAY_GROUP_COLOR_VARS[i % DAY_GROUP_COLOR_VARS.length];
+          return (
+            <div key={group.dateStr} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge
+                  style={{
+                    backgroundColor: `var(${colorVar})`,
+                    color: `var(${colorVar}-fg)`,
+                  }}
+                >
+                  {group.dateLabel}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{group.orders.length} đơn</span>
+              </div>
+              {group.orders.map((order) => (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="flex items-center justify-between rounded-lg border p-2 text-sm transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{order.orderCode}</span>
+                    <span className="text-muted-foreground">{order.customerName}</span>
+                    <BranchBadge name={order.branchName} />
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <CountdownTimer targetDate={order.actionDate} />
+                    <span className="text-xs text-muted-foreground">
+                      {dateFormatter.format(new Date(order.actionDate))}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
