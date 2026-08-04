@@ -69,8 +69,6 @@ export function QuickCustomerDialog({
             <DialogTitle>Tạo khách hàng mới</DialogTitle>
           </DialogHeader>
 
-          {/* Tạo nhanh — chỉ hỏi thông tin thiết yếu, các trường còn lại
-              (email, MST, địa chỉ...) có thể bổ sung sau ở trang Khách hàng. */}
           <input type="hidden" name="deposit_percentage" value="100" />
 
           <div className="space-y-2">
@@ -94,6 +92,21 @@ export function QuickCustomerDialog({
           <div className="space-y-2">
             <Label htmlFor="quick-phone">Số điện thoại</Label>
             <Input id="quick-phone" name="phone" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quick-email">Email</Label>
+            <Input id="quick-email" name="email" type="email" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quick-tax_code">Mã số thuế (MST)</Label>
+            <Input id="quick-tax_code" name="tax_code" placeholder="VD: 0312345678" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quick-address">Địa chỉ</Label>
+            <Input id="quick-address" name="address" placeholder="Địa chỉ xuất hoá đơn" />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
