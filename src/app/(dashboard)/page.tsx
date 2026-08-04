@@ -230,6 +230,7 @@ export default async function DashboardHomePage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard
           orders={ordersToHandle.upcomingDeliveries}
+          now={now}
           hideViewAllLink
           rangeFilter={
             !upcomingLateActive && (
@@ -246,6 +247,7 @@ export default async function DashboardHomePage({
         />
         <PendingCollectionsCard
           orders={ordersToHandle.pendingCollections}
+          now={now}
           hideViewAllLink
           rangeFilter={
             !returningLateActive && (
