@@ -455,18 +455,24 @@ export async function updateOrderRentalPeriod(
 
   const { data: lines } = await supabase
     .from("order_equipment")
-    .select("id, equipment_type_id, quantity")
+    .select("id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity")
     .eq("order_id", id);
 
   for (const line of lines ?? []) {
     if (!line.equipment_type_id) continue; // dòng tự do — giá do người nhập tự gõ, không tính lại
 
+    const unitPriceOverride = await resolveUnitPriceOverride(
+      supabase,
+      line.equipment_unit_id,
+      line.equipment_instance_id,
+    );
     const { equipmentType, computed } = await computeLineForEquipmentType(
       supabase,
       line.equipment_type_id,
       parsed.data.rental_start_at,
       parsed.data.rental_end_at,
       line.quantity,
+      unitPriceOverride,
     );
     if (equipmentType.product_type !== "rental") continue;
 
@@ -690,13 +696,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
 // client chỉ gửi lựa chọn sản phẩm + số lượng + ngày thuê (nếu có).
 // ---------------------------------------------------------------------------
 
-async function computeLineForEquipmentType(
-  supabase: SupabaseServerClient,
-  equipmentTypeId: string,
-  rentalStartAt: string | null,
-  rentalEndAt: string | null,
-  quantity: number,
-) {
+async function fetchEquipmentTypeForPricing(supabase: SupabaseServerClient, equipmentTypeId: string) {
   const { data: equipmentType, error: typeError } = await supabase
     .from("equipment_types")
     .select(
@@ -718,9 +718,22 @@ async function computeLineForEquipmentType(
     tiers = tierRows ?? [];
   }
 
-  const computed = computeOrderLinePrice({
+  return { equipmentType, tiers };
+}
+
+function computeLinePrice(
+  equipmentType: Awaited<ReturnType<typeof fetchEquipmentTypeForPricing>>["equipmentType"],
+  tiers: PricingTierInput[],
+  rentalStartAt: string | null,
+  rentalEndAt: string | null,
+  quantity: number,
+  // Giá riêng của biến thể (equipment_units.price) khi đã xác định được biến
+  // thể cụ thể — null/undefined = dùng giá chung của sản phẩm như trước.
+  unitPriceOverride?: number | null,
+) {
+  return computeOrderLinePrice({
     productType: equipmentType.product_type,
-    price: equipmentType.price,
+    price: unitPriceOverride ?? equipmentType.price,
     rentalPeriodUnit: equipmentType.rental_period_unit,
     pricingMethod: equipmentType.pricing_method,
     tiers,
@@ -728,8 +741,60 @@ async function computeLineForEquipmentType(
     rentalEndAt,
     quantity,
   });
+}
 
+async function computeLineForEquipmentType(
+  supabase: SupabaseServerClient,
+  equipmentTypeId: string,
+  rentalStartAt: string | null,
+  rentalEndAt: string | null,
+  quantity: number,
+  unitPriceOverride?: number | null,
+) {
+  const { equipmentType, tiers } = await fetchEquipmentTypeForPricing(supabase, equipmentTypeId);
+  const computed = computeLinePrice(
+    equipmentType,
+    tiers,
+    rentalStartAt,
+    rentalEndAt,
+    quantity,
+    unitPriceOverride,
+  );
   return { equipmentType, computed };
+}
+
+// Biến thể (equipment_unit) có thể được chọn trực tiếp (hàng theo số lượng)
+// hoặc gián tiếp qua equipment_instance.equipment_unit_id (hàng theo từng
+// sản phẩm, biến thể chỉ là nhãn phân loại — xem migration 20260802040000).
+// Dùng chung 1 hàm tra giá riêng cho cả 2 trường hợp.
+async function resolveUnitPriceOverride(
+  supabase: SupabaseServerClient,
+  equipmentUnitId: string | null,
+  equipmentInstanceId: string | null,
+): Promise<number | null> {
+  if (equipmentUnitId) {
+    const { data } = await supabase
+      .from("equipment_units")
+      .select("price")
+      .eq("id", equipmentUnitId)
+      .maybeSingle();
+    return data?.price ?? null;
+  }
+  if (equipmentInstanceId) {
+    const { data: instance } = await supabase
+      .from("equipment_instances")
+      .select("equipment_unit_id")
+      .eq("id", equipmentInstanceId)
+      .maybeSingle();
+    if (!instance?.equipment_unit_id) return null;
+    const { data: unit } = await supabase
+      .from("equipment_units")
+      .select("price")
+      .eq("id", instance.equipment_unit_id)
+      .maybeSingle();
+    return unit?.price ?? null;
+  }
+  return null;
 }
 
 const OrderEquipmentLineSchema = z.object({
@@ -767,14 +832,11 @@ export async function addOrderEquipmentLine(
     .single();
 
   let equipmentType;
-  let computed;
+  let tiers;
   try {
-    ({ equipmentType, computed } = await computeLineForEquipmentType(
+    ({ equipmentType, tiers } = await fetchEquipmentTypeForPricing(
       supabase,
       parsed.data.equipment_type_id,
-      order?.rental_start_at ?? null,
-      order?.rental_end_at ?? null,
-      parsed.data.quantity,
     ));
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
@@ -817,6 +879,24 @@ export async function addOrderEquipmentLine(
       equipmentUnitId = newUnitId;
     }
   }
+
+  // Tra giá riêng biến thể SAU khi đã biết chắc equipmentUnitId (biến thể
+  // chọn thẳng, biến thể duy nhất tự dùng, hay biến thể mặc định vừa tạo) —
+  // null nếu biến thể không có giá riêng, khi đó computeLinePrice tự rơi về
+  // giá chung equipmentType.price như trước giờ.
+  const unitPriceOverride = await resolveUnitPriceOverride(
+    supabase,
+    equipmentUnitId,
+    parsed.data.equipment_instance_id ?? null,
+  );
+  const computed = computeLinePrice(
+    equipmentType,
+    tiers,
+    order?.rental_start_at ?? null,
+    order?.rental_end_at ?? null,
+    parsed.data.quantity,
+    unitPriceOverride,
+  );
 
   const { error } = await supabase.from("order_equipment").insert({
     order_id: parsed.data.order_id,

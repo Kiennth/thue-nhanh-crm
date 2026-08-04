@@ -431,7 +431,14 @@ export default async function EquipmentDetailPage({
                         />
                       )}
                       <div>
-                        <p className="font-medium">{unit.brand_model}</p>
+                        <p className="font-medium">
+                          {unit.brand_model}
+                          {unit.price != null && (
+                            <span className="text-muted-foreground ml-2 text-sm font-normal">
+                              {currencyFormatter.format(unit.price)}đ
+                            </span>
+                          )}
+                        </p>
                         {unit.condition_notes && (
                           <p className="text-sm text-muted-foreground">{unit.condition_notes}</p>
                         )}
@@ -445,7 +452,7 @@ export default async function EquipmentDetailPage({
                           equipmentUnitId={unit.id}
                           tags={unitTags}
                         />
-                        <EquipmentUnitDialog equipmentTypeId={type.id} unit={unit} />
+                        <EquipmentUnitDialog equipmentTypeId={type.id} typePrice={type.price} unit={unit} />
                         <ConfirmDeleteButton
                           confirmMessage={`Xoá biến thể "${unit.brand_model}"?`}
                           successMessage="Đã xoá biến thể."
@@ -532,7 +539,7 @@ export default async function EquipmentDetailPage({
           )}
 
           {showUnitsBlock && canManageCatalog && (
-            <EquipmentUnitDialog equipmentTypeId={type.id} />
+            <EquipmentUnitDialog equipmentTypeId={type.id} typePrice={type.price} />
           )}
 
           {isRentalIndividual && (
@@ -546,7 +553,9 @@ export default async function EquipmentDetailPage({
                 <div className="space-y-2 rounded-lg border p-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Biến thể</p>
-                    {canManageCatalog && <EquipmentUnitDialog equipmentTypeId={type.id} />}
+                    {canManageCatalog && (
+                      <EquipmentUnitDialog equipmentTypeId={type.id} typePrice={type.price} />
+                    )}
                   </div>
                   {unitList.length > 0 ? (
                     <ul className="divide-y">
@@ -555,10 +564,17 @@ export default async function EquipmentDetailPage({
                           key={unit.id}
                           className="flex items-center justify-between gap-2 py-1.5 text-sm first:pt-0 last:pb-0"
                         >
-                          <span>{unit.brand_model}</span>
+                          <span>
+                            {unit.brand_model}
+                            {unit.price != null && (
+                              <span className="text-muted-foreground ml-2">
+                                {currencyFormatter.format(unit.price)}đ
+                              </span>
+                            )}
+                          </span>
                           {canManageCatalog && (
                             <div className="flex items-center gap-1">
-                              <EquipmentUnitDialog equipmentTypeId={type.id} unit={unit} />
+                              <EquipmentUnitDialog equipmentTypeId={type.id} typePrice={type.price} unit={unit} />
                               <ConfirmDeleteButton
                                 confirmMessage={`Xoá biến thể "${unit.brand_model}"?`}
                                 successMessage="Đã xoá biến thể."

@@ -236,6 +236,8 @@ export interface Database {
           brand_model: string;
           condition_notes: string | null;
           image_url: string | null;
+          // Giá thuê riêng cho biến thể này — null = dùng equipment_types.price.
+          price: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -245,6 +247,7 @@ export interface Database {
           brand_model: string;
           condition_notes?: string | null;
           image_url?: string | null;
+          price?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_units"]["Insert"]>;
         Relationships: [];

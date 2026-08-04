@@ -282,6 +282,13 @@ const EquipmentUnitSchema = z.object({
   equipment_type_id: z.string().uuid(),
   brand_model: z.string().trim().min(1, { message: "Hãng/model không được để trống." }),
   condition_notes: z.string().trim().optional(),
+  // Để trống = dùng giá sản phẩm chung (equipment_types.price) — luôn parse
+  // ra null tường minh (thay vì undefined) để lúc update, xoá ô giá thật sự
+  // xoá override trong DB chứ không phải giữ nguyên giá trị cũ.
+  price: z
+    .union([z.literal(""), z.coerce.number().min(0, { message: "Giá không được âm." })])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? null : v)),
 });
 
 export async function createEquipmentUnit(
@@ -294,6 +301,7 @@ export async function createEquipmentUnit(
     equipment_type_id: formData.get("equipment_type_id"),
     brand_model: formData.get("brand_model"),
     condition_notes: formData.get("condition_notes") || undefined,
+    price: formData.get("price") ?? "",
   });
 
   if (!parsed.success) {
@@ -338,6 +346,7 @@ export async function updateEquipmentUnit(
     equipment_type_id: formData.get("equipment_type_id"),
     brand_model: formData.get("brand_model"),
     condition_notes: formData.get("condition_notes") || undefined,
+    price: formData.get("price") ?? "",
   });
 
   if (!parsed.success) {

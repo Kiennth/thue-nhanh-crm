@@ -21,16 +21,21 @@ import {
 
 interface EquipmentUnitDialogProps {
   equipmentTypeId: string;
+  // Giá thuê chung của sản phẩm — hiện làm placeholder để biết để trống thì
+  // biến thể này áp giá gì.
+  typePrice: number;
   unit?: {
     id: string;
     brand_model: string;
     condition_notes: string | null;
     image_url: string | null;
+    price: number | null;
   };
 }
 
 export function EquipmentUnitDialog({
   equipmentTypeId,
+  typePrice,
   unit,
 }: EquipmentUnitDialogProps) {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
@@ -98,6 +103,19 @@ export function EquipmentUnitDialog({
               defaultValue={unit?.brand_model}
               placeholder="VD: Samsung"
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="price">Giá thuê riêng</Label>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              min={0}
+              step={1000}
+              defaultValue={unit?.price ?? ""}
+              placeholder={`Để trống = dùng giá chung (${typePrice.toLocaleString("vi-VN")}đ)`}
             />
           </div>
 
