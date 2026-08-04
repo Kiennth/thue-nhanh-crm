@@ -19,7 +19,7 @@ const CustomerSchema = z.object({
   }),
 });
 
-export type ActionState = { error: string } | { success: true } | undefined;
+export type ActionState = { error: string } | { success: true; id?: string } | undefined;
 
 export async function createCustomer(
   _prevState: ActionState,
@@ -44,16 +44,18 @@ export async function createCustomer(
 
   const { email, ...rest } = parsed.data;
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("customers")
-    .insert({ ...rest, email: email || null });
+    .insert({ ...rest, email: email || null })
+    .select("id")
+    .single();
 
   if (error) {
     return { error: "Không thể tạo khách hàng: " + error.message };
   }
 
   revalidatePath("/customers");
-  return { success: true };
+  return { success: true, id: data.id };
 }
 
 export async function updateCustomer(
