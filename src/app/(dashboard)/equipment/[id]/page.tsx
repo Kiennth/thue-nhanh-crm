@@ -191,14 +191,16 @@ export default async function EquipmentDetailPage({
   const rentalTotalPages = Math.max(1, Math.ceil((rentalTotalCount ?? 0) / RENTAL_PAGE_SIZE));
   const rentalPage = Math.min(requestedRentalPage, rentalTotalPages);
 
+  // Không phân trang ở bước này: order_equipment không có ngày thuê (nằm bên
+  // orders.rental_start_at), nên phải tải hết dòng của loại hàng này, ghép
+  // sang orders rồi mới sắp xếp theo ngày thuê được — phân trang thật sự làm
+  // ở bước cắt mảng sortedRentalRows bên dưới, sau khi đã sắp xếp xong.
   const { data: rentalLines } =
     activeTab === "rentals"
       ? await supabase
           .from("order_equipment")
           .select("id, order_id, equipment_instance_id, equipment_unit_id, quantity, line_total")
           .eq("equipment_type_id", id)
-          .order("created_at", { ascending: false })
-          .range((rentalPage - 1) * RENTAL_PAGE_SIZE, rentalPage * RENTAL_PAGE_SIZE - 1)
       : { data: [] as { id: string; order_id: string; equipment_instance_id: string | null; equipment_unit_id: string | null; quantity: number; line_total: number }[] };
 
   const rentalOrderIds = [...new Set((rentalLines ?? []).map((l) => l.order_id))];
@@ -303,28 +305,40 @@ export default async function EquipmentDetailPage({
     })
     .filter((r) => r !== null);
 
-  const sortedRentalRows = [...rentalRows].sort((a, b) => {
-    switch (activeSort) {
+  // Chưa chọn cột nào thì mặc định xếp theo ngày bắt đầu thuê, mới nhất lên
+  // đầu — trước đây mặc định giữ nguyên thứ tự trả về của DB (không phải
+  // ngày thuê), khiến đơn cũ lẫn với đơn mới tuỳ vào lúc dòng order_equipment
+  // được ghi/sửa gần đây (vd sau khi chạy migration gộp SKU).
+  const rentalSort = activeSort ?? "start";
+  const rentalDirMult = activeSort ? activeDirMult : -1;
+  const sortedRentalRowsAll = [...rentalRows].sort((a, b) => {
+    switch (rentalSort) {
       case "order_code":
-        return activeDirMult * a.order.order_code.localeCompare(b.order.order_code, "vi");
+        return rentalDirMult * a.order.order_code.localeCompare(b.order.order_code, "vi");
       case "customer":
-        return activeDirMult * a.customerName.localeCompare(b.customerName, "vi");
+        return rentalDirMult * a.customerName.localeCompare(b.customerName, "vi");
       case "start":
         return (
-          activeDirMult * (a.order.rental_start_at ?? "").localeCompare(b.order.rental_start_at ?? "")
+          rentalDirMult * (a.order.rental_start_at ?? "").localeCompare(b.order.rental_start_at ?? "")
         );
       case "end":
-        return activeDirMult * (a.order.rental_end_at ?? "").localeCompare(b.order.rental_end_at ?? "");
+        return rentalDirMult * (a.order.rental_end_at ?? "").localeCompare(b.order.rental_end_at ?? "");
       case "quantity":
-        return activeDirMult * (a.line.quantity - b.line.quantity);
+        return rentalDirMult * (a.line.quantity - b.line.quantity);
       case "revenue":
-        return activeDirMult * (a.line.line_total - b.line.line_total);
+        return rentalDirMult * (a.line.line_total - b.line.line_total);
       case "status":
-        return activeDirMult * a.statusLabel.localeCompare(b.statusLabel, "vi");
+        return rentalDirMult * a.statusLabel.localeCompare(b.statusLabel, "vi");
       default:
         return 0;
     }
   });
+  // Phân trang thật diễn ra ở đây, sau khi đã sắp xếp toàn bộ dòng theo loại
+  // hàng này (xem ghi chú ở chỗ tải rentalLines phía trên).
+  const sortedRentalRows = sortedRentalRowsAll.slice(
+    (rentalPage - 1) * RENTAL_PAGE_SIZE,
+    rentalPage * RENTAL_PAGE_SIZE,
+  );
 
   const priceLine =
     type.product_type === "rental"
