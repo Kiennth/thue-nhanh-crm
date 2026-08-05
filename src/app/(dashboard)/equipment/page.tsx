@@ -39,6 +39,7 @@ import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
 import { EquipmentValueTrendChart } from "./equipment-value-trend-chart";
+import { EquipmentCategoryFilter } from "./equipment-category-filter";
 import { OrderDateRangeFilter } from "../orders/order-date-range-filter";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -83,6 +84,7 @@ export default async function EquipmentPage({
 }: {
   searchParams: Promise<{
     search?: string;
+    category?: string;
     page?: string;
     sort?: string;
     dir?: string;
@@ -91,8 +93,18 @@ export default async function EquipmentPage({
     to?: string;
   }>;
 }) {
-  const { search, page: pageParam, sort, dir, range, from: rangeFrom, to: rangeTo } = await searchParams;
+  const {
+    search,
+    category,
+    page: pageParam,
+    sort,
+    dir,
+    range,
+    from: rangeFrom,
+    to: rangeTo,
+  } = await searchParams;
   const activeSearch = search?.trim() ?? "";
+  const activeCategory = category?.trim() || null;
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
@@ -135,6 +147,7 @@ export default async function EquipmentPage({
   const [
     allTypes,
     { data: templates },
+    { data: categories },
     equipmentValueOverview,
     { data: reportTypes },
     reportUnits,
@@ -151,9 +164,11 @@ export default async function EquipmentPage({
     fetchAllRows<EquipmentTypeRow>((from, to) => {
       let q = supabase.from("equipment_types").select("*");
       if (activeSearch) q = q.ilike("name", `%${activeSearch}%`);
+      if (activeCategory) q = q.eq("category_id", activeCategory);
       return q.range(from, to);
     }),
     supabase.from("pricing_templates").select("*").order("name"),
+    supabase.from("equipment_categories").select("id, name").eq("is_active", true).order("sort_order"),
     canViewInventoryTrend
       ? computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
       : Promise.resolve(null),
@@ -217,6 +232,8 @@ export default async function EquipmentPage({
 
   const templateList = templates ?? [];
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
+  const categoryList = categories ?? [];
+  const categoryNameById = new Map(categoryList.map((c) => [c.id, c.name]));
 
   function trackingTypeLabel(t: EquipmentTypeRow) {
     return t.tracking_type ? TRACKING_TYPE_LABELS[t.tracking_type] : "—";
@@ -379,7 +396,10 @@ export default async function EquipmentPage({
             value={activeSearch}
             resetParams={["page"]}
           />
-          {canManageCatalog && <EquipmentTypeDialog templates={templateList} />}
+          <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
+          {canManageCatalog && (
+            <EquipmentTypeDialog templates={templateList} categories={categoryList} />
+          )}
         </div>
       </div>
 
@@ -497,7 +517,12 @@ export default async function EquipmentPage({
                         <ImageOff className="size-4" />
                       </div>
                     )}
-                    {type.name}
+                    <span>
+                      {type.name}
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {categoryNameById.get(type.category_id ?? "") ?? "Chưa phân loại"}
+                      </span>
+                    </span>
                   </Link>
                 </TableCell>
                 <TableCell>
@@ -512,7 +537,11 @@ export default async function EquipmentPage({
                   {(canManageCatalog || canManageStock) && (
                     <div className="flex items-center gap-1">
                       {canManageCatalog && (
-                        <EquipmentTypeDialog templates={templateList} equipmentType={type} />
+                        <EquipmentTypeDialog
+                          templates={templateList}
+                          categories={categoryList}
+                          equipmentType={type}
+                        />
                       )}
                       {canManageCatalog && (
                         <ConfirmDeleteButton

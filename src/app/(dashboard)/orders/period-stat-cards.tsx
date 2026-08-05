@@ -25,15 +25,16 @@ function GrowthBadge({ growthPct }: { growthPct: number | null }) {
   );
 }
 
-function PeriodCard({ stat }: { stat: PeriodStat }) {
+function PeriodCard({ stat, unitLabel }: { stat: PeriodStat; unitLabel: string }) {
   return (
-    <StatCard label={stat.label} value={`${stat.count} đơn`}>
+    <StatCard label={stat.label} value={`${stat.count} ${unitLabel}`}>
       <p className="text-sm text-muted-foreground">
-        Trung bình {currencyFormatter.format(Math.round(stat.avgValue))}đ/đơn
+        Trung bình {currencyFormatter.format(Math.round(stat.avgValue))}đ/{unitLabel}
       </p>
       <GrowthBadge growthPct={stat.growthPct} />
       <p className="text-xs text-muted-foreground">
-        Dự kiến hết kỳ: ~{stat.projectedCount} đơn (~{currencyFormatter.format(stat.projectedRevenue)}đ)
+        Dự kiến hết kỳ: ~{stat.projectedCount} {unitLabel} (~
+        {currencyFormatter.format(stat.projectedRevenue)}đ)
       </p>
     </StatCard>
   );
@@ -43,16 +44,18 @@ export function PeriodStatCards({
   week,
   month,
   year,
+  unitLabel = "đơn",
 }: {
   week: PeriodStat;
   month: PeriodStat;
   year: PeriodStat;
+  unitLabel?: string;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <PeriodCard stat={week} />
-      <PeriodCard stat={month} />
-      <PeriodCard stat={year} />
+      <PeriodCard stat={week} unitLabel={unitLabel} />
+      <PeriodCard stat={month} unitLabel={unitLabel} />
+      <PeriodCard stat={year} unitLabel={unitLabel} />
     </div>
   );
 }

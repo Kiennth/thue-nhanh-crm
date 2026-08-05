@@ -18,6 +18,10 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
+import { computeEquipmentRevenueOverview } from "@/lib/equipment-revenue-overview";
+import { StatCard } from "@/components/stat-card";
+import { PeriodStatCards } from "../../orders/period-stat-cards";
+import { OrdersTrendChart } from "../../orders/orders-trend-chart";
 import {
   deleteEquipmentType,
   deleteEquipmentUnit,
@@ -73,6 +77,7 @@ const INSTANCE_STATUS_VARIANT = {
 
 const TABS = [
   { value: "stock", label: "Tồn kho" },
+  { value: "revenue", label: "Doanh thu" },
   { value: "rentals", label: "Lịch sử thuê" },
   { value: "history", label: "Lịch sử chuyển kho" },
 ] as const;
@@ -104,20 +109,31 @@ export default async function EquipmentDetailPage({
 }) {
   const { id } = await params;
   const { tab, sort, dir, page: pageParam } = await searchParams;
-  const activeTab: Tab = tab === "history" ? "history" : tab === "rentals" ? "rentals" : "stock";
+  const requestedTab: Tab =
+    tab === "history" ? "history" : tab === "rentals" ? "rentals" : tab === "revenue" ? "revenue" : "stock";
   const requestedRentalPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
-  const [{ data: type }, { data: templates }, { data: branches }, employee] = await Promise.all([
-    supabase.from("equipment_types").select("*").eq("id", id).maybeSingle(),
-    supabase.from("pricing_templates").select("*").order("name"),
-    supabase.from("branches").select("id, name, position").order("position"),
-    getCurrentEmployee(),
-  ]);
+  const [{ data: type }, { data: templates }, { data: categories }, { data: branches }, employee] =
+    await Promise.all([
+      supabase.from("equipment_types").select("*").eq("id", id).maybeSingle(),
+      supabase.from("pricing_templates").select("*").order("name"),
+      supabase.from("equipment_categories").select("id, name").eq("is_active", true).order("sort_order"),
+      supabase.from("branches").select("id, name, position").order("position"),
+      getCurrentEmployee(),
+    ]);
   if (!type) notFound();
+
+  const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
+  const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
+  // Doanh thu là số liệu điều hành nhạy cảm — cùng luật ẩn với Admin đã có ở
+  // trang danh sách /equipment (canViewEquipmentReports): Admin quản trị
+  // được danh mục nhưng không xem doanh thu.
+  const canViewRevenue = canManageCatalog && employee?.role !== "admin";
+  const activeTab: Tab = requestedTab === "revenue" && !canViewRevenue ? "stock" : requestedTab;
 
   const isRentalQuantity = type.product_type === "rental" && type.tracking_type === "quantity";
   const isRentalIndividual = type.product_type === "rental" && type.tracking_type === "individual";
@@ -144,6 +160,9 @@ export default async function EquipmentDetailPage({
       ? supabase.from("equipment_instances").select("*").eq("equipment_type_id", id).order("identifier_code")
       : Promise.resolve({ data: [] as EquipmentInstanceRow[] }),
   ]);
+
+  const revenueOverview =
+    activeTab === "revenue" && canViewRevenue ? await computeEquipmentRevenueOverview(id) : null;
 
   const unitList = units ?? [];
   const unitIds = unitList.map((u) => u.id);
@@ -224,11 +243,9 @@ export default async function EquipmentDetailPage({
     return TASK_TYPE_LABELS[o.status];
   }
 
-  const employeeChecked = employee;
-  const canManageCatalog = !!employeeChecked && MANAGE_ROLES.includes(employeeChecked.role);
-  const canManageStock = !!employeeChecked && EQUIPMENT_WRITE_ROLES.includes(employeeChecked.role);
   const branchList = branches ?? [];
   const templateList = templates ?? [];
+  const categoryList = categories ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
   const branchPositionById = new Map(branchList.map((b, idx) => [b.id, b.position ?? idx]));
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
@@ -377,6 +394,7 @@ export default async function EquipmentDetailPage({
             <div className="flex items-center gap-1">
               <EquipmentTypeDialog
                 templates={templateList}
+                categories={categoryList}
                 equipmentType={type}
                 editTriggerVariant="outline"
               />
@@ -392,7 +410,7 @@ export default async function EquipmentDetailPage({
       </Card>
 
       <div className="flex items-center gap-1 border-b">
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.value !== "revenue" || canViewRevenue).map((t) => (
           <Link
             key={t.value}
             href={`/equipment/${id}?tab=${t.value}`}
@@ -683,6 +701,23 @@ export default async function EquipmentDetailPage({
               )}
             </>
           )}
+        </div>
+      )}
+
+      {activeTab === "revenue" && canViewRevenue && revenueOverview && (
+        <div className="space-y-4">
+          <StatCard label="Toàn bộ thời gian" value={`${revenueOverview.allTime.count} lượt`}>
+            <p className="text-sm text-muted-foreground">
+              Doanh thu: {currencyFormatter.format(revenueOverview.allTime.revenue)}đ
+            </p>
+          </StatCard>
+          <PeriodStatCards
+            week={revenueOverview.week}
+            month={revenueOverview.month}
+            year={revenueOverview.year}
+            unitLabel="lượt thuê"
+          />
+          <OrdersTrendChart trend={revenueOverview.trend} />
         </div>
       )}
 

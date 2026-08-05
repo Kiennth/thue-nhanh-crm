@@ -68,6 +68,11 @@ export const SETTINGS_ITEMS: NavItem[] = [
     roles: [...DIRECTOR_ONLY],
   },
   {
+    href: "/equipment-categories",
+    label: "Danh mục thiết bị",
+    roles: [...MANAGE_ROLES],
+  },
+  {
     href: "/activity",
     label: "Nhật ký hoạt động",
     roles: [...MANAGE_ROLES],

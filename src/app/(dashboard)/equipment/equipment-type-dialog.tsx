@@ -43,8 +43,18 @@ interface PricingTemplateOption {
   name: string;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+// Danh mục tuỳ chọn — "Chưa phân loại" là sentinel để rewrite thành rỗng
+// trước khi gửi, cùng pattern với equipment-instance-dialog.tsx (biến thể).
+const NO_CATEGORY = "__no_category__";
+
 interface EquipmentTypeDialogProps {
   templates: PricingTemplateOption[];
+  categories: CategoryOption[];
   equipmentType?: {
     id: string;
     name: string;
@@ -57,6 +67,7 @@ interface EquipmentTypeDialogProps {
     deposit_amount: number;
     image_url: string | null;
     payout_percentage: number | null;
+    category_id: string | null;
   };
   // Biến thể nút "Sửa" — icon-only ở bảng danh sách (mặc định), outline có
   // chữ ở trang chi tiết.
@@ -71,6 +82,7 @@ const PRICE_LABEL: Record<ProductType, string> = {
 
 export function EquipmentTypeDialog({
   templates,
+  categories,
   equipmentType,
   editTriggerVariant = "icon",
 }: EquipmentTypeDialogProps) {
@@ -112,6 +124,9 @@ export function EquipmentTypeDialog({
 
   function handleSubmit(formData: FormData) {
     setError(null);
+    if (formData.get("category_id") === NO_CATEGORY) {
+      formData.delete("category_id");
+    }
     startTransition(async () => {
       const result = equipmentType
         ? await updateEquipmentType(equipmentType.id, undefined, formData)
@@ -157,6 +172,29 @@ export function EquipmentTypeDialog({
               placeholder="VD: TV 43inch 4K"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="category_id">Danh mục</Label>
+            <Select name="category_id" defaultValue={equipmentType?.category_id ?? NO_CATEGORY}>
+              <SelectTrigger id="category_id" className="w-full">
+                <SelectValue placeholder="Chưa phân loại">
+                  {(value: string) =>
+                    value === NO_CATEGORY
+                      ? "Chưa phân loại"
+                      : (categories.find((c) => c.id === value)?.name ?? "—")
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>Chưa phân loại</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

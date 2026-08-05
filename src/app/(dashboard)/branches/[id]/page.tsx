@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { requireRole } from "@/lib/dal";
+import { DIRECTOR_ONLY } from "@/lib/roles";
 import {
   revenueForDay,
   revenueForMonth,
@@ -10,6 +12,9 @@ import {
   todayParts,
 } from "@/lib/dashboard-reports";
 import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
+import { computeOrdersOverview } from "@/lib/orders-overview";
+import { PeriodStatCards } from "../../orders/period-stat-cards";
+import { OrdersTrendChart } from "../../orders/orders-trend-chart";
 
 // Dashboard riêng của 1 chi nhánh — giống trang chủ nhưng mọi số liệu (doanh
 // thu, lượt thuê, giá vốn, thanh lý, tồn kho) đều lọc theo chi nhánh này.
@@ -20,6 +25,10 @@ export default async function BranchDashboardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ day?: string; month?: string; year?: string }>;
 }) {
+  // Menu đã để mục này riêng cho Giám đốc, nhưng trang lại không chặn ai —
+  // gõ thẳng URL là vào (cùng lỗ hổng đã vá ở /branches, xem branches/page.tsx).
+  await requireRole([...DIRECTOR_ONLY]);
+
   const { id } = await params;
   const sp = await searchParams;
   const defaults = todayParts();
@@ -38,6 +47,7 @@ export default async function BranchDashboardPage({
     { data: purchases },
     { data: disposals },
     { data: stock },
+    ordersOverview,
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
     fetchAllRows<{ id: string; order_date: string; total_value: number }>((from, to) =>
@@ -65,6 +75,7 @@ export default async function BranchDashboardPage({
       .from("equipment_stock")
       .select("equipment_unit_id, quantity_total")
       .eq("branch_id", id),
+    computeOrdersOverview(id),
   ]);
 
   if (!branch) {
@@ -135,6 +146,12 @@ export default async function BranchDashboardPage({
         monthRevenue={revenueForMonth(orderList, month)}
         yearRevenue={revenueForYear(orderList, year)}
       />
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Xu hướng đơn hàng</h2>
+        <PeriodStatCards week={ordersOverview.week} month={ordersOverview.month} year={ordersOverview.year} />
+        <OrdersTrendChart trend={ordersOverview.trend} />
+      </div>
 
       <ProductHighlightCards
         mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}

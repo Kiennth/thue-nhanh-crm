@@ -79,6 +79,7 @@ const EquipmentTypeSchema = z
       .min(0, { message: "% trả trực tiếp phải từ 0-100." })
       .max(100, { message: "% trả trực tiếp phải từ 0-100." })
       .optional(),
+    category_id: z.string().uuid().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.product_type !== "rental") return;
@@ -128,6 +129,7 @@ function normalizeEquipmentType(
         data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
       deposit_amount: data.deposit_amount ?? 0,
       payout_percentage: null,
+      category_id: data.category_id ?? null,
     };
   }
 
@@ -142,6 +144,7 @@ function normalizeEquipmentType(
       pricing_template_id: null,
       deposit_amount: 0,
       payout_percentage: data.payout_percentage ?? null,
+      category_id: data.category_id ?? null,
     };
   }
 
@@ -156,6 +159,7 @@ function normalizeEquipmentType(
     pricing_template_id: null,
     deposit_amount: 0,
     payout_percentage: null,
+    category_id: data.category_id ?? null,
   };
 }
 
@@ -170,6 +174,7 @@ function parseEquipmentTypeForm(formData: FormData) {
     pricing_template_id: formData.get("pricing_template_id") || undefined,
     deposit_amount: formData.get("deposit_amount") || undefined,
     payout_percentage: formData.get("payout_percentage") || undefined,
+    category_id: formData.get("category_id") || undefined,
   });
 }
 
@@ -908,4 +913,90 @@ export async function deletePricingTier(id: string) {
 
   revalidatePath("/equipment");
   revalidatePath("/pricing-templates");
+}
+
+// ---------------------------------------------------------------------------
+// equipment_categories — danh mục PHẲNG cho equipment_types (1 sản phẩm = 1
+// danh mục). Ghi dùng đúng bộ vai trò đang quản lý equipment_types
+// (MANAGE_ROLES) — ai sửa được sản phẩm thì sửa được danh mục của nó.
+// ---------------------------------------------------------------------------
+
+const EquipmentCategorySchema = z.object({
+  name: z.string().trim().min(1, { message: "Tên danh mục không được để trống." }),
+  sort_order: z.coerce.number().int().optional(),
+  is_active: z.coerce.boolean(),
+});
+
+export async function createEquipmentCategory(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = EquipmentCategorySchema.safeParse({
+    name: formData.get("name"),
+    sort_order: formData.get("sort_order") || undefined,
+    is_active: formData.get("is_active") === "on",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment_categories").insert(parsed.data);
+
+  if (error) {
+    return { error: "Không thể tạo danh mục: " + error.message };
+  }
+
+  revalidatePath("/equipment-categories");
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
+export async function updateEquipmentCategory(
+  id: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = EquipmentCategorySchema.safeParse({
+    name: formData.get("name"),
+    sort_order: formData.get("sort_order") || undefined,
+    is_active: formData.get("is_active") === "on",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment_categories").update(parsed.data).eq("id", id);
+
+  if (error) {
+    return { error: "Không thể cập nhật danh mục: " + error.message };
+  }
+
+  revalidatePath("/equipment-categories");
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
+// Không cần guard "đang được dùng" như deletePricingTemplate — category_id
+// là on delete set null, xoá danh mục không bao giờ raise lỗi ràng buộc,
+// sản phẩm chỉ rơi về "Chưa phân loại".
+export async function deleteEquipmentCategory(id: string) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment_categories").delete().eq("id", id);
+
+  if (error) {
+    throw new Error("Không thể xoá danh mục: " + error.message);
+  }
+
+  revalidatePath("/equipment-categories");
+  revalidatePath("/equipment");
 }

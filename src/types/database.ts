@@ -125,6 +125,24 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      equipment_categories: {
+        Row: {
+          id: string;
+          name: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_categories"]["Insert"]>;
+        Relationships: [];
+      };
       equipment_types: {
         Row: {
           id: string;
@@ -142,6 +160,8 @@ export interface Database {
           // thuật=50), tách khỏi quỹ khoán theo khâu. null = vẫn tính theo
           // quỹ khoán chung như cũ.
           payout_percentage: number | null;
+          // Danh mục PHẲNG (1 sản phẩm = 1 category) — null = chưa phân loại.
+          category_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -157,6 +177,7 @@ export interface Database {
           deposit_amount?: number;
           image_url?: string | null;
           payout_percentage?: number | null;
+          category_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];
