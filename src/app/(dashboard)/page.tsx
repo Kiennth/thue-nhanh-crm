@@ -77,13 +77,12 @@ export default async function DashboardHomePage({
   // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
-  // CEO chốt 2026-08-05: riêng khối "Đơn hàng sắp tới"/"sắp về" mở cho Cửa
-  // hàng trưởng xem TOÀN HỆ THỐNG (không chỉ chi nhánh mình) — có thể cần
-  // support chéo chi nhánh khác. Các khối khác (tổng quan đơn hàng chi
-  // nhánh, so sánh chi nhánh...) vẫn dùng branchId như cũ, không đổi.
-  // Kỹ thuật/Sales KHÔNG nằm trong diện này, vẫn chỉ thấy đúng chi nhánh
-  // mình.
-  const handleBranchId = canManage || isBranchManager ? null : employee.branch_id;
+  // CEO chốt 2026-08-05: khối "Đơn hàng sắp tới"/"sắp về" mở TOÀN HỆ THỐNG
+  // cho mọi role đăng nhập được (Cửa hàng trưởng lẫn Kỹ thuật/Sales đều có
+  // thể cần support chéo chi nhánh khác) — không còn role nào bị scope theo
+  // chi nhánh ở 2 khối này. Các khối khác (tổng quan đơn hàng chi nhánh, so
+  // sánh chi nhánh...) vẫn dùng branchId như cũ, không đổi.
+  const handleBranchId = null;
   // Trang chủ chỉ giữ chỉ số HIỆN THỜI (CEO chốt 2026-08-01): hiệu suất cá
   // nhân, đơn cần xử lý, so sánh chi nhánh tháng này. Các khối đếm tổng, cơ
   // cấu khách hàng, xếp hạng sản phẩm đã trả về đúng trang Khách hàng /
@@ -300,10 +299,11 @@ export default async function DashboardHomePage({
         </p>
       </div>
 
-      {/* CEO chốt 2026-08-05: Cửa hàng trưởng ưu tiên xem đơn hàng chi nhánh
-          mình trước, "Thu nhập của bạn" đẩy xuống dưới — vai trò khác giữ
-          nguyên thứ tự cũ (thu nhập trước, đơn hàng sau). */}
-      {isBranchManager ? (
+      {/* CEO chốt 2026-08-05: Cửa hàng trưởng lẫn Kỹ thuật/Sales (mọi role
+          không thuộc MANAGE_ROLES) ưu tiên xem đơn hàng trước, "Thu nhập của
+          bạn" đẩy xuống dưới — Giám đốc/Admin/Kế toán giữ nguyên thứ tự cũ
+          (thu nhập trước, đơn hàng sau). */}
+      {!canManage ? (
         <>
           {ordersSection}
           {incomeSection}

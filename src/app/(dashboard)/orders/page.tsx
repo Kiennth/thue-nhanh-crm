@@ -28,7 +28,11 @@ export default async function OrdersPage({
   // khác (RLS đã cho đọc — xem 20260731000000_branch_manager_reads_all_orders).
   const isBranchManager = employee.role === "cua_hang_truong";
   const viewingAllBranches = isBranchManager && scope === "all";
-  const listBranchId = viewingAllBranches ? null : branchId;
+  // CEO chốt 2026-08-05: Kỹ thuật/Sales xem đơn TOÀN HỆ THỐNG luôn (không
+  // cần bật/tắt như Cửa hàng trưởng) — RLS đã cho đọc, xem
+  // 20260805120000_ky_thuat_sales_reads_all_orders.sql.
+  const isTechSales = employee.role === "ky_thuat_sales";
+  const listBranchId = viewingAllBranches || isTechSales ? null : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
   // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
   const canViewAggregates = employee.role !== "ky_thuat_sales";
