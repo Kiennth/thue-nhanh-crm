@@ -214,19 +214,17 @@ export default async function DashboardHomePage({
     branchProfit = { operatingByBranch, payrollByBranch };
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Trang chủ</h1>
-        <p className="text-sm text-muted-foreground">
-          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
-        </p>
-      </div>
-
+  // "Thu nhập của bạn" + xu hướng theo tháng.
+  const incomeSection = (
+    <>
       <MyPerformanceCard perf={myPerformance} />
-
       {myTrend && <MyPerformanceTrendCard points={myTrend} />}
+    </>
+  );
 
+  // "Đơn hàng sắp tới"/"sắp về" + tổng quan đơn hàng chi nhánh (Cửa hàng trưởng).
+  const ordersSection = (
+    <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard
           orders={ordersToHandle.upcomingDeliveries}
@@ -282,6 +280,32 @@ export default async function DashboardHomePage({
           />
           <OrdersTrendChart trend={branchOrdersOverview.trend} />
         </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Trang chủ</h1>
+        <p className="text-sm text-muted-foreground">
+          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
+        </p>
+      </div>
+
+      {/* CEO chốt 2026-08-05: Cửa hàng trưởng ưu tiên xem đơn hàng chi nhánh
+          mình trước, "Thu nhập của bạn" đẩy xuống dưới — vai trò khác giữ
+          nguyên thứ tự cũ (thu nhập trước, đơn hàng sau). */}
+      {isBranchManager ? (
+        <>
+          {ordersSection}
+          {incomeSection}
+        </>
+      ) : (
+        <>
+          {incomeSection}
+          {ordersSection}
+        </>
       )}
 
       {canViewBranchComparison && (
