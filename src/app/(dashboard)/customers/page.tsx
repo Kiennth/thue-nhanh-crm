@@ -75,10 +75,14 @@ export default async function CustomersPage({
 
   const supabase = await createClient();
 
-  // Cửa hàng trưởng/Kỹ thuật-Sales chỉ thấy khách từng phát sinh đơn ở chi
-  // nhánh mình (RPC lọc theo pickup/return branch, khớp cách lọc ở /orders).
+  // CEO chốt 2026-08-05: Cửa hàng trưởng/Kỹ thuật-Sales xem được TOÀN BỘ
+  // khách hàng công ty (khách hàng dùng chung toàn hệ thống, không thuộc
+  // riêng chi nhánh nào) — chỉ khối "report tổng quan" phía trên mới thu hẹp
+  // về đúng chi nhánh mình quản lý. Trước đây 1 biến branchId lỡ dùng chung
+  // cho cả 2 RPC nên danh sách khách cũng bị lọc theo chi nhánh, sai với
+  // bản chất khách hàng không branch-scoped.
   const viewer = await getCurrentEmployee();
-  const branchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+  const reportBranchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
   const isAdmin = viewer?.role === "admin";
 
   // Toàn bộ tổng hợp (thống kê, biểu đồ, xếp hạng, công nợ) + danh sách phân
@@ -89,9 +93,9 @@ export default async function CustomersPage({
   // 20260802010000) vì mốc "khách mới với cả công ty" cần đọc đơn mọi chi
   // nhánh trong khi RLS cắt orders theo chi nhánh với role thường.
   const [reportRes, listRes] = await Promise.all([
-    supabase.rpc("customer_page_report", { p_branch_id: branchId }),
+    supabase.rpc("customer_page_report", { p_branch_id: reportBranchId }),
     supabase.rpc("customer_page_list", {
-      p_branch_id: branchId,
+      p_branch_id: null,
       p_search: activeSearch || null,
       p_sort: activeSort ?? "created_at",
       p_dir: activeDir,
@@ -146,9 +150,9 @@ export default async function CustomersPage({
         data={reportData}
         // Admin đi cùng đơn hàng nên vẫn cần công nợ để đôn đốc thu tiền,
         // nhưng không cần xếp hạng doanh số hay danh sách khách nguội.
-        showRankings={!branchId && !isAdmin}
-        showDormant={!branchId && !isAdmin}
-        showDebt={!branchId}
+        showRankings={!reportBranchId && !isAdmin}
+        showDormant={!reportBranchId && !isAdmin}
+        showDebt={!reportBranchId}
       />
 
       <div className="space-y-3">
