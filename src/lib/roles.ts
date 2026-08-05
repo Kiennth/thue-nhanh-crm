@@ -88,7 +88,10 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/customers",
     label: "Khách hàng",
-    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
+    // Trang customers/page.tsx và customers/[id]/page.tsx không chặn role
+    // (không có requireRole) — Kỹ thuật/Sales vốn đã vào được nếu gõ thẳng
+    // URL, chỉ thiếu mục nav. Thêm vào cho khớp thực tế trang đã cho phép.
+    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
   },
   {
     href: "/equipment",
@@ -98,7 +101,11 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/payroll",
     label: "Bảng lương",
-    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
+    // payroll/page.tsx không chặn role — non-manage & không phải cua_hang_truong
+    // (tức ky_thuat_sales) tự động chỉ thấy đúng dòng lương của chính mình
+    // (performanceOptions = {employeeIds: [viewer.id]}), không rò dữ liệu
+    // người khác. Thêm nav để họ không phải gõ thẳng URL mới xem được.
+    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
   },
   {
     href: "/expenses",
