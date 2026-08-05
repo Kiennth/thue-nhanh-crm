@@ -1,7 +1,6 @@
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
-import { OrdersOverviewSection } from "./orders-overview-section";
 import { OrdersListSection } from "./orders-list-section";
 
 export default async function OrdersPage({
@@ -27,8 +26,6 @@ export default async function OrdersPage({
   // Cửa hàng trưởng: mặc định chỉ thấy đơn kho mình để tập trung đúng việc,
   // nhưng chủ động chuyển sang "tất cả chi nhánh" khi cần xem/hỗ trợ kho
   // khác (RLS đã cho đọc — xem 20260731000000_branch_manager_reads_all_orders).
-  // Tổng quan phía trên KHÔNG đổi theo lựa chọn này: số của kho mình vẫn là
-  // số của kho mình.
   const isBranchManager = employee.role === "cua_hang_truong";
   const viewingAllBranches = isBranchManager && scope === "all";
   const listBranchId = viewingAllBranches ? null : branchId;
@@ -47,10 +44,6 @@ export default async function OrdersPage({
 
   return (
     <div className="space-y-6">
-      {/* Kỹ thuật/Sales không được xem số liệu tổng hợp — section tổng quan
-          giờ chỉ còn thống kê + xu hướng nên ẩn hẳn với role này (2 thẻ đơn
-          sắp tới/sắp về đã dời hết về trang chủ). */}
-      {canViewAggregates && <OrdersOverviewSection branchId={branchId} />}
       <OrdersListSection
         status={status}
         range={range}

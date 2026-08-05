@@ -77,6 +77,13 @@ export default async function DashboardHomePage({
   // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
   // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
+  // CEO chốt 2026-08-05: riêng khối "Đơn hàng sắp tới"/"sắp về" mở cho Cửa
+  // hàng trưởng xem TOÀN HỆ THỐNG (không chỉ chi nhánh mình) — có thể cần
+  // support chéo chi nhánh khác. Các khối khác (tổng quan đơn hàng chi
+  // nhánh, so sánh chi nhánh...) vẫn dùng branchId như cũ, không đổi.
+  // Kỹ thuật/Sales KHÔNG nằm trong diện này, vẫn chỉ thấy đúng chi nhánh
+  // mình.
+  const handleBranchId = canManage || isBranchManager ? null : employee.branch_id;
   // Trang chủ chỉ giữ chỉ số HIỆN THỜI (CEO chốt 2026-08-01): hiệu suất cá
   // nhân, đơn cần xử lý, so sánh chi nhánh tháng này. Các khối đếm tổng, cơ
   // cấu khách hàng, xếp hạng sản phẩm đã trả về đúng trang Khách hàng /
@@ -150,7 +157,7 @@ export default async function DashboardHomePage({
               .range(from, to),
         )
       : Promise.resolve([]),
-    getOrdersToHandle(branchId, HANDLE_LIMIT, {
+    getOrdersToHandle(handleBranchId, HANDLE_LIMIT, {
       delivery: upcomingDateRange,
       collection: returningDateRange,
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
