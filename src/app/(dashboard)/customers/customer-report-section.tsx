@@ -13,6 +13,10 @@ import {
   CustomerOverviewPeriodToggle,
   type CustomerOverviewPeriod,
 } from "./customer-overview-period-toggle";
+import {
+  CustomerTypeComparisonTable,
+  type CustomerTypeStat,
+} from "./customer-type-comparison-table";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
@@ -35,6 +39,12 @@ export interface CustomerReportData {
     CustomerOverviewPeriod,
     { newCustomers: number; revenue: number; debt: number }
   >;
+  // Tương quan Khách cá nhân/Khách công ty theo từng kỳ — CEO yêu cầu
+  // 2026-08-06 để ra quyết định/báo cáo cổ đông, nhà đầu tư.
+  periodByCustomerType: Record<
+    CustomerOverviewPeriod,
+    { individual: CustomerTypeStat; company: CustomerTypeStat }
+  >;
 }
 
 const EMPTY_PERIOD_STAT = { newCustomers: 0, revenue: 0, debt: 0 };
@@ -43,6 +53,15 @@ export const EMPTY_PERIOD_STATS: CustomerReportData["periodStats"] = {
   lastMonth: EMPTY_PERIOD_STAT,
   thisYear: EMPTY_PERIOD_STAT,
   lastYear: EMPTY_PERIOD_STAT,
+};
+
+const EMPTY_TYPE_STAT: CustomerTypeStat = { customerCount: 0, orderCount: 0, revenue: 0 };
+const EMPTY_TYPE_PERIOD = { individual: EMPTY_TYPE_STAT, company: EMPTY_TYPE_STAT };
+export const EMPTY_PERIOD_BY_CUSTOMER_TYPE: CustomerReportData["periodByCustomerType"] = {
+  thisMonth: EMPTY_TYPE_PERIOD,
+  lastMonth: EMPTY_TYPE_PERIOD,
+  thisYear: EMPTY_TYPE_PERIOD,
+  lastYear: EMPTY_TYPE_PERIOD,
 };
 
 function isCustomerOverviewPeriod(value: string): value is CustomerOverviewPeriod {
@@ -236,6 +255,8 @@ export function CustomerReportSection({
   const overviewPeriod: CustomerOverviewPeriod =
     overview && isCustomerOverviewPeriod(overview) ? overview : "thisMonth";
   const periodStat = data.periodStats[overviewPeriod] ?? EMPTY_PERIOD_STATS.thisMonth;
+  const periodTypeStat =
+    data.periodByCustomerType[overviewPeriod] ?? EMPTY_PERIOD_BY_CUSTOMER_TYPE.thisMonth;
 
   return (
     <div className="space-y-4">
@@ -272,6 +293,14 @@ export function CustomerReportSection({
               value={`${currencyFormatter.format(periodStat.debt)}đ`}
             />
           </div>
+
+          {/* Chỉ Kế toán/Giám đốc/Admin thấy (đi cùng showDebt — 3 vai trò
+              này đang là đúng tập hợp effectively MANAGE_ROLES). Dùng chung
+              kỳ với toggle ngay trên, không có toggle riêng. */}
+          <CustomerTypeComparisonTable
+            individual={periodTypeStat.individual}
+            company={periodTypeStat.company}
+          />
         </div>
       )}
 

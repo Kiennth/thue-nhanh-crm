@@ -20,6 +20,7 @@ import { DeleteCustomerButton } from "./delete-customer-button";
 import {
   CustomerReportSection,
   EMPTY_PERIOD_STATS,
+  EMPTY_PERIOD_BY_CUSTOMER_TYPE,
   type CustomerReportData,
 } from "./customer-report-section";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -128,6 +129,7 @@ export default async function CustomersPage({
     topCompanies: rawReport.topCompanies ?? [],
     debt: rawReport.debt ?? [],
     periodStats: rawReport.periodStats ?? EMPTY_PERIOD_STATS,
+    periodByCustomerType: rawReport.periodByCustomerType ?? EMPTY_PERIOD_BY_CUSTOMER_TYPE,
   };
 
   const rawList = (listRes.data ?? {}) as { totalCount?: number; rows?: CustomerListRpcRow[] };
