@@ -34,8 +34,12 @@ export default async function OrdersPage({
   const isTechSales = employee.role === "ky_thuat_sales";
   const listBranchId = viewingAllBranches || isTechSales ? null : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
-  // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
-  const canViewAggregates = employee.role !== "ky_thuat_sales";
+  // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ. Admin
+  // cũng bỏ (CEO chốt 2026-08-06): không cần dùng tới, mà khối này đang kéo
+  // TOÀN BỘ đơn khớp bộ lọc (mặc định "Tất cả thời gian", có thể chạm
+  // ~10.000+ dòng) về tính tổng — nặng nhất khi không lọc gì, y hệt lỗi vừa
+  // vá ở /equipment.
+  const canViewAggregates = employee.role !== "ky_thuat_sales" && employee.role !== "admin";
 
   // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
   // chung — chỉ cần khi có ô chọn đó.

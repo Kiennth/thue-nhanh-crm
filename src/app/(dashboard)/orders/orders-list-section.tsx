@@ -17,14 +17,12 @@ import { CustomerAvatar } from "@/components/customer-avatar";
 import { BranchBadge } from "@/components/branch-badge";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { deleteOrder } from "@/lib/actions/orders";
 import { vnNow } from "@/lib/vn-time";
-import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import {
   computeDateRange,
   DATE_RANGE_PRESET_OPTIONS,
-  type DateRange,
   type DateRangePreset,
 } from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
@@ -42,10 +40,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
 });
 const PAGE_SIZE = 20;
 
-function isTaskType(value: string): value is TaskType {
-  return (TASK_TYPE_SEQUENCE as readonly string[]).includes(value);
-}
-
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
 }
@@ -56,20 +50,16 @@ function isOrderSortKey(value: string): value is OrderSortKey {
   return (ORDER_SORT_KEYS as readonly string[]).includes(value);
 }
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
-interface OrderFilters {
-  branchId: string | null;
-  activeStatus: string;
-  dateRange: DateRange | null;
-}
-
+// 1 dòng đã lọc/sắp/phân trang sẵn từ RPC orders_page_list (migration
+// 20260806120000) — kèm sẵn customer_name qua join, không cần fetch riêng
+// bảng customers nữa (needAllCustomers cũ).
 interface OrderRow {
   id: string;
   order_code: string;
   pickup_branch_id: string;
   return_branch_id: string;
   customer_id: string;
+  customer_name: string | null;
   rental_start_at: string | null;
   rental_end_at: string | null;
   total_value: number;
@@ -79,35 +69,10 @@ interface OrderRow {
   cancelled_at: string | null;
 }
 
-// Áp cùng 1 bộ lọc (chi nhánh/trạng thái/khoảng ngày) cho câu truy vấn TOÀN
-// BỘ đơn khớp bộ lọc — dùng chung cho cả thẻ tổng kết lẫn bảng danh sách.
-function ordersQueryWithFilters<Q extends string>(
-  supabase: SupabaseServerClient,
-  selectColumns: Q,
-  { branchId, activeStatus, dateRange }: OrderFilters,
-  options?: { count: "exact"; head: boolean },
-) {
-  let q = supabase.from("orders").select(selectColumns, options);
-  if (branchId) {
-    q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
-  }
-  if (activeStatus === "completed") {
-    q = q.not("completed_at", "is", null);
-  } else if (activeStatus === "cancelled") {
-    q = q.not("cancelled_at", "is", null);
-  } else if (isTaskType(activeStatus)) {
-    q = q.eq("status", activeStatus).is("completed_at", null).is("cancelled_at", null);
-  }
-  if (dateRange) {
-    q = q.gte("order_date", dateRange.start).lte("order_date", dateRange.end);
-  }
-  return q;
-}
-
-function statusLabel(order: Pick<OrderRow, "status" | "completed_at" | "cancelled_at">): string {
-  if (order.cancelled_at) return "Đã huỷ";
-  if (order.completed_at) return "Hoàn tất";
-  return TASK_TYPE_LABELS[order.status];
+interface OrdersPageListResult {
+  totalCount: number;
+  stats: { totalRevenue: number; completedCount: number; cancelledCount: number };
+  rows: OrderRow[];
 }
 
 // Nội dung trang /orders — Admin/Kế toán thấy tất cả chi nhánh (branchId
@@ -146,112 +111,65 @@ export async function OrdersListSection({
   const activeStatus = status ?? "all";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
   const dateRange = computeDateRange(activeRange, vnNow(), { from, to });
-  const filters: OrderFilters = { branchId, activeStatus, dateRange };
   const activeSort: OrderSortKey | null = sort && isOrderSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
   const activeSearch = search?.trim() ?? "";
+  const requestedPage = Math.max(1, Number(page) || 1);
 
   const supabase = await createClient();
 
-  // Sắp xếp theo Khách hàng/Doanh số/Trạng thái không thể đẩy hết xuống
-  // Postgres (tên khách phải join qua bảng customers, trạng thái là suy ra
-  // từ 3 cột) — lấy TOÀN BỘ đơn khớp bộ lọc (đằng nào cũng cần đủ để tính
-  // thẻ tổng kết phía trên), lọc/sắp/phân trang gộp 1 lần trong JS. ~10.000
-  // dòng nên phân trang SONG SONG — bản tuần tự là một nửa nguyên nhân
-  // /orders sập 503 trên Cloudflare cho vai Giám đốc.
-  //
-  // Bảng customers chỉ cần NGUYÊN bảng khi phải khớp/sắp theo tên khách trên
-  // toàn bộ đơn (đang tìm kiếm, hoặc sắp theo cột Khách hàng) — còn mặc định
-  // chỉ cần tên của ≤20 khách đang hiện, nạp sau khi đã cắt trang.
-  const needAllCustomers = activeSearch !== "" || activeSort === "customer";
-  const [allOrders, { data: branches }, allCustomers] = await Promise.all([
-    fetchAllRowsFast<OrderRow>(
-      (rangeFrom, rangeTo) =>
-        ordersQueryWithFilters(
-          supabase,
-          "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, total_value, status, order_date, completed_at, cancelled_at",
-          filters,
-        )
-          .order("id")
-          .range(rangeFrom, rangeTo),
-      () => ordersQueryWithFilters(supabase, "*", filters, { count: "exact", head: true }),
-    ),
+  // Lọc (chi nhánh/trạng thái/khoảng ngày) + tìm kiếm (join customers ngay
+  // trong SQL) + sắp xếp + phân trang + thẻ tổng kết đều tính trong Postgres
+  // qua RPC orders_page_list (migration 20260806120000) — thay cho việc kéo
+  // TOÀN BỘ đơn khớp bộ lọc (~10.000 dòng) + TOÀN BỘ bảng customers (~5.500
+  // dòng, khi tìm kiếm/sắp theo tên) về JS mỗi lần tải trang. Kèm sẵn
+  // customer_name qua join nên không cần fetch riêng bảng customers nữa.
+  const [rpcRes, { data: branches }] = await Promise.all([
+    supabase.rpc("orders_page_list", {
+      p_branch_id: branchId,
+      p_status: activeStatus,
+      p_range_start: dateRange?.start ?? null,
+      p_range_end: dateRange?.end ?? null,
+      p_search: activeSearch || null,
+      p_sort: activeSort,
+      p_dir: activeDir,
+      p_page: requestedPage,
+      p_page_size: PAGE_SIZE,
+    }),
     supabase.from("branches").select("id, name").order("position"),
-    needAllCustomers
-      ? fetchAllRowsFast<{ id: string; name: string }>(
-          (rangeFrom, rangeTo) =>
-            supabase.from("customers").select("id, name").order("id").range(rangeFrom, rangeTo),
-          () => supabase.from("customers").select("*", { count: "exact", head: true }),
-        )
-      : Promise.resolve(null),
   ]);
 
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
-  const customerNameById = new Map((allCustomers ?? []).map((c) => [c.id, c.name]));
 
-  // Tìm theo mã đơn hoặc tên khách hàng — lọc trên tập đã khớp
-  // chi nhánh/trạng thái/khoảng ngày, áp trước khi tính thẻ tổng kết để các
-  // con số phía trên cũng phản ánh đúng kết quả tìm kiếm.
-  const searchLower = activeSearch.toLowerCase();
-  const searchedOrders = activeSearch
-    ? allOrders.filter(
-        (o) =>
-          o.order_code.toLowerCase().includes(searchLower) ||
-          (customerNameById.get(o.customer_id) ?? "").toLowerCase().includes(searchLower),
-      )
-    : allOrders;
-
-  const totalCount = searchedOrders.length;
-  let totalRevenue = 0;
-  let completedCount = 0;
-  let cancelledCount = 0;
-  for (const o of searchedOrders) {
-    totalRevenue += o.total_value;
-    if (o.cancelled_at) cancelledCount += 1;
-    else if (o.completed_at) completedCount += 1;
+  let result = (rpcRes.data ?? { totalCount: 0, stats: { totalRevenue: 0, completedCount: 0, cancelledCount: 0 }, rows: [] }) as OrdersPageListResult;
+  const totalPages = Math.max(1, Math.ceil(result.totalCount / PAGE_SIZE));
+  let currentPage = requestedPage;
+  // Trang đang xin vượt quá số trang thật (VD: đổi bộ lọc làm tổng số đơn
+  // giảm xuống) — gọi lại đúng trang cuối, khớp hành vi clamp cũ.
+  if (requestedPage > totalPages) {
+    currentPage = totalPages;
+    const { data: refetched } = await supabase.rpc("orders_page_list", {
+      p_branch_id: branchId,
+      p_status: activeStatus,
+      p_range_start: dateRange?.start ?? null,
+      p_range_end: dateRange?.end ?? null,
+      p_search: activeSearch || null,
+      p_sort: activeSort,
+      p_dir: activeDir,
+      p_page: currentPage,
+      p_page_size: PAGE_SIZE,
+    });
+    if (refetched) result = refetched as OrdersPageListResult;
   }
+
+  const totalCount = result.totalCount;
+  const totalRevenue = result.stats.totalRevenue;
+  const completedCount = result.stats.completedCount;
+  const cancelledCount = result.stats.cancelledCount;
   const processingCount = totalCount - completedCount - cancelledCount;
-
-  const dirMult = activeDir === "asc" ? 1 : -1;
-  const sortedOrders = [...searchedOrders].sort((a, b) => {
-    switch (activeSort) {
-      case "rental_start_at":
-        return dirMult * (a.rental_start_at ?? "").localeCompare(b.rental_start_at ?? "");
-      case "rental_end_at":
-        return dirMult * (a.rental_end_at ?? "").localeCompare(b.rental_end_at ?? "");
-      case "customer":
-        return (
-          dirMult *
-          (customerNameById.get(a.customer_id) ?? "").localeCompare(
-            customerNameById.get(b.customer_id) ?? "",
-            "vi",
-          )
-        );
-      case "total_value":
-        return dirMult * (a.total_value - b.total_value);
-      case "status":
-        return dirMult * statusLabel(a).localeCompare(statusLabel(b), "vi");
-      default:
-        // .order("id") thứ 2 làm tie-breaker — nhiều đơn cùng order_date,
-        // nếu chỉ sort theo order_date thì thứ tự giữa các trang không ổn
-        // định, gây trùng hoặc bỏ sót dòng khi chuyển trang.
-        return b.order_date.localeCompare(a.order_date) || b.id.localeCompare(a.id);
-    }
-  });
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
-  const orders = sortedOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-  if (!needAllCustomers && orders.length) {
-    const pageCustomerIds = [...new Set(orders.map((o) => o.customer_id))];
-    const { data: pageCustomers } = await supabase
-      .from("customers")
-      .select("id, name")
-      .in("id", pageCustomerIds);
-    for (const c of pageCustomers ?? []) customerNameById.set(c.id, c.name);
-  }
+  const orders = result.rows;
+  const customerNameById = new Map(orders.map((o) => [o.customer_id, o.customer_name ?? "—"]));
 
   return (
     <div className="space-y-4">
