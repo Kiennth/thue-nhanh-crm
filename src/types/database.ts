@@ -778,6 +778,44 @@ export interface Database {
         };
         Returns: unknown;
       };
+      // Lọc/tìm kiếm (join customers)/sắp xếp/phân trang + thẻ tổng kết cho
+      // /orders — trả jsonb (typed lỏng, page tự ép kiểu), thay cho việc kéo
+      // toàn bộ orders + customers thô về JS (xem migration 20260806120000).
+      orders_page_list: {
+        Args: {
+          p_branch_id?: string | null;
+          p_status?: string;
+          p_range_start?: string | null;
+          p_range_end?: string | null;
+          p_search?: string | null;
+          p_sort?: string | null;
+          p_dir?: string;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: unknown;
+      };
+      // Doanh thu/lượt thuê/tồn kho/giá trị tồn kho gộp sẵn theo từng loại
+      // hàng — dùng cho /equipment và /branches/[id], thay cho việc kéo
+      // order_equipment thô về JS rồi cộng dồn (xem migration 20260806100000).
+      equipment_page_report: {
+        Args: {
+          p_branch_id?: string | null;
+          p_start?: string | null;
+          p_end?: string | null;
+        };
+        Returns: {
+          equipment_type_id: string;
+          revenue: number;
+          rental_count: number;
+          current_stock_qty: number;
+          current_inventory_value: number;
+          purchase_cost: number;
+          disposal_proceeds: number;
+          profit: number;
+          profit_ratio: number | null;
+        }[];
+      };
       ensure_default_equipment_unit: {
         Args: { p_equipment_type_id: string };
         Returns: string;

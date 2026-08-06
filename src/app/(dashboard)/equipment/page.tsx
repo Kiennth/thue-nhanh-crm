@@ -18,10 +18,9 @@ import { SortableTableHead } from "@/components/sortable-table-head";
 import { ProductHighlightCards } from "@/components/dashboard-cards";
 import { RevenueBarList, type RevenuePoint } from "@/components/revenue-bar-list";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteEquipmentType } from "@/lib/actions/equipment";
-import { computeEquipmentTypeReports, type OrderLineInput } from "@/lib/equipment-reports";
 import { computeEquipmentValueOverview } from "@/lib/equipment-value-overview";
 import { vnNow } from "@/lib/vn-time";
 import {
@@ -75,6 +74,7 @@ const EQUIPMENT_REPORT_RANGE_VALUES = [
   "last_7_days",
   "last_week",
   "last_month",
+  "this_year",
   "last_year",
   "custom",
 ] as const satisfies readonly DateRangePreset[];
@@ -108,7 +108,12 @@ export default async function EquipmentPage({
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
-  const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
+  // Mặc định "Năm nay" thay vì "Tất cả thời gian" — khối "Báo cáo" bên dưới
+  // trước đây LUÔN quét nguyên bảng order_equipment (30k+ dòng, ~14s) dù
+  // chưa ai chọn kỳ nào, vì "Tất cả thời gian" là mặc định. "Tất cả thời
+  // gian" vẫn chọn được (giữ nguyên ý nghĩa "sản phẩm chủ lực từ trước đến
+  // giờ"), chỉ không còn là mặc định — CEO chốt 2026-08-06.
+  const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "this_year";
   const reportDateRange = computeDateRange(activeRange, vnNow(), { from: rangeFrom, to: rangeTo });
 
   const supabase = await createClient();
@@ -125,41 +130,36 @@ export default async function EquipmentPage({
   // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
   // thông tin điều hành danh mục — Cửa hàng trưởng và Admin không cần biết.
   const canViewProductHighlights = canViewEquipmentReports;
-  // Cửa hàng trưởng/Kỹ thuật-Sale chỉ đếm tồn kho của ĐÚNG chi nhánh mình —
-  // Giám đốc/Admin/Kế toán cộng gộp toàn hệ thống.
-  const stockBranchId = canManageCatalog ? null : (employee?.branch_id ?? null);
 
   // Trước đây trang này fetch theo 3 CHẶNG TUẦN TỰ (giá trị tồn kho đứng một
   // mình → allTypes đứng một mình → units/instances/stock → rồi mới tới khối
   // báo cáo) — mỗi chặng chờ chặng trước xong mới bắt đầu, cộng dồn lại là
   // trang chậm nhất hệ thống (~15s). Không truy vấn nào trong số này phụ
-  // thuộc kết quả của truy vấn khác (branchOrderIds chỉ cần stockBranchId,
-  // baseReports chỉ cần dữ liệu thô) nên gộp hết vào 1 Promise.all — thời
-  // gian chờ giờ bằng đúng truy vấn CHẬM NHẤT (order_equipment) thay vì
-  // tổng của cả 4 chặng.
+  // thuộc kết quả của truy vấn khác nên gộp hết vào 1 Promise.all — thời
+  // gian chờ giờ bằng đúng truy vấn CHẬM NHẤT thay vì tổng của cả nhiều
+  // chặng.
   //
-  // Đồng thời vá luôn 1 lỗi số liệu ẩn: equipment_types/units/instances/
-  // purchases/disposals/stock trước đây gọi trực tiếp KHÔNG qua fetchAllRows
-  // — Supabase âm thầm cắt còn 1.000 dòng, không báo lỗi. equipment_instances
-  // hiện có 1.766 dòng nên "Tổng giá trị tồn kho"/"Số thiết bị đang giữ" đã
-  // tính thiếu ~766 máy suốt thời gian qua. Các bảng còn lại hiện dưới 1.000
-  // dòng nên chưa lộ, nhưng bọc sẵn cho an toàn khi dữ liệu lớn lên.
+  // Doanh thu/lượt thuê/tồn kho/giá trị tồn kho từng loại hàng giờ tính 1
+  // lần DUY NHẤT trong Postgres qua RPC equipment_page_report (migration
+  // 20260806100000) — thay cho việc kéo order_equipment (30k+ dòng, ~14s) +
+  // equipment_units/instances/purchases/disposals/stock thô về JS rồi cộng
+  // dồn (computeEquipmentTypeReports cũ, đã xoá). p_branch_id luôn truyền
+  // null vì trang này không có ô chọn chi nhánh — hàm tự ép về đúng
+  // branch_id của người gọi nếu không phải vai trò quản lý (khớp đúng
+  // "Giám đốc/Admin/Kế toán cộng gộp toàn hệ thống, còn lại chỉ đúng chi
+  // nhánh mình" của bản JS cũ). p_start/p_end null = "Tất cả thời gian";
+  // tồn kho/giá trị tồn kho LUÔN là số hiện tại bất kể 2 tham số này (không
+  // đụng order_equipment trong hàm SQL) — chỉ doanh thu/lượt thuê mới theo kỳ.
   const [
     allTypes,
     { data: templates },
     { data: categories },
     equipmentValueOverview,
     { data: reportTypes },
-    reportUnits,
-    reportInstances,
-    purchases,
-    disposals,
-    reportStock,
-    allOrderLines,
-    branchOrderIdList,
+    { data: reportRowsRaw },
   ] = await Promise.all([
     // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
-    // nhãn ghép từ 2 cột, Tồn kho lấy từ baseReports) — lấy TOÀN BỘ loại
+    // nhãn ghép từ 2 cột, Tồn kho lấy từ reportByTypeId) — lấy TOÀN BỘ loại
     // hàng khớp tìm kiếm, tính/lọc/sắp/phân trang gộp 1 lần trong JS.
     fetchAllRows<EquipmentTypeRow>((from, to) => {
       let q = supabase.from("equipment_types").select("*");
@@ -172,63 +172,19 @@ export default async function EquipmentPage({
     canViewInventoryTrend
       ? computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
       : Promise.resolve(null),
-    // Giá trị tồn kho = giá VỐN mua vào (bình quân gia quyền) x số lượng còn
-    // giữ — KHÔNG phải giá thuê x số lượng. Tính 1 lần cho TOÀN BỘ danh mục,
-    // dùng cho cả cột trong bảng (mọi vai trò đều thấy) lẫn phần "Báo cáo"
-    // bên dưới — thay cho việc trước đây fetch riêng units/instances/stock
-    // một lần nữa chỉ để tính mỗi cột "Tồn kho".
-    supabase.from("equipment_types").select("id, name, product_type, tracking_type").order("name"),
-    fetchAllRows<{ id: string; equipment_type_id: string }>((from, to) =>
-      supabase.from("equipment_units").select("id, equipment_type_id").range(from, to),
-    ),
-    fetchAllRows<{
-      equipment_type_id: string;
-      purchase_price: number | null;
-      disposal_price: number | null;
-      status: Database["public"]["Tables"]["equipment_instances"]["Row"]["status"];
-    }>((from, to) => {
-      let q = supabase
-        .from("equipment_instances")
-        .select("equipment_type_id, purchase_price, disposal_price, status");
-      if (stockBranchId) q = q.eq("branch_id", stockBranchId);
-      return q.range(from, to);
+    // Tên/loại hàng cho khối "Báo cáo" — TOÀN BỘ danh mục, không bị giới hạn
+    // bởi bộ lọc tìm kiếm/danh mục đang áp cho bảng chính.
+    supabase.from("equipment_types").select("id, name, product_type").order("name"),
+    supabase.rpc("equipment_page_report", {
+      p_branch_id: null,
+      p_start: reportDateRange?.start ?? null,
+      p_end: reportDateRange?.end ?? null,
     }),
-    fetchAllRows<{ equipment_unit_id: string; quantity: number; unit_cost: number }>((from, to) =>
-      supabase.from("equipment_purchases").select("equipment_unit_id, quantity, unit_cost").range(from, to),
-    ),
-    fetchAllRows<{ equipment_unit_id: string; quantity: number; unit_price: number }>((from, to) =>
-      supabase.from("equipment_disposals").select("equipment_unit_id, quantity, unit_price").range(from, to),
-    ),
-    fetchAllRows<{ equipment_unit_id: string; quantity_total: number }>((from, to) => {
-      let q = supabase.from("equipment_stock").select("equipment_unit_id, quantity_total");
-      if (stockBranchId) q = q.eq("branch_id", stockBranchId);
-      return q.range(from, to);
-    }),
-    // Bảng lớn nhất trang này (30.000+ dòng) — đo bằng preview_logs, tự
-    // phân trang tuần tự tốn ~14s một mình. .order("id") để bắn các trang
-    // song song an toàn (xem fetchAllRowsFast).
-    fetchAllRowsFast<OrderLineInput & { order_id: string }>(
-      (from, to) =>
-        supabase
-          .from("order_equipment")
-          .select("equipment_type_id, line_total, order_id")
-          .order("id")
-          .range(from, to),
-      () => supabase.from("order_equipment").select("*", { count: "exact", head: true }),
-    ),
-    // Cửa hàng trưởng: doanh thu/lượt thuê chỉ tính trên đơn của chi nhánh
-    // mình — chỉ cần fetch khi có stockBranchId, không phụ thuộc gì khác
-    // trong khối này nên nằm ngay trong đợt gọi đầu tiên.
-    stockBranchId
-      ? fetchAllRows<{ id: string }>((from, to) =>
-          supabase
-            .from("orders")
-            .select("id")
-            .or(`pickup_branch_id.eq.${stockBranchId},return_branch_id.eq.${stockBranchId}`)
-            .range(from, to),
-        )
-      : Promise.resolve(null),
   ]);
+
+  const reportByTypeId = new Map(
+    (reportRowsRaw ?? []).map((r) => [r.equipment_type_id, r] as const),
+  );
 
   const templateList = templates ?? [];
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
@@ -244,29 +200,17 @@ export default async function EquipmentPage({
     return templateNameById.get(t.pricing_template_id ?? "") ?? PRICING_METHOD_LABELS.pricing_structure;
   }
 
-  const branchOrderIds = branchOrderIdList ? new Set(branchOrderIdList.map((o) => o.id)) : null;
-  const scopedOrderLines = branchOrderIds
-    ? allOrderLines.filter((l) => branchOrderIds.has(l.order_id))
-    : allOrderLines;
   const reportTypeList = reportTypes ?? [];
-  const baseReports = computeEquipmentTypeReports(
-    reportTypeList,
-    reportUnits,
-    reportInstances,
-    purchases,
-    disposals,
-    reportStock,
-    scopedOrderLines,
-  );
+  // Cột "Tồn kho"/"Tổng giá trị tồn kho" (bảng chính, mọi vai trò đều thấy)
+  // lấy thẳng từ reportByTypeId — RPC luôn trả về số HIỆN TẠI bất kể
+  // p_start/p_end đang truyền gì (xem comment ở lời gọi rpc phía trên).
   const inventoryValueByTypeId = new Map(
-    reportTypeList.map((t) => [t.id, baseReports.get(t.id)?.currentInventoryValue ?? 0]),
+    reportTypeList.map((t) => [t.id, reportByTypeId.get(t.id)?.current_inventory_value ?? 0]),
   );
-  // Cột "Tồn kho" — dịch vụ không có khái niệm tồn kho (-1 = ẩn cột), còn
-  // lại lấy thẳng từ baseReports (đã gộp cả units-theo-số-lượng lẫn
-  // instances-theo-máy trong computeEquipmentTypeReports).
+  // Cột "Tồn kho" — dịch vụ không có khái niệm tồn kho (-1 = ẩn cột).
   function stockValue(t: EquipmentTypeRow): number {
     if (t.product_type === "service") return -1;
-    return baseReports.get(t.id)?.currentStockQty ?? 0;
+    return reportByTypeId.get(t.id)?.current_stock_qty ?? 0;
   }
 
   const dirMult = activeDir === "asc" ? 1 : -1;
@@ -314,45 +258,16 @@ export default async function EquipmentPage({
   } | null = null;
 
   // Cửa hàng trưởng cũng xem được báo cáo này, nhưng mọi số liệu bên trong
-  // đã bị lọc sẵn về đúng kho/đơn hàng chi nhánh mình (stockBranchId ở trên).
+  // đã bị lọc sẵn về đúng kho/đơn hàng chi nhánh mình (RPC tự ép branch_id
+  // — xem comment ở lời gọi rpc phía trên).
   if (canViewInventoryTrend) {
-    // Doanh thu/số lượt thuê/tỉ suất lợi nhuận lọc theo ngày đặt đơn (order_date)
-    // khi có chọn khoảng thời gian — order_equipment không có cột ngày riêng
-    // nên phải lấy trước tập order_id khớp khoảng ngày rồi lọc theo đó. Giá
-    // trị tồn kho (currentInventoryValue) KHÔNG phụ thuộc đơn hàng nên luôn
-    // dùng lại baseReports (đã tính sẵn ở trên) — chỉ tính lại reports khi
-    // thật sự có bộ lọc thời gian, tránh tính 2 lần không cần thiết.
-    const reports = reportDateRange
-      ? await (async () => {
-          const ordersInRange = await fetchAllRows<{ id: string }>((from, to) =>
-            supabase
-              .from("orders")
-              .select("id")
-              .gte("order_date", reportDateRange.start)
-              .lte("order_date", reportDateRange.end)
-              .range(from, to),
-          );
-          const orderIdsInRange = new Set(ordersInRange.map((o) => o.id));
-          const filteredOrderLines = scopedOrderLines.filter((l) => orderIdsInRange.has(l.order_id));
-          return computeEquipmentTypeReports(
-            reportTypeList,
-            reportUnits,
-            reportInstances,
-            purchases,
-            disposals,
-            reportStock,
-            filteredOrderLines,
-          );
-        })()
-      : baseReports;
-    const reportRows = reportTypeList.map((type) => ({ type, report: reports.get(type.id)! }));
+    const reportRows = reportTypeList.map((type) => ({
+      type,
+      report: reportByTypeId.get(type.id)!,
+    }));
 
-    const totalInventoryValue = reportRows.reduce((sum, r) => sum + r.report.currentInventoryValue, 0);
-    // Lấy từ currentStockQty (đã tính theo units/stock cho tracking_type=
-    // quantity, hoặc instances cho individual) thay vì cộng thẳng reportStock
-    // + reportInstances — cộng thẳng sẽ đếm trùng cho vài loại hàng cũ bị đổi
-    // tracking_type mà chưa dọn hết equipment_instances (xem equipment-reports.ts).
-    const totalUnitsInStock = reportRows.reduce((sum, r) => sum + r.report.currentStockQty, 0);
+    const totalInventoryValue = reportRows.reduce((sum, r) => sum + (r.report?.current_inventory_value ?? 0), 0);
+    const totalUnitsInStock = reportRows.reduce((sum, r) => sum + (r.report?.current_stock_qty ?? 0), 0);
 
     reportSummary = {
       totalInventoryValue,
@@ -362,25 +277,25 @@ export default async function EquipmentPage({
       // hồi bằng xe máy/ô tô, hỗ trợ kỹ thuật...) vì không phản ánh sản phẩm
       // công ty cho thuê.
       topRevenue: reportRows
-        .filter((r) => r.type.product_type === "rental" && r.report.revenue > 0)
-        .sort((a, b) => b.report.revenue - a.report.revenue)
+        .filter((r) => r.type.product_type === "rental" && (r.report?.revenue ?? 0) > 0)
+        .sort((a, b) => (b.report?.revenue ?? 0) - (a.report?.revenue ?? 0))
         .slice(0, 5)
-        .map((r) => ({ label: r.type.name, value: r.report.revenue })),
+        .map((r) => ({ label: r.type.name, value: r.report!.revenue })),
       topRentalCount: reportRows
-        .filter((r) => r.type.product_type === "rental" && r.report.rentalCount > 0)
-        .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
+        .filter((r) => r.type.product_type === "rental" && (r.report?.rental_count ?? 0) > 0)
+        .sort((a, b) => (b.report?.rental_count ?? 0) - (a.report?.rental_count ?? 0))
         .slice(0, 5)
-        .map((r) => ({ label: r.type.name, value: r.report.rentalCount })),
+        .map((r) => ({ label: r.type.name, value: r.report!.rental_count })),
       topProfitRatio: reportRows
-        .filter((r) => r.type.product_type === "rental" && r.report.profitRatio !== null)
-        .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
+        .filter((r) => r.type.product_type === "rental" && r.report?.profit_ratio != null)
+        .sort((a, b) => (b.report?.profit_ratio ?? 0) - (a.report?.profit_ratio ?? 0))
         .slice(0, TOP_N)
-        .map((r) => ({ label: r.type.name, value: (r.report.profitRatio ?? 0) * 100 })),
+        .map((r) => ({ label: r.type.name, value: (r.report?.profit_ratio ?? 0) * 100 })),
       topInventoryValue: reportRows
-        .filter((r) => r.report.currentInventoryValue > 0)
-        .sort((a, b) => b.report.currentInventoryValue - a.report.currentInventoryValue)
+        .filter((r) => (r.report?.current_inventory_value ?? 0) > 0)
+        .sort((a, b) => (b.report?.current_inventory_value ?? 0) - (a.report?.current_inventory_value ?? 0))
         .slice(0, TOP_N)
-        .map((r) => ({ label: r.type.name, value: r.report.currentInventoryValue })),
+        .map((r) => ({ label: r.type.name, value: r.report!.current_inventory_value })),
     };
   }
 

@@ -37,7 +37,10 @@ export function OrderDateRangeFilter({
   function updateParams(next: { range?: string; from?: string; to?: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next.range !== undefined) {
-      if (!next.range || next.range === "all") {
+      // Không còn coi "all" là "xoá param" — /equipment giờ có mặc định
+      // khác "all" (xem equipment/page.tsx), nên "Tất cả thời gian" phải là
+      // 1 lựa chọn tường minh trên URL, khác với việc không chọn gì cả.
+      if (!next.range) {
         params.delete("range");
       } else {
         params.set("range", next.range);
