@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/stat-card";
 import {
   daysSince,
   DORMANT_DAYS,
@@ -24,13 +23,6 @@ import { VN_TIME_ZONE } from "@/lib/date-format";
 export interface CustomerReportData {
   topCompanies: { id: string; name: string; orderCount: number; totalRevenue: number }[];
   debt: { id: string; name: string; orderCount: number; totalOwed: number }[];
-  // Khách mới/doanh thu/công nợ CÒN THIẾU theo order_date rơi vào từng kỳ
-  // (khác "debt" ở trên — đó là công nợ DỒN theo khách, không theo thời
-  // điểm phát sinh) — CEO yêu cầu 2026-08-06, cùng toggle kỳ với /orders.
-  periodStats: Record<
-    CustomerOverviewPeriod,
-    { newCustomers: number; revenue: number; debt: number }
-  >;
   // Tương quan Khách cá nhân/Khách công ty theo từng kỳ — CEO yêu cầu
   // 2026-08-06 để ra quyết định/báo cáo cổ đông, nhà đầu tư.
   periodByCustomerType: Record<
@@ -38,15 +30,6 @@ export interface CustomerReportData {
     { individual: CustomerTypeStat; company: CustomerTypeStat }
   >;
 }
-
-const EMPTY_PERIOD_STAT = { newCustomers: 0, revenue: 0, debt: 0 };
-export const EMPTY_PERIOD_STATS: CustomerReportData["periodStats"] = {
-  thisMonth: EMPTY_PERIOD_STAT,
-  lastMonth: EMPTY_PERIOD_STAT,
-  thisYear: EMPTY_PERIOD_STAT,
-  lastYear: EMPTY_PERIOD_STAT,
-  allTime: EMPTY_PERIOD_STAT,
-};
 
 const EMPTY_TYPE_STAT: CustomerTypeStat = { customerCount: 0, orderCount: 0, revenue: 0 };
 const EMPTY_TYPE_PERIOD = { individual: EMPTY_TYPE_STAT, company: EMPTY_TYPE_STAT };
@@ -220,7 +203,6 @@ export function CustomerReportSection({
   const debtRows = data.debt.map((r) => ({ ...r, value: r.totalOwed }));
   const overviewPeriod: CustomerOverviewPeriod =
     overview && isCustomerOverviewPeriod(overview) ? overview : "thisMonth";
-  const periodStat = data.periodStats[overviewPeriod] ?? EMPTY_PERIOD_STATS.thisMonth;
   const periodTypeStat =
     data.periodByCustomerType[overviewPeriod] ?? EMPTY_PERIOD_BY_CUSTOMER_TYPE.thisMonth;
 
@@ -238,20 +220,15 @@ export function CustomerReportSection({
 
       {/* Tổng quan theo kỳ — CEO yêu cầu 2026-08-06 toggle Tháng này/Tháng
           trước/Năm nay/Năm trước giống hệt /orders, thay cho 3 thẻ công nợ
-          tĩnh trước đó. "Khách mới trong kỳ"/"Doanh thu trong kỳ" bỏ luôn
-          sau đó (CEO 2026-08-06) vì trùng thông tin với donut tỉ trọng bên
-          dưới — chỉ còn "Công nợ phát sinh" (donut không có mục công nợ). */}
+          tĩnh trước đó. "Khách mới trong kỳ"/"Doanh thu trong kỳ" rồi "Công nợ
+          phát sinh" đều bỏ dần sau đó (CEO 2026-08-06) — chỉ còn donut tỉ
+          trọng + bảng tương quan cá nhân/công ty. */}
       {showDebt && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-muted-foreground">Tổng quan theo kỳ</h3>
             <CustomerOverviewPeriodToggle value={overviewPeriod} />
           </div>
-          <StatCard
-            className="max-w-xs"
-            label="Công nợ phát sinh"
-            value={`${currencyFormatter.format(periodStat.debt)}đ`}
-          />
 
           {/* Chỉ Kế toán/Giám đốc/Admin thấy (đi cùng showDebt — 3 vai trò
               này đang là đúng tập hợp effectively MANAGE_ROLES). Dùng chung
