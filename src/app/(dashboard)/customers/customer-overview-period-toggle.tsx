@@ -4,13 +4,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTopLoader } from "nextjs-toploader";
 import { Button } from "@/components/ui/button";
 
-export type CustomerOverviewPeriod = "thisMonth" | "lastMonth" | "thisYear" | "lastYear";
+export type CustomerOverviewPeriod = "thisMonth" | "lastMonth" | "thisYear" | "lastYear" | "allTime";
 
 const OPTIONS: { value: CustomerOverviewPeriod; label: string }[] = [
   { value: "thisMonth", label: "Tháng này" },
   { value: "lastMonth", label: "Tháng trước" },
   { value: "thisYear", label: "Năm nay" },
   { value: "lastYear", label: "Năm trước" },
+  { value: "allTime", label: "Toàn thời gian" },
 ];
 
 // Mirror OrdersOverviewPeriodToggle (src/app/(dashboard)/orders/orders-overview-period-toggle.tsx)

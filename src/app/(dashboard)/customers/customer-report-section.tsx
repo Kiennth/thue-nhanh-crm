@@ -54,6 +54,7 @@ export const EMPTY_PERIOD_STATS: CustomerReportData["periodStats"] = {
   lastMonth: EMPTY_PERIOD_STAT,
   thisYear: EMPTY_PERIOD_STAT,
   lastYear: EMPTY_PERIOD_STAT,
+  allTime: EMPTY_PERIOD_STAT,
 };
 
 const EMPTY_TYPE_STAT: CustomerTypeStat = { customerCount: 0, orderCount: 0, revenue: 0 };
@@ -63,10 +64,11 @@ export const EMPTY_PERIOD_BY_CUSTOMER_TYPE: CustomerReportData["periodByCustomer
   lastMonth: EMPTY_TYPE_PERIOD,
   thisYear: EMPTY_TYPE_PERIOD,
   lastYear: EMPTY_TYPE_PERIOD,
+  allTime: EMPTY_TYPE_PERIOD,
 };
 
 function isCustomerOverviewPeriod(value: string): value is CustomerOverviewPeriod {
-  return ["thisMonth", "lastMonth", "thisYear", "lastYear"].includes(value);
+  return ["thisMonth", "lastMonth", "thisYear", "lastYear", "allTime"].includes(value);
 }
 import { RevenueBarList } from "@/components/revenue-bar-list";
 
@@ -157,20 +159,19 @@ function DormantCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
   );
 }
 
-// 4 thẻ tóm tắt — dùng chung cho báo cáo đầy đủ ở /customers và khối tóm tắt
-// condensed trên Trang chủ.
+// CEO yêu cầu 2026-08-06: bỏ "Tổng khách hàng"/"Cá nhân / Doanh nghiệp" — đã
+// được donut "Tỉ trọng số khách hàng" (chế độ Số khách, kỳ Toàn thời gian)
+// bao quát, chỉ còn lệch phần khách CHƯA TỪNG có đơn (donut chỉ đếm khách có
+// đơn — xem migration 20260806180000). Chỉ giữ lại 2 thẻ không donut nào thay
+// thế được.
 export function CustomerOverviewTiles({ stats }: { stats: CustomerReportData["stats"] }) {
-  const individualCount = stats.individualCount;
-  const companyCount = stats.companyCount;
   // "Chưa quay lại" = có đơn nhưng chỉ đúng 1 — suy từ 2 số đếm của RPC.
   const newCount = stats.withOrders - stats.returning2Plus;
   const returningCount = stats.returning2Plus;
   const rowsLength = stats.totalCustomers;
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <StatCard label="Tổng khách hàng" value={rowsLength} />
-      <StatCard label="Cá nhân / Doanh nghiệp" value={`${individualCount} / ${companyCount}`} />
+    <div className="grid grid-cols-2 gap-4">
       {/* Không đặt tên "Khách mới": đây là khách CHƯA TỪNG quay lại tính từ
           đầu đến giờ, khác hẳn "khách mới trong tháng" ở thẻ xu hướng. */}
       <StatCard label="Khách chưa quay lại (1 đơn)" value={newCount} />
