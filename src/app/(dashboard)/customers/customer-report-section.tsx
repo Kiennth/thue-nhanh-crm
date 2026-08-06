@@ -7,9 +7,12 @@ import {
   DORMANT_MIN_ORDERS,
   findDormantCustomers,
   type CustomerReportRow,
-  type NewCustomerPoint,
 } from "@/lib/customer-reports";
-import { NewCustomersCard, ReturningRateCard } from "./customer-trend-cards";
+import { ReturningRateCard } from "./customer-trend-cards";
+import {
+  CustomerOverviewPeriodToggle,
+  type CustomerOverviewPeriod,
+} from "./customer-overview-period-toggle";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
@@ -22,14 +25,28 @@ export interface CustomerReportData {
     withOrders: number;
     returning2Plus: number;
   };
-  monthlyNew: NewCustomerPoint[];
   returningRate: { month: string; activeCount: number; returningCount: number }[];
   topCompanies: { id: string; name: string; orderCount: number; totalRevenue: number }[];
   debt: { id: string; name: string; orderCount: number; totalOwed: number }[];
-  // Công nợ CÒN THIẾU của các đơn theo order_date rơi vào từng kỳ (không
-  // phải dồn theo khách như "debt" ở trên) — CEO yêu cầu 2026-08-06 để theo
-  // dõi công nợ mới phát sinh, không chỉ nhìn "ai đang nợ nhiều nhất".
-  debtByPeriod: { thisMonth: number; lastMonth: number; thisYear: number };
+  // Khách mới/doanh thu/công nợ CÒN THIẾU theo order_date rơi vào từng kỳ
+  // (khác "debt" ở trên — đó là công nợ DỒN theo khách, không theo thời
+  // điểm phát sinh) — CEO yêu cầu 2026-08-06, cùng toggle kỳ với /orders.
+  periodStats: Record<
+    CustomerOverviewPeriod,
+    { newCustomers: number; revenue: number; debt: number }
+  >;
+}
+
+const EMPTY_PERIOD_STAT = { newCustomers: 0, revenue: 0, debt: 0 };
+export const EMPTY_PERIOD_STATS: CustomerReportData["periodStats"] = {
+  thisMonth: EMPTY_PERIOD_STAT,
+  lastMonth: EMPTY_PERIOD_STAT,
+  thisYear: EMPTY_PERIOD_STAT,
+  lastYear: EMPTY_PERIOD_STAT,
+};
+
+function isCustomerOverviewPeriod(value: string): value is CustomerOverviewPeriod {
+  return ["thisMonth", "lastMonth", "thisYear", "lastYear"].includes(value);
 }
 import { RevenueBarList } from "@/components/revenue-bar-list";
 
@@ -194,10 +211,15 @@ function CustomerRankCard({
 
 export function CustomerReportSection({
   data,
+  overview,
   showRankings = true,
   showDormant = true,
   showDebt = true,
 }: {
+  // Kỳ cho khối "Tổng quan theo kỳ" — cùng cơ chế URL param `overview` như
+  // /orders (xem OrdersOverviewPeriodToggle), độc lập với bảng danh sách
+  // khách hàng bên dưới.
+  overview?: string;
   // Ba khối này bật/tắt độc lập vì CEO chia quyền khác nhau cho từng vai trò:
   //   - Cửa hàng trưởng: không xem cả ba, chỉ cần số lượng/cơ cấu và tăng
   //     trưởng khách của chi nhánh mình.
@@ -211,6 +233,9 @@ export function CustomerReportSection({
 }) {
   const topCompanyByRevenue = data.topCompanies.map((r) => ({ ...r, value: r.totalRevenue }));
   const debtRows = data.debt.map((r) => ({ ...r, value: r.totalOwed }));
+  const overviewPeriod: CustomerOverviewPeriod =
+    overview && isCustomerOverviewPeriod(overview) ? overview : "thisMonth";
+  const periodStat = data.periodStats[overviewPeriod] ?? EMPTY_PERIOD_STATS.thisMonth;
 
   return (
     <div className="space-y-4">
@@ -218,33 +243,35 @@ export function CustomerReportSection({
 
       <CustomerOverviewTiles stats={data.stats} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <NewCustomersCard points={data.monthlyNew} />
-        <ReturningRateCard ratePoints={data.returningRate} />
-      </div>
+      {/* "Khách mới theo tháng" bỏ hẳn cho mọi vai trò (CEO 2026-08-06) —
+          chỉ còn tỉ lệ quay lại. */}
+      <ReturningRateCard ratePoints={data.returningRate} />
 
       {/* Thẻ "Khách nguội cần gọi lại" tạm ẩn (CEO 2026-08-02: sẽ dùng lại
           sau) — khi bật lại cần bổ sung mảng dormant vào RPC
           customer_page_report rồi truyền xuống đây thay cho []. */}
       {false && showDormant && <DormantCustomersCard rows={[]} />}
 
-      {/* Công nợ CÒN THIẾU phát sinh theo kỳ (khác "Công nợ" bên dưới — đó
-          là công nợ DỒN theo khách, không theo thời điểm phát sinh). CEO yêu
-          cầu 2026-08-06. */}
+      {/* Tổng quan theo kỳ (khách mới/doanh thu/công nợ phát sinh) — CEO yêu
+          cầu 2026-08-06 toggle Tháng này/Tháng trước/Năm nay/Năm trước
+          giống hệt /orders, thay cho 3 thẻ công nợ tĩnh trước đó. */}
       {showDebt && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Công nợ tháng này"
-            value={`${currencyFormatter.format(data.debtByPeriod.thisMonth)}đ`}
-          />
-          <StatCard
-            label="Công nợ tháng trước"
-            value={`${currencyFormatter.format(data.debtByPeriod.lastMonth)}đ`}
-          />
-          <StatCard
-            label="Công nợ cả năm"
-            value={`${currencyFormatter.format(data.debtByPeriod.thisYear)}đ`}
-          />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">Tổng quan theo kỳ</h3>
+            <CustomerOverviewPeriodToggle value={overviewPeriod} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard label="Khách mới trong kỳ" value={periodStat.newCustomers} />
+            <StatCard
+              label="Doanh thu trong kỳ"
+              value={`${currencyFormatter.format(periodStat.revenue)}đ`}
+            />
+            <StatCard
+              label="Công nợ phát sinh"
+              value={`${currencyFormatter.format(periodStat.debt)}đ`}
+            />
+          </div>
         </div>
       )}
 

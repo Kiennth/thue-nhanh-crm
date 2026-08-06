@@ -6,73 +6,11 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 // import type không kéo runtime của customer-reports.ts (nó phụ thuộc
 // vn-time.ts, đánh dấu "server-only") — an toàn để dùng trong client component.
-import type { NewCustomerPoint, ReturningRatePoint } from "@/lib/customer-reports";
-import { NewCustomersChart } from "./new-customers-chart";
+import type { ReturningRatePoint } from "@/lib/customer-reports";
 import { ReturningRateChart } from "./returning-rate-chart";
 
-// Chi nhánh tháng này có kéo thêm được khách mới không — con số duy nhất
-// trong khối báo cáo nói về TĂNG TRƯỞNG, mấy ô còn lại chỉ đếm tồn tại.
-//
-// Mặc định chỉ hiện số tháng này — biểu đồ 12 tháng chỉ tốn chỗ khi không ai
-// cần so kỳ, nên gập lại phía sau nút "Xem cả năm" (cùng tinh thần với khối
-// Doanh thu/Lợi nhuận gộp ở trang chủ chỉ hiện đúng kỳ đang chọn).
-export function NewCustomersCard({ points }: { points: NewCustomerPoint[] }) {
-  const [showChart, setShowChart] = useState(false);
-  const thisMonth = points[points.length - 1]?.count ?? 0;
-  const lastMonth = points[points.length - 2]?.count ?? 0;
-  const delta = thisMonth - lastMonth;
-  // Trung bình các tháng TRƯỚC tháng đang chạy — tháng hiện tại còn dở nên
-  // đưa vào trung bình sẽ tự kéo mốc so sánh xuống.
-  const past = points.slice(0, -1);
-  const average = past.length ? past.reduce((s, p) => s + p.count, 0) / past.length : 0;
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between">
-        <div>
-          <CardTitle className="text-base">Khách mới theo tháng</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Khách lần đầu thuê của công ty — tháng hiện tại tính tới hôm nay.
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setShowChart((v) => !v)}>
-          {showChart ? "Ẩn" : "Xem cả năm"}
-          {showChart ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <p className="text-2xl font-semibold tabular-nums">{thisMonth}</p>
-          <p className="text-sm text-muted-foreground">khách mới tháng này</p>
-          {lastMonth > 0 && (
-            <p
-              className={`flex items-center gap-1 text-xs ${
-                delta >= 0 ? "text-primary" : "text-destructive"
-              }`}
-            >
-              {delta >= 0 ? (
-                <TrendingUp className="size-3.5" />
-              ) : (
-                <TrendingDown className="size-3.5" />
-              )}
-              {delta >= 0 ? "+" : ""}
-              {delta} so với tháng trước
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Trung bình {average.toFixed(0)} khách/tháng trong {past.length} tháng trước
-          </p>
-        </div>
-
-        {showChart && <NewCustomersChart points={points} />}
-      </CardContent>
-    </Card>
-  );
-}
-
-// Cùng cặp với thẻ khách mới: một bên đo kéo được người lạ vào, bên này đo
-// giữ được người cũ ở lại. Tỉ lệ theo TỪNG THÁNG nên nhúc nhích thật, khác
-// ô "Khách quay lại (2+ đơn)" cộng dồn từ đầu gần như đứng yên.
+// Đo giữ được khách cũ ở lại — tỉ lệ theo TỪNG THÁNG nên nhúc nhích thật,
+// khác ô "Khách quay lại (2+ đơn)" cộng dồn từ đầu gần như đứng yên.
 export function ReturningRateCard({
   ratePoints,
 }: {

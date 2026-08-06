@@ -16,11 +16,6 @@ export interface CustomerReportRow {
   lastOrderDate: string | null;
 }
 
-export interface NewCustomerPoint {
-  month: string;
-  count: number;
-}
-
 // Khách "nguội": đã quen thuê (từ 2 đơn trở lên) nhưng lâu rồi không quay
 // lại. Ngưỡng 90 ngày ~ 1 quý, đủ dài để không tính nhầm khách theo mùa vụ,
 // đủ ngắn để gọi lại còn kịp.

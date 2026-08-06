@@ -17,7 +17,11 @@ import { MANAGE_ROLES } from "@/lib/roles";
 import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
-import { CustomerReportSection, type CustomerReportData } from "./customer-report-section";
+import {
+  CustomerReportSection,
+  EMPTY_PERIOD_STATS,
+  type CustomerReportData,
+} from "./customer-report-section";
 import { SortableTableHead } from "@/components/sortable-table-head";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
@@ -65,9 +69,15 @@ interface CustomerListRpcRow {
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+    overview?: string;
+  }>;
 }) {
-  const { search, page: pageParam, sort, dir } = await searchParams;
+  const { search, page: pageParam, sort, dir, overview } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
@@ -114,11 +124,10 @@ export default async function CustomersPage({
       returning2Plus: 0,
     },
     // jsonb_agg trả null (không phải mảng rỗng) khi không có dòng nào.
-    monthlyNew: rawReport.monthlyNew ?? [],
     returningRate: rawReport.returningRate ?? [],
     topCompanies: rawReport.topCompanies ?? [],
     debt: rawReport.debt ?? [],
-    debtByPeriod: rawReport.debtByPeriod ?? { thisMonth: 0, lastMonth: 0, thisYear: 0 },
+    periodStats: rawReport.periodStats ?? EMPTY_PERIOD_STATS,
   };
 
   const rawList = (listRes.data ?? {}) as { totalCount?: number; rows?: CustomerListRpcRow[] };
@@ -153,6 +162,7 @@ export default async function CustomersPage({
       {!isAdmin && (
         <CustomerReportSection
           data={reportData}
+          overview={overview}
           showRankings={!reportBranchId}
           showDormant={!reportBranchId}
           showDebt={!reportBranchId}
