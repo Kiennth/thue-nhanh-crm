@@ -274,26 +274,22 @@ export function CustomerReportSection({
           customer_page_report rồi truyền xuống đây thay cho []. */}
       {false && showDormant && <DormantCustomersCard rows={[]} />}
 
-      {/* Tổng quan theo kỳ (khách mới/doanh thu/công nợ phát sinh) — CEO yêu
-          cầu 2026-08-06 toggle Tháng này/Tháng trước/Năm nay/Năm trước
-          giống hệt /orders, thay cho 3 thẻ công nợ tĩnh trước đó. */}
+      {/* Tổng quan theo kỳ — CEO yêu cầu 2026-08-06 toggle Tháng này/Tháng
+          trước/Năm nay/Năm trước giống hệt /orders, thay cho 3 thẻ công nợ
+          tĩnh trước đó. "Khách mới trong kỳ"/"Doanh thu trong kỳ" bỏ luôn
+          sau đó (CEO 2026-08-06) vì trùng thông tin với donut tỉ trọng bên
+          dưới — chỉ còn "Công nợ phát sinh" (donut không có mục công nợ). */}
       {showDebt && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-muted-foreground">Tổng quan theo kỳ</h3>
             <CustomerOverviewPeriodToggle value={overviewPeriod} />
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard label="Khách mới trong kỳ" value={periodStat.newCustomers} />
-            <StatCard
-              label="Doanh thu trong kỳ"
-              value={`${currencyFormatter.format(periodStat.revenue)}đ`}
-            />
-            <StatCard
-              label="Công nợ phát sinh"
-              value={`${currencyFormatter.format(periodStat.debt)}đ`}
-            />
-          </div>
+          <StatCard
+            className="max-w-xs"
+            label="Công nợ phát sinh"
+            value={`${currencyFormatter.format(periodStat.debt)}đ`}
+          />
 
           {/* Chỉ Kế toán/Giám đốc/Admin thấy (đi cùng showDebt — 3 vai trò
               này đang là đúng tập hợp effectively MANAGE_ROLES). Dùng chung
