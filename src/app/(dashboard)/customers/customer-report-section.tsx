@@ -17,6 +17,8 @@ import {
   CustomerTypeComparisonTable,
   type CustomerTypeStat,
 } from "./customer-type-comparison-table";
+import { CustomerTypeRevenueDonutChart } from "./customer-type-revenue-donut-chart";
+import { CustomerTypeMetricsBarChart } from "./customer-type-metrics-bar-chart";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
@@ -297,6 +299,18 @@ export function CustomerReportSection({
           {/* Chỉ Kế toán/Giám đốc/Admin thấy (đi cùng showDebt — 3 vai trò
               này đang là đúng tập hợp effectively MANAGE_ROLES). Dùng chung
               kỳ với toggle ngay trên, không có toggle riêng. */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <CustomerTypeRevenueDonutChart
+              individualRevenue={periodTypeStat.individual.revenue}
+              companyRevenue={periodTypeStat.company.revenue}
+            />
+            <CustomerTypeMetricsBarChart
+              individualCustomerCount={periodTypeStat.individual.customerCount}
+              companyCustomerCount={periodTypeStat.company.customerCount}
+              individualOrderCount={periodTypeStat.individual.orderCount}
+              companyOrderCount={periodTypeStat.company.orderCount}
+            />
+          </div>
           <CustomerTypeComparisonTable
             individual={periodTypeStat.individual}
             company={periodTypeStat.company}
