@@ -68,7 +68,6 @@ function isDateRangePreset(value: string): value is DateRangePreset {
 // Báo cáo thiết bị chỉ nhìn lại quá khứ (doanh thu/lượt thuê đã phát sinh) —
 // không có "tuần tới"/"tháng tới" như bộ lọc đơn hàng sắp giao/sắp thu hồi.
 const EQUIPMENT_REPORT_RANGE_VALUES = [
-  "all",
   "today",
   "yesterday",
   "last_7_days",
@@ -76,6 +75,7 @@ const EQUIPMENT_REPORT_RANGE_VALUES = [
   "last_month",
   "this_year",
   "last_year",
+  "all",
   "custom",
 ] as const satisfies readonly DateRangePreset[];
 
@@ -318,71 +318,72 @@ export default async function EquipmentPage({
         </div>
       </div>
 
-      {equipmentValueOverview && <EquipmentValueTrendChart trend={equipmentValueOverview.trend} />}
-
-      {reportSummary && (
+      {/* CEO yêu cầu 2026-08-06: 3 card Cho thuê nhiều nhất/Sản phẩm chủ
+          lực/Tỉ suất lợi nhuận lên đầu trang — thứ cần thấy ngay khi mở
+          trang, thay vì cuộn qua Tổng quan tồn kho/biểu đồ giá trị mới tới. */}
+      {reportSummary && canViewProductHighlights && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Tổng quan tồn kho</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Tổng giá trị tồn kho</p>
-                  <p className="text-lg font-medium">
-                    {currencyFormatter.format(reportSummary.totalInventoryValue)}đ
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Số thiết bị đang giữ</p>
-                  <p className="text-lg font-medium">{reportSummary.totalUnitsInStock}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Giá trị trung bình / thiết bị</p>
-                  <p className="text-lg font-medium">
-                    {currencyFormatter.format(reportSummary.averageInventoryValue)}đ
-                  </p>
-                </div>
-              </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Báo cáo</h2>
+            <OrderDateRangeFilter
+              preset={activeRange}
+              from={rangeFrom ?? ""}
+              to={rangeTo ?? ""}
+              values={EQUIPMENT_REPORT_RANGE_VALUES}
+            />
+          </div>
 
-              {/* Cùng câu chuyện với 3 con số trên (giá trị hàng đang nằm
-                  trong kho) nên nằm chung thẻ — và quan trọng là nó KHÔNG
-                  chịu ảnh hưởng của bộ lọc thời gian ở mục "Báo cáo", để
-                  dưới đó dễ hiểu nhầm là số liệu theo kỳ đã chọn. */}
-              <div className="mt-6 border-t pt-4">
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Hàng hoá chiếm nhiều vốn tồn kho nhất
-                </p>
-                <RevenueBarList
-                  points={reportSummary.topInventoryValue}
-                  labelWidthClassName="w-32"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {canViewProductHighlights && (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Báo cáo</h2>
-                <OrderDateRangeFilter
-                  preset={activeRange}
-                  from={rangeFrom ?? ""}
-                  to={rangeTo ?? ""}
-                  values={EQUIPMENT_REPORT_RANGE_VALUES}
-                />
-              </div>
-
-              <ProductHighlightCards
-                mostRented={reportSummary.topRentalCount}
-                flagship={reportSummary.topRevenue}
-                topMargin={reportSummary.topProfitRatio}
-              />
-            </>
-          )}
+          <ProductHighlightCards
+            mostRented={reportSummary.topRentalCount}
+            flagship={reportSummary.topRevenue}
+            topMargin={reportSummary.topProfitRatio}
+          />
         </div>
       )}
+
+      {reportSummary && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tổng quan tồn kho</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Tổng giá trị tồn kho</p>
+                <p className="text-lg font-medium">
+                  {currencyFormatter.format(reportSummary.totalInventoryValue)}đ
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Số thiết bị đang giữ</p>
+                <p className="text-lg font-medium">{reportSummary.totalUnitsInStock}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Giá trị trung bình / thiết bị</p>
+                <p className="text-lg font-medium">
+                  {currencyFormatter.format(reportSummary.averageInventoryValue)}đ
+                </p>
+              </div>
+            </div>
+
+            {/* Cùng câu chuyện với 3 con số trên (giá trị hàng đang nằm
+                trong kho) nên nằm chung thẻ — và quan trọng là nó KHÔNG
+                chịu ảnh hưởng của bộ lọc thời gian ở mục "Báo cáo", để
+                dưới đó dễ hiểu nhầm là số liệu theo kỳ đã chọn. */}
+            <div className="mt-6 border-t pt-4">
+              <p className="mb-3 text-xs text-muted-foreground">
+                Hàng hoá chiếm nhiều vốn tồn kho nhất
+              </p>
+              <RevenueBarList
+                points={reportSummary.topInventoryValue}
+                labelWidthClassName="w-32"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {equipmentValueOverview && <EquipmentValueTrendChart trend={equipmentValueOverview.trend} />}
 
       <Table>
         <TableHeader>

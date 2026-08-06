@@ -26,8 +26,12 @@ export function OrderDateRangeFilter({
   to: string;
   values?: readonly DateRangePreset[];
 }) {
+  // Khi có `values`, hiện đúng theo THỨ TỰ của mảng đó (không phải thứ tự
+  // gốc trong DATE_RANGE_PRESET_OPTIONS) — cho phép mỗi nơi gọi tự sắp xếp
+  // dropdown hợp lý với bối cảnh của mình (VD: báo cáo thiết bị muốn "Tất cả
+  // thời gian" nằm dưới "Năm nay"/"Năm trước" thay vì lên đầu).
   const options = values
-    ? DATE_RANGE_PRESET_OPTIONS.filter((o) => values.includes(o.value))
+    ? values.map((v) => DATE_RANGE_PRESET_OPTIONS.find((o) => o.value === v)!)
     : DATE_RANGE_PRESET_OPTIONS;
   const router = useRouter();
   const { start } = useTopLoader();
