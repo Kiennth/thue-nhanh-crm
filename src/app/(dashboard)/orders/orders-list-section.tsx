@@ -34,6 +34,8 @@ import {
   OrdersOverviewPeriodToggle,
   type OrdersOverviewPeriod,
 } from "./orders-overview-period-toggle";
+import { OrdersStatusDonutChart } from "./orders-status-donut-chart";
+import { OrdersCollectionProgress } from "./orders-collection-progress";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -75,6 +77,10 @@ interface OrderRow {
 
 interface OrdersPageListStats {
   totalRevenue: number;
+  // Tổng giá trị ĐÃ GỒM VAT của đơn chưa huỷ — cùng nền với unpaidAmount,
+  // dùng để vẽ thanh "Đã thu/Còn thiếu" (collected = vatRevenue - unpaidAmount)
+  // mà không lệch số như khi trừ thẳng vào totalRevenue (chưa gồm VAT).
+  vatRevenue: number;
   completedCount: number;
   cancelledCount: number;
   unpaidCount: number;
@@ -89,6 +95,7 @@ interface OrdersPageListResult {
 
 const EMPTY_STATS: OrdersPageListStats = {
   totalRevenue: 0,
+  vatRevenue: 0,
   completedCount: 0,
   cancelledCount: 0,
   unpaidCount: 0,
@@ -290,6 +297,18 @@ export async function OrdersListSection({
                 </p>
               </StatCard>
             </Link>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <OrdersStatusDonutChart
+              processingCount={overviewProcessingCount}
+              completedCount={overviewStats.completedCount}
+              cancelledCount={overviewStats.cancelledCount}
+            />
+            <OrdersCollectionProgress
+              vatRevenue={overviewStats.vatRevenue}
+              unpaidAmount={overviewStats.unpaidAmount}
+            />
           </div>
         </div>
       )}
