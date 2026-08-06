@@ -299,10 +299,13 @@ export default async function EquipmentPage({
     };
   }
 
-  // CEO yêu cầu 2026-08-06: xem chi tiết tồn kho đang "phình" ở sản phẩm
-  // nào trong tháng, không chỉ xem đường tổng trên biểu đồ.
+  // CEO yêu cầu 2026-08-06: xem chi tiết tồn kho đang "phình"/"co" ở sản
+  // phẩm nào trong tháng, không chỉ xem đường tổng trên biểu đồ.
   const typeNameById = new Map(reportTypeList.map((t) => [t.id, t.name]));
   const topStockIncreasePoints: RevenuePoint[] = (equipmentValueOverview?.topStockIncrease ?? [])
+    .filter((r) => typeNameById.has(r.equipmentTypeId))
+    .map((r) => ({ label: typeNameById.get(r.equipmentTypeId)!, value: r.deltaValue }));
+  const topStockDecreasePoints: RevenuePoint[] = (equipmentValueOverview?.topStockDecrease ?? [])
     .filter((r) => typeNameById.has(r.equipmentTypeId))
     .map((r) => ({ label: typeNameById.get(r.equipmentTypeId)!, value: r.deltaValue }));
 
@@ -404,15 +407,23 @@ export default async function EquipmentPage({
               />
             </div>
 
-            {/* CEO yêu cầu 2026-08-06: sản phẩm nào đang kéo tồn kho tăng
-                nhiều nhất trong tháng — trả lời câu hỏi "phình ra ở đâu",
-                khác khối trên vốn là số TĨNH tại 1 thời điểm. */}
+            {/* CEO yêu cầu 2026-08-06: sản phẩm nào đang kéo tồn kho tăng/
+                giảm nhiều nhất trong tháng — trả lời câu hỏi "phình ra/co
+                lại ở đâu", khác khối trên vốn là số TĨNH tại 1 thời điểm. */}
             {topStockIncreasePoints.length > 0 && (
               <div className="mt-6 border-t pt-4">
                 <p className="mb-3 text-xs text-muted-foreground">
                   Tăng tồn kho nhiều nhất trong tháng
                 </p>
                 <RevenueBarList points={topStockIncreasePoints} labelWidthClassName="w-32" />
+              </div>
+            )}
+            {topStockDecreasePoints.length > 0 && (
+              <div className="mt-6 border-t pt-4">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Giảm tồn kho nhiều nhất trong tháng
+                </p>
+                <RevenueBarList points={topStockDecreasePoints} labelWidthClassName="w-32" />
               </div>
             )}
           </CardContent>

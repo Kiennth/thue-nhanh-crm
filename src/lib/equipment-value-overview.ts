@@ -7,6 +7,7 @@ import { vnNow } from "@/lib/vn-time";
 const WEEK_TREND_COUNT = 8;
 const MONTH_TREND_COUNT = 6;
 const YEAR_TREND_COUNT = 5;
+const STOCK_CHANGE_TOP_N = 5;
 
 interface PurchaseRow {
   equipment_unit_id: string;
@@ -54,12 +55,15 @@ export interface EquipmentValueOverview {
     deltaValue: number;
     deltaPercent: number | null;
   };
-  // Loại hàng nào kéo tồn kho tăng nhiều nhất trong tháng — cùng công thức
-  // dựng số dư theo thời điểm (weighted-average cost) như trend, chỉ tách
-  // riêng theo equipment_type thay vì gộp tổng. Chỉ giữ loại có tăng (>0) —
-  // trả lời đúng câu hỏi "tồn kho đang phình ra ở đâu", khác totalInventoryValue
-  // vốn là số TĨNH tại 1 thời điểm.
+  // Loại hàng nào kéo tồn kho tăng/giảm nhiều nhất trong tháng — cùng công
+  // thức dựng số dư theo thời điểm (weighted-average cost) như trend, chỉ
+  // tách riêng theo equipment_type thay vì gộp tổng. topStockIncrease chỉ
+  // giữ loại tăng (>0), topStockDecrease chỉ giữ loại giảm (<0, sắp theo
+  // mức giảm nhiều nhất trước — CEO 2026-08-06) — trả lời đúng câu hỏi "tồn
+  // kho đang phình ra/co lại ở đâu", khác totalInventoryValue vốn là số
+  // TĨNH tại 1 thời điểm.
   topStockIncrease: { equipmentTypeId: string; deltaValue: number }[];
+  topStockDecrease: { equipmentTypeId: string; deltaValue: number }[];
 }
 
 function toDateOnly(d: Date) {
@@ -178,7 +182,10 @@ function computeMonthlyChangeByType(
   instances: InstanceRow[],
   unitTypeMap: Map<string, string>,
   today: Date,
-): { equipmentTypeId: string; deltaValue: number }[] {
+): {
+  increase: { equipmentTypeId: string; deltaValue: number }[];
+  decrease: { equipmentTypeId: string; deltaValue: number }[];
+} {
   const purchasesByType = new Map<string, Map<string, PurchaseRow[]>>();
   for (const [unitId, rows] of purchasesByUnit) {
     const typeId = unitTypeMap.get(unitId);
@@ -210,7 +217,8 @@ function computeMonthlyChangeByType(
   const previousAsOf = toDateStr(previousMonthEnd);
   const currentAsOf = toDateStr(today);
 
-  const results: { equipmentTypeId: string; deltaValue: number }[] = [];
+  const increase: { equipmentTypeId: string; deltaValue: number }[] = [];
+  const decrease: { equipmentTypeId: string; deltaValue: number }[] = [];
   for (const typeId of allTypeIds) {
     const typeCtx: BalanceContext = {
       purchasesByUnit: purchasesByType.get(typeId) ?? new Map(),
@@ -220,11 +228,17 @@ function computeMonthlyChangeByType(
     const current = computeBalanceAsOf(typeCtx, currentAsOf);
     const previous = computeBalanceAsOf(typeCtx, previousAsOf);
     const deltaValue = current.value - previous.value;
-    if (deltaValue > 0) results.push({ equipmentTypeId: typeId, deltaValue });
+    if (deltaValue > 0) increase.push({ equipmentTypeId: typeId, deltaValue });
+    else if (deltaValue < 0) decrease.push({ equipmentTypeId: typeId, deltaValue });
   }
 
-  results.sort((a, b) => b.deltaValue - a.deltaValue);
-  return results.slice(0, 10);
+  increase.sort((a, b) => b.deltaValue - a.deltaValue);
+  decrease.sort((a, b) => a.deltaValue - b.deltaValue);
+
+  return {
+    increase: increase.slice(0, STOCK_CHANGE_TOP_N),
+    decrease: decrease.slice(0, STOCK_CHANGE_TOP_N),
+  };
 }
 
 function buildYearTrend(ctx: BalanceContext, today: Date): EquipmentValueTrendPoint[] {
@@ -303,6 +317,13 @@ export async function computeEquipmentValueOverview(
   const deltaValue = currentPoint.value - previousPoint.value;
 
   const unitTypeMap = new Map(units.map((u) => [u.id, u.equipment_type_id] as const));
+  const monthlyChangeByType = computeMonthlyChangeByType(
+    purchasesByUnit,
+    disposalsByUnit,
+    instances,
+    unitTypeMap,
+    today,
+  );
 
   return {
     trend: {
@@ -316,12 +337,7 @@ export async function computeEquipmentValueOverview(
       deltaValue,
       deltaPercent: previousPoint.value > 0 ? (deltaValue / previousPoint.value) * 100 : null,
     },
-    topStockIncrease: computeMonthlyChangeByType(
-      purchasesByUnit,
-      disposalsByUnit,
-      instances,
-      unitTypeMap,
-      today,
-    ),
+    topStockIncrease: monthlyChangeByType.increase,
+    topStockDecrease: monthlyChangeByType.decrease,
   };
 }
