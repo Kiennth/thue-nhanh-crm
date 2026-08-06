@@ -2,7 +2,11 @@ import { TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { EmployeeIncomeCompositionChart } from "../employee-performance-charts";
-import { BranchPayrollChart, type BranchPayrollPoint } from "./branch-payroll-chart";
+import { BranchPayrollDonutChart, type BranchPayrollPoint } from "./branch-payroll-chart";
+import {
+  PayrollBranchPeriodToggle,
+  type PayrollBranchScope,
+} from "./payroll-branch-period-toggle";
 import type { EmployeeMonthlyPerformance } from "@/lib/employee-performance-charts";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -14,12 +18,19 @@ function sumIncome(rows: EmployeeMonthlyPerformance[]) {
 // Tổng quan quỹ lương tháng: 4 con số chốt ở trên, rồi biểu đồ cơ cấu thu
 // nhập từng người (cột chồng ngang) — nhìn phát biết ai ăn khoán nhiều, ai
 // chủ yếu lương cứng, mà không phải dò 12 cột số trong bảng bên dưới.
+// "Chưa gán" (nhân viên không branch_id) không có id thật trong bảng
+// branches — dùng sentinel cố định để vẫn gộp/tô màu ổn định được.
+const UNASSIGNED_BRANCH_ID = "__unassigned__";
+
 export function PayrollOverview({
   rows,
   prevRows,
   month,
   branchName,
   branchNameById,
+  branchColorIndexById,
+  branchPayrollRows,
+  payrollScope,
 }: {
   rows: EmployeeMonthlyPerformance[];
   prevRows: EmployeeMonthlyPerformance[];
@@ -29,6 +40,13 @@ export function PayrollOverview({
   branchName?: string;
   // Chỉ cần khi xem toàn công ty, để tách quỹ lương theo từng chi nhánh.
   branchNameById?: Map<string, string>;
+  // Màu ổn định theo chi nhánh (không đổi khi đổi kỳ xem) — xem page.tsx.
+  branchColorIndexById?: Map<string, number>;
+  // Tập dữ liệu cho ĐÚNG kỳ đang chọn ở toggle "Quỹ lương theo chi nhánh" —
+  // KHÁC rows (luôn là đúng 1 tháng trên MonthNavigator, dùng cho 4 thẻ tổng
+  // quan + biểu đồ cơ cấu thu nhập phía dưới). CEO yêu cầu 2026-08-06.
+  branchPayrollRows?: EmployeeMonthlyPerformance[];
+  payrollScope?: PayrollBranchScope;
 }) {
   if (!rows.length) return null;
 
@@ -48,18 +66,24 @@ export function PayrollOverview({
   // Xem toàn công ty: gom quỹ lương theo chi nhánh để thấy nơi nào tốn nhất.
   // Cửa hàng trưởng chỉ có 1 chi nhánh nên khối này tự ẩn.
   const branchPoints: BranchPayrollPoint[] = (() => {
-    if (branchName || !branchNameById) return [];
-    const byBranch = new Map<string, { total: number; headcount: number }>();
-    for (const row of rows) {
+    if (branchName || !branchNameById || !branchPayrollRows) return [];
+    const byBranch = new Map<string, { branch: string; total: number; headcount: number }>();
+    for (const row of branchPayrollRows) {
+      const id = row.branchId ?? UNASSIGNED_BRANCH_ID;
       const label = (row.branchId ? branchNameById.get(row.branchId) : undefined) ?? "Chưa gán";
-      const cur = byBranch.get(label) ?? { total: 0, headcount: 0 };
-      byBranch.set(label, {
+      const cur = byBranch.get(id) ?? { branch: label, total: 0, headcount: 0 };
+      byBranch.set(id, {
+        branch: label,
         total: cur.total + row.totalIncome,
         headcount: cur.headcount + 1,
       });
     }
     return [...byBranch.entries()]
-      .map(([branch, v]) => ({ branch, ...v }))
+      .map(([branchId, v]) => ({
+        branchId,
+        colorIndex: branchColorIndexById?.get(branchId) ?? 0,
+        ...v,
+      }))
       .sort((a, b) => b.total - a.total);
   })();
 
@@ -108,16 +132,19 @@ export function PayrollOverview({
         </StatCard>
       </div>
 
-      {branchPoints.length > 1 && (
+      {!branchName && branchNameById && branchNameById.size > 1 && payrollScope && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quỹ lương theo chi nhánh</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Tổng chi lương tháng {month} của từng chi nhánh — di chuột để xem kèm số nhân viên.
-            </p>
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">Quỹ lương theo chi nhánh</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Tổng chi lương từng chi nhánh — di chuột để xem kèm số nhân viên.
+              </p>
+            </div>
+            <PayrollBranchPeriodToggle value={payrollScope} />
           </CardHeader>
           <CardContent>
-            <BranchPayrollChart points={branchPoints} />
+            <BranchPayrollDonutChart points={branchPoints} />
           </CardContent>
         </Card>
       )}

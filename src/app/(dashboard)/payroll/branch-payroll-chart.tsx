@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
+import { Cell, Pie, PieChart } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -10,53 +10,81 @@ import {
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
-// 1 chuỗi số liệu duy nhất (quỹ lương) nên không cần chú giải — tiêu đề thẻ
-// đã nói rõ đang đo gì; giá trị dán thẳng lên đầu thanh thay vì bắt dò trục.
-const CONFIG = {
-  total: { label: "Quỹ lương", color: "var(--chart-1)" },
-} satisfies ChartConfig;
-
 export interface BranchPayrollPoint {
+  branchId: string;
   branch: string;
   total: number;
   headcount: number;
+  // Màu bám theo CHI NHÁNH (thứ tự cố định trong bảng chi tiết), không theo
+  // thứ hạng quỹ lương — đổi kỳ xem thì mỗi chi nhánh vẫn giữ nguyên màu.
+  colorIndex: number;
 }
 
-export function BranchPayrollChart({ points }: { points: BranchPayrollPoint[] }) {
+// Đổi từ bar chart sang donut (CEO yêu cầu 2026-08-06) — cùng khuôn mẫu với
+// BranchComparisonCard (so sánh doanh thu chi nhánh ở trang chủ): số tuyệt
+// đối + % qua tooltip, tên chi nhánh dán cạnh lát đủ lớn, tổng ở giữa vòng.
+export function BranchPayrollDonutChart({ points }: { points: BranchPayrollPoint[] }) {
+  const total = points.reduce((sum, p) => sum + p.total, 0);
+  const slices = points.filter((p) => p.total > 0);
+
+  const chartConfig = Object.fromEntries(
+    points.map((p) => [p.branch, { label: p.branch }]),
+  ) satisfies ChartConfig;
+
   return (
-    <ChartContainer
-      config={CONFIG}
-      className="aspect-auto w-full"
-      style={{ height: Math.max(180, points.length * 52) }}
-    >
-      <BarChart data={points} layout="vertical" margin={{ left: 8, right: 72 }}>
-        <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-        <XAxis type="number" tickFormatter={(v) => currencyFormatter.format(v)} />
-        <YAxis type="category" dataKey="branch" width={90} tick={{ fontSize: 12 }} />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              formatter={(value, _name, item) => (
-                <div className="flex flex-1 items-center justify-between gap-3">
-                  <span>Quỹ lương</span>
-                  <span className="font-mono font-medium tabular-nums text-foreground">
-                    {currencyFormatter.format(Number(value))}đ · {item.payload.headcount} người
-                  </span>
-                </div>
-              )}
+    <div className="flex justify-center">
+      <div className="relative">
+        <ChartContainer config={chartConfig} className="aspect-auto h-[240px] w-[400px] max-w-full">
+          <PieChart>
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  hideLabel
+                  formatter={(value, name, item) => (
+                    <div className="flex w-full items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{name}</span>
+                      <span className="font-medium tabular-nums">
+                        {currencyFormatter.format(Number(value))}đ (
+                        {total > 0 ? Math.round((Number(value) / total) * 100) : 0}%) ·{" "}
+                        {item.payload.headcount} người
+                      </span>
+                    </div>
+                  )}
+                />
+              }
             />
-          }
-        />
-        <Bar dataKey="total" fill="var(--color-total)" radius={[0, 4, 4, 0]}>
-          <LabelList
-            dataKey="total"
-            position="right"
-            className="fill-muted-foreground"
-            fontSize={11}
-            formatter={(v) => `${currencyFormatter.format(Number(v ?? 0))}đ`}
-          />
-        </Bar>
-      </BarChart>
-    </ChartContainer>
+            <Pie
+              data={
+                slices.length
+                  ? slices.map((p) => ({ name: p.branch, value: p.total, headcount: p.headcount }))
+                  : [{ name: "Chưa có dữ liệu", value: 1, headcount: 0 }]
+              }
+              dataKey="value"
+              nameKey="name"
+              innerRadius={58}
+              outerRadius={86}
+              paddingAngle={slices.length > 1 ? 2 : 0}
+              strokeWidth={0}
+              isAnimationActive={slices.length > 0}
+              label={({ name, percent }) =>
+                slices.length && (percent ?? 0) >= 0.04 ? String(name) : ""
+              }
+            >
+              {slices.length ? (
+                slices.map((p) => <Cell key={p.branchId} fill={`var(--chart-${(p.colorIndex % 10) + 1})`} />)
+              ) : (
+                <Cell fill="var(--muted)" />
+              )}
+            </Pie>
+          </PieChart>
+        </ChartContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-xs text-muted-foreground">Tổng quỹ lương</span>
+          <span className="max-w-[110px] text-base font-semibold tabular-nums leading-tight">
+            {currencyFormatter.format(total)}đ
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -15,10 +15,13 @@ import {
   computeEmployeeMonthlyPerformance,
   currentMonth,
   MANAGE_ROLES,
+  sumEmployeePerformanceAcrossMonths,
+  type EmployeeMonthlyPerformance,
 } from "@/lib/employee-performance-charts";
 import { MonthNavigator } from "./month-navigator";
 import { ExportPayrollButton } from "./export-payroll-button";
 import { PayrollOverview } from "./payroll-overview";
+import type { PayrollBranchScope } from "./payroll-branch-period-toggle";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -46,15 +49,26 @@ function isSortKey(value: string): value is SortKey {
   return value === "name" || (NUMERIC_SORT_KEYS as readonly string[]).includes(value);
 }
 
+const PAYROLL_BRANCH_SCOPES = ["thisMonth", "lastMonth", "thisYear", "lastYear"] as const;
+function isPayrollBranchScope(value: string): value is PayrollBranchScope {
+  return (PAYROLL_BRANCH_SCOPES as readonly string[]).includes(value);
+}
+
+function monthsOfYear(year: number): string[] {
+  return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+}
+
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ month?: string; sort?: string; dir?: string; payrollScope?: string }>;
 }) {
-  const { month: monthParam, sort, dir } = await searchParams;
+  const { month: monthParam, sort, dir, payrollScope: payrollScopeParam } = await searchParams;
   const month = monthParam ?? currentMonth();
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
+  const payrollScope: PayrollBranchScope =
+    payrollScopeParam && isPayrollBranchScope(payrollScopeParam) ? payrollScopeParam : "thisMonth";
 
   const viewer = await getCurrentEmployee();
   if (!viewer) return null;
@@ -98,6 +112,28 @@ export default async function PayrollPage({
     return a.name.localeCompare(b.name, "vi");
   });
 
+  // Toggle "Quỹ lương theo chi nhánh" — CEO yêu cầu 2026-08-06. thisMonth/
+  // lastMonth tái dùng đúng rows/prevRows đã có (miễn phí, không query
+  // thêm). thisYear/lastYear cần cộng dồn 12 tháng (giống khối Lợi nhuận
+  // gộp ở Trang chủ, xem sumEmployeePerformanceAcrossMonths) — CHỈ tính khi
+  // thật sự đang chọn kỳ đó, và chỉ cho canViewAll (khối này tự ẩn với vai
+  // trò còn lại) để không cõng thêm 12 lượt query mỗi lần tải trang.
+  const yearOfMonth = Number(yearStr);
+  let branchPayrollRows: EmployeeMonthlyPerformance[] = sortedRows;
+  if (canViewAll && payrollScope === "lastMonth") {
+    branchPayrollRows = prevRows;
+  } else if (canViewAll && (payrollScope === "thisYear" || payrollScope === "lastYear")) {
+    const targetYear = payrollScope === "thisYear" ? yearOfMonth : yearOfMonth - 1;
+    const monthlyRows = await Promise.all(
+      monthsOfYear(targetYear).map((m) => computeEmployeeMonthlyPerformance(m)),
+    );
+    branchPayrollRows = sumEmployeePerformanceAcrossMonths(monthlyRows);
+  }
+
+  const branchColorIndexById = new Map(
+    (branches ?? []).map((b) => [b.id, branchSortIndex(b.id) % 10]),
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -136,6 +172,9 @@ export default async function PayrollPage({
             : undefined
         }
         branchNameById={branchNameById}
+        branchColorIndexById={branchColorIndexById}
+        branchPayrollRows={branchPayrollRows}
+        payrollScope={payrollScope}
       />
 
       <Card>
