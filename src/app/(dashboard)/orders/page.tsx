@@ -37,11 +37,12 @@ export default async function OrdersPage({
   const isTechSales = employee.role === "ky_thuat_sales";
   const listBranchId = viewingAllBranches || isTechSales ? null : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
-  // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ. Admin
-  // cũng bỏ (CEO chốt 2026-08-06): không cần dùng tới. Kế toán VẪN xem —
-  // CEO chốt thêm 2026-08-06: Kế toán cần tổng quan đơn hàng theo tháng/năm
-  // + đơn chưa thanh toán hết, y hệt Giám đốc.
-  const canViewAggregates = employee.role !== "ky_thuat_sales" && employee.role !== "admin";
+  // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
+  // Admin/Kế toán/Giám đốc đều xem — CEO chốt 2026-08-06: khối tổng quan
+  // giờ có toggle theo tháng/năm + biểu đồ trực quan (không còn là số dồn
+  // "Tất cả thời gian" vô nghĩa như bản cũ), nên mở lại cho Admin luôn
+  // (trước đó từng ẩn vì bản cũ đúng là không có giá trị với Admin).
+  const canViewAggregates = employee.role !== "ky_thuat_sales";
 
   // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
   // chung — chỉ cần khi có ô chọn đó.
