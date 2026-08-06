@@ -301,9 +301,10 @@ export default async function DashboardHomePage({
 
       {/* CEO chốt 2026-08-05: Cửa hàng trưởng lẫn Kỹ thuật/Sales (mọi role
           không thuộc MANAGE_ROLES) ưu tiên xem đơn hàng trước, "Thu nhập của
-          bạn" đẩy xuống dưới — Giám đốc/Admin/Kế toán giữ nguyên thứ tự cũ
-          (thu nhập trước, đơn hàng sau). */}
-      {!canManage ? (
+          bạn" đẩy xuống dưới. CEO chốt thêm 2026-08-06: Admin cũng vậy (dù
+          Admin thuộc MANAGE_ROLES) — chỉ Giám đốc/Kế toán giữ thứ tự cũ (thu
+          nhập trước, đơn hàng sau). */}
+      {!canManage || employee.role === "admin" ? (
         <>
           {ordersSection}
           {incomeSection}
