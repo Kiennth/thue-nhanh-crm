@@ -279,12 +279,12 @@ export default async function EquipmentPage({
       topRevenue: reportRows
         .filter((r) => r.type.product_type === "rental" && (r.report?.revenue ?? 0) > 0)
         .sort((a, b) => (b.report?.revenue ?? 0) - (a.report?.revenue ?? 0))
-        .slice(0, 5)
+        .slice(0, TOP_N)
         .map((r) => ({ label: r.type.name, value: r.report!.revenue })),
       topRentalCount: reportRows
         .filter((r) => r.type.product_type === "rental" && (r.report?.rental_count ?? 0) > 0)
         .sort((a, b) => (b.report?.rental_count ?? 0) - (a.report?.rental_count ?? 0))
-        .slice(0, 5)
+        .slice(0, TOP_N)
         .map((r) => ({ label: r.type.name, value: r.report!.rental_count })),
       topProfitRatio: reportRows
         .filter((r) => r.type.product_type === "rental" && r.report?.profit_ratio != null)
