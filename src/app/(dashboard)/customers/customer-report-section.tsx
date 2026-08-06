@@ -17,8 +17,7 @@ import {
   CustomerTypeComparisonTable,
   type CustomerTypeStat,
 } from "./customer-type-comparison-table";
-import { CustomerTypeRevenueDonutChart } from "./customer-type-revenue-donut-chart";
-import { CustomerTypeMetricsBarChart } from "./customer-type-metrics-bar-chart";
+import { CustomerTypeShareDonutChart } from "./customer-type-share-donut-chart";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
@@ -298,19 +297,14 @@ export function CustomerReportSection({
 
           {/* Chỉ Kế toán/Giám đốc/Admin thấy (đi cùng showDebt — 3 vai trò
               này đang là đúng tập hợp effectively MANAGE_ROLES). Dùng chung
-              kỳ với toggle ngay trên, không có toggle riêng. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <CustomerTypeRevenueDonutChart
-              individualRevenue={periodTypeStat.individual.revenue}
-              companyRevenue={periodTypeStat.company.revenue}
-            />
-            <CustomerTypeMetricsBarChart
-              individualCustomerCount={periodTypeStat.individual.customerCount}
-              companyCustomerCount={periodTypeStat.company.customerCount}
-              individualOrderCount={periodTypeStat.individual.orderCount}
-              companyOrderCount={periodTypeStat.company.orderCount}
-            />
-          </div>
+              kỳ với toggle ngay trên; toggle CHỈ SỐ (doanh thu/số khách/số
+              đơn) là toggle riêng, cục bộ trong biểu đồ — cả 3 đều tự nhiên
+              cộng đúng 100% giữa 2 loại khách nên gộp về 1 donut duy nhất
+              thay vì 2 biểu đồ khác dạng như trước (CEO 2026-08-06). */}
+          <CustomerTypeShareDonutChart
+            individual={periodTypeStat.individual}
+            company={periodTypeStat.company}
+          />
           <CustomerTypeComparisonTable
             individual={periodTypeStat.individual}
             company={periodTypeStat.company}
