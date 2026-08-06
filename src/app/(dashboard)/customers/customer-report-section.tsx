@@ -12,10 +12,9 @@ import {
   type CustomerOverviewPeriod,
 } from "./customer-overview-period-toggle";
 import {
-  CustomerTypeComparisonTable,
+  CustomerTypeShareDonutChart,
   type CustomerTypeStat,
-} from "./customer-type-comparison-table";
-import { CustomerTypeShareDonutChart } from "./customer-type-share-donut-chart";
+} from "./customer-type-share-donut-chart";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
@@ -220,9 +219,10 @@ export function CustomerReportSection({
 
       {/* Tổng quan theo kỳ — CEO yêu cầu 2026-08-06 toggle Tháng này/Tháng
           trước/Năm nay/Năm trước giống hệt /orders, thay cho 3 thẻ công nợ
-          tĩnh trước đó. "Khách mới trong kỳ"/"Doanh thu trong kỳ" rồi "Công nợ
-          phát sinh" đều bỏ dần sau đó (CEO 2026-08-06) — chỉ còn donut tỉ
-          trọng + bảng tương quan cá nhân/công ty. */}
+          tĩnh trước đó. "Khách mới trong kỳ"/"Doanh thu trong kỳ", "Công nợ
+          phát sinh", rồi bảng "Tương quan cá nhân/công ty" đều bỏ dần sau đó
+          (CEO 2026-08-06, bảng trùng phần lớn với donut) — chỉ còn donut tỉ
+          trọng. */}
       {showDebt && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -237,10 +237,6 @@ export function CustomerReportSection({
               cộng đúng 100% giữa 2 loại khách nên gộp về 1 donut duy nhất
               thay vì 2 biểu đồ khác dạng như trước (CEO 2026-08-06). */}
           <CustomerTypeShareDonutChart
-            individual={periodTypeStat.individual}
-            company={periodTypeStat.company}
-          />
-          <CustomerTypeComparisonTable
             individual={periodTypeStat.individual}
             company={periodTypeStat.company}
           />

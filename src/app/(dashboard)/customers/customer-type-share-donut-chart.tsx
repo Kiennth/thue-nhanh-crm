@@ -10,7 +10,11 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { CustomerTypeStat } from "./customer-type-comparison-table";
+export interface CustomerTypeStat {
+  customerCount: number;
+  orderCount: number;
+  revenue: number;
+}
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const numberFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
