@@ -16,7 +16,7 @@ import type { PayrollBranchScope } from "./payroll-branch-period-toggle";
 // không nằm trong danh sách này (nếu phát sinh sau) xếp cuối theo tên.
 const BRANCH_ORDER = ["Hà Nội", "TP HCM", "Đà Nẵng", "HQ"];
 
-const PAYROLL_BRANCH_SCOPES = ["thisMonth", "lastMonth", "thisYear", "lastYear"] as const;
+const PAYROLL_BRANCH_SCOPES = ["thisMonth", "lastMonth", "thisYear", "lastYear", "custom"] as const;
 function isPayrollBranchScope(value: string): value is PayrollBranchScope {
   return (PAYROLL_BRANCH_SCOPES as readonly string[]).includes(value);
 }
@@ -28,12 +28,23 @@ function monthsOfYear(year: number): string[] {
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; sort?: string; dir?: string; payrollScope?: string }>;
+  searchParams: Promise<{
+    month?: string;
+    payrollScope?: string;
+    payrollCustomMonth?: string;
+  }>;
 }) {
-  const { month: monthParam, payrollScope: payrollScopeParam } = await searchParams;
+  const {
+    month: monthParam,
+    payrollScope: payrollScopeParam,
+    payrollCustomMonth,
+  } = await searchParams;
   const month = monthParam ?? currentMonth();
   const payrollScope: PayrollBranchScope =
     payrollScopeParam && isPayrollBranchScope(payrollScopeParam) ? payrollScopeParam : "thisMonth";
+  // Ô "chọn tháng bất kỳ" ở cuối toggle — mặc định bằng tháng đang xem trên
+  // MonthNavigator cho tới khi người dùng tự chọn tháng khác.
+  const customMonth = payrollCustomMonth ?? month;
 
   const viewer = await getCurrentEmployee();
   if (!viewer) return null;
@@ -92,6 +103,11 @@ export default async function PayrollPage({
       monthsOfYear(targetYear).map((m) => computeEmployeeMonthlyPerformance(m)),
     );
     scopeRows = sumEmployeePerformanceAcrossMonths(monthlyRows).sort(byBranchThenName);
+  } else if (canViewAll && payrollScope === "custom") {
+    scopeRows =
+      customMonth === month
+        ? sortedRows
+        : (await computeEmployeeMonthlyPerformance(customMonth)).sort(byBranchThenName);
   }
 
   const branchColorIndexById = new Map(
@@ -139,6 +155,7 @@ export default async function PayrollPage({
         branchColorIndexById={branchColorIndexById}
         scopeRows={scopeRows}
         payrollScope={payrollScope}
+        customMonth={customMonth}
         canViewAll={canViewAll}
       />
     </div>

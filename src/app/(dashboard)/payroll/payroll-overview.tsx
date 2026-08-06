@@ -31,6 +31,7 @@ export function PayrollOverview({
   branchColorIndexById,
   scopeRows,
   payrollScope,
+  customMonth,
   canViewAll,
 }: {
   rows: EmployeeMonthlyPerformance[];
@@ -50,6 +51,8 @@ export function PayrollOverview({
   // toggle) nên dùng thẳng không cần nhánh điều kiện riêng ở đây.
   scopeRows: EmployeeMonthlyPerformance[];
   payrollScope: PayrollBranchScope;
+  // Giá trị cho ô "chọn tháng bất kỳ" ở cuối toggle — xem page.tsx.
+  customMonth: string;
   // Chỉ Giám đốc/Admin/Kế toán mới có toggle kỳ (Cửa hàng trưởng/nhân viên
   // luôn chỉ xem đúng 1 tháng trên MonthNavigator) — CEO chốt 2026-08-06.
   canViewAll: boolean;
@@ -148,7 +151,7 @@ export function PayrollOverview({
                 Tổng chi lương từng chi nhánh — di chuột để xem kèm số nhân viên.
               </p>
             </div>
-            <PayrollBranchPeriodToggle value={payrollScope} />
+            <PayrollBranchPeriodToggle value={payrollScope} customMonth={customMonth} />
           </CardHeader>
           <CardContent>
             <BranchPayrollDonutChart points={branchPoints} />
@@ -165,7 +168,9 @@ export function PayrollOverview({
               để xem số chi tiết.
             </p>
           </div>
-          {canViewAll && <PayrollBranchPeriodToggle value={payrollScope} />}
+          {canViewAll && (
+            <PayrollBranchPeriodToggle value={payrollScope} customMonth={customMonth} />
+          )}
         </CardHeader>
         <CardContent>
           <EmployeeIncomeCompositionChart rows={scopeRows} />
