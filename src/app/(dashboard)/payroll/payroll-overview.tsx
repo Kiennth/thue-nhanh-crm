@@ -15,9 +15,9 @@ function sumIncome(rows: EmployeeMonthlyPerformance[]) {
   return rows.reduce((sum, r) => sum + r.totalIncome, 0);
 }
 
-// Tổng quan quỹ lương tháng: 4 con số chốt ở trên, rồi biểu đồ cơ cấu thu
-// nhập từng người (cột chồng ngang) — nhìn phát biết ai ăn khoán nhiều, ai
-// chủ yếu lương cứng, mà không phải dò 12 cột số trong bảng bên dưới.
+// Tổng quan quỹ lương tháng: 4 con số chốt ở trên, rồi quỹ lương theo chi
+// nhánh + cơ cấu thu nhập từng người — nhìn phát biết chi nhánh nào tốn
+// nhất, ai ăn khoán nhiều, ai chủ yếu lương cứng.
 // "Chưa gán" (nhân viên không branch_id) không có id thật trong bảng
 // branches — dùng sentinel cố định để vẫn gộp/tô màu ổn định được.
 const UNASSIGNED_BRANCH_ID = "__unassigned__";
@@ -29,8 +29,9 @@ export function PayrollOverview({
   branchName,
   branchNameById,
   branchColorIndexById,
-  branchPayrollRows,
+  scopeRows,
   payrollScope,
+  canViewAll,
 }: {
   rows: EmployeeMonthlyPerformance[];
   prevRows: EmployeeMonthlyPerformance[];
@@ -42,11 +43,16 @@ export function PayrollOverview({
   branchNameById?: Map<string, string>;
   // Màu ổn định theo chi nhánh (không đổi khi đổi kỳ xem) — xem page.tsx.
   branchColorIndexById?: Map<string, number>;
-  // Tập dữ liệu cho ĐÚNG kỳ đang chọn ở toggle "Quỹ lương theo chi nhánh" —
-  // KHÁC rows (luôn là đúng 1 tháng trên MonthNavigator, dùng cho 4 thẻ tổng
-  // quan + biểu đồ cơ cấu thu nhập phía dưới). CEO yêu cầu 2026-08-06.
-  branchPayrollRows?: EmployeeMonthlyPerformance[];
-  payrollScope?: PayrollBranchScope;
+  // Tập dữ liệu cho ĐÚNG kỳ đang chọn ở toggle "Quỹ lương theo chi nhánh"/
+  // "Cơ cấu thu nhập theo nhân viên" — KHÁC rows (luôn là đúng 1 tháng trên
+  // MonthNavigator, dùng cho 4 thẻ tổng quan). Với vai trò không xem được
+  // toàn công ty, page.tsx luôn trả về scopeRows = rows (không đổi theo
+  // toggle) nên dùng thẳng không cần nhánh điều kiện riêng ở đây.
+  scopeRows: EmployeeMonthlyPerformance[];
+  payrollScope: PayrollBranchScope;
+  // Chỉ Giám đốc/Admin/Kế toán mới có toggle kỳ (Cửa hàng trưởng/nhân viên
+  // luôn chỉ xem đúng 1 tháng trên MonthNavigator) — CEO chốt 2026-08-06.
+  canViewAll: boolean;
 }) {
   if (!rows.length) return null;
 
@@ -64,11 +70,12 @@ export function PayrollOverview({
   const scopeLabel = branchName ? `kho ${branchName}` : "toàn công ty";
 
   // Xem toàn công ty: gom quỹ lương theo chi nhánh để thấy nơi nào tốn nhất.
-  // Cửa hàng trưởng chỉ có 1 chi nhánh nên khối này tự ẩn.
+  // Cửa hàng trưởng/nhân viên không có khối này (branchName có giá trị, hoặc
+  // canViewAll=false).
   const branchPoints: BranchPayrollPoint[] = (() => {
-    if (branchName || !branchNameById || !branchPayrollRows) return [];
+    if (!canViewAll || !branchNameById) return [];
     const byBranch = new Map<string, { branch: string; total: number; headcount: number }>();
-    for (const row of branchPayrollRows) {
+    for (const row of scopeRows) {
       const id = row.branchId ?? UNASSIGNED_BRANCH_ID;
       const label = (row.branchId ? branchNameById.get(row.branchId) : undefined) ?? "Chưa gán";
       const cur = byBranch.get(id) ?? { branch: label, total: 0, headcount: 0 };
@@ -132,7 +139,7 @@ export function PayrollOverview({
         </StatCard>
       </div>
 
-      {!branchName && branchNameById && branchNameById.size > 1 && payrollScope && (
+      {canViewAll && branchNameById && branchNameById.size > 1 && (
         <Card>
           <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
             <div>
@@ -150,15 +157,18 @@ export function PayrollOverview({
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Cơ cấu thu nhập theo nhân viên</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Mỗi thanh là 1 người — các mảng màu là từng hạng mục cấu thành thu nhập. Di chuột để
-            xem số chi tiết; bảng đầy đủ ở ngay dưới.
-          </p>
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Cơ cấu thu nhập theo nhân viên</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Mỗi thanh là 1 người — các mảng màu là từng hạng mục cấu thành thu nhập. Di chuột
+              để xem số chi tiết.
+            </p>
+          </div>
+          {canViewAll && <PayrollBranchPeriodToggle value={payrollScope} />}
         </CardHeader>
         <CardContent>
-          <EmployeeIncomeCompositionChart rows={rows} />
+          <EmployeeIncomeCompositionChart rows={scopeRows} />
         </CardContent>
       </Card>
     </div>
