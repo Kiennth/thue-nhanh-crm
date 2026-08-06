@@ -26,6 +26,10 @@ export interface CustomerReportData {
   returningRate: { month: string; activeCount: number; returningCount: number }[];
   topCompanies: { id: string; name: string; orderCount: number; totalRevenue: number }[];
   debt: { id: string; name: string; orderCount: number; totalOwed: number }[];
+  // Công nợ CÒN THIẾU của các đơn theo order_date rơi vào từng kỳ (không
+  // phải dồn theo khách như "debt" ở trên) — CEO yêu cầu 2026-08-06 để theo
+  // dõi công nợ mới phát sinh, không chỉ nhìn "ai đang nợ nhiều nhất".
+  debtByPeriod: { thisMonth: number; lastMonth: number; thisYear: number };
 }
 import { RevenueBarList } from "@/components/revenue-bar-list";
 
@@ -223,6 +227,26 @@ export function CustomerReportSection({
           sau) — khi bật lại cần bổ sung mảng dormant vào RPC
           customer_page_report rồi truyền xuống đây thay cho []. */}
       {false && showDormant && <DormantCustomersCard rows={[]} />}
+
+      {/* Công nợ CÒN THIẾU phát sinh theo kỳ (khác "Công nợ" bên dưới — đó
+          là công nợ DỒN theo khách, không theo thời điểm phát sinh). CEO yêu
+          cầu 2026-08-06. */}
+      {showDebt && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Công nợ tháng này"
+            value={`${currencyFormatter.format(data.debtByPeriod.thisMonth)}đ`}
+          />
+          <StatCard
+            label="Công nợ tháng trước"
+            value={`${currencyFormatter.format(data.debtByPeriod.lastMonth)}đ`}
+          />
+          <StatCard
+            label="Công nợ cả năm"
+            value={`${currencyFormatter.format(data.debtByPeriod.thisYear)}đ`}
+          />
+        </div>
+      )}
 
       {(showRankings || showDebt) && (
         // Bỏ xếp hạng thì chỉ còn công nợ — để nguyên 3 cột sẽ thành một thẻ

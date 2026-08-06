@@ -118,6 +118,7 @@ export default async function CustomersPage({
     returningRate: rawReport.returningRate ?? [],
     topCompanies: rawReport.topCompanies ?? [],
     debt: rawReport.debt ?? [],
+    debtByPeriod: rawReport.debtByPeriod ?? { thisMonth: 0, lastMonth: 0, thisYear: 0 },
   };
 
   const rawList = (listRes.data ?? {}) as { totalCount?: number; rows?: CustomerListRpcRow[] };
@@ -146,14 +147,17 @@ export default async function CustomersPage({
         <CustomerDialog />
       </div>
 
-      <CustomerReportSection
-        data={reportData}
-        // Admin đi cùng đơn hàng nên vẫn cần công nợ để đôn đốc thu tiền,
-        // nhưng không cần xếp hạng doanh số hay danh sách khách nguội.
-        showRankings={!reportBranchId && !isAdmin}
-        showDormant={!reportBranchId && !isAdmin}
-        showDebt={!reportBranchId}
-      />
+      {/* CEO chốt 2026-08-06: Admin bỏ luôn cả "Báo cáo khách hàng" tổng
+          (trước đây vẫn giữ riêng công nợ để đôn đốc thu tiền — nay bỏ hết,
+          không chỉ xếp hạng/khách nguội). */}
+      {!isAdmin && (
+        <CustomerReportSection
+          data={reportData}
+          showRankings={!reportBranchId}
+          showDormant={!reportBranchId}
+          showDebt={!reportBranchId}
+        />
+      )}
 
       <div className="space-y-3">
         <SearchInput
