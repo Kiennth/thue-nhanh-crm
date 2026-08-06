@@ -64,6 +64,18 @@ export interface EquipmentValueOverview {
   // TĨNH tại 1 thời điểm.
   topStockIncrease: { equipmentTypeId: string; deltaValue: number }[];
   topStockDecrease: { equipmentTypeId: string; deltaValue: number }[];
+  // "Hàng hoá chiếm nhiều vốn tồn kho nhất" TẠI 2 MỐC QUÁ KHỨ — khác 2 mục
+  // trên (biến động TRONG kỳ): đây là cơ cấu vốn tồn kho tại 1 thời điểm.
+  // Mốc "Hiện tại" của toggle KHÔNG lấy từ đây — dùng số RPC chính xác hơn
+  // (equipment_stock hiện tại, xem equipment/page.tsx) vì dựng lại từ
+  // equipment_purchases thiếu lịch sử hàng cũ (162/164 loại đang có tồn kho
+  // nhưng 0 dòng ghi nhận mua — kiểm tra 2026-08-06), sẽ ra số THIẾU rất
+  // nhiều. 2 mốc quá khứ này vẫn giữ dù cùng hạn chế đó vì không có nguồn
+  // nào khác — StockValueSnapshotCard hiện cảnh báo kèm theo.
+  stockValueSnapshots: {
+    endOfLastMonth: { equipmentTypeId: string; value: number }[];
+    endOfLastYear: { equipmentTypeId: string; value: number }[];
+  };
 }
 
 function toDateOnly(d: Date) {
@@ -172,20 +184,22 @@ function buildMonthTrend(ctx: BalanceContext, today: Date): EquipmentValueTrendP
   return points;
 }
 
-// Tăng/giảm giá trị tồn kho trong tháng, tách riêng theo từng equipment_type
-// — so số dư (computeBalanceAsOf) tại 2 mốc "hôm nay" và "cuối tháng trước"
-// cho từng loại, thay vì tính 1 lần cho tổng như trend. Chỉ trả về loại có
-// tăng (deltaValue > 0), sắp giảm dần, lấy top 10.
-function computeMonthlyChangeByType(
+interface ByTypeContext {
+  purchasesByType: Map<string, Map<string, PurchaseRow[]>>;
+  disposalsByType: Map<string, Map<string, DisposalRow[]>>;
+  instancesByType: Map<string, InstanceRow[]>;
+  allTypeIds: Set<string>;
+}
+
+// Chia lại purchases/disposals/instances (đang gộp theo unit) sang gộp theo
+// equipment_type — dùng chung cho mọi tính toán "theo từng loại hàng" (tăng/
+// giảm trong tháng, cơ cấu tại 1 thời điểm) thay vì lặp lại logic gộp nhóm.
+function partitionByType(
   purchasesByUnit: Map<string, PurchaseRow[]>,
   disposalsByUnit: Map<string, DisposalRow[]>,
   instances: InstanceRow[],
   unitTypeMap: Map<string, string>,
-  today: Date,
-): {
-  increase: { equipmentTypeId: string; deltaValue: number }[];
-  decrease: { equipmentTypeId: string; deltaValue: number }[];
-} {
+): ByTypeContext {
   const purchasesByType = new Map<string, Map<string, PurchaseRow[]>>();
   for (const [unitId, rows] of purchasesByUnit) {
     const typeId = unitTypeMap.get(unitId);
@@ -213,21 +227,41 @@ function computeMonthlyChangeByType(
     ...instancesByType.keys(),
   ]);
 
+  return { purchasesByType, disposalsByType, instancesByType, allTypeIds };
+}
+
+function balanceByType(byType: ByTypeContext, asOf: string): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const typeId of byType.allTypeIds) {
+    const typeCtx: BalanceContext = {
+      purchasesByUnit: byType.purchasesByType.get(typeId) ?? new Map(),
+      disposalsByUnit: byType.disposalsByType.get(typeId) ?? new Map(),
+      instances: byType.instancesByType.get(typeId) ?? [],
+    };
+    result.set(typeId, computeBalanceAsOf(typeCtx, asOf).value);
+  }
+  return result;
+}
+
+// Tăng/giảm giá trị tồn kho trong tháng, tách riêng theo từng equipment_type
+// — so số dư (computeBalanceAsOf) tại 2 mốc "hôm nay" và "cuối tháng trước"
+// cho từng loại, thay vì tính 1 lần cho tổng như trend. Chỉ trả về loại có
+// tăng (deltaValue > 0), sắp giảm dần, lấy top 10.
+function computeMonthlyChangeByType(
+  byType: ByTypeContext,
+  today: Date,
+): {
+  increase: { equipmentTypeId: string; deltaValue: number }[];
+  decrease: { equipmentTypeId: string; deltaValue: number }[];
+} {
   const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  const previousAsOf = toDateStr(previousMonthEnd);
-  const currentAsOf = toDateStr(today);
+  const currentBalance = balanceByType(byType, toDateStr(today));
+  const previousBalance = balanceByType(byType, toDateStr(previousMonthEnd));
 
   const increase: { equipmentTypeId: string; deltaValue: number }[] = [];
   const decrease: { equipmentTypeId: string; deltaValue: number }[] = [];
-  for (const typeId of allTypeIds) {
-    const typeCtx: BalanceContext = {
-      purchasesByUnit: purchasesByType.get(typeId) ?? new Map(),
-      disposalsByUnit: disposalsByType.get(typeId) ?? new Map(),
-      instances: instancesByType.get(typeId) ?? [],
-    };
-    const current = computeBalanceAsOf(typeCtx, currentAsOf);
-    const previous = computeBalanceAsOf(typeCtx, previousAsOf);
-    const deltaValue = current.value - previous.value;
+  for (const typeId of byType.allTypeIds) {
+    const deltaValue = (currentBalance.get(typeId) ?? 0) - (previousBalance.get(typeId) ?? 0);
     if (deltaValue > 0) increase.push({ equipmentTypeId: typeId, deltaValue });
     else if (deltaValue < 0) decrease.push({ equipmentTypeId: typeId, deltaValue });
   }
@@ -239,6 +273,21 @@ function computeMonthlyChangeByType(
     increase: increase.slice(0, STOCK_CHANGE_TOP_N),
     decrease: decrease.slice(0, STOCK_CHANGE_TOP_N),
   };
+}
+
+// Top 10 loại hàng chiếm nhiều vốn tồn kho nhất TẠI đúng thời điểm asOf —
+// dùng cho toggle "tại thời điểm" (Hiện tại/Cuối tháng trước/Cuối năm
+// trước) của khối "Hàng hoá chiếm nhiều vốn tồn kho nhất".
+function computeTopStockValueAt(
+  byType: ByTypeContext,
+  asOf: string,
+): { equipmentTypeId: string; value: number }[] {
+  const balance = balanceByType(byType, asOf);
+  return Array.from(balance.entries())
+    .filter(([, value]) => value > 0)
+    .map(([equipmentTypeId, value]) => ({ equipmentTypeId, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
 }
 
 function buildYearTrend(ctx: BalanceContext, today: Date): EquipmentValueTrendPoint[] {
@@ -317,13 +366,11 @@ export async function computeEquipmentValueOverview(
   const deltaValue = currentPoint.value - previousPoint.value;
 
   const unitTypeMap = new Map(units.map((u) => [u.id, u.equipment_type_id] as const));
-  const monthlyChangeByType = computeMonthlyChangeByType(
-    purchasesByUnit,
-    disposalsByUnit,
-    instances,
-    unitTypeMap,
-    today,
-  );
+  const byType = partitionByType(purchasesByUnit, disposalsByUnit, instances, unitTypeMap);
+  const monthlyChangeByType = computeMonthlyChangeByType(byType, today);
+
+  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+  const endOfLastYear = new Date(today.getFullYear() - 1, 11, 31);
 
   return {
     trend: {
@@ -339,5 +386,9 @@ export async function computeEquipmentValueOverview(
     },
     topStockIncrease: monthlyChangeByType.increase,
     topStockDecrease: monthlyChangeByType.decrease,
+    stockValueSnapshots: {
+      endOfLastMonth: computeTopStockValueAt(byType, toDateStr(endOfLastMonth)),
+      endOfLastYear: computeTopStockValueAt(byType, toDateStr(endOfLastYear)),
+    },
   };
 }

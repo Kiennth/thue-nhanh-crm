@@ -38,6 +38,7 @@ import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
 import { EquipmentTypeDialog } from "./equipment-type-dialog";
 import { EquipmentValueTrendChart } from "./equipment-value-trend-chart";
+import { StockValueSnapshotCard } from "./stock-value-snapshot-card";
 import { EquipmentCategoryFilter } from "./equipment-category-filter";
 import { OrderDateRangeFilter } from "../orders/order-date-range-filter";
 
@@ -291,6 +292,11 @@ export default async function EquipmentPage({
         .sort((a, b) => (b.report?.profit_ratio ?? 0) - (a.report?.profit_ratio ?? 0))
         .slice(0, TOP_N)
         .map((r) => ({ label: r.type.name, value: (r.report?.profit_ratio ?? 0) * 100 })),
+      // Nguồn RPC (equipment_stock hiện tại × giá vốn bình quân) — dùng cho
+      // mốc "Hiện tại" của toggle bên dưới thay vì dựng lại từ
+      // equipment_purchases: bảng đó gần như trống với hàng cũ (162/164 loại
+      // đang có tồn kho nhưng 0 dòng ghi nhận mua — kiểm tra 2026-08-06), nên
+      // dựng lại từ đó sẽ ra số THIẾU rất nhiều so với thực tế.
       topInventoryValue: reportRows
         .filter((r) => (r.report?.current_inventory_value ?? 0) > 0)
         .sort((a, b) => (b.report?.current_inventory_value ?? 0) - (a.report?.current_inventory_value ?? 0))
@@ -308,6 +314,23 @@ export default async function EquipmentPage({
   const topStockDecreasePoints: RevenuePoint[] = (equipmentValueOverview?.topStockDecrease ?? [])
     .filter((r) => typeNameById.has(r.equipmentTypeId))
     .map((r) => ({ label: typeNameById.get(r.equipmentTypeId)!, value: r.deltaValue }));
+
+  // Toggle "tại thời điểm" cho khối "Hàng hoá chiếm nhiều vốn tồn kho nhất"
+  // — CEO chốt 2026-08-06. Mốc "Hiện tại" dùng số RPC chính xác
+  // (reportSummary.topInventoryValue, khớp "Tổng giá trị tồn kho" phía
+  // trên) — CHỈ 2 mốc quá khứ mới dùng số dựng lại từ equipment_purchases
+  // (kém chính xác hơn do thiếu lịch sử hàng cũ, xem cảnh báo trong
+  // StockValueSnapshotCard).
+  function toSnapshotPoints(rows: { equipmentTypeId: string; value: number }[]): RevenuePoint[] {
+    return rows
+      .filter((r) => typeNameById.has(r.equipmentTypeId))
+      .map((r) => ({ label: typeNameById.get(r.equipmentTypeId)!, value: r.value }));
+  }
+  const stockValueSnapshotPoints = {
+    current: reportSummary?.topInventoryValue ?? [],
+    endOfLastMonth: toSnapshotPoints(equipmentValueOverview?.stockValueSnapshots.endOfLastMonth ?? []),
+    endOfLastYear: toSnapshotPoints(equipmentValueOverview?.stockValueSnapshots.endOfLastYear ?? []),
+  };
 
   return (
     <div className="space-y-4">
@@ -398,12 +421,10 @@ export default async function EquipmentPage({
                 chịu ảnh hưởng của bộ lọc thời gian ở mục "Báo cáo", để
                 dưới đó dễ hiểu nhầm là số liệu theo kỳ đã chọn. */}
             <div className="mt-6 border-t pt-4">
-              <p className="mb-3 text-xs text-muted-foreground">
-                Hàng hoá chiếm nhiều vốn tồn kho nhất
-              </p>
-              <RevenueBarList
-                points={reportSummary.topInventoryValue}
-                labelWidthClassName="w-32"
+              <StockValueSnapshotCard
+                current={stockValueSnapshotPoints.current}
+                endOfLastMonth={stockValueSnapshotPoints.endOfLastMonth}
+                endOfLastYear={stockValueSnapshotPoints.endOfLastYear}
               />
             </div>
 
