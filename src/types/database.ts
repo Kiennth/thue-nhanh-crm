@@ -792,6 +792,7 @@ export interface Database {
           p_dir?: string;
           p_page?: number;
           p_page_size?: number;
+          p_unpaid_only?: boolean;
         };
         Returns: unknown;
       };

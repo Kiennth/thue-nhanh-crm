@@ -16,9 +16,12 @@ export default async function OrdersPage({
     dir?: string;
     search?: string;
     scope?: string;
+    overview?: string;
+    paid?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir, search, scope } = await searchParams;
+  const { status, range, from, to, page, sort, dir, search, scope, overview, paid } =
+    await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
@@ -35,10 +38,9 @@ export default async function OrdersPage({
   const listBranchId = viewingAllBranches || isTechSales ? null : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
   // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ. Admin
-  // cũng bỏ (CEO chốt 2026-08-06): không cần dùng tới, mà khối này đang kéo
-  // TOÀN BỘ đơn khớp bộ lọc (mặc định "Tất cả thời gian", có thể chạm
-  // ~10.000+ dòng) về tính tổng — nặng nhất khi không lọc gì, y hệt lỗi vừa
-  // vá ở /equipment.
+  // cũng bỏ (CEO chốt 2026-08-06): không cần dùng tới. Kế toán VẪN xem —
+  // CEO chốt thêm 2026-08-06: Kế toán cần tổng quan đơn hàng theo tháng/năm
+  // + đơn chưa thanh toán hết, y hệt Giám đốc.
   const canViewAggregates = employee.role !== "ky_thuat_sales" && employee.role !== "admin";
 
   // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
@@ -61,6 +63,8 @@ export default async function OrdersPage({
         sort={sort}
         dir={dir}
         search={search}
+        overview={overview}
+        paid={paid}
         branchId={listBranchId}
         canDelete={canManage}
         // Mở rộng ra toàn hệ thống thì ẩn dãy thẻ thống kê: cửa hàng trưởng

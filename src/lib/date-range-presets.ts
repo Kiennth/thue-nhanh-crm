@@ -4,6 +4,7 @@ export const DATE_RANGE_PRESET_OPTIONS = [
   { value: "yesterday", label: "Hôm qua" },
   { value: "last_7_days", label: "7 ngày trước" },
   { value: "last_week", label: "Tuần trước" },
+  { value: "this_month", label: "Tháng này" },
   { value: "last_month", label: "Tháng trước" },
   { value: "this_year", label: "Năm nay" },
   { value: "last_year", label: "Năm trước" },
@@ -66,6 +67,11 @@ export function computeDateRange(
       const thisMonday = startOfWeek(today);
       const lastMonday = addDays(thisMonday, -7);
       return { start: toDateStr(lastMonday), end: toDateStr(addDays(lastMonday, 6)) };
+    }
+    case "this_month": {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { start: toDateStr(start), end: toDateStr(end) };
     }
     case "last_month": {
       const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);

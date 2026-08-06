@@ -30,6 +30,10 @@ import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
+import {
+  OrdersOverviewPeriodToggle,
+  type OrdersOverviewPeriod,
+} from "./orders-overview-period-toggle";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -69,10 +73,30 @@ interface OrderRow {
   cancelled_at: string | null;
 }
 
+interface OrdersPageListStats {
+  totalRevenue: number;
+  completedCount: number;
+  cancelledCount: number;
+  unpaidCount: number;
+  unpaidAmount: number;
+}
+
 interface OrdersPageListResult {
   totalCount: number;
-  stats: { totalRevenue: number; completedCount: number; cancelledCount: number };
+  stats: OrdersPageListStats;
   rows: OrderRow[];
+}
+
+const EMPTY_STATS: OrdersPageListStats = {
+  totalRevenue: 0,
+  completedCount: 0,
+  cancelledCount: 0,
+  unpaidCount: 0,
+  unpaidAmount: 0,
+};
+
+function isOverviewPeriod(value: string): value is OrdersOverviewPeriod {
+  return ["this_month", "last_month", "this_year", "last_year"].includes(value);
 }
 
 // Nội dung trang /orders — Admin/Kế toán thấy tất cả chi nhánh (branchId
@@ -86,6 +110,8 @@ export async function OrdersListSection({
   sort,
   dir,
   search,
+  overview,
+  paid,
   branchId,
   canDelete,
   showStats = true,
@@ -99,6 +125,12 @@ export async function OrdersListSection({
   sort?: string;
   dir?: string;
   search?: string;
+  // Kỳ cho khối "Tổng quan đơn hàng" — độc lập với `range` của bảng bên
+  // dưới (xem OrdersOverviewPeriodToggle).
+  overview?: string;
+  // "unpaid" = đang lọc bảng chỉ còn đơn chưa thanh toán hết (bấm từ thẻ
+  // "Chưa thanh toán hết" trong khối tổng quan).
+  paid?: string;
   branchId: string | null;
   canDelete: boolean;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp — ẩn cả dãy thẻ thống kê
@@ -115,16 +147,28 @@ export async function OrdersListSection({
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(page) || 1);
+  const unpaidOnly = paid === "unpaid";
+  const overviewPeriod: OrdersOverviewPeriod =
+    overview && isOverviewPeriod(overview) ? overview : "this_month";
+  const overviewDateRange = computeDateRange(overviewPeriod, vnNow());
 
   const supabase = await createClient();
 
-  // Lọc (chi nhánh/trạng thái/khoảng ngày) + tìm kiếm (join customers ngay
-  // trong SQL) + sắp xếp + phân trang + thẻ tổng kết đều tính trong Postgres
-  // qua RPC orders_page_list (migration 20260806120000) — thay cho việc kéo
-  // TOÀN BỘ đơn khớp bộ lọc (~10.000 dòng) + TOÀN BỘ bảng customers (~5.500
-  // dòng, khi tìm kiếm/sắp theo tên) về JS mỗi lần tải trang. Kèm sẵn
-  // customer_name qua join nên không cần fetch riêng bảng customers nữa.
-  const [rpcRes, { data: branches }] = await Promise.all([
+  // Lọc (chi nhánh/trạng thái/khoảng ngày/chưa thanh toán) + tìm kiếm (join
+  // customers ngay trong SQL) + sắp xếp + phân trang + thẻ tổng kết đều tính
+  // trong Postgres qua RPC orders_page_list (migration 20260806120000, mở
+  // rộng p_unpaid_only ở 20260806130000) — thay cho việc kéo TOÀN BỘ đơn
+  // khớp bộ lọc (~10.000 dòng) + TOÀN BỘ bảng customers (~5.500 dòng, khi
+  // tìm kiếm/sắp theo tên) về JS mỗi lần tải trang. Kèm sẵn customer_name
+  // qua join nên không cần fetch riêng bảng customers nữa.
+  //
+  // Khối "Tổng quan đơn hàng" CEO yêu cầu 2026-08-06 phải có số Ý NGHĨA
+  // (tháng này/tháng trước/năm nay/năm trước) chứ không phải tổng dồn "Tất
+  // cả thời gian" như bảng bên dưới mặc định — gọi RPC lần THỨ 2, độc lập
+  // hoàn toàn với mọi bộ lọc của bảng (trạng thái/tìm kiếm/chưa thanh toán),
+  // chỉ khác nhau ở khoảng ngày (kỳ tổng quan) — page_size=1 vì chỉ cần
+  // .stats/.totalCount, không cần rows.
+  const [rpcRes, overviewRes, { data: branches }] = await Promise.all([
     supabase.rpc("orders_page_list", {
       p_branch_id: branchId,
       p_status: activeStatus,
@@ -135,14 +179,29 @@ export async function OrdersListSection({
       p_dir: activeDir,
       p_page: requestedPage,
       p_page_size: PAGE_SIZE,
+      p_unpaid_only: unpaidOnly,
     }),
+    showStats
+      ? supabase.rpc("orders_page_list", {
+          p_branch_id: branchId,
+          p_status: "all",
+          p_range_start: overviewDateRange?.start ?? null,
+          p_range_end: overviewDateRange?.end ?? null,
+          p_search: null,
+          p_sort: null,
+          p_dir: "asc",
+          p_page: 1,
+          p_page_size: 1,
+          p_unpaid_only: false,
+        })
+      : Promise.resolve({ data: null }),
     supabase.from("branches").select("id, name").order("position"),
   ]);
 
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
-  let result = (rpcRes.data ?? { totalCount: 0, stats: { totalRevenue: 0, completedCount: 0, cancelledCount: 0 }, rows: [] }) as OrdersPageListResult;
+  let result = (rpcRes.data ?? { totalCount: 0, stats: EMPTY_STATS, rows: [] }) as OrdersPageListResult;
   const totalPages = Math.max(1, Math.ceil(result.totalCount / PAGE_SIZE));
   let currentPage = requestedPage;
   // Trang đang xin vượt quá số trang thật (VD: đổi bộ lọc làm tổng số đơn
@@ -159,17 +218,44 @@ export async function OrdersListSection({
       p_dir: activeDir,
       p_page: currentPage,
       p_page_size: PAGE_SIZE,
+      p_unpaid_only: unpaidOnly,
     });
     if (refetched) result = refetched as OrdersPageListResult;
   }
 
   const totalCount = result.totalCount;
-  const totalRevenue = result.stats.totalRevenue;
-  const completedCount = result.stats.completedCount;
-  const cancelledCount = result.stats.cancelledCount;
-  const processingCount = totalCount - completedCount - cancelledCount;
   const orders = result.rows;
   const customerNameById = new Map(orders.map((o) => [o.customer_id, o.customer_name ?? "—"]));
+
+  const overviewStats = (
+    (overviewRes as { data: OrdersPageListResult | null }).data?.stats ?? EMPTY_STATS
+  );
+  const overviewTotalCount = (overviewRes as { data: OrdersPageListResult | null }).data?.totalCount ?? 0;
+  const overviewProcessingCount =
+    overviewTotalCount - overviewStats.completedCount - overviewStats.cancelledCount;
+  // Bấm thẻ "Chưa thanh toán hết" → lọc bảng bên dưới đúng theo kỳ tổng
+  // quan đang chọn + chỉ còn đơn chưa thanh toán hết, bỏ mọi bộ lọc khác
+  // (trạng thái/tìm kiếm/trang) để không gây nhầm lẫn kết quả.
+  const unpaidLinkParams = new URLSearchParams();
+  if (overviewPeriod !== "this_month") unpaidLinkParams.set("overview", overviewPeriod);
+  unpaidLinkParams.set("range", overviewPeriod);
+  unpaidLinkParams.set("paid", "unpaid");
+  const unpaidHref = `?${unpaidLinkParams.toString()}`;
+
+  // Bỏ lọc "chưa thanh toán hết" nhưng GIỮ NGUYÊN mọi lựa chọn khác đang có
+  // (trạng thái/khoảng ngày/tìm kiếm/sắp xếp/kỳ tổng quan) — chỉ xoá đúng
+  // tham số `paid`.
+  const clearUnpaidParams = new URLSearchParams();
+  if (status) clearUnpaidParams.set("status", status);
+  if (range) clearUnpaidParams.set("range", range);
+  if (from) clearUnpaidParams.set("from", from);
+  if (to) clearUnpaidParams.set("to", to);
+  if (sort) clearUnpaidParams.set("sort", sort);
+  if (dir) clearUnpaidParams.set("dir", dir);
+  if (search) clearUnpaidParams.set("search", search);
+  if (overview) clearUnpaidParams.set("overview", overview);
+  const clearUnpaidQuery = clearUnpaidParams.toString();
+  const clearUnpaidHref = clearUnpaidQuery ? `?${clearUnpaidQuery}` : "?";
 
   return (
     <div className="space-y-4">
@@ -179,15 +265,32 @@ export async function OrdersListSection({
       </div>
 
       {showStats && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Tổng đơn (khớp bộ lọc)" value={totalCount} />
-          <StatCard label="Đang xử lý" value={processingCount} />
-          <StatCard label="Hoàn tất" value={completedCount} />
-          <StatCard label="Đã huỷ" value={cancelledCount} />
-          <StatCard
-            label="Tổng doanh số"
-            value={`${currencyFormatter.format(Math.round(totalRevenue))}đ`}
-          />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">Tổng quan đơn hàng</h3>
+            <OrdersOverviewPeriodToggle value={overviewPeriod} />
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <StatCard label="Tổng đơn" value={overviewTotalCount} />
+            <StatCard label="Đang xử lý" value={overviewProcessingCount} />
+            <StatCard label="Hoàn tất" value={overviewStats.completedCount} />
+            <StatCard label="Đã huỷ" value={overviewStats.cancelledCount} />
+            <StatCard
+              label="Tổng doanh số"
+              value={`${currencyFormatter.format(Math.round(overviewStats.totalRevenue))}đ`}
+            />
+            <Link href={unpaidHref} className="block">
+              <StatCard
+                className="transition hover:border-destructive/50 hover:ring-1 hover:ring-destructive/30"
+                label="Chưa thanh toán hết"
+                value={overviewStats.unpaidCount}
+              >
+                <p className="text-xs text-muted-foreground">
+                  {currencyFormatter.format(Math.round(overviewStats.unpaidAmount))}đ còn thiếu
+                </p>
+              </StatCard>
+            </Link>
+          </div>
         </div>
       )}
 
@@ -201,6 +304,14 @@ export async function OrdersListSection({
         />
         <OrderStatusFilter value={activeStatus} />
         <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
+        {unpaidOnly && (
+          <Link
+            href={clearUnpaidHref}
+            className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
+          >
+            Chỉ hiện đơn chưa thanh toán hết ×
+          </Link>
+        )}
         {branchScope && (
           <OrderBranchScopeFilter value={branchScope.value} branchName={branchScope.branchName} />
         )}
