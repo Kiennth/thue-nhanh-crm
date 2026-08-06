@@ -125,9 +125,11 @@ export default async function EquipmentPage({
   // xem bức tranh tài sản của công ty: giá trị thiết bị theo thời gian, tổng
   // quan tồn kho, xếp hạng sản phẩm — CEO chốt 2026-08-01.
   const canViewEquipmentReports = canManageCatalog && employee?.role !== "admin";
-  // Xu hướng giá trị thiết bị + tổng quan tồn kho: Giám đốc/Kế toán xem toàn
-  // hệ thống, Cửa hàng trưởng xem đúng kho mình quản lý.
-  const canViewInventoryTrend = canViewEquipmentReports || employee?.role === "cua_hang_truong";
+  // Xu hướng giá trị thiết bị + tổng quan tồn kho — CEO chốt 2026-08-06: bỏ
+  // luôn cho Cửa hàng trưởng, không chỉ Admin (đây là bức tranh tài sản công
+  // ty, không phải việc vận hành hằng ngày của 1 kho). Chỉ còn Giám đốc/Kế
+  // toán xem được.
+  const canViewInventoryTrend = canViewEquipmentReports;
   // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
   // thông tin điều hành danh mục — Cửa hàng trưởng và Admin không cần biết.
   const canViewProductHighlights = canViewEquipmentReports;
@@ -170,9 +172,10 @@ export default async function EquipmentPage({
     }),
     supabase.from("pricing_templates").select("*").order("name"),
     supabase.from("equipment_categories").select("id, name").eq("is_active", true).order("sort_order"),
-    canViewInventoryTrend
-      ? computeEquipmentValueOverview(canManageCatalog ? null : employee!.branch_id)
-      : Promise.resolve(null),
+    // canViewInventoryTrend giờ chỉ true cho Giám đốc/Kế toán (canManageCatalog
+    // luôn true theo đó) nên không còn cần nhánh branch_id riêng cho Cửa hàng
+    // trưởng nữa — xem toàn công ty.
+    canViewInventoryTrend ? computeEquipmentValueOverview(null) : Promise.resolve(null),
     // Tên/loại hàng cho khối "Báo cáo" — TOÀN BỘ danh mục, không bị giới hạn
     // bởi bộ lọc tìm kiếm/danh mục đang áp cho bảng chính.
     supabase.from("equipment_types").select("id, name, product_type").order("name"),
