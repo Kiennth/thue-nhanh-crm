@@ -8,7 +8,6 @@ import {
   findDormantCustomers,
   type CustomerReportRow,
 } from "@/lib/customer-reports";
-import { ReturningRateCard } from "./customer-trend-cards";
 import {
   CustomerOverviewPeriodToggle,
   type CustomerOverviewPeriod,
@@ -23,14 +22,6 @@ import { VN_TIME_ZONE } from "@/lib/date-format";
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
 // vài chục dòng) — thay cho việc kéo 21k dòng thô về rồi cộng trừ trong JS.
 export interface CustomerReportData {
-  stats: {
-    totalCustomers: number;
-    individualCount: number;
-    companyCount: number;
-    withOrders: number;
-    returning2Plus: number;
-  };
-  returningRate: { month: string; activeCount: number; returningCount: number }[];
   topCompanies: { id: string; name: string; orderCount: number; totalRevenue: number }[];
   debt: { id: string; name: string; orderCount: number; totalOwed: number }[];
   // Khách mới/doanh thu/công nợ CÒN THIẾU theo order_date rơi vào từng kỳ
@@ -159,33 +150,6 @@ function DormantCustomersCard({ rows }: { rows: CustomerReportRow[] }) {
   );
 }
 
-// CEO yêu cầu 2026-08-06: bỏ "Tổng khách hàng"/"Cá nhân / Doanh nghiệp" — đã
-// được donut "Tỉ trọng số khách hàng" (chế độ Số khách, kỳ Toàn thời gian)
-// bao quát, chỉ còn lệch phần khách CHƯA TỪNG có đơn (donut chỉ đếm khách có
-// đơn — xem migration 20260806180000). Chỉ giữ lại 2 thẻ không donut nào thay
-// thế được.
-export function CustomerOverviewTiles({ stats }: { stats: CustomerReportData["stats"] }) {
-  // "Chưa quay lại" = có đơn nhưng chỉ đúng 1 — suy từ 2 số đếm của RPC.
-  const newCount = stats.withOrders - stats.returning2Plus;
-  const returningCount = stats.returning2Plus;
-  const rowsLength = stats.totalCustomers;
-
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      {/* Không đặt tên "Khách mới": đây là khách CHƯA TỪNG quay lại tính từ
-          đầu đến giờ, khác hẳn "khách mới trong tháng" ở thẻ xu hướng. */}
-      <StatCard label="Khách chưa quay lại (1 đơn)" value={newCount} />
-      <StatCard label="Khách quay lại (2+ đơn)" value={returningCount}>
-        {rowsLength > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {((returningCount / rowsLength) * 100).toFixed(0)}% tổng số khách
-          </p>
-        )}
-      </StatCard>
-    </div>
-  );
-}
-
 // Ba bảng số cũ (mỗi bảng 3 cột × 10 dòng) đọc rất mỏi mắt và chiếm chỗ.
 // Cùng một dữ liệu, ở dạng thanh ngang thì liếc phát thấy ngay ai vượt trội,
 // mà cao chỉ còn bằng nửa. Mỗi thẻ giữ đúng MỘT màu — thanh dài ngắn mới
@@ -264,11 +228,8 @@ export function CustomerReportSection({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Báo cáo khách hàng</h2>
 
-      <CustomerOverviewTiles stats={data.stats} />
-
-      {/* "Khách mới theo tháng" bỏ hẳn cho mọi vai trò (CEO 2026-08-06) —
-          chỉ còn tỉ lệ quay lại. */}
-      <ReturningRateCard ratePoints={data.returningRate} />
+      {/* "Khách chưa quay lại"/"Khách quay lại" + "Tỉ lệ khách quay lại theo
+          tháng" bỏ hẳn cho mọi vai trò (CEO 2026-08-06). */}
 
       {/* Thẻ "Khách nguội cần gọi lại" tạm ẩn (CEO 2026-08-02: sẽ dùng lại
           sau) — khi bật lại cần bổ sung mảng dormant vào RPC

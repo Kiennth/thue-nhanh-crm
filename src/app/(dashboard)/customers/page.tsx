@@ -117,15 +117,7 @@ export default async function CustomersPage({
 
   const rawReport = (reportRes.data ?? {}) as Partial<CustomerReportData> & { error?: string };
   const reportData: CustomerReportData = {
-    stats: rawReport.stats ?? {
-      totalCustomers: 0,
-      individualCount: 0,
-      companyCount: 0,
-      withOrders: 0,
-      returning2Plus: 0,
-    },
     // jsonb_agg trả null (không phải mảng rỗng) khi không có dòng nào.
-    returningRate: rawReport.returningRate ?? [],
     topCompanies: rawReport.topCompanies ?? [],
     debt: rawReport.debt ?? [],
     periodStats: rawReport.periodStats ?? EMPTY_PERIOD_STATS,

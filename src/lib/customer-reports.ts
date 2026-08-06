@@ -42,16 +42,6 @@ export function findDormantCustomers(
     .sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
-export interface ReturningRatePoint {
-  month: string;
-  // Số khách có đơn trong tháng, và trong đó bao nhiêu người đã từng thuê
-  // trước tháng này. rate = null khi tháng đó không có khách nào (tránh chia
-  // cho 0 và tránh vẽ điểm 0% giả).
-  activeCount: number;
-  returningCount: number;
-  rate: number | null;
-}
-
 // So sánh THỜI ĐIỂM THẬT (không dùng vnNow() — epoch của nó đã bị dịch, cộng
 // trừ trực tiếp sẽ sai) — quy "hôm nay" về đúng 00:00 giờ VN của ngày hôm
 // nay rồi trừ epoch thật với dateStr.
