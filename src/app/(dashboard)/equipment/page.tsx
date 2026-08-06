@@ -299,6 +299,13 @@ export default async function EquipmentPage({
     };
   }
 
+  // CEO yêu cầu 2026-08-06: xem chi tiết tồn kho đang "phình" ở sản phẩm
+  // nào trong tháng, không chỉ xem đường tổng trên biểu đồ.
+  const typeNameById = new Map(reportTypeList.map((t) => [t.id, t.name]));
+  const topStockIncreasePoints: RevenuePoint[] = (equipmentValueOverview?.topStockIncrease ?? [])
+    .filter((r) => typeNameById.has(r.equipmentTypeId))
+    .map((r) => ({ label: typeNameById.get(r.equipmentTypeId)!, value: r.deltaValue }));
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -353,6 +360,23 @@ export default async function EquipmentPage({
                 <p className="text-lg font-medium">
                   {currencyFormatter.format(reportSummary.totalInventoryValue)}đ
                 </p>
+                {/* CEO yêu cầu 2026-08-06: biết ngay đang tăng/giảm bao nhiêu
+                    so với tháng trước mà không phải đọc biểu đồ bên dưới. */}
+                {equipmentValueOverview && (
+                  <p
+                    className={`text-xs ${
+                      equipmentValueOverview.monthOverMonth.deltaValue >= 0
+                        ? "text-primary"
+                        : "text-destructive"
+                    }`}
+                  >
+                    {equipmentValueOverview.monthOverMonth.deltaValue >= 0 ? "+" : ""}
+                    {currencyFormatter.format(equipmentValueOverview.monthOverMonth.deltaValue)}đ
+                    {equipmentValueOverview.monthOverMonth.deltaPercent != null &&
+                      ` (${equipmentValueOverview.monthOverMonth.deltaValue >= 0 ? "+" : ""}${equipmentValueOverview.monthOverMonth.deltaPercent.toFixed(1)}%)`}{" "}
+                    so với tháng trước
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Số thiết bị đang giữ</p>
@@ -379,6 +403,18 @@ export default async function EquipmentPage({
                 labelWidthClassName="w-32"
               />
             </div>
+
+            {/* CEO yêu cầu 2026-08-06: sản phẩm nào đang kéo tồn kho tăng
+                nhiều nhất trong tháng — trả lời câu hỏi "phình ra ở đâu",
+                khác khối trên vốn là số TĨNH tại 1 thời điểm. */}
+            {topStockIncreasePoints.length > 0 && (
+              <div className="mt-6 border-t pt-4">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Tăng tồn kho nhiều nhất trong tháng
+                </p>
+                <RevenueBarList points={topStockIncreasePoints} labelWidthClassName="w-32" />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
