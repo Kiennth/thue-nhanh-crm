@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Roboto, JetBrains_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-// Industrial Skeuomorphism: Inter (humanist, trung tính kiểu Dieter Rams) +
-// JetBrains Mono cho mọi số liệu/nhãn kỹ thuật. Giữ nguyên tên biến
-// --font-geist-* để khỏi sửa @theme mapping trong globals.css.
-const interSans = Inter({
+// CEO chốt 2026-08-06: đổi sang Roboto — đúng font fallback Booqable đang
+// dùng (proxima-nova, Roboto, sans-serif; Proxima Nova là font trả phí,
+// không nhúng được). Giữ nguyên tên biến --font-geist-* để khỏi sửa @theme
+// mapping trong globals.css. JetBrains Mono vẫn có sẵn cho chỗ thật sự cần
+// số liệu canh cột đều, không còn bị ép dùng tràn lan như bản Industrial
+// Skeuomorphism trước đó.
+const robotoSans = Roboto({
   variable: "--font-geist-sans",
   subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "700"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -30,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${interSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${robotoSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <NextTopLoader

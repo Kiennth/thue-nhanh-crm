@@ -37,14 +37,12 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         <Link href="/" className="text-sm font-semibold">
           Thuê Nhanh CRM
         </Link>
-        {/* Đèn LED trạng thái kiểu vỏ máy — chi tiết ký danh của Industrial
-            Skeuomorphism, kèm nhãn mono như tem in trên chassis. */}
         <div className="mt-1 flex items-center gap-2">
           <span
             aria-hidden
             className="size-2 animate-pulse rounded-full bg-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.7)]"
           />
-          <span className="font-mono text-[0.6rem] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+          <span className="text-[0.6rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
             System Operational
           </span>
         </div>
