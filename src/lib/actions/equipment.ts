@@ -521,6 +521,77 @@ export async function transferEquipmentStock(
   return { success: true };
 }
 
+const TransferInstancesSchema = z.object({
+  equipment_type_id: z.string().uuid(),
+  to_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh đích." }),
+  instance_ids: z.array(z.string().uuid()).min(1, { message: "Chọn ít nhất 1 sản phẩm để chuyển." }),
+});
+
+// Chuyển kho nhanh cho hàng serialized — chọn nhiều máy chuyển sang chi nhánh
+// khác 1 lượt, thay vì mở "Sửa" từng máy (CEO yêu cầu 2026-08-08). Chỉ
+// MANAGE_ROLES (không có Cửa hàng trưởng, khác transferEquipmentStock): RLS
+// update của equipment_instances vốn chỉ cho 3 role này đổi branch_id — với
+// cua_hang_truong, with-check đòi branch mới PHẢI là chi nhánh mình nên
+// chuyển ĐI đâu cũng bị chặn ở tầng DB; gate ở đây cho khớp thay vì để lỗi
+// RLS khó hiểu.
+export async function transferEquipmentInstances(
+  equipmentTypeId: string,
+  toBranchId: string,
+  instanceIds: string[],
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = TransferInstancesSchema.safeParse({
+    equipment_type_id: equipmentTypeId,
+    to_branch_id: toBranchId,
+    instance_ids: instanceIds,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+
+  // Máy "Đang cho thuê" đang nằm ở khách — chuyển kho lúc này là ghi sai vị
+  // trí vật lý; máy "Đã thanh lý" không còn để chuyển. UI đã lọc sẵn nhưng
+  // vẫn chặn lại ở đây (dialog có thể mở từ dữ liệu cũ chưa refresh).
+  const { data: instances, error: fetchError } = await supabase
+    .from("equipment_instances")
+    .select("id, identifier_code, status, branch_id, equipment_type_id")
+    .in("id", parsed.data.instance_ids);
+  if (fetchError) {
+    return { error: "Không thể đọc danh sách sản phẩm: " + fetchError.message };
+  }
+  if ((instances ?? []).length !== parsed.data.instance_ids.length) {
+    return { error: "Có sản phẩm không còn tồn tại — tải lại trang rồi thử lại." };
+  }
+  for (const inst of instances ?? []) {
+    if (inst.equipment_type_id !== parsed.data.equipment_type_id) {
+      return { error: `Sản phẩm "${inst.identifier_code}" không thuộc loại hàng này.` };
+    }
+    if (inst.status === "rented") {
+      return { error: `Máy "${inst.identifier_code}" đang cho thuê — thu hồi xong mới chuyển kho được.` };
+    }
+    if (inst.status === "disposed") {
+      return { error: `Máy "${inst.identifier_code}" đã thanh lý, không thể chuyển kho.` };
+    }
+    if (inst.branch_id === parsed.data.to_branch_id) {
+      return { error: `Máy "${inst.identifier_code}" đã ở chi nhánh đích rồi.` };
+    }
+  }
+
+  const { error } = await supabase
+    .from("equipment_instances")
+    .update({ branch_id: parsed.data.to_branch_id })
+    .in("id", parsed.data.instance_ids);
+  if (error) {
+    return { error: "Không thể chuyển kho: " + error.message };
+  }
+
+  revalidatePath(`/equipment/${parsed.data.equipment_type_id}`);
+  return { success: true };
+}
+
 // ---------------------------------------------------------------------------
 // equipment_instances — từng sản phẩm riêng lẻ (hàng cho thuê, theo dõi
 // individual). VD: xe theo biển số.

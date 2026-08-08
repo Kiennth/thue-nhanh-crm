@@ -40,6 +40,7 @@ import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
 import { TransferStockDialog } from "../transfer-stock-dialog";
+import { TransferInstancesDialog } from "../transfer-instances-dialog";
 import { EquipmentInstanceDialog } from "../equipment-instance-dialog";
 import { EquipmentInstanceDisposeDialog } from "../equipment-instance-dispose-dialog";
 import { EquipmentPurchaseDialog } from "../equipment-purchase-dialog";
@@ -610,6 +611,27 @@ export default async function EquipmentDetailPage({
                       lập theo serial riêng.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Chuyển kho nhanh nhiều máy — CEO yêu cầu 2026-08-08. Chỉ
+                  canManageCatalog (khớp RLS: cua_hang_truong không đổi được
+                  branch_id của instance, xem transferEquipmentInstances).
+                  Máy đang cho thuê/đã thanh lý không chuyển được — lọc sẵn. */}
+              {canManageCatalog && (
+                <div className="flex justify-end">
+                  <TransferInstancesDialog
+                    equipmentTypeId={type.id}
+                    branches={branchList}
+                    instances={sortedInstances
+                      .filter((i) => i.status === "available" || i.status === "maintenance")
+                      .map((i) => ({
+                        id: i.id,
+                        identifier_code: i.identifier_code,
+                        branch_id: i.branch_id,
+                        branchName: branchNameById.get(i.branch_id ?? "") ?? "Chưa gán",
+                      }))}
+                  />
                 </div>
               )}
 
