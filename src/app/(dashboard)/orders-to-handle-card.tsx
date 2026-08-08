@@ -86,7 +86,10 @@ function OrderCountdownList({
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{order.orderCode}</span>
-                    <span className="text-muted-foreground">{order.customerName}</span>
+                    {/* Tên khách là thông tin chính — để màu chữ chuẩn, không
+                        dùng muted (CEO 2026-08-09: chữ xám trên nền trắng
+                        nhìn mờ so với bảng các trang khác). */}
+                    <span>{order.customerName}</span>
                     <BranchBadge name={order.branchName} />
                   </div>
                   <div className="flex flex-col items-end">

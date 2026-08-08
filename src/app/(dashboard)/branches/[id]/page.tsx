@@ -11,7 +11,6 @@ import {
   revenueForYear,
   todayParts,
 } from "@/lib/dashboard-reports";
-import { computeEquipmentTypeReports } from "@/lib/equipment-reports";
 import { computeOrdersOverview } from "@/lib/orders-overview";
 import { PeriodStatCards } from "../../orders/period-stat-cards";
 import { OrdersTrendChart } from "../../orders/orders-trend-chart";
@@ -38,97 +37,68 @@ export default async function BranchDashboardPage({
 
   const supabase = await createClient();
 
+  // PeriodRevenueCards chỉ đọc đúng 3 mốc Ngày/Tháng/Năm đang chọn — chỉ cần
+  // fetch đơn trong cửa sổ bao trùm 3 mốc đó (thường = đúng 1 năm), không kéo
+  // cả lịch sử. Trang này từng tải 16,5s trên production (đo 2026-08-09) vì
+  // kéo NGUYÊN bảng order_equipment 30k+ dòng + 5 bảng thiết bị rồi cộng dồn
+  // bằng JS — phần đó giờ giao cho RPC equipment_page_report (cùng hàm đã chữa
+  // /equipment, lọc theo p_branch_id, doanh thu chỉ đơn hoàn tất).
+  const rangeStart = [`${day.slice(0, 4)}-01-01`, `${month.slice(0, 4)}-01-01`, `${year}-01-01`]
+    .sort()[0];
+  const rangeEnd = [`${day.slice(0, 4)}-12-31`, `${month.slice(0, 4)}-12-31`, `${year}-12-31`]
+    .sort()
+    .at(-1)!;
+
   const [
     { data: branch },
     orders,
     { data: types },
-    { data: units },
-    { data: instances },
-    { data: purchases },
-    { data: disposals },
-    { data: stock },
+    { data: reportRows, error: reportError },
     ordersOverview,
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
-    // CEO chốt 2026-08-08: doanh thu chỉ tính đơn hoàn tất (trước đây còn
-    // không lọc cả đơn huỷ — bug có sẵn, tiện sửa luôn theo quy tắc mới).
-    // orderList nuôi PeriodRevenueCards + doanh thu thiết bị của chi nhánh.
-    fetchAllRows<{ id: string; order_date: string; total_value: number }>((from, to) =>
+    // CEO chốt 2026-08-08: doanh thu chỉ tính đơn hoàn tất.
+    fetchAllRows<{ order_date: string; total_value: number }>((from, to) =>
       supabase
         .from("orders")
-        .select("id, order_date, total_value")
+        .select("order_date, total_value")
         .eq("pickup_branch_id", id)
         .is("cancelled_at", null)
         .not("completed_at", "is", null)
+        .gte("order_date", rangeStart)
+        .lte("order_date", rangeEnd)
         .range(from, to),
     ),
-    supabase.from("equipment_types").select("id, name, product_type, tracking_type"),
-    supabase.from("equipment_units").select("id, equipment_type_id"),
-    supabase
-      .from("equipment_instances")
-      .select("equipment_type_id, purchase_price, disposal_price, status")
-      .eq("branch_id", id),
-    supabase
-      .from("equipment_purchases")
-      .select("equipment_unit_id, quantity, unit_cost")
-      .eq("branch_id", id),
-    supabase
-      .from("equipment_disposals")
-      .select("equipment_unit_id, quantity, unit_price")
-      .eq("branch_id", id),
-    supabase
-      .from("equipment_stock")
-      .select("equipment_unit_id, quantity_total")
-      .eq("branch_id", id),
+    supabase.from("equipment_types").select("id, name, product_type"),
+    supabase.rpc("equipment_page_report", { p_branch_id: id, p_start: null, p_end: null }),
     computeOrdersOverview(id),
   ]);
 
   if (!branch) {
     notFound();
   }
+  if (reportError) {
+    throw new Error("Không tải được báo cáo thiết bị chi nhánh: " + reportError.message);
+  }
 
   const orderList = orders;
-  const orderIdSet = new Set(orderList.map((o) => o.id));
-  // Không lọc order_equipment bằng .in(order_id, ...) — chi nhánh đông có thể
-  // hàng nghìn đơn, danh sách IN dài cỡ đó dễ vượt giới hạn độ dài URL của
-  // PostgREST. Lấy toàn bộ order_equipment (phân trang) rồi lọc ở JS.
-  const allOrderLines = orderIdSet.size
-    ? await fetchAllRows<{ order_id: string; equipment_type_id: string | null; line_total: number }>(
-        (from, to) =>
-          supabase
-            .from("order_equipment")
-            .select("order_id, equipment_type_id, line_total")
-            .range(from, to),
-      )
-    : [];
-  const orderLines = allOrderLines.filter((line) => orderIdSet.has(line.order_id));
-
   const typeList = types ?? [];
-  const reports = computeEquipmentTypeReports(
-    typeList,
-    units ?? [],
-    instances ?? [],
-    purchases ?? [],
-    disposals ?? [],
-    stock ?? [],
-    orderLines ?? [],
-  );
-  const rows = typeList.map((type) => ({ type, report: reports.get(type.id)! }));
+  const reportByTypeId = new Map((reportRows ?? []).map((r) => [r.equipment_type_id, r]));
+  const rows = typeList.map((type) => ({ type, report: reportByTypeId.get(type.id) }));
 
   const mostRented = rows
-    .filter((r) => r.type.product_type === "rental")
-    .sort((a, b) => b.report.rentalCount - a.report.rentalCount)
-    .filter((r) => r.report.rentalCount > 0)
+    .filter((r) => r.type.product_type === "rental" && (r.report?.rental_count ?? 0) > 0)
+    .sort((a, b) => (b.report?.rental_count ?? 0) - (a.report?.rental_count ?? 0))
     .slice(0, 5);
 
-  const flagship = [...rows]
-    .sort((a, b) => b.report.revenue - a.report.revenue)
-    .filter((r) => r.report.revenue > 0)
+  const flagship = rows
+    .filter((r) => (r.report?.revenue ?? 0) > 0)
+    .sort((a, b) => (b.report?.revenue ?? 0) - (a.report?.revenue ?? 0))
     .slice(0, 5);
 
   const topMargin = rows
-    .filter((r) => r.report.profitRatio !== null)
-    .sort((a, b) => (b.report.profitRatio ?? 0) - (a.report.profitRatio ?? 0))
+    .filter((r) => r.report?.profit_ratio != null)
+    .sort((a, b) => (b.report?.profit_ratio ?? 0) - (a.report?.profit_ratio ?? 0))
     .slice(0, 5);
 
   return (
@@ -159,11 +129,11 @@ export default async function BranchDashboardPage({
       </div>
 
       <ProductHighlightCards
-        mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report.rentalCount }))}
-        flagship={flagship.map((r) => ({ label: r.type.name, value: r.report.revenue }))}
+        mostRented={mostRented.map((r) => ({ label: r.type.name, value: r.report?.rental_count ?? 0 }))}
+        flagship={flagship.map((r) => ({ label: r.type.name, value: r.report?.revenue ?? 0 }))}
         topMargin={topMargin.map((r) => ({
           label: r.type.name,
-          value: (r.report.profitRatio ?? 0) * 100,
+          value: (r.report?.profit_ratio ?? 0) * 100,
         }))}
       />
     </div>
