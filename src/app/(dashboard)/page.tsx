@@ -299,22 +299,10 @@ export default async function DashboardHomePage({
         </p>
       </div>
 
-      {/* CEO chốt 2026-08-05: Cửa hàng trưởng lẫn Kỹ thuật/Sales (mọi role
-          không thuộc MANAGE_ROLES) ưu tiên xem đơn hàng trước, "Thu nhập của
-          bạn" đẩy xuống dưới. CEO chốt thêm 2026-08-06: Admin cũng vậy (dù
-          Admin thuộc MANAGE_ROLES) — chỉ Giám đốc/Kế toán giữ thứ tự cũ (thu
-          nhập trước, đơn hàng sau). */}
-      {!canManage || employee.role === "admin" ? (
-        <>
-          {ordersSection}
-          {incomeSection}
-        </>
-      ) : (
-        <>
-          {incomeSection}
-          {ordersSection}
-        </>
-      )}
+      {/* CEO chốt 2026-08-08: "Thu nhập của bạn" xuống DƯỚI CÙNG trang chủ
+          cho MỌI vai trò (trước đó chỉ Giám đốc/Kế toán còn giữ nó ở đầu) —
+          đơn hàng và so sánh chi nhánh mới là thứ cần thấy ngay khi mở app. */}
+      {ordersSection}
 
       {canViewBranchComparison && (
         <BranchComparisonSection
@@ -327,6 +315,8 @@ export default async function DashboardHomePage({
           profitPeriod={profitPeriod}
         />
       )}
+
+      {incomeSection}
     </div>
   );
 }
