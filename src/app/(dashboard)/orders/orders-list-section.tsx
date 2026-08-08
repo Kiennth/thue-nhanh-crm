@@ -273,7 +273,7 @@ export async function OrdersListSection({
 
       {showStats && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">Tổng quan đơn hàng</h3>
             <OrdersOverviewPeriodToggle value={overviewPeriod} />
           </div>

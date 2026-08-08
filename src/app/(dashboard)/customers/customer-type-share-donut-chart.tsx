@@ -61,7 +61,7 @@ export function CustomerTypeShareDonutChart({
         <CardTitle className="text-base">
           Tỉ trọng {METRIC_OPTIONS.find((o) => o.value === metric)!.label.toLowerCase()}
         </CardTitle>
-        <div className="inline-flex items-center gap-1 rounded-lg border p-1">
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border p-1">
           {METRIC_OPTIONS.map((o) => (
             <Button
               key={o.value}

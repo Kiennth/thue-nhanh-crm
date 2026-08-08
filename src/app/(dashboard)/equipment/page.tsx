@@ -337,9 +337,12 @@ export default async function EquipmentPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* flex-wrap cả 2 tầng: mobile 375px không đủ chỗ cho tiêu đề + ô tìm
+          + lọc danh mục + nút Thêm trên 1 hàng — không wrap là cả trang bị
+          scroll ngang. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SearchInput
             key={activeSearch}
             paramName="search"

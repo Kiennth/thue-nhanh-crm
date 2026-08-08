@@ -43,7 +43,10 @@ function OrderCountdownList({
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between">
+      {/* flex-wrap + gap-y: màn hẹp (mobile 375px) tiêu đề và cụm lọc/badge
+          không đủ chỗ 1 hàng — không wrap thì badge "Trễ hạn (N)" bị cắt chữ
+          (card có overflow hidden). */}
+      <CardHeader className="flex flex-wrap items-center justify-between gap-y-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Icon className="size-4 text-muted-foreground" />
           {title}

@@ -47,7 +47,7 @@ export function StockValueSnapshotCard({
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Hàng hoá chiếm nhiều vốn tồn kho nhất</p>
-        <div className="inline-flex items-center gap-1 rounded-lg border p-1">
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border p-1">
           {SNAPSHOT_OPTIONS.map((o) => (
             <Button
               key={o.value}

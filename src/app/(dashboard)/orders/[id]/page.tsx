@@ -501,7 +501,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        {/* flex-wrap: mobile 375px không đủ chỗ 5 nút hành động 1 hàng —
+            không wrap là cả trang bị scroll ngang. */}
+        <div className="flex flex-wrap items-center gap-2">
           <PrintMenu orderId={order.id} />
           <SendDocumentEmailDialog orderId={order.id} customerEmail={orderCustomer?.email ?? null} />
           <OrderDialog

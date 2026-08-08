@@ -38,7 +38,7 @@ export function CustomerOverviewPeriodToggle({ value }: { value: CustomerOvervie
   }
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border p-1">
+    <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border p-1">
       {OPTIONS.map((o) => (
         <Button
           key={o.value}
