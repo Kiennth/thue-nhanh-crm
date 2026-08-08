@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Check, Lock } from "lucide-react";
+import type { TaskType } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -175,6 +176,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const taskByType = new Map((tasks ?? []).map((t) => [t.task_type, t]));
   const doneCount = (tasks ?? []).filter((t) => t.completed_date).length;
+  // Bỏ tick khâu đã hoàn thành — CEO chốt 2026-08-06, hẹp hơn canManage (thêm
+  // Cửa hàng trưởng, xem uncompleteOrderTask trong actions/orders.ts). Chỉ
+  // khâu CUỐI CÙNG đã hoàn thành mới cho bỏ, để giữ đúng tính tuần tự.
+  const canUncompleteTask =
+    canManage || (!!employee && employee.role === "cua_hang_truong");
+  let lastDoneTaskType: TaskType | null = null;
+  for (let i = TASK_TYPE_SEQUENCE.length - 1; i >= 0; i--) {
+    if (taskByType.get(TASK_TYPE_SEQUENCE[i])?.completed_date) {
+      lastDoneTaskType = TASK_TYPE_SEQUENCE[i];
+      break;
+    }
+  }
 
   // Doanh số các dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ
   // thuật...) loại khỏi giá trị dùng để tra bậc %hoa hồng/tính quỹ khoán
@@ -907,6 +920,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     employees={employeeList}
                                     task={task}
                                     status={status}
+                                    canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}
                                   />
                                 </div>
                                 {scanType && status === "current" && (

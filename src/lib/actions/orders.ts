@@ -7,9 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
-import { ALL_ROLES, BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { DELIVERY_NOTE_TYPE_IDS, TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
+import type { TaskType } from "@/types/database";
 
 const DELETE_ROLES = MANAGE_ROLES;
 
@@ -1113,4 +1114,68 @@ export async function upsertOrderTask(
 
   revalidatePath(`/orders/${parsed.data.order_id}`);
   return { success: true };
+}
+
+// Bỏ tick 1 khâu đã hoàn thành — VD khách đổi ý sau khi đã chốt đơn/thu cọc,
+// cần lùi đơn về đúng khâu đang dở. CEO yêu cầu 2026-08-06 (trước đó phải sửa
+// tay qua DB, xem BQ12223). Giới hạn Giám đốc/Admin/Kế toán/Cửa hàng trưởng —
+// hẹp hơn upsertOrderTask (ALL_ROLES) vì đây là thao tác SỬA LẠI lịch sử, có
+// thể đụng tồn kho, không phải cập nhật tiến độ thường ngày của Kỹ thuật/Sales.
+//
+// Chỉ cho bỏ khâu CUỐI CÙNG đã hoàn thành (không có khâu nào SAU nó cũng
+// "done") — giữ đúng tính tuần tự bắt buộc của upsertOrderTask, tránh tình
+// huống khâu giữa chừng dở dang trong khi khâu sau vẫn báo xong.
+export async function uncompleteOrderTask(orderId: string, taskType: TaskType) {
+  await requireRole([...EQUIPMENT_WRITE_ROLES]);
+
+  const supabase = await createClient();
+
+  const { data: doneTasks, error: fetchError } = await supabase
+    .from("order_tasks")
+    .select("task_type")
+    .eq("order_id", orderId)
+    .not("completed_date", "is", null);
+  if (fetchError) {
+    throw new Error("Không thể đọc trạng thái khâu: " + fetchError.message);
+  }
+
+  const doneSet = new Set((doneTasks ?? []).map((t) => t.task_type));
+  if (!doneSet.has(taskType)) {
+    throw new Error("Khâu này chưa hoàn thành, không có gì để bỏ.");
+  }
+
+  const sequenceIndex = TASK_TYPE_SEQUENCE.indexOf(taskType);
+  const laterDone = TASK_TYPE_SEQUENCE.slice(sequenceIndex + 1).find((stage) => doneSet.has(stage));
+  if (laterDone) {
+    throw new Error(
+      `Phải bỏ hoàn thành khâu "${TASK_TYPE_LABELS[laterDone]}" trước (bỏ theo đúng thứ tự ngược lại).`,
+    );
+  }
+
+  // Hoàn tác tồn kho TRƯỚC khi xoá completed_date — lỗi ở bước này thì dừng
+  // lại luôn (không xoá completed_date), tránh đơn báo "chưa hoàn thành"
+  // trong khi tồn kho vẫn y như lúc đã hoàn thành.
+  if (taskType === "giao_hang_ban_giao") {
+    const { error: undoError } = await supabase.rpc("undo_deliver_order_stock", { p_order_id: orderId });
+    if (undoError) {
+      throw new Error("Không thể hoàn tác trừ tồn kho: " + undoError.message);
+    }
+  }
+  if (taskType === "nhap_kho_bao_tri") {
+    const { error: undoError } = await supabase.rpc("undo_return_order_stock", { p_order_id: orderId });
+    if (undoError) {
+      throw new Error("Không thể hoàn tác trả tồn kho: " + undoError.message);
+    }
+  }
+
+  const { error } = await supabase
+    .from("order_tasks")
+    .update({ completed_date: null })
+    .eq("order_id", orderId)
+    .eq("task_type", taskType);
+  if (error) {
+    throw new Error("Không thể bỏ hoàn thành khâu: " + error.message);
+  }
+
+  revalidatePath(`/orders/${orderId}`);
 }

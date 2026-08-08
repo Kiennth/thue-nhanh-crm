@@ -761,6 +761,18 @@ export interface Database {
         };
         Returns: void;
       };
+      undo_deliver_order_stock: {
+        Args: {
+          p_order_id: string;
+        };
+        Returns: void;
+      };
+      undo_return_order_stock: {
+        Args: {
+          p_order_id: string;
+        };
+        Returns: void;
+      };
       // Hai RPC tổng hợp cho trang /customers — trả jsonb (typed lỏng, page
       // tự ép kiểu sang CustomerReportData/khối danh sách).
       customer_page_report: {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,7 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { upsertOrderTask } from "@/lib/actions/orders";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { upsertOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
 import type { TaskType } from "@/types/database";
 
 interface EmployeeOption {
@@ -33,9 +43,79 @@ interface OrderTaskRowProps {
   // gating tuần tự nên chỉ có đúng 1 khâu ở trạng thái này cùng lúc, hiện
   // form đầy đủ. locked: chưa tới lượt, hiện mờ, không có form/nút bấm.
   status: "done" | "current" | "locked";
+  // Chỉ true cho ĐÚNG khâu "done" cuối cùng (page.tsx tự tính) — bỏ tick khâu
+  // giữa chừng trong khi khâu sau vẫn "done" sẽ phá tính tuần tự bắt buộc.
+  canUncomplete?: boolean;
 }
 
-export function OrderTaskRow({ orderId, taskType, label, employees, task, status }: OrderTaskRowProps) {
+function UncompleteTaskButton({
+  orderId,
+  taskType,
+  label,
+}: {
+  orderId: string;
+  taskType: TaskType;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  // "Giao hàng & bàn giao"/"Nhập kho & bảo trì" đụng tồn kho thật — cảnh báo
+  // rõ hơn 2 khâu còn lại (chỉ xoá completed_date).
+  const touchesStock = taskType === "giao_hang_ban_giao" || taskType === "nhap_kho_bao_tri";
+
+  function handleConfirm() {
+    startTransition(async () => {
+      try {
+        await uncompleteOrderTask(orderId, taskType);
+        toast.success(`Đã bỏ hoàn thành khâu "${label}".`);
+        setOpen(false);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra.");
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+            <Undo2 className="size-3.5" />
+            Bỏ hoàn thành
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Bỏ hoàn thành khâu &quot;{label}&quot;</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Đơn sẽ lùi về đang chờ ở khâu này, phần khoán của khâu này sẽ mất khỏi bảng lương.
+          {touchesStock &&
+            " Khâu này đã trừ/trả tồn kho thật — bỏ hoàn thành sẽ tự hoàn tác đúng phần tồn kho đó."}
+        </p>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+            Không bỏ
+          </Button>
+          <Button variant="destructive" onClick={handleConfirm} disabled={pending}>
+            {pending ? "Đang xử lý..." : "Bỏ hoàn thành"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function OrderTaskRow({
+  orderId,
+  taskType,
+  label,
+  employees,
+  task,
+  status,
+  canUncomplete,
+}: OrderTaskRowProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -53,9 +133,12 @@ export function OrderTaskRow({ orderId, taskType, label, employees, task, status
     return (
       <div className="flex items-center justify-between gap-2 py-0.5">
         <span className="text-sm font-medium">{label}</span>
-        {task?.completed_date && (
-          <span className="text-xs text-muted-foreground">{task.completed_date}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {task?.completed_date && (
+            <span className="text-xs text-muted-foreground">{task.completed_date}</span>
+          )}
+          {canUncomplete && <UncompleteTaskButton orderId={orderId} taskType={taskType} label={label} />}
+        </div>
       </div>
     );
   }
