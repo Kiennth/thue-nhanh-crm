@@ -20,8 +20,20 @@ import { VN_TIME_ZONE } from "@/lib/date-format";
 // Payload đã tổng hợp sẵn từ RPC customer_page_report (Postgres tính, trả
 // vài chục dòng) — thay cho việc kéo 21k dòng thô về rồi cộng trừ trong JS.
 export interface CustomerReportData {
-  topCompanies: { id: string; name: string; orderCount: number; totalRevenue: number }[];
-  debt: { id: string; name: string; orderCount: number; totalOwed: number }[];
+  // 2 bảng xếp hạng theo TỪNG KỲ (CEO 2026-08-08, trước đó là số cộng dồn
+  // toàn thời gian) — kỳ nào không có dữ liệu thì RPC bỏ key, client tự ?? [].
+  periodTopCompanies: Partial<
+    Record<
+      CustomerOverviewPeriod,
+      { id: string; name: string; orderCount: number; totalRevenue: number }[]
+    >
+  >;
+  periodDebt: Partial<
+    Record<
+      CustomerOverviewPeriod,
+      { id: string; name: string; orderCount: number; totalOwed: number }[]
+    >
+  >;
   // Tương quan Khách cá nhân/Khách công ty theo từng kỳ — CEO yêu cầu
   // 2026-08-06 để ra quyết định/báo cáo cổ đông, nhà đầu tư.
   periodByCustomerType: Record<
@@ -198,12 +210,20 @@ export function CustomerReportSection({
   showDebt?: boolean;
   data: CustomerReportData;
 }) {
-  const topCompanyByRevenue = data.topCompanies.map((r) => ({ ...r, value: r.totalRevenue }));
-  const debtRows = data.debt.map((r) => ({ ...r, value: r.totalOwed }));
   const overviewPeriod: CustomerOverviewPeriod =
     overview && isCustomerOverviewPeriod(overview) ? overview : "thisMonth";
   const periodTypeStat =
     data.periodByCustomerType[overviewPeriod] ?? EMPTY_PERIOD_BY_CUSTOMER_TYPE.thisMonth;
+  // 2 bảng xếp hạng chạy theo CÙNG kỳ với toggle "Tổng quan theo kỳ" (CEO
+  // 2026-08-08, mặc định Tháng này) — đổi kỳ ở đâu cũng đồng bộ cả trang.
+  const topCompanyByRevenue = (data.periodTopCompanies[overviewPeriod] ?? []).map((r) => ({
+    ...r,
+    value: r.totalRevenue,
+  }));
+  const debtRows = (data.periodDebt[overviewPeriod] ?? []).map((r) => ({
+    ...r,
+    value: r.totalOwed,
+  }));
 
   return (
     <div className="space-y-4">
@@ -243,6 +263,15 @@ export function CustomerReportSection({
         </div>
       )}
 
+      {/* Toggle kỳ thứ 2 cho khối xếp hạng — cùng param `overview` với toggle
+          "Tổng quan theo kỳ" phía trên nên 2 nơi luôn đồng bộ (CEO 2026-08-08,
+          cùng pattern 2 toggle đồng bộ ở Bảng lương). */}
+      {(showRankings || showDebt) && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Xếp hạng trong kỳ</h3>
+          <CustomerOverviewPeriodToggle value={overviewPeriod} />
+        </div>
+      )}
       {(showRankings || showDebt) && (
         // Bỏ xếp hạng thì chỉ còn công nợ — để nguyên 3 cột sẽ thành một thẻ
         // hẹp tí trơ trọi, nên khi đó cho nó chiếm cả hàng.

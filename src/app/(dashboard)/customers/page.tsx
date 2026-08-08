@@ -116,9 +116,10 @@ export default async function CustomersPage({
 
   const rawReport = (reportRes.data ?? {}) as Partial<CustomerReportData> & { error?: string };
   const reportData: CustomerReportData = {
-    // jsonb_agg trả null (không phải mảng rỗng) khi không có dòng nào.
-    topCompanies: rawReport.topCompanies ?? [],
-    debt: rawReport.debt ?? [],
+    // Kỳ không có dữ liệu thì RPC bỏ hẳn key trong map — component tự ?? []
+    // theo từng kỳ, ở đây chỉ cần chống null cho cả map.
+    periodTopCompanies: rawReport.periodTopCompanies ?? {},
+    periodDebt: rawReport.periodDebt ?? {},
     periodByCustomerType: rawReport.periodByCustomerType ?? EMPTY_PERIOD_BY_CUSTOMER_TYPE,
   };
 
