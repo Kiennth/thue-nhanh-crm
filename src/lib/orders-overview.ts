@@ -19,11 +19,15 @@ export interface OrdersOverview {
   };
 }
 
-// Cần TOÀN BỘ đơn (chưa huỷ) để tính thống kê/xu hướng theo thời gian — xu
+// Cần TOÀN BỘ đơn hoàn tất để tính thống kê/xu hướng theo thời gian — xu
 // hướng 5 năm không date-bound được. ~10.000 dòng ≈ 11 trang, nên phân trang
 // SONG SONG: bản tuần tự trước đây là một nửa nguyên nhân /orders sập 503
 // (Worker exceeded resource limits) trên Cloudflare cho vai Giám đốc.
-async function fetchNonCancelledOrders(branchId: string | null): Promise<DatedValue[]> {
+//
+// CEO chốt 2026-08-08: đơn chưa hoàn thành không tính doanh số — chỉ lấy
+// đơn có completed_at (đủ 10 khâu), số đơn/xu hướng ở đây đều là "đơn đã
+// hoàn tất" (nhất quán toàn hệ thống, xem migration 20260808120000).
+async function fetchCompletedOrders(branchId: string | null): Promise<DatedValue[]> {
   const supabase = await createClient();
   const orders = await fetchAllRowsFast<{ order_date: string; total_value: number }>(
     (from, to) => {
@@ -31,6 +35,7 @@ async function fetchNonCancelledOrders(branchId: string | null): Promise<DatedVa
         .from("orders")
         .select("order_date, total_value")
         .is("cancelled_at", null)
+        .not("completed_at", "is", null)
         .order("id")
         .range(from, to);
       if (branchId) {
@@ -42,7 +47,8 @@ async function fetchNonCancelledOrders(branchId: string | null): Promise<DatedVa
       let q = supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
-        .is("cancelled_at", null);
+        .is("cancelled_at", null)
+        .not("completed_at", "is", null);
       if (branchId) {
         q = q.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
       }
@@ -52,13 +58,13 @@ async function fetchNonCancelledOrders(branchId: string | null): Promise<DatedVa
   return orders.map((o) => ({ date: o.order_date, value: o.total_value }));
 }
 
-// Thống kê + xu hướng đơn hàng theo tuần/tháng/năm cho trang /orders — không
-// tính đơn đã huỷ, không phụ thuộc bộ lọc trạng thái/thời gian của bảng danh
-// sách (luôn là bức tranh toàn cảnh, chỉ giới hạn theo chi nhánh).
+// Thống kê + xu hướng đơn hàng theo tuần/tháng/năm — chỉ đơn ĐÃ HOÀN TẤT,
+// không phụ thuộc bộ lọc trạng thái/thời gian của bảng danh sách (luôn là
+// bức tranh toàn cảnh, chỉ giới hạn theo chi nhánh).
 export async function computeOrdersOverview(
   branchId: string | null,
   now = vnNow(),
 ): Promise<OrdersOverview> {
-  const orders = await fetchNonCancelledOrders(branchId);
+  const orders = await fetchCompletedOrders(branchId);
   return buildPeriodOverview(orders, toDateOnly(now));
 }

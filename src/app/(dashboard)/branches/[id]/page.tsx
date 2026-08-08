@@ -50,11 +50,16 @@ export default async function BranchDashboardPage({
     ordersOverview,
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
+    // CEO chốt 2026-08-08: doanh thu chỉ tính đơn hoàn tất (trước đây còn
+    // không lọc cả đơn huỷ — bug có sẵn, tiện sửa luôn theo quy tắc mới).
+    // orderList nuôi PeriodRevenueCards + doanh thu thiết bị của chi nhánh.
     fetchAllRows<{ id: string; order_date: string; total_value: number }>((from, to) =>
       supabase
         .from("orders")
         .select("id, order_date, total_value")
         .eq("pickup_branch_id", id)
+        .is("cancelled_at", null)
+        .not("completed_at", "is", null)
         .range(from, to),
     ),
     supabase.from("equipment_types").select("id, name, product_type, tracking_type"),

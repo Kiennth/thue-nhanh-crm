@@ -26,6 +26,11 @@ export interface EquipmentRevenueOverview {
 // nghĩa "doanh thu" NHẤT QUÁN với revenueForDay/Month/Year (dashboard-reports.ts)
 // và computeOrdersOverview (orders-overview.ts): cả hai đều dùng order_date,
 // KHÔNG dùng rental_start_at.
+//
+// CEO chốt 2026-08-08: chỉ tính đơn ĐÃ HOÀN TẤT (completed_at not null, chưa
+// huỷ) — lọc ngay ở query orders nên dòng của đơn chưa xong/đã huỷ tự rơi ra
+// khỏi orderDateById (trước đây còn không lọc cả đơn huỷ — bug có sẵn, tiện
+// sửa luôn theo quy tắc mới).
 async function fetchOrderLinesForType(equipmentTypeId: string): Promise<DatedValue[]> {
   const supabase = await createClient();
   const lines = await fetchAllRows<{ order_id: string; line_total: number }>((from, to) =>
@@ -39,7 +44,13 @@ async function fetchOrderLinesForType(equipmentTypeId: string): Promise<DatedVal
 
   const orderIds = [...new Set(lines.map((l) => l.order_id))];
   const orders = await fetchRowsByIds<{ id: string; order_date: string }>(orderIds, (idChunk, from, to) =>
-    supabase.from("orders").select("id, order_date").in("id", idChunk).range(from, to),
+    supabase
+      .from("orders")
+      .select("id, order_date")
+      .in("id", idChunk)
+      .is("cancelled_at", null)
+      .not("completed_at", "is", null)
+      .range(from, to),
   );
   const orderDateById = new Map(orders.map((o) => [o.id, o.order_date]));
 

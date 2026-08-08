@@ -144,10 +144,11 @@ export default async function DashboardHomePage({
             supabase
               .from("orders")
               .select("pickup_branch_id, order_date, total_value")
-              // Đơn huỷ không phải doanh thu — trước đây thiếu điều kiện này
-              // (chưa lệch số vì hệ thống hiện có 0 đơn huỷ, nhưng lãi/lỗ
-              // thì phải đúng từ gốc).
+              // Đơn huỷ không phải doanh thu; đơn chưa hoàn thành cũng không
+              // (CEO chốt 2026-08-08, áp toàn hệ thống) — doanh thu so sánh
+              // chi nhánh + lãi/lỗ gộp chỉ tính đơn đủ 10 khâu.
               .is("cancelled_at", null)
+              .not("completed_at", "is", null)
               // BranchComparisonSection chỉ đọc lại đúng 3 mốc Ngày/Tháng/
               // Năm đang chọn — trước đây fetch NGUYÊN bảng orders all-time
               // (10.020 dòng) chỉ để dùng khoảng này.
