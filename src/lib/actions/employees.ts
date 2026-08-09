@@ -13,6 +13,9 @@ const employeeShape = {
   branch_id: z.string().uuid().optional().or(z.literal("")),
   base_salary: z.coerce.number().min(0, { message: "Lương cứng không được âm." }),
   role: z.enum(["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"]),
+  // Ngày sinh — để module Thưởng tự nhắc sinh nhật trong tháng (CEO
+  // 2026-08-09). Không bắt buộc.
+  birthday: z.string().optional().or(z.literal("")),
 };
 
 const CreateEmployeeSchema = z.object({
@@ -35,6 +38,7 @@ export async function createEmployee(
     branch_id: formData.get("branch_id") || "",
     base_salary: formData.get("base_salary"),
     role: formData.get("role"),
+    birthday: formData.get("birthday") || "",
     email: formData.get("email"),
   });
 
@@ -42,7 +46,7 @@ export async function createEmployee(
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
-  const { email, branch_id, ...rest } = parsed.data;
+  const { email, branch_id, birthday, ...rest } = parsed.data;
   const admin = createAdminClient();
 
   const siteUrl = await getSiteUrl();
@@ -60,6 +64,7 @@ export async function createEmployee(
     ...rest,
     email,
     branch_id: branch_id || null,
+    birthday: birthday || null,
     user_id: invited.user.id,
   });
 
@@ -85,17 +90,18 @@ export async function updateEmployee(
     branch_id: formData.get("branch_id") || "",
     base_salary: formData.get("base_salary"),
     role: formData.get("role"),
+    birthday: formData.get("birthday") || "",
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
-  const { branch_id, ...rest } = parsed.data;
+  const { branch_id, birthday, ...rest } = parsed.data;
   const supabase = await createClient();
   const { error } = await supabase
     .from("employees")
-    .update({ ...rest, branch_id: branch_id || null })
+    .update({ ...rest, branch_id: branch_id || null, birthday: birthday || null })
     .eq("id", id);
 
   if (error) {

@@ -38,6 +38,7 @@ interface EmployeeDialogProps {
     branch_id: string | null;
     base_salary: number;
     role: UserRole;
+    birthday: string | null;
   };
 }
 
@@ -137,6 +138,19 @@ export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
               defaultValue={employee?.base_salary ?? 0}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="birthday">Ngày sinh (không bắt buộc)</Label>
+            <Input
+              id="birthday"
+              name="birthday"
+              type="date"
+              defaultValue={employee?.birthday ?? undefined}
+            />
+            <p className="text-xs text-muted-foreground">
+              Khai để module Thưởng tự nhắc sinh nhật trong tháng.
+            </p>
           </div>
 
           <div className="space-y-2">

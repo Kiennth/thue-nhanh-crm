@@ -19,6 +19,10 @@ import { REWARD_CATEGORY_LABELS, REWARD_CATEGORY_OPTIONS } from "@/lib/reward-la
 import type { RewardCategory } from "@/types/database";
 import { MonthNavigator } from "../payroll/month-navigator";
 import { RewardDialog } from "./reward-dialog";
+import { RuleDialog } from "./rule-dialog";
+import { ApplyRuleButton } from "./apply-rule-button";
+import { deleteRewardRule } from "@/lib/actions/rewards";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -52,19 +56,42 @@ export default async function RewardsPage({
       : `${yearStr}-${String(Number(monthStr) + 1).padStart(2, "0")}-01`;
 
   const supabase = await createClient();
-  const [{ data: entries }, { data: employees }, { data: bonusTiers }, { data: branches }] =
-    await Promise.all([
+  const [
+    { data: entries },
+    { data: employees },
+    { data: bonusTiers },
+    { data: branches },
+    { data: rules },
+    monthOrders,
+  ] = await Promise.all([
+    supabase
+      .from("reward_entries")
+      .select("id, employee_id, entry_date, amount, reason, category, rule_id, created_by")
+      .gte("entry_date", rangeStart)
+      .lt("entry_date", rangeEnd)
+      .order("entry_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase.from("employees").select("id, name, is_active, birthday"),
+    supabase.from("bonus_tiers").select("branch_id, tier_number, threshold_amount, bonus_amount"),
+    supabase.from("branches").select("id, name").order("position"),
+    supabase
+      .from("reward_rules")
+      .select("id, rule_type, label, amount, threshold_amount, employee_id, is_active")
+      .eq("is_active", true)
+      .order("created_at"),
+    // Doanh số tháng đang xem cho qui tắc doanh_so — CHỈ đơn hoàn tất, chưa
+    // VAT (khớp "Tổng doanh số" trang Đơn hàng, quy tắc 2026-08-08).
+    fetchAllRows<{ total_value: number }>((from, to) =>
       supabase
-        .from("reward_entries")
-        .select("id, employee_id, entry_date, amount, reason, category, created_by")
-        .gte("entry_date", rangeStart)
-        .lt("entry_date", rangeEnd)
-        .order("entry_date", { ascending: false })
-        .order("created_at", { ascending: false }),
-      supabase.from("employees").select("id, name, is_active"),
-      supabase.from("bonus_tiers").select("branch_id, tier_number, threshold_amount, bonus_amount"),
-      supabase.from("branches").select("id, name").order("position"),
-    ]);
+        .from("orders")
+        .select("total_value")
+        .is("cancelled_at", null)
+        .not("completed_at", "is", null)
+        .gte("order_date", rangeStart)
+        .lt("order_date", rangeEnd)
+        .range(from, to),
+    ),
+  ]);
 
   const employeeList = employees ?? [];
   const employeeNameById = new Map(employeeList.map((e) => [e.id, e.name]));
@@ -95,6 +122,26 @@ export default async function RewardsPage({
 
   const isDirector = viewer.role === "giam_doc";
   const monthLabel = `${monthStr}/${yearStr}`;
+
+  // Sinh nhật trong tháng đang xem — chỉ nhân viên đang hoạt động có khai
+  // ngày sinh. "Đã thưởng" = có khoản loại sinh_nhat cho người đó trong tháng.
+  const birthdayEmployees = employeeList
+    .filter((e) => e.is_active && e.birthday && e.birthday.slice(5, 7) === monthStr)
+    .sort((a, b) => (a.birthday ?? "").slice(8) < (b.birthday ?? "").slice(8) ? -1 : 1);
+  const birthdayRewardedIds = new Set(
+    allEntries.filter((e) => e.category === "sinh_nhat").map((e) => e.employee_id),
+  );
+  const missingBirthdayCount = employeeList.filter((e) => e.is_active && !e.birthday).length;
+
+  // Qui tắc: doanh_so so với doanh số tháng; cả 2 loại check "đã áp trong
+  // tháng" qua rule_id trên entries.
+  const monthRevenue = monthOrders.reduce((sum, o) => sum + o.total_value, 0);
+  const appliedRuleIds = new Set(allEntries.map((e) => e.rule_id).filter(Boolean));
+  const ruleList = rules ?? [];
+  const revenueRules = ruleList.filter((r) => r.rule_type === "doanh_so");
+  const recurringRules = ruleList.filter((r) => r.rule_type === "dinh_ky");
+  const recipientLabel = (employeeId: string | null) =>
+    employeeId ? (employeeNameById.get(employeeId) ?? "—") : "Cả công ty";
 
   return (
     <div className="space-y-4">
@@ -136,6 +183,159 @@ export default async function RewardsPage({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{recipientCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Sinh nhật tháng đang xem — nhắc để không quên, trao thì bấm Trao
+            thưởng chọn loại Sinh nhật. */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Sinh nhật tháng {monthLabel} 🎂</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {birthdayEmployees.length ? (
+              <ul className="space-y-1">
+                {birthdayEmployees.map((emp) => (
+                  <li
+                    key={emp.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border p-2 text-sm"
+                  >
+                    <span className="font-medium">{emp.name}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground">
+                        {emp.birthday!.slice(8, 10)}/{emp.birthday!.slice(5, 7)}
+                      </span>
+                      {birthdayRewardedIds.has(emp.id) ? (
+                        <Badge>Đã thưởng ✓</Badge>
+                      ) : (
+                        <Badge variant="outline">Chưa thưởng</Badge>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Không có sinh nhật nào trong tháng (trong số nhân viên đã khai ngày sinh).
+              </p>
+            )}
+            {missingBirthdayCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {missingBirthdayCount} nhân viên chưa khai ngày sinh — bổ sung ở trang{" "}
+                {isDirector ? (
+                  <Link href="/employees" className="text-primary underline-offset-2 hover:underline">
+                    Nhân viên
+                  </Link>
+                ) : (
+                  "Nhân viên"
+                )}
+                .
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Qui tắc thưởng — doanh_so: theo dõi mốc, ĐẠT thì hiện Trao ngay;
+            dinh_ky: Áp kỳ này 1 chạm. Không tự động — Giám đốc luôn là người
+            bấm. */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-base">Qui tắc thưởng</CardTitle>
+              {isDirector && <RuleDialog employees={activeEmployees} />}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!ruleList.length && (
+              <p className="text-sm text-muted-foreground">
+                Chưa có qui tắc nào. Tạo qui tắc doanh số (đạt mốc thì gợi ý trao) hoặc định kỳ
+                (áp 1 chạm mỗi tháng).
+              </p>
+            )}
+            {revenueRules.map((rule) => {
+              const reached = monthRevenue >= (rule.threshold_amount ?? 0);
+              const applied = appliedRuleIds.has(rule.id);
+              const progressPct = Math.min(
+                100,
+                Math.round((monthRevenue / (rule.threshold_amount ?? 1)) * 100),
+              );
+              return (
+                <div key={rule.id} className="space-y-1.5 rounded-lg border p-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{rule.label}</span>
+                    <span className="flex items-center gap-1">
+                      {applied ? (
+                        <Badge>Đã trao ✓</Badge>
+                      ) : reached ? (
+                        isDirector ? (
+                          <ApplyRuleButton ruleId={rule.id} month={month} label="Trao ngay" />
+                        ) : (
+                          <Badge>ĐẠT MỐC</Badge>
+                        )
+                      ) : (
+                        <Badge variant="outline">Chưa đạt</Badge>
+                      )}
+                      {isDirector && (
+                        <ConfirmDeleteButton
+                          confirmMessage={`Xoá qui tắc "${rule.label}"? Khoản đã trao vẫn giữ trong sổ.`}
+                          successMessage="Đã xoá qui tắc."
+                          action={deleteRewardRule}
+                          actionArg={rule.id}
+                        />
+                      )}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Doanh số tháng {currencyFormatter.format(monthRevenue)}đ /{" "}
+                    {currencyFormatter.format(rule.threshold_amount ?? 0)}đ ({progressPct}%) —
+                    thưởng {currencyFormatter.format(rule.amount)}đ ·{" "}
+                    {recipientLabel(rule.employee_id)}
+                  </p>
+                </div>
+              );
+            })}
+            {recurringRules.map((rule) => {
+              const applied = appliedRuleIds.has(rule.id);
+              return (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border p-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium">{rule.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {currencyFormatter.format(rule.amount)}đ/tháng ·{" "}
+                      {recipientLabel(rule.employee_id)}
+                    </p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {applied ? (
+                      <Badge>Đã áp tháng này ✓</Badge>
+                    ) : isDirector ? (
+                      <ApplyRuleButton ruleId={rule.id} month={month} label="Áp kỳ này" />
+                    ) : (
+                      <Badge variant="outline">Chưa áp</Badge>
+                    )}
+                    {isDirector && (
+                      <ConfirmDeleteButton
+                        confirmMessage={`Xoá qui tắc "${rule.label}"? Khoản đã áp vẫn giữ trong sổ.`}
+                        successMessage="Đã xoá qui tắc."
+                        action={deleteRewardRule}
+                        actionArg={rule.id}
+                      />
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

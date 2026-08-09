@@ -12,6 +12,7 @@ export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
 export type RewardCategory = "bat_chot" | "doanh_so" | "dinh_ky" | "tet" | "sinh_nhat" | "khac";
+export type RewardRuleType = "doanh_so" | "dinh_ky";
 export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" | "khac";
 export type OrderPaymentType = "invoice" | "deposit_collect" | "deposit_refund";
 export type RfidTagStatus = "in_stock" | "with_customer";
@@ -67,6 +68,7 @@ export interface Database {
           email: string | null;
           user_id: string | null;
           is_active: boolean;
+          birthday: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -79,6 +81,7 @@ export interface Database {
           email?: string | null;
           user_id?: string | null;
           is_active?: boolean;
+          birthday?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
         Relationships: [];
@@ -622,6 +625,7 @@ export interface Database {
           amount: number;
           reason: string;
           category: RewardCategory;
+          rule_id: string | null;
           created_by: string | null;
           created_at: string;
         };
@@ -632,9 +636,33 @@ export interface Database {
           amount: number;
           reason: string;
           category?: RewardCategory;
+          rule_id?: string | null;
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["reward_entries"]["Insert"]>;
+        Relationships: [];
+      };
+      reward_rules: {
+        Row: {
+          id: string;
+          rule_type: RewardRuleType;
+          label: string;
+          amount: number;
+          threshold_amount: number | null;
+          employee_id: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          rule_type: RewardRuleType;
+          label: string;
+          amount: number;
+          threshold_amount?: number | null;
+          employee_id?: string | null;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["reward_rules"]["Insert"]>;
         Relationships: [];
       };
       commission_tiers: {
