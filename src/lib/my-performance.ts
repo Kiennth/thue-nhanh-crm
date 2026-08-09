@@ -51,6 +51,9 @@ export interface MyPerformance {
   deliveryPayout: number;
   collectionPayout: number;
   overtimePay: number;
+  // Thưởng đột xuất Giám đốc trao (reward_entries) — cộng vào totalIncome,
+  // KHÔNG vào cơ sở xét bậc thưởng (giống OT).
+  rewardPay: number;
   totalIncome: number;
   completedTaskCount: number;
   tiers: BonusTierProgress[];
@@ -70,7 +73,7 @@ export async function computeMyPerformance(
   const { start, end, label } = currentMonthRange();
   const admin = createAdminClient();
 
-  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }, { data: equipmentTypes }, myLinesInMonth, overtimeInMonth] =
+  const [taskList, { data: commissionTiers }, { data: taskWeights }, { data: bonusTiers }, { data: equipmentTypes }, myLinesInMonth, overtimeInMonth, rewardsInMonth] =
     await Promise.all([
       fetchAllRows<{ task_type: TaskType; order_id: string }>((from, to) =>
         admin
@@ -100,6 +103,15 @@ export async function computeMyPerformance(
       fetchAllRows<{ amount: number }>((from, to) =>
         admin
           .from("overtime_entries")
+          .select("amount")
+          .eq("employee_id", employeeId)
+          .gte("entry_date", start)
+          .lt("entry_date", end)
+          .range(from, to),
+      ),
+      fetchAllRows<{ amount: number }>((from, to) =>
+        admin
+          .from("reward_entries")
           .select("amount")
           .eq("employee_id", employeeId)
           .gte("entry_date", start)
@@ -180,6 +192,7 @@ export async function computeMyPerformance(
     { installation: 0, removal: 0, support: 0, delivery: 0, collection: 0 },
   );
   const overtimePay = overtimeInMonth.reduce((sum, entry) => sum + entry.amount, 0);
+  const rewardPay = rewardsInMonth.reduce((sum, entry) => sum + entry.amount, 0);
 
   const totalCommission = taskList.reduce((sum, t) => {
     const order = orderById.get(t.order_id);
@@ -224,6 +237,7 @@ export async function computeMyPerformance(
     deliveryPayout: servicePayout.delivery,
     collectionPayout: servicePayout.collection,
     overtimePay,
+    rewardPay,
     totalIncome:
       baseSalary +
       totalCommission +
@@ -233,7 +247,8 @@ export async function computeMyPerformance(
       servicePayout.support +
       servicePayout.delivery +
       servicePayout.collection +
-      overtimePay,
+      overtimePay +
+      rewardPay,
     completedTaskCount: taskList.length,
     tiers: tierList,
     currentTierIndex,

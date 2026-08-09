@@ -26,6 +26,7 @@ const CONFIG = {
   deliveryPayout: { label: "Giao hàng", color: "var(--chart-8)" },
   collectionPayout: { label: "Thu hồi", color: "var(--chart-9)" },
   overtimePay: { label: "OT", color: "var(--chart-5)" },
+  rewardPay: { label: "Thưởng đột xuất", color: "var(--chart-10)" },
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
 

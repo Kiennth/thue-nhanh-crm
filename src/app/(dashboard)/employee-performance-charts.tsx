@@ -26,6 +26,7 @@ const INCOME_COMPOSITION_CONFIG = {
   deliveryPayout: { label: "Giao hàng", color: "var(--chart-8)" },
   collectionPayout: { label: "Thu hồi", color: "var(--chart-9)" },
   overtimePay: { label: "OT", color: "var(--chart-5)" },
+  rewardPay: { label: "Thưởng đột xuất", color: "var(--chart-10)" },
   bonus: { label: "Thưởng", color: "var(--chart-4)" },
 } satisfies ChartConfig;
 
@@ -56,6 +57,7 @@ export function EmployeeIncomeCompositionChart({ rows }: { rows: EmployeeMonthly
         <Bar dataKey="deliveryPayout" stackId="income" fill="var(--color-deliveryPayout)" />
         <Bar dataKey="collectionPayout" stackId="income" fill="var(--color-collectionPayout)" />
         <Bar dataKey="overtimePay" stackId="income" fill="var(--color-overtimePay)" />
+        <Bar dataKey="rewardPay" stackId="income" fill="var(--color-rewardPay)" />
         <Bar dataKey="bonus" stackId="income" fill="var(--color-bonus)" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ChartContainer>

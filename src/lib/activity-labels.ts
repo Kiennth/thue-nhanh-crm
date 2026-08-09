@@ -17,6 +17,7 @@ export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   commission_tiers: "Bậc hoa hồng",
   bonus_tiers: "Bậc thưởng",
   task_weights: "Trọng số khâu",
+  reward_entries: "Thưởng đột xuất",
 };
 
 export const ACTIVITY_TABLE_OPTIONS = Object.entries(ACTIVITY_TABLE_LABELS).map(([value, label]) => ({

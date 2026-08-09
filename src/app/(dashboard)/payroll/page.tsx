@@ -10,6 +10,7 @@ import {
 import { MonthNavigator } from "./month-navigator";
 import { ExportPayrollButton } from "./export-payroll-button";
 import { PayrollOverview } from "./payroll-overview";
+import { RewardDialog, type RewardEntryRow } from "./reward-dialog";
 import type { PayrollBranchScope } from "./payroll-branch-period-toggle";
 
 // Thứ tự hiển thị chi nhánh cố định (khớp màu ở BranchBadge) — chi nhánh nào
@@ -62,10 +63,26 @@ export default async function PayrollPage({
   const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
   const supabase = await createClient();
-  const [rows, prevRows, { data: branches }] = await Promise.all([
+  // Sổ thưởng đột xuất của tháng đang xem — chỉ Giám đốc thấy (người duy
+  // nhất được tạo/xoá, RLS cũng chặn đúng vậy). Dùng chung getMonthRange
+  // sẽ kéo thêm import — tự dựng khoảng [đầu tháng, đầu tháng sau) tại chỗ.
+  const rewardRangeStart = `${month}-01`;
+  const rewardRangeEnd =
+    Number(month.split("-")[1]) === 12
+      ? `${Number(month.split("-")[0]) + 1}-01-01`
+      : `${month.split("-")[0]}-${String(Number(month.split("-")[1]) + 1).padStart(2, "0")}-01`;
+  const [rows, prevRows, { data: branches }, { data: rewardEntries }] = await Promise.all([
     computeEmployeeMonthlyPerformance(month, performanceOptions),
     computeEmployeeMonthlyPerformance(prevMonth, performanceOptions),
     supabase.from("branches").select("id, name"),
+    viewer.role === "giam_doc"
+      ? supabase
+          .from("reward_entries")
+          .select("id, employee_id, entry_date, amount, reason")
+          .gte("entry_date", rewardRangeStart)
+          .lt("entry_date", rewardRangeEnd)
+          .order("entry_date", { ascending: false })
+      : Promise.resolve({ data: [] as RewardEntryRow[] }),
   ]);
 
   const branchNameById = new Map((branches ?? []).map((b) => [b.id, b.name]));
@@ -119,6 +136,13 @@ export default async function PayrollPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Bảng lương tháng</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {viewer.role === "giam_doc" && (
+            <RewardDialog
+              employees={sortedRows.map((row) => ({ id: row.id, name: row.name }))}
+              entries={rewardEntries ?? []}
+              monthLabel={month.split("-").reverse().join("/")}
+            />
+          )}
           <ExportPayrollButton
             month={month}
             rows={sortedRows.map((row) => ({
@@ -132,6 +156,7 @@ export default async function PayrollPage({
               deliveryPayout: row.deliveryPayout,
               collectionPayout: row.collectionPayout,
               overtimePay: row.overtimePay,
+              rewardPay: row.rewardPay,
               bonus: row.bonus,
               totalIncome: row.totalIncome,
             }))}

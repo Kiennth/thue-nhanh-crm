@@ -58,6 +58,9 @@ export interface EmployeeMonthlyPerformance {
   deliveryPayout: number;
   collectionPayout: number;
   overtimePay: number;
+  // Thưởng đột xuất Giám đốc trao (reward_entries) — thu nhập đột biến,
+  // cộng vào totalIncome nhưng KHÔNG vào cơ sở xét bậc thưởng, giống OT.
+  rewardPay: number;
   totalIncome: number;
   completedTaskCount: number;
   taskTypeCounts: Partial<Record<TaskType, number>>;
@@ -96,6 +99,7 @@ export async function computeEmployeeMonthlyPerformance(
     { data: equipmentTypes },
     linesCompletedInMonth,
     overtimeInMonth,
+    rewardsInMonth,
   ] = await Promise.all([
     employeesQuery,
     fetchAllRows<{ task_type: TaskType; employee_id: string | null; completed_date: string; order_id: string }>(
@@ -123,6 +127,14 @@ export async function computeEmployeeMonthlyPerformance(
     fetchAllRows<{ employee_id: string; amount: number }>((from, to) =>
       admin
         .from("overtime_entries")
+        .select("employee_id, amount")
+        .gte("entry_date", start)
+        .lt("entry_date", end)
+        .range(from, to),
+    ),
+    fetchAllRows<{ employee_id: string; amount: number }>((from, to) =>
+      admin
+        .from("reward_entries")
         .select("employee_id, amount")
         .gte("entry_date", start)
         .lt("entry_date", end)
@@ -225,6 +237,11 @@ export async function computeEmployeeMonthlyPerformance(
     overtimeByEmployeeId.set(entry.employee_id, (overtimeByEmployeeId.get(entry.employee_id) ?? 0) + entry.amount);
   }
 
+  const rewardByEmployeeId = new Map<string, number>();
+  for (const entry of rewardsInMonth) {
+    rewardByEmployeeId.set(entry.employee_id, (rewardByEmployeeId.get(entry.employee_id) ?? 0) + entry.amount);
+  }
+
   return employeeList.map((emp) => {
     const empTasks = tasksInMonth.filter((t) => t.employee_id === emp.id);
     const taskTypeCounts: Partial<Record<TaskType, number>> = {};
@@ -249,6 +266,7 @@ export async function computeEmployeeMonthlyPerformance(
       collection: 0,
     };
     const overtimePay = overtimeByEmployeeId.get(emp.id) ?? 0;
+    const rewardPay = rewardByEmployeeId.get(emp.id) ?? 0;
     return {
       id: emp.id,
       name: emp.name,
@@ -262,6 +280,7 @@ export async function computeEmployeeMonthlyPerformance(
       deliveryPayout: service.delivery,
       collectionPayout: service.collection,
       overtimePay,
+      rewardPay,
       totalIncome:
         emp.base_salary +
         totalCommission +
@@ -271,7 +290,8 @@ export async function computeEmployeeMonthlyPerformance(
         service.support +
         service.delivery +
         service.collection +
-        overtimePay,
+        overtimePay +
+        rewardPay,
       completedTaskCount: empTasks.length,
       taskTypeCounts,
     };
@@ -302,6 +322,7 @@ export function sumEmployeePerformanceAcrossMonths(
       existing.deliveryPayout += r.deliveryPayout;
       existing.collectionPayout += r.collectionPayout;
       existing.overtimePay += r.overtimePay;
+      existing.rewardPay += r.rewardPay;
       existing.totalIncome += r.totalIncome;
       existing.completedTaskCount += r.completedTaskCount;
       for (const [taskType, count] of Object.entries(r.taskTypeCounts)) {
@@ -324,6 +345,7 @@ export interface MyMonthlyTrendPoint {
   deliveryPayout: number;
   collectionPayout: number;
   overtimePay: number;
+  rewardPay: number;
   totalIncome: number;
   completedTaskCount: number;
   // Tháng hiện tại chưa chốt — biểu đồ hiển thị khác + chú thích để nhân
@@ -365,6 +387,7 @@ export async function computeMyMonthlyTrend(
       deliveryPayout: row?.deliveryPayout ?? 0,
       collectionPayout: row?.collectionPayout ?? 0,
       overtimePay: row?.overtimePay ?? 0,
+      rewardPay: row?.rewardPay ?? 0,
       totalIncome: row?.totalIncome ?? 0,
       completedTaskCount: row?.completedTaskCount ?? 0,
       inProgress: month === thisMonth,

@@ -613,6 +613,27 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["overtime_entries"]["Insert"]>;
         Relationships: [];
       };
+      reward_entries: {
+        Row: {
+          id: string;
+          employee_id: string;
+          entry_date: string;
+          amount: number;
+          reason: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          entry_date?: string;
+          amount: number;
+          reason: string;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["reward_entries"]["Insert"]>;
+        Relationships: [];
+      };
       commission_tiers: {
         Row: {
           id: string;

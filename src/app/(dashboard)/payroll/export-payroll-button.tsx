@@ -15,6 +15,7 @@ export interface PayrollExportRow {
   deliveryPayout: number;
   collectionPayout: number;
   overtimePay: number;
+  rewardPay: number;
   bonus: number;
   totalIncome: number;
 }
@@ -30,6 +31,7 @@ const COLUMNS: { header: string; key: keyof PayrollExportRow; money?: boolean }[
   { header: "Giao hàng", key: "deliveryPayout", money: true },
   { header: "Thu hồi", key: "collectionPayout", money: true },
   { header: "OT", key: "overtimePay", money: true },
+  { header: "Thưởng đột xuất", key: "rewardPay", money: true },
   { header: "Thưởng", key: "bonus", money: true },
   { header: "Tổng thu nhập", key: "totalIncome", money: true },
 ];

@@ -61,6 +61,7 @@ export function MyPerformanceCard({ perf }: { perf: MyPerformance }) {
               ["Giao hàng", perf.deliveryPayout],
               ["Thu hồi", perf.collectionPayout],
               ["OT", perf.overtimePay],
+              ["Thưởng đột xuất", perf.rewardPay],
             ] as const
           )
             .filter(([, value]) => value > 0)
