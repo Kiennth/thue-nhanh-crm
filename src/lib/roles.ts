@@ -108,6 +108,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
   },
   {
+    href: "/rewards",
+    label: "Thưởng",
+    // Module thưởng (CEO 2026-08-09): sổ thưởng trao tay + tóm tắt thưởng
+    // theo khoán. Quản lý xem; trao/xoá chỉ Giám đốc (gate trong trang + RLS).
+    roles: [...MANAGE_ROLES],
+  },
+  {
     href: "/expenses",
     label: "Chi phí",
     roles: [...EXPENSE_ROLES],

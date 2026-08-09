@@ -11,6 +11,7 @@ export type TrackingType = "individual" | "quantity";
 export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
+export type RewardCategory = "bat_chot" | "doanh_so" | "dinh_ky" | "tet" | "sinh_nhat" | "khac";
 export type PaymentMethod = "tien_mat" | "chuyen_khoan" | "the" | "vi_dien_tu" | "khac";
 export type OrderPaymentType = "invoice" | "deposit_collect" | "deposit_refund";
 export type RfidTagStatus = "in_stock" | "with_customer";
@@ -620,6 +621,7 @@ export interface Database {
           entry_date: string;
           amount: number;
           reason: string;
+          category: RewardCategory;
           created_by: string | null;
           created_at: string;
         };
@@ -629,6 +631,7 @@ export interface Database {
           entry_date?: string;
           amount: number;
           reason: string;
+          category?: RewardCategory;
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["reward_entries"]["Insert"]>;

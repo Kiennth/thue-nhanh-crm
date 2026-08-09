@@ -18,6 +18,9 @@ const RewardSchema = z.object({
   entry_date: z.string().min(1, { message: "Vui lòng chọn ngày." }),
   amount: z.coerce.number().positive({ message: "Số tiền phải lớn hơn 0." }),
   reason: z.string().trim().min(1, { message: "Vui lòng ghi lý do thưởng — khoản này cần được ghi chép lại." }),
+  category: z.enum(["bat_chot", "doanh_so", "dinh_ky", "tet", "sinh_nhat", "khac"], {
+    message: "Vui lòng chọn loại thưởng.",
+  }),
 });
 
 export async function addReward(
@@ -31,6 +34,7 @@ export async function addReward(
     entry_date: formData.get("entry_date"),
     amount: formData.get("amount"),
     reason: formData.get("reason"),
+    category: formData.get("category"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -58,6 +62,7 @@ export async function addReward(
       entry_date: parsed.data.entry_date,
       amount: parsed.data.amount,
       reason: parsed.data.reason,
+      category: parsed.data.category,
       created_by: director.id,
     })),
   );
@@ -65,6 +70,7 @@ export async function addReward(
     return { error: "Không thể ghi nhận thưởng: " + error.message };
   }
 
+  revalidatePath("/rewards");
   revalidatePath("/payroll");
   return { success: true };
 }
@@ -77,5 +83,6 @@ export async function deleteReward(id: string) {
   if (error) {
     throw new Error("Không thể xoá khoản thưởng: " + error.message);
   }
+  revalidatePath("/rewards");
   revalidatePath("/payroll");
 }
