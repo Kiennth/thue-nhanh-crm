@@ -108,6 +108,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
   },
   {
+    href: "/debts",
+    label: "Công nợ",
+    // Sổ đòi nợ theo tuổi nợ (CEO 2026-08-09) — dữ liệu tài chính, chỉ
+    // Giám đốc/Admin/Kế toán (gate trang + RLS debt_notes/RPC).
+    roles: [...MANAGE_ROLES],
+  },
+  {
     href: "/rewards",
     label: "Thưởng",
     // Module thưởng (CEO 2026-08-09): sổ thưởng trao tay + tóm tắt thưởng

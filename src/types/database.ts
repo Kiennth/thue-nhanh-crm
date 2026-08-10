@@ -642,6 +642,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["reward_entries"]["Insert"]>;
         Relationships: [];
       };
+      debt_notes: {
+        Row: {
+          id: string;
+          customer_id: string;
+          note: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          note: string;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["debt_notes"]["Insert"]>;
+        Relationships: [];
+      };
       reward_rules: {
         Row: {
           id: string;
@@ -824,6 +841,32 @@ export interface Database {
           p_order_id: string;
         };
         Returns: void;
+      };
+      debt_aging_report: {
+        Args: Record<string, never>;
+        Returns: {
+          totals: {
+            totalOwed: number;
+            bucket0_30: number;
+            bucket31_60: number;
+            bucket61_90: number;
+            bucket90Plus: number;
+            customerCount: number;
+          };
+          // 300 khách nợ già nhất — totals vẫn cộng trên toàn bộ.
+          rows: {
+            customer_id: string;
+            customer_name: string;
+            phone: string | null;
+            total_owed: number;
+            bucket_0_30: number;
+            bucket_31_60: number;
+            bucket_61_90: number;
+            bucket_90_plus: number;
+            oldest_debt_days: number;
+            unpaid_order_count: number;
+          }[];
+        };
       };
       order_schedule_conflicts: {
         Args: {
