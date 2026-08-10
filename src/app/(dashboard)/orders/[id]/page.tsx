@@ -67,6 +67,7 @@ import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
 import { PrintMenu } from "./print-menu";
+import { OrderConflictAlert } from "./order-conflict-alert";
 import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
@@ -563,6 +564,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       </div>
+
+      {/* Cảnh báo trùng lịch — đặt ngay trên danh sách thiết bị, tự tính lại
+          sau mỗi lần thêm dòng/đổi khoảng thuê (trang revalidate). */}
+      <OrderConflictAlert orderId={order.id} />
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">

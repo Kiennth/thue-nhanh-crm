@@ -825,6 +825,25 @@ export interface Database {
         };
         Returns: void;
       };
+      order_schedule_conflicts: {
+        Args: {
+          p_order_id: string;
+        };
+        Returns: {
+          equipment_type_id: string;
+          equipment_type_name: string;
+          capacity: number;
+          my_quantity: number;
+          others_quantity: number;
+          conflicting_orders: {
+            orderId: string;
+            orderCode: string;
+            rentalStartAt: string;
+            rentalEndAt: string;
+            quantity: number;
+          }[];
+        }[];
+      };
       // Hai RPC tổng hợp cho trang /customers — trả jsonb (typed lỏng, page
       // tự ép kiểu sang CustomerReportData/khối danh sách).
       customer_page_report: {
