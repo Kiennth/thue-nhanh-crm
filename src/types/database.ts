@@ -868,6 +868,17 @@ export interface Database {
           }[];
         };
       };
+      equipment_utilization: {
+        Args: { p_days?: number };
+        Returns: {
+          equipment_type_id: string;
+          equipment_type_name: string;
+          capacity: number;
+          booked_unit_days: number;
+          utilization_pct: number | null;
+          orders_in_period: number;
+        }[];
+      };
       order_schedule_conflicts: {
         Args: {
           p_order_id: string;

@@ -16,6 +16,7 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { SearchInput } from "@/components/search-input";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { ProductHighlightCards } from "@/components/dashboard-cards";
+import { InvestmentSuggestionsCard } from "./investment-suggestions-card";
 import { RevenueBarList, type RevenuePoint } from "@/components/revenue-bar-list";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
@@ -379,6 +380,11 @@ export default async function EquipmentPage({
           />
         </div>
       )}
+
+      {/* Gợi ý mua thêm/thanh lý theo tỉ lệ lấp đầy 90 ngày (CEO 2026-08-09)
+          — chỉ Giám đốc/Kế toán, RPC tự gate nên component tự ẩn với role
+          khác. */}
+      {canViewEquipmentReports && <InvestmentSuggestionsCard />}
 
       {reportSummary && (
         <Card>
