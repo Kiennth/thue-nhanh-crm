@@ -30,6 +30,7 @@ import { OrderDialog } from "./order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
+import { OrdersBranchToggle } from "./orders-branch-toggle";
 import {
   OrdersOverviewPeriodToggle,
   type OrdersOverviewPeriod,
@@ -123,6 +124,7 @@ export async function OrdersListSection({
   canDelete,
   showStats = true,
   branchScope,
+  branchToggle,
 }: {
   status?: string;
   range?: string;
@@ -146,6 +148,10 @@ export async function OrdersListSection({
   // Chỉ Cửa hàng trưởng có: chọn xem đơn kho mình (mặc định) hay toàn hệ
   // thống. Vắng mặt thì không hiện ô chọn — phạm vi do role quyết định cứng.
   branchScope?: { value: "branch" | "all"; branchName: string };
+  // Chỉ Giám đốc/Admin/Kế toán có: toggle xem theo 1 kho (CEO 2026-08-13).
+  // selectedId đã hoà vào branchId ở page.tsx nên cả tổng quan lẫn bảng đều
+  // theo kho đang chọn; ở đây chỉ cần vẽ toggle + giữ lựa chọn qua các link.
+  branchToggle?: { selectedId: string | null };
 }) {
   const activeStatus = status ?? "all";
   const activeRange: DateRangePreset = range && isDateRangePreset(range) ? range : "all";
@@ -247,6 +253,7 @@ export async function OrdersListSection({
   if (overviewPeriod !== "this_month") unpaidLinkParams.set("overview", overviewPeriod);
   unpaidLinkParams.set("range", overviewPeriod);
   unpaidLinkParams.set("paid", "unpaid");
+  if (branchToggle?.selectedId) unpaidLinkParams.set("branch", branchToggle.selectedId);
   const unpaidHref = `?${unpaidLinkParams.toString()}`;
 
   // Bỏ lọc "chưa thanh toán hết" nhưng GIỮ NGUYÊN mọi lựa chọn khác đang có
@@ -261,6 +268,7 @@ export async function OrdersListSection({
   if (dir) clearUnpaidParams.set("dir", dir);
   if (search) clearUnpaidParams.set("search", search);
   if (overview) clearUnpaidParams.set("overview", overview);
+  if (branchToggle?.selectedId) clearUnpaidParams.set("branch", branchToggle.selectedId);
   const clearUnpaidQuery = clearUnpaidParams.toString();
   const clearUnpaidHref = clearUnpaidQuery ? `?${clearUnpaidQuery}` : "?";
 
@@ -275,7 +283,12 @@ export async function OrdersListSection({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">Tổng quan đơn hàng</h3>
-            <OrdersOverviewPeriodToggle value={overviewPeriod} />
+            <div className="flex flex-wrap items-center gap-2">
+              {branchToggle && (
+                <OrdersBranchToggle branches={branchList} value={branchToggle.selectedId} />
+              )}
+              <OrdersOverviewPeriodToggle value={overviewPeriod} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label="Tổng đơn" value={overviewTotalCount} />

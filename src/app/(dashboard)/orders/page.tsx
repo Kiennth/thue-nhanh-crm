@@ -18,13 +18,20 @@ export default async function OrdersPage({
     scope?: string;
     overview?: string;
     paid?: string;
+    branch?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir, search, scope, overview, paid } =
+  const { status, range, from, to, page, sort, dir, search, scope, overview, paid, branch } =
     await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
   const branchId = canManage ? null : employee.branch_id;
+
+  // Giám đốc/Admin/Kế toán chọn xem theo 1 kho qua toggle (CEO 2026-08-13).
+  // Chỉ nhận uuid hợp lệ — param là đất người dùng sửa tay, giá trị rác thì
+  // coi như "Tất cả kho" thay vì để RPC nổ lỗi parse.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const managerBranchId = canManage && branch && UUID_RE.test(branch) ? branch : null;
 
   // Cửa hàng trưởng: mặc định chỉ thấy đơn kho mình để tập trung đúng việc,
   // nhưng chủ động chuyển sang "tất cả chi nhánh" khi cần xem/hỗ trợ kho
@@ -35,7 +42,8 @@ export default async function OrdersPage({
   // cần bật/tắt như Cửa hàng trưởng) — RLS đã cho đọc, xem
   // 20260805120000_ky_thuat_sales_reads_all_orders.sql.
   const isTechSales = employee.role === "ky_thuat_sales";
-  const listBranchId = viewingAllBranches || isTechSales ? null : branchId;
+  const listBranchId =
+    viewingAllBranches || isTechSales ? null : canManage ? managerBranchId : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
   // Cửa hàng trưởng vẫn xem được vì số đã scope theo chi nhánh của họ.
   // Admin/Kế toán/Giám đốc đều xem — CEO chốt 2026-08-06: khối tổng quan
@@ -77,6 +85,7 @@ export default async function OrdersPage({
             ? { value: viewingAllBranches ? "all" : "branch", branchName }
             : undefined
         }
+        branchToggle={canManage ? { selectedId: managerBranchId } : undefined}
       />
     </div>
   );
