@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { updateWebsiteProduct } from "@/lib/actions/website";
 import type { Database } from "@/types/database";
 
@@ -120,23 +121,18 @@ export function WebsiteProductDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description_html">Mô tả chi tiết (HTML)</Label>
-            <Textarea
-              id="description_html"
+            <Label>Mô tả chi tiết</Label>
+            <RichTextEditor
               name="description_html"
-              rows={8}
-              className="font-mono text-xs"
               defaultValue={product.description_html ?? ""}
+              placeholder="Tiêu đề lớn để chia ô: Cấu hình, Trong hộp, FAQ..."
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description_html_en">Mô tả chi tiết tiếng Anh (HTML)</Label>
-            <Textarea
-              id="description_html_en"
+            <Label>Mô tả chi tiết tiếng Anh</Label>
+            <RichTextEditor
               name="description_html_en"
-              rows={8}
-              className="font-mono text-xs"
               defaultValue={product.description_html_en ?? ""}
             />
           </div>
