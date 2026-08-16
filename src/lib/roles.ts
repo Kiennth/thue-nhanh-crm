@@ -126,4 +126,11 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Chi phí",
     roles: [...EXPENSE_ROLES],
   },
+  {
+    href: "/website",
+    label: "Website",
+    // Quản trị nội dung web công khai new.thuenhanh.vn (CEO 2026-08-16) —
+    // cùng bộ role được sửa equipment_types/website_* theo RLS.
+    roles: [...MANAGE_ROLES],
+  },
 ];

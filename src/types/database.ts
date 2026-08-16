@@ -782,6 +782,108 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["rfid_scan_log"]["Insert"]>;
         Relationships: [];
       };
+      // Lớp nội dung website công khai (migration 20260816000000_website_catalog)
+      // — new.thuenhanh.vn đọc qua view *_public; CRM sửa thẳng bảng gốc.
+      website_categories: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          name_en: string | null;
+          seo_title: string | null;
+          seo_title_en: string | null;
+          seo_description: string | null;
+          seo_description_en: string | null;
+          intro_html: string | null;
+          intro_html_en: string | null;
+          hero_image_url: string | null;
+          sort_order: number;
+          is_published: boolean;
+          equipment_category_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          name_en?: string | null;
+          seo_title?: string | null;
+          seo_title_en?: string | null;
+          seo_description?: string | null;
+          seo_description_en?: string | null;
+          intro_html?: string | null;
+          intro_html_en?: string | null;
+          hero_image_url?: string | null;
+          sort_order?: number;
+          is_published?: boolean;
+          equipment_category_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["website_categories"]["Insert"]>;
+        Relationships: [];
+      };
+      website_products: {
+        Row: {
+          id: string;
+          equipment_type_id: string;
+          slug: string;
+          name: string | null;
+          name_en: string | null;
+          short_description: string | null;
+          short_description_en: string | null;
+          description_html: string | null;
+          description_html_en: string | null;
+          seo_title: string | null;
+          seo_title_en: string | null;
+          seo_description: string | null;
+          seo_description_en: string | null;
+          brand: string | null;
+          gallery_image_urls: string[];
+          website_category_id: string | null;
+          sort_order: number;
+          is_featured: boolean;
+          is_published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          equipment_type_id: string;
+          slug: string;
+          name?: string | null;
+          name_en?: string | null;
+          short_description?: string | null;
+          short_description_en?: string | null;
+          description_html?: string | null;
+          description_html_en?: string | null;
+          seo_title?: string | null;
+          seo_title_en?: string | null;
+          seo_description?: string | null;
+          seo_description_en?: string | null;
+          brand?: string | null;
+          gallery_image_urls?: string[];
+          website_category_id?: string | null;
+          sort_order?: number;
+          is_featured?: boolean;
+          is_published?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["website_products"]["Insert"]>;
+        Relationships: [];
+      };
+      website_leads: {
+        Row: {
+          id: string;
+          name: string;
+          phone: string;
+          message: string | null;
+          product_slug: string | null;
+          source_page: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       employees_public: {
