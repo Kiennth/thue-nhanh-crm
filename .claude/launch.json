@@ -6,6 +6,12 @@
       "runtimeExecutable": "/opt/homebrew/bin/npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "thuenhanh-web-dev",
+      "runtimeExecutable": "/opt/homebrew/bin/npm",
+      "runtimeArgs": ["--prefix", "/Users/nguyentrungkien/Documents/Thuê Nhanh Web", "run", "dev", "--", "--port", "3001"],
+      "port": 3001
     }
   ]
 }
