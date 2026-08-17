@@ -140,6 +140,19 @@ export function WebsiteProductDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="ship_fee">Phí giao tận nơi (đ) — để trống nếu muốn báo giá khi chốt</Label>
+            <Input
+              id="ship_fee"
+              name="ship_fee"
+              type="number"
+              min={0}
+              step={10000}
+              placeholder="VD: 100000"
+              defaultValue={product.ship_fee ?? ""}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="tags_csv">Tags tìm chéo (phân tách bằng dấu phẩy)</Label>
             <Input
               id="tags_csv"

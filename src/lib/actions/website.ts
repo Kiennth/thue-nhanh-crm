@@ -107,6 +107,10 @@ const ProductSchema = z.object({
   description_html: z.string().trim().max(50000).optional(),
   description_html_en: z.string().trim().max(50000).optional(),
   website_category_id: z.string().uuid().optional(),
+  // Phí giao tận nơi (đ) — trống = chưa quy định, web hiện "báo khi xác nhận".
+  ship_fee: z
+    .union([z.literal("").transform(() => null), z.coerce.number().min(0).max(100_000_000)])
+    .optional(),
   // Danh sách id sản phẩm liên quan (gắn tay) từ RelatedPicker — JSON mảng uuid.
   related_json: z
     .string()
@@ -166,6 +170,7 @@ export async function updateWebsiteProduct(
     gallery_json: formData.get("gallery_json") || undefined,
     tags_csv: formData.get("tags_csv") ?? undefined,
     related_json: formData.get("related_json") || undefined,
+    ship_fee: formData.get("ship_fee") ?? undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -186,6 +191,7 @@ export async function updateWebsiteProduct(
       ...(parsed.data.gallery_json ? { gallery_image_urls: parsed.data.gallery_json } : {}),
       ...(parsed.data.tags_csv !== undefined ? { tags: parsed.data.tags_csv } : {}),
       ...(parsed.data.related_json ? { related_product_ids: parsed.data.related_json } : {}),
+      ...(parsed.data.ship_fee !== undefined ? { ship_fee: parsed.data.ship_fee } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };

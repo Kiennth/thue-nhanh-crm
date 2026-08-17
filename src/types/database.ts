@@ -847,6 +847,7 @@ export interface Database {
           is_published: boolean;
           tags: string[];
           related_product_ids: string[];
+          ship_fee: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -872,6 +873,7 @@ export interface Database {
           is_published?: boolean;
           tags?: string[];
           related_product_ids?: string[];
+          ship_fee?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["website_products"]["Insert"]>;
         Relationships: [];
