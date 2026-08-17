@@ -96,12 +96,27 @@ export default async function WebsitePage({
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
-          <WebsiteCategoryDialog />
+          <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {categoryList.map((c) => (
-            <WebsiteCategoryDialog key={c.id} category={c} />
-          ))}
+        <CardContent className="space-y-2">
+          {/* 2 tầng: mỗi dòng = nhóm cha + các con của nó */}
+          {categoryList
+            .filter((c) => !c.parent_id)
+            .map((parent) => (
+              <div key={parent.id} className="flex flex-wrap items-center gap-2">
+                <WebsiteCategoryDialog category={parent} parents={categoryList.filter((c) => !c.parent_id)} />
+                <span className="text-muted-foreground">›</span>
+                {categoryList
+                  .filter((c) => c.parent_id === parent.id)
+                  .map((child) => (
+                    <WebsiteCategoryDialog
+                      key={child.id}
+                      category={child}
+                      parents={categoryList.filter((c) => !c.parent_id)}
+                    />
+                  ))}
+              </div>
+            ))}
           {!categoryList.length && (
             <p className="text-sm text-muted-foreground">Chưa có danh mục web nào.</p>
           )}

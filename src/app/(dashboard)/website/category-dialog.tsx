@@ -21,7 +21,14 @@ import type { Database } from "@/types/database";
 type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Row"];
 
 // Không có category = nút "Thêm danh mục"; có = chip bấm vào để sửa.
-export function WebsiteCategoryDialog({ category }: { category?: WebsiteCategoryRow }) {
+// parents = các danh mục tầng trên để chọn "Nhóm cha" (2 tầng, CEO 2026-08-17).
+export function WebsiteCategoryDialog({
+  category,
+  parents = [],
+}: {
+  category?: WebsiteCategoryRow;
+  parents?: WebsiteCategoryRow[];
+}) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -83,6 +90,25 @@ export function WebsiteCategoryDialog({ category }: { category?: WebsiteCategory
               <Label htmlFor="sort_order">Thứ tự</Label>
               <Input id="sort_order" name="sort_order" type="number" defaultValue={category?.sort_order ?? 0} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="parent_id">Nhóm cha (trống = là nhóm tầng trên)</Label>
+            <select
+              id="parent_id"
+              name="parent_id"
+              defaultValue={category?.parent_id ?? ""}
+              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+            >
+              <option value="">— Không (tầng trên) —</option>
+              {parents
+                .filter((p) => p.id !== category?.id)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
           </div>
 
           <div className="space-y-2">

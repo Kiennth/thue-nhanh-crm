@@ -800,6 +800,7 @@ export interface Database {
           sort_order: number;
           is_published: boolean;
           equipment_category_id: string | null;
+          parent_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -818,6 +819,7 @@ export interface Database {
           sort_order?: number;
           is_published?: boolean;
           equipment_category_id?: string | null;
+          parent_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["website_categories"]["Insert"]>;
         Relationships: [];

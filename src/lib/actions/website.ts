@@ -183,6 +183,7 @@ const CategorySchema = z.object({
   is_published: z.coerce.boolean(),
   intro_html: z.string().trim().max(20000).optional(),
   intro_html_en: z.string().trim().max(20000).optional(),
+  parent_id: z.string().uuid().optional(),
 });
 
 export async function upsertWebsiteCategory(
@@ -200,6 +201,7 @@ export async function upsertWebsiteCategory(
     is_published: formData.get("is_published") === "on",
     intro_html: formData.get("intro_html") || undefined,
     intro_html_en: formData.get("intro_html_en") || undefined,
+    parent_id: formData.get("parent_id") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -214,6 +216,8 @@ export async function upsertWebsiteCategory(
     is_published: parsed.data.is_published,
     intro_html: parsed.data.intro_html ?? null,
     intro_html_en: parsed.data.intro_html_en ?? null,
+    // Không cho tự làm cha chính mình — DB cũng chặn vòng qua FK nhưng chặn sớm.
+    parent_id: parsed.data.parent_id && parsed.data.parent_id !== id ? parsed.data.parent_id : null,
   };
   const { error } = id
     ? await supabase.from("website_categories").update(values).eq("id", id)
