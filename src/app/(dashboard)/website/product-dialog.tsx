@@ -127,6 +127,16 @@ export function WebsiteProductDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="tags_csv">Tags tìm chéo (phân tách bằng dấu phẩy)</Label>
+            <Input
+              id="tags_csv"
+              name="tags_csv"
+              placeholder="13 inch, M1 Pro, Thunderbolt 4..."
+              defaultValue={product.tags.join(", ")}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Mô tả chi tiết</Label>
             <RichTextEditor
               name="description_html"

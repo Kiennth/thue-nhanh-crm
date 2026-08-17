@@ -107,6 +107,11 @@ const ProductSchema = z.object({
   description_html: z.string().trim().max(50000).optional(),
   description_html_en: z.string().trim().max(50000).optional(),
   website_category_id: z.string().uuid().optional(),
+  // Tags phân tách bằng dấu phẩy → mảng, lọc rỗng, tối đa 15 tag.
+  tags_csv: z
+    .string()
+    .transform((s) => [...new Set(s.split(",").map((t) => t.trim()).filter(Boolean))].slice(0, 15))
+    .optional(),
   // JSON string từ GalleryEditor — mảng URL theo thứ tự hiển thị (ảnh đầu
   // là ảnh đại diện). Chỉ nhận URL trong bucket của mình, chặn hotlink lạ.
   gallery_json: z
@@ -144,6 +149,7 @@ export async function updateWebsiteProduct(
     description_html_en: formData.get("description_html_en") || undefined,
     website_category_id: formData.get("website_category_id") || undefined,
     gallery_json: formData.get("gallery_json") || undefined,
+    tags_csv: formData.get("tags_csv") ?? undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -162,6 +168,7 @@ export async function updateWebsiteProduct(
       description_html_en: parsed.data.description_html_en ?? null,
       website_category_id: parsed.data.website_category_id ?? null,
       ...(parsed.data.gallery_json ? { gallery_image_urls: parsed.data.gallery_json } : {}),
+      ...(parsed.data.tags_csv !== undefined ? { tags: parsed.data.tags_csv } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };

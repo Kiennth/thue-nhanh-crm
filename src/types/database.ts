@@ -845,6 +845,7 @@ export interface Database {
           sort_order: number;
           is_featured: boolean;
           is_published: boolean;
+          tags: string[];
           created_at: string;
           updated_at: string;
         };
@@ -868,6 +869,7 @@ export interface Database {
           sort_order?: number;
           is_featured?: boolean;
           is_published?: boolean;
+          tags?: string[];
         };
         Update: Partial<Database["public"]["Tables"]["website_products"]["Insert"]>;
         Relationships: [];
