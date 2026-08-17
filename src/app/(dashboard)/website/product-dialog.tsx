@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { GalleryEditor } from "./gallery-editor";
+import { RelatedPicker, type RelatedOption } from "./related-picker";
 import { updateWebsiteProduct } from "@/lib/actions/website";
 import type { Database } from "@/types/database";
 
@@ -28,9 +29,12 @@ type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Ro
 export function WebsiteProductDialog({
   product,
   categories,
+  relatedOptions = [],
 }: {
   product: WebsiteProductRow;
   categories: WebsiteCategoryRow[];
+  // Danh sách nhẹ mọi sản phẩm web (id + tên) cho bộ chọn "liên quan".
+  relatedOptions?: RelatedOption[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +128,15 @@ export function WebsiteProductDialog({
                 defaultValue={product.short_description_en ?? ""}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Sản phẩm liên quan (gắn tay, hiện dưới trang sản phẩm)</Label>
+            <RelatedPicker
+              options={relatedOptions}
+              initialIds={product.related_product_ids}
+              selfId={product.id}
+            />
           </div>
 
           <div className="space-y-2">

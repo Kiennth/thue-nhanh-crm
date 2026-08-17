@@ -107,6 +107,21 @@ const ProductSchema = z.object({
   description_html: z.string().trim().max(50000).optional(),
   description_html_en: z.string().trim().max(50000).optional(),
   website_category_id: z.string().uuid().optional(),
+  // Danh sách id sản phẩm liên quan (gắn tay) từ RelatedPicker — JSON mảng uuid.
+  related_json: z
+    .string()
+    .transform((s, ctx) => {
+      try {
+        const arr = JSON.parse(s);
+        if (!Array.isArray(arr) || arr.length > 8) throw new Error();
+        if (!arr.every((u) => typeof u === "string" && /^[0-9a-f-]{36}$/i.test(u))) throw new Error();
+        return arr as string[];
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Danh sách liên quan không hợp lệ (tối đa 8)." });
+        return z.NEVER;
+      }
+    })
+    .optional(),
   // Tags phân tách bằng dấu phẩy → mảng, lọc rỗng, tối đa 15 tag.
   tags_csv: z
     .string()
@@ -150,6 +165,7 @@ export async function updateWebsiteProduct(
     website_category_id: formData.get("website_category_id") || undefined,
     gallery_json: formData.get("gallery_json") || undefined,
     tags_csv: formData.get("tags_csv") ?? undefined,
+    related_json: formData.get("related_json") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -169,6 +185,7 @@ export async function updateWebsiteProduct(
       website_category_id: parsed.data.website_category_id ?? null,
       ...(parsed.data.gallery_json ? { gallery_image_urls: parsed.data.gallery_json } : {}),
       ...(parsed.data.tags_csv !== undefined ? { tags: parsed.data.tags_csv } : {}),
+      ...(parsed.data.related_json ? { related_product_ids: parsed.data.related_json } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };
