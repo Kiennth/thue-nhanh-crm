@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { GalleryEditor } from "./gallery-editor";
 import { updateWebsiteProduct } from "@/lib/actions/website";
 import type { Database } from "@/types/database";
 
@@ -69,6 +70,11 @@ export function WebsiteProductDialog({
           <div className="space-y-2">
             <Label htmlFor="slug">Slug (đường dẫn: new.thuenhanh.vn/…)</Label>
             <Input id="slug" name="slug" defaultValue={product.slug} required />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Ảnh sản phẩm</Label>
+            <GalleryEditor slug={product.slug} initialUrls={product.gallery_image_urls} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

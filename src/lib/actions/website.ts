@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 
@@ -63,6 +64,36 @@ export async function toggleProductFeatured(id: string): Promise<ActionState> {
   return { success: true };
 }
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const GALLERY_MAX = 10;
+
+// Upload 1 ảnh gallery — trả URL để client thêm vào danh sách (lưu thứ tự
+// khi bấm Lưu). Dùng ADMIN client cho storage: policy bucket cũ chỉ cho
+// admin/ke_toan, nhưng Giám đốc cũng phải up được ảnh web — requireRole ở
+// đây mới là lớp gác thật.
+export async function uploadWebsiteProductImage(
+  slug: string,
+  formData: FormData,
+): Promise<{ url: string } | { error: string }> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Chưa chọn ảnh." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: "Ảnh không được vượt quá 5MB." };
+  if (!file.type.startsWith("image/")) return { error: "File không phải ảnh." };
+  if (!/^[a-z0-9-]+$/.test(slug)) return { error: "Slug không hợp lệ." };
+
+  const ext = (file.name.includes(".") ? file.name.split(".").pop() : "jpg") ?? "jpg";
+  const path = `website/${slug}/${crypto.randomUUID()}.${ext.toLowerCase()}`;
+  const admin = createAdminClient();
+  const { error } = await admin.storage
+    .from("equipment-images")
+    .upload(path, file, { contentType: file.type || undefined });
+  if (error) return { error: "Không tải được ảnh lên: " + error.message };
+
+  return { url: admin.storage.from("equipment-images").getPublicUrl(path).data.publicUrl };
+}
+
 const ProductSchema = z.object({
   name: z.string().trim().max(300).optional(),
   name_en: z.string().trim().max(300).optional(),
@@ -76,6 +107,24 @@ const ProductSchema = z.object({
   description_html: z.string().trim().max(50000).optional(),
   description_html_en: z.string().trim().max(50000).optional(),
   website_category_id: z.string().uuid().optional(),
+  // JSON string từ GalleryEditor — mảng URL theo thứ tự hiển thị (ảnh đầu
+  // là ảnh đại diện). Chỉ nhận URL trong bucket của mình, chặn hotlink lạ.
+  gallery_json: z
+    .string()
+    .transform((s, ctx) => {
+      try {
+        const arr = JSON.parse(s);
+        if (!Array.isArray(arr) || arr.length > GALLERY_MAX) throw new Error();
+        if (!arr.every((u) => typeof u === "string" && u.includes("/storage/v1/object/public/equipment-images/"))) {
+          throw new Error();
+        }
+        return arr as string[];
+      } catch {
+        ctx.addIssue({ code: "custom", message: `Gallery không hợp lệ (tối đa ${GALLERY_MAX} ảnh).` });
+        return z.NEVER;
+      }
+    })
+    .optional(),
 });
 
 export async function updateWebsiteProduct(
@@ -94,6 +143,7 @@ export async function updateWebsiteProduct(
     description_html: formData.get("description_html") || undefined,
     description_html_en: formData.get("description_html_en") || undefined,
     website_category_id: formData.get("website_category_id") || undefined,
+    gallery_json: formData.get("gallery_json") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -111,6 +161,7 @@ export async function updateWebsiteProduct(
       description_html: parsed.data.description_html ?? null,
       description_html_en: parsed.data.description_html_en ?? null,
       website_category_id: parsed.data.website_category_id ?? null,
+      ...(parsed.data.gallery_json ? { gallery_image_urls: parsed.data.gallery_json } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };
