@@ -1,0 +1,33 @@
+-- Đợt chỉnh danh mục web + 3 sản phẩm Booqable mới (CEO 2026-08-18, buổi
+-- tối). Đã áp qua REST service-role; file này là sổ sách.
+--
+-- DANH MỤC WEB:
+--   * 5 danh mục con mới của Thiết Bị Sự Kiện: Loa Trợ Giảng
+--     (thue-loa-tro-giang), Intercom & Bộ Đàm (thue-intercom-bo-dam),
+--     Camera An Ninh (thue-camera-an-ninh), Quạt & Điều Hoà
+--     (thue-quat-dieu-hoa, chưa có sản phẩm), Máy Pha Cà Phê
+--     (thue-may-pha-ca-phe, chưa có sản phẩm).
+--   * Dọn vào danh mục mới: Loa trợ giảng (SL); 4 món intercom (Bộ đàm
+--     Motorola/Xiaomi, Perfect Cue, Saramonic WiTalk) từ "Thiết Bị Trình
+--     Chiếu"; Camera An Ninh - Camera ngoài trời từ "Máy Quay".
+--   * "Camera & Quay chụp" đổi tên hiển thị → "Quay & Chụp" / "Photo &
+--     Video" (slug thue-camera-quay-chup giữ nguyên).
+--   * Insta360 Luna Ultra - Creator Combo → danh mục Máy Quay Chống Rung.
+--   * Máy ảnh Canon EOS R100 lên web: slug thue-may-anh-canon-eos-r100,
+--     danh mục Máy Ảnh, published.
+--   * (Yêu cầu xoá 4 danh mục Đồ sự kiện & Văn phòng / Phụ kiện / Giải trí
+--     & Thể thao / Gia dụng & Thể thao đang TREO — CEO đóng hộp thoại,
+--     chưa chốt chỗ mới cho 4 danh mục con của Giải trí.)
+--
+-- SẢN PHẨM BOOQABLE MỚI (khuôn cũ: quantity/day/pricing_structure template
+-- 88a44846, cọc + giá + kho + ảnh theo Booqable, web published):
+--   1. "DJI Osmo Pocket 4 Creator Combo" dc7597de… — 600k/cọc 5tr, kho
+--      HN 1 + HCM 2; nối 2 dòng mồ côi (BQ11469, BQ11164 — đều đã đóng);
+--      web thue-dji-osmo-pocket-4-creator-combo → Máy Quay Chống Rung.
+--   2. "DJI Osmo Pocket 4P Creator Combo" 201e25ad… — 800k/cọc 5tr, kho 0
+--      (Booqable cũng chưa nhập kho); web …-4p-… → Máy Quay Chống Rung.
+--   3. "Máy quay DJI Action 6 - Adventure Combo" 861c1c2a… — 700k/cọc 5tr,
+--      kho 0 (Booqable chưa nhập); web thue-dji-action-6-adventure-combo
+--      → Action Cam.
+--
+-- (INSERT/PATCH chi tiết qua REST — xem log phiên 2026-08-18.)
