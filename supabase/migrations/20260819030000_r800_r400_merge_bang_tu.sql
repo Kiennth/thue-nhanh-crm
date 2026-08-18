@@ -1,0 +1,22 @@
+-- 2 việc CEO 2026-08-19. Đã áp qua REST service-role; file này là sổ sách.
+--
+-- 1. Tạo 2 bút trình chiếu từ Booqable (khuôn cũ: quantity/day/template
+--    88a44846, ảnh Booqable vào bucket, CHƯA lên web):
+--    * "Bút trình chiếu Logitech Professional Presenter R800" 42f434eb… —
+--      100k/ngày, cọc 0, kho HN 1; nối 1 dòng mồ côi (BQ5077 đã đóng).
+--    * "Bút trình chiếu Logitech Wireless Presenter R400" 0753ca4f… —
+--      100k/ngày, cọc 0, kho HN 1; không có lịch sử.
+--
+-- 2. Ghép "Bảng từ trắng có chân di động chuẩn Hàn Quốc" 8970aa2b (quantity,
+--    150k/cọc 0, 2 dòng — 1 thuộc ĐƠN MỞ BQ11899, kho HN có 1 cái đang ở
+--    khách) VÀO "Bảng từ hàn quốc chân bánh xe" ad3e12e1 (quantity, 200k/
+--    cọc 200k):
+--    a. Đóng băng cọc BQ11899: deposit_override_amount = 62.000.000 (raw
+--       62.4tr x 100%, làm tròn triệu) — vì dòng chuyển sang type cọc 200k
+--       sẽ làm cọc tính live tăng (quy tắc 2026-08-04).
+--    b. 2 dòng chuyển sang type + unit của thằng giữ.
+--    c. Kho HN thằng giữ: -1 in_stock +1 picked_up (phản ánh máy đang ở
+--       khách); xoá unit/stock thằng gom.
+--    d. Web: chép mô tả (360 ký tự) từ row thằng gom sang row thằng giữ
+--       (đang trống) rồi xoá row gom; seed-data vá id cho redirect.
+--    e. Xoá type 8970aa2b.
