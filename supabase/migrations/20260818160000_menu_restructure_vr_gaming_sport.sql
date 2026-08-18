@@ -1,0 +1,31 @@
+-- Đại tu menu web (CEO 2026-08-18 tối, chuỗi lệnh liên tiếp). Toàn bộ là
+-- data website_categories/website_products qua REST; file này là sổ sách.
+--
+-- TÁCH: "PC & Màn hình" (thue-pc-man-hinh, XOÁ) → 2 con của Máy tính:
+--   PC (thue-pc, 7 sp) + Màn Hình (thue-man-hinh, 8 sp).
+--
+-- NHÓM MỚI TRÊN MENUBAR (theo thứ tự CEO chốt):
+--   1. "Thực tế ảo" / VR (thue-thuc-te-ao, sort 0 — đứng đầu) + 3 con:
+--      Kính Thực Tế Ảo VR (thue-kinh-thuc-te-ao: Vision Pro, Quest 2/3/3S),
+--      Kính AR (thue-kinh-ar: Xreal, Rayban x4, Hololens 2),
+--      Gói Thiết bị VR (thue-goi-thiet-bi-vr: Booth Thực Tế Ảo VR).
+--      Danh mục "Kính VR" cũ rỗng → XOÁ.
+--   2. "Gaming" (thue-gaming cũ nâng lên gốc, sort 5; CEO chỉnh "GAMING"
+--      → "Gaming") + 6 con: Playstation (PS4/PS5/tay cầm), Xbox (kèm
+--      Kinect), Nintendo (Switch/JoyCon/Mario), Gaming PC & Laptop (trống),
+--      Gaming LCD (Odyssey G5 chuyển từ Màn Hình), Bàn & Ghế Gaming (ghế
+--      EDRA). Xe RC + Ferrari 488 giữ ở nhóm gốc Gaming.
+--   3. "Thiết Bị Thể Thao" / Sport (thue-thiet-bi-the-thao, sort 7) + 6
+--      con: Máy Chạy Bộ (KingSmith, Merach), Máy Đạp Xe (YESOUL), Thiết Bị
+--      Vật Lý Trị Liệu (trống), Thiết Bị Cắm Trại (trống), Xe Đạp (trống),
+--      Đồng Hồ Thông Minh (trống).
+--
+-- XOÁ 4 DANH MỤC (yêu cầu sáng, chốt tối; sản phẩm về "Chưa có danh mục"
+-- — CEO tự phân trong CRM, tổng 31 sp):
+--   Đồ sự kiện & Văn phòng (11 sp), Phụ kiện & Thiết bị khác (15 sp),
+--   Gia dụng & Thể thao (5 sp còn lại), Giải trí & Thể thao (nhóm gốc).
+--   TV & Trình chiếu + Màn Hình Tương Tác chuyển làm con Thiết Bị Sự Kiện.
+--
+-- Menubar cuối ngày: Thực tế ảo, Gaming, Thiết Bị Thể Thao, Thiết Bị Sự
+-- Kiện, Máy tính, Điện thoại & Máy tính bảng, Âm thanh, Quay & Chụp.
+-- Luật auto-categorize + redirect bên repo web cập nhật cùng ngày.
