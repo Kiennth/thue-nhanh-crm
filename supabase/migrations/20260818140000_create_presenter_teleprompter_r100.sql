@@ -1,0 +1,28 @@
+-- Tạo 3 sản phẩm từ Booqable chưa có trong CRM (CEO 2026-08-18) + danh mục
+-- web mới. Đã áp qua REST service-role; file này là sổ sách.
+--
+-- Cùng khuôn đợt router WiFi (20260818130000): quantity, day,
+-- pricing_structure template 88a44846, kho + giá + cọc + ảnh theo Booqable,
+-- nối dòng mồ côi custom_name (set type+unit, xoá custom_name theo
+-- constraint order_equipment_custom_or_catalog). Mọi đơn liên quan đều đã
+-- đóng → không cần đóng băng cọc.
+--
+--   1. "Bút trình chiếu Logitech Presenter SPOTLIGHT" 47313546… —
+--      300k/ngày, cọc 500k, kho HN 2 + HCM 2; nối 15 dòng.
+--   2. "Máy nhắc chữ LILLIPUT Teleprompter" 26f48436… — 400k/ngày, cọc
+--      2tr, kho HN 2 + HCM 2; nối 5 dòng (custom_name cũ "máy nhắc chữ
+--      LILLIPUT Telepromter 11-inch").
+--   3. "Máy ảnh Canon EOS R100" ee2a7d9f… — 400k/ngày, cọc 5tr, kho
+--      HN 2 + HCM 2; nối 1 dòng (BQ9229).
+--
+-- Còn thiếu bên Booqable (CEO quyết sau): Bút trình chiếu Logitech R800
+-- (100k, 1 dòng mồ côi) và R400 (100k, 0 dòng) — chưa tạo vì CEO chưa yêu cầu.
+--
+-- Danh mục web mới (website_categories 22e9ce37…): "Trụ Phân Làn & Biển
+-- Báo" / "Signboards & Barriers", slug thue-tru-phan-lan-bien-bao, con của
+-- Thiết Bị Sự Kiện. Chuyển 4 trang cột chắn inox từ "Đồ sự kiện & Văn
+-- phòng" sang + tạo trang mới cho "Cột Chắn INOX phân làn 5m màu ĐEN"
+-- (slug thue-cot-chan-inox-phan-lan-5m-mau-den, published).
+--
+-- CHƯA đưa 3 sản phẩm mới lên web công khai — CEO duyệt rồi bật ở mục Website.
+-- (INSERT/PATCH chi tiết qua REST — xem log phiên 2026-08-18.)
