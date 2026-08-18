@@ -1,0 +1,27 @@
+-- Tạo 3 router WiFi từ Booqable chưa từng có trong CRM (CEO 2026-08-18:
+-- "sao Cục phát WiFi 7 không có trên CRM" + "cả Cục phát WiFi 6 nữa").
+-- Đã áp qua REST service-role; file này là sổ sách.
+--
+-- Đây là ROUTER cắm nhà, khác hẳn dòng "Cục phát 5G ..." (hotspot dùng SIM)
+-- đã có sẵn. Lịch sử thuê nằm mồ côi dạng custom_name từ đợt import Booqable.
+--
+-- Tạo mới (quantity, day, pricing_structure template 88a44846 như các cục
+-- phát 5G; kho + cọc + ảnh theo Booqable; giá theo Booqable):
+--   1. "Cục phát WiFi 5 Dual Band"  9d8cefe5… — 100k/ngày, cọc 0,
+--      kho HN 2 + HCM 2; nối 7 dòng mồ côi (đơn đều đã đóng).
+--   2. "Cục phát WiFi 6 Dual Band"  c5f86707… — 100k/ngày, cọc 0,
+--      kho HN 3 + HCM 4; nối 7 dòng mồ côi (đã đóng).
+--   3. "Cục phát WiFi 7 (Archer BE220)" f4485836… — GIÁ 150k/ngày là TẠM
+--      (Booqable để 0đ, CEO chỉnh lại), cọc 500k, kho HCM 5; nối 3 dòng —
+--      trong đó 1 dòng thuộc ĐƠN MỞ BQ12279 (chuan_bi) → đã đóng băng cọc
+--      orders.deposit_override_amount = 10.000.000 (raw 9.7tr x 100%, làm
+--      tròn triệu) TRƯỚC khi nối, vì nối thêm dòng cọc 500k sẽ làm cọc
+--      tính live tăng (quy tắc 2026-08-04).
+--
+-- Nối mồ côi = set equipment_type_id + equipment_unit_id, xoá custom_name
+-- (constraint order_equipment_custom_or_catalog bắt đúng 1 trong 2).
+-- Ảnh tải từ content.booqablecdn.com → bucket equipment-images/{type_id}/booqable.jpg.
+--
+-- CHƯA đưa lên web công khai — CEO duyệt giá xong tự bật ở mục Website.
+--
+-- (INSERT/PATCH chi tiết thực hiện qua REST — xem log phiên 2026-08-18.)
