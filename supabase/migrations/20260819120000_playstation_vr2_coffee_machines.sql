@@ -1,0 +1,28 @@
+-- Import Sony PlayStation VR2 + 5 máy pha cà phê từ Booqable, sửa cọc
+-- HoloLens 2 (CEO 2026-08-19: "kính thực tế ảo Microsoft HoloLens 2 và
+-- Sony PlayStation VR2 của tao đâu rồi" + "import máy pha cà phê vào Gia
+-- Dụng"). Đã áp qua REST service-role; file này là sổ sách.
+--
+-- HoloLens 2 d4bf625b: đã có sẵn trong CRM (individual, 1 serial
+-- KÍNHVRMICROSOF-01, publish sẵn tại thue-kinh-vr-microsoft-hololens-2,
+-- danh mục Kính AR — xếp AR vì là thiết bị mixed-reality, không phải VR
+-- thuần) — chỉ sửa cọc 20tr → 30tr khớp Booqable thật (không đơn mở nên
+-- không cần đóng băng).
+--
+-- "Kính thực tế ảo Sony PlayStation VR2" 71fb96db… (MỚI, chưa từng có
+-- trong CRM) — 600k/ngày, cọc 3tr (web cũ Haravan ghi "cọc 5tr" trong mô
+-- tả nhưng đó là template chung, giá thật theo Booqable), kho HCM 4; web
+-- thue-kinh-thuc-te-ao-sony-playstation-vr2, danh mục Kính Thực Tế Ảo VR.
+-- Web cũ có biến thể "Kèm/Không kèm PS5" nhưng Booqable hiện chỉ có 1 SKU
+-- — theo Booqable làm chuẩn.
+--
+-- 5 máy pha cà phê (MỚI hết, danh mục Đồ Gia Dụng — chỉ hiện lưới nổi bật
+-- trang chủ, không lên menu bar):
+--   Máy pha cafe viên nén MOMENTO COFFEE 120 — 1.5tr/cọc 1tr, kho 0 (chưa
+--     nhập hàng, Booqable cũng 0).
+--   Máy pha cà phê hạt DELONGHI — 600k/cọc 1tr, kho HCM 1.
+--   Máy pha cà phê hạt Philips EP2339/40 — 600k/cọc 1tr, kho HN 1.
+--   Máy pha cà phê viên nén NESPRESSO LATTISSIMA ONE — 400k/cọc 1tr, kho
+--     HCM 1.
+--   Máy pha cà phê viên nén NESPRESSO LATTISSIMA PRO — 500k/cọc 1tr, kho
+--     HN 1.
