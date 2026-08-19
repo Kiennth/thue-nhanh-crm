@@ -1,0 +1,9 @@
+-- CEO 2026-08-19: "bỏ đi, tao không còn cho thuê 2 con đó" (Bút trình
+-- chiếu Logitech R800/R400 — hỏi có đưa lên web không thì CEO từ chối vì
+-- đã ngừng kinh doanh). Đã áp qua REST service-role; file này là sổ sách.
+--
+--   * R400 0753ca4f… — 0 dòng lịch sử, chưa từng lên web → xoá sạch (unit
+--     + stock + type).
+--   * R800 42f434eb… — có 1 dòng lịch sử đã đóng (đơn cũ), chưa từng lên
+--     web → GIỮ type để không phá lịch sử đơn, chỉ đưa kho về 0 (ngừng
+--     cho thuê, không còn đặt được nữa).
