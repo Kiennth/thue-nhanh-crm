@@ -140,16 +140,34 @@ export function WebsiteProductDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ship_fee">Phí giao tận nơi (đ) — để trống nếu muốn báo giá khi chốt</Label>
+            <Label htmlFor="ship_fee">Phí giao tận nơi cố định (đ) — để trống để web tự tính theo xe máy/ô tô</Label>
             <Input
               id="ship_fee"
               name="ship_fee"
               type="number"
               min={0}
               step={10000}
-              placeholder="VD: 100000"
+              placeholder="Để trống = tính theo mô hình xe máy/ô tô bên dưới"
               defaultValue={product.ship_fee ?? ""}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ship_bike_max_qty">
+              Ngưỡng xe máy trước khi đổi ô tô (số lượng) — bỏ trống dùng mặc định 5
+            </Label>
+            <Input
+              id="ship_bike_max_qty"
+              name="ship_bike_max_qty"
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Mặc định 5 — 0 = luôn ô tô, số lớn (999) = không bao giờ cần ô tô"
+              defaultValue={product.ship_bike_max_qty ?? ""}
+            />
+            <p className="text-xs text-muted-foreground">
+              Bỏ qua nếu đã đặt phí giao cố định ở trên. 0 = đồ cồng kềnh luôn cần ô tô; số lớn (vd 999) = nhẹ, xe máy chở bao nhiêu cũng được (như điện thoại).
+            </p>
           </div>
 
           <div className="space-y-2">

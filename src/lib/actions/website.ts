@@ -107,9 +107,13 @@ const ProductSchema = z.object({
   description_html: z.string().trim().max(50000).optional(),
   description_html_en: z.string().trim().max(50000).optional(),
   website_category_id: z.string().uuid().optional(),
-  // Phí giao tận nơi (đ) — trống = chưa quy định, web hiện "báo khi xác nhận".
+  // Phí giao tận nơi cố định (đ) — trống = web tự tính theo mô hình xe máy/ô tô.
   ship_fee: z
     .union([z.literal("").transform(() => null), z.coerce.number().min(0).max(100_000_000)])
+    .optional(),
+  // Ngưỡng số lượng xe máy chở tối đa trước khi đổi ô tô — trống = mặc định site-wide.
+  ship_bike_max_qty: z
+    .union([z.literal("").transform(() => null), z.coerce.number().int().min(0).max(9999)])
     .optional(),
   // Danh sách id sản phẩm liên quan (gắn tay) từ RelatedPicker — JSON mảng uuid.
   related_json: z
@@ -171,6 +175,7 @@ export async function updateWebsiteProduct(
     tags_csv: formData.get("tags_csv") ?? undefined,
     related_json: formData.get("related_json") || undefined,
     ship_fee: formData.get("ship_fee") ?? undefined,
+    ship_bike_max_qty: formData.get("ship_bike_max_qty") ?? undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -192,6 +197,7 @@ export async function updateWebsiteProduct(
       ...(parsed.data.tags_csv !== undefined ? { tags: parsed.data.tags_csv } : {}),
       ...(parsed.data.related_json ? { related_product_ids: parsed.data.related_json } : {}),
       ...(parsed.data.ship_fee !== undefined ? { ship_fee: parsed.data.ship_fee } : {}),
+      ...(parsed.data.ship_bike_max_qty !== undefined ? { ship_bike_max_qty: parsed.data.ship_bike_max_qty } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };
