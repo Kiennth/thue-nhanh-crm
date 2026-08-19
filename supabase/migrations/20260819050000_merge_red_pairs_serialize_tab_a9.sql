@@ -1,0 +1,61 @@
+-- Đợt dọn trùng lặp lớn (CEO 2026-08-19: "mấy cái màu đỏ mày nghi ngờ cho
+-- làm luôn" + "galaxy Tab A9, A9+ chuyển hết về quản lý theo serial").
+-- Đã áp qua REST service-role; file này là sổ sách.
+--
+-- PHẦN 1 — 11 cặp trùng lặp (khuôn chung: 1 bên là VỎ RỖNG 0 dòng/0 kho/0
+-- instance, bên kia là hàng thật đầy lịch sử — CHỈ xoá vỏ, KHÔNG đổi giá/
+-- cọc/tracking của hàng thật, không đơn mở nào bị ảnh hưởng vì không đổi
+-- gì trên type đang giữ):
+--   1. Shure MV7X: giữ "Microphone podcast Shure MV7X" d3d07c89 (155 dòng,
+--      2 đơn mở) — web riêng đã đẹp (2388 ký tự), xoá vỏ 807d7cb6 + web nó.
+--   2. Shure 55SH: giữ "Microphone cổ điển..." 5222096a (31 dòng) — web nó
+--      TRỐNG, web đẹp của vỏ f2b37dfb (1343 ký tự) chuyển sang.
+--   3. Shure MV7+: giữ "Microphone podcast...- Đen" 8c8f9a85 (9 dòng), xoá
+--      vỏ 064ec0b9 (web trùng nội dung).
+--   4. RODE NTG2: giữ "Microphone RODE NTG2..." b0eedebb (32 dòng, 1 đơn
+--      mở), xoá vỏ 428fcc9e.
+--   5. MSI Modern 15: giữ "Laptop MSI Modern 15.6..." a95a8e2f (475 dòng,
+--      10 đơn mở) — web nó TRỐNG, web đẹp của vỏ 0d5aa133 (674 ký tự)
+--      chuyển sang. ⚠ PHÁT HIỆN: 464/475 dòng của type này đang dùng
+--      equipment_instance_id (kiểu individual) dù tracking_type vẫn ghi
+--      "quantity" — dữ liệu cũ lệch chuẩn (có 44 instance AUTO- đang được
+--      dòng đơn tham chiếu thật, không phải mồ côi). KHÔNG đụng vào — để
+--      nguyên, CEO cân nhắc dọn riêng khi rảnh (có thể cần flip hẳn type
+--      này sang individual cho khớp thực tế).
+--   6. PC Core i7 14th 64GB RTX 4070: giữ bản individual 68d59ae2 (đã có
+--      30 serial PCI7-14TH-4070-* + web); xoá vỏ fec4b9bf (rỗng hoàn toàn,
+--      không có cả web).
+--   7. Epson L3250: giữ "Máy In Phun màu EPSON L3250..." 6c36f199 (90
+--      dòng, 1 đơn mở), xoá vỏ 65930038 (cả 2 web đều trống, không mất gì).
+--   8. TV 65-inch: giữ "Smart TV 65-inch 4K" 868744f1 (153 dòng, nhiều đơn
+--      mở, 7 serial LG65UT8050-01...) — type này CHƯA từng có trang web,
+--      lấy web đẹp của vỏ 1494d1ba (718 ký tự, slug thue-tv-4k-65-inch)
+--      chuyển sang → sản phẩm giờ mới thật sự bán được trên web.
+--   9. HDD 8TB: giữ "ổ cứng để bàn HDD 8TB USB 3.0" 332a28fc (4 dòng), xoá
+--      vỏ 858da28c.
+--   10. SSD 8TB: cả 2 đều 0 dòng — giữ bản individual df0aa003 (khớp kiểu
+--       theo dõi của SSD 2TB/4TB cùng họ), xoá vỏ quantity dad2b3c9.
+--   11. Xe điều khiển: giữ "Xe điều khiển RC" 5999ff4a (4 dòng) — web nó
+--       trống, lấy web đẹp (94 ký tự + 4 ảnh) từ 1 trong 2 vỏ trùng nội
+--       dung; xoá cả "Xe điều khiển từ xa RC" ba850fc4 và "Xe điều khiển
+--       từ xa" 23310604.
+--
+-- PHẦN 2 — Tab A9 + A9+ chuyển hẳn về theo dõi serial, khớp tồn kho THẬT
+-- đối chiếu Booqable (không dùng số ảo cũ):
+--   * Tab A9 a287126d: tracking_type ghi "quantity" nhưng ~111 dòng đã
+--     100% dùng kiểu instance từ trước (36 instance AUTO- ảo, vượt xa
+--     tồn kho thật). Booqable thật: 13 cái, tất cả ở Hà Nội. → flip hẳn
+--     type sang individual, tạo đúng 13 instance mới, 13 dòng đang mở
+--     (đều thuộc 1 đơn) gán mỗi dòng 1 máy riêng — vốn đã tách biệt sẵn
+--     nên giữ nguyên tính chất; 98 dòng lịch sử round-robin 13 máy; xoá 36
+--     instance ảo cũ + unit/stock kiểu đếm số lượng còn sót.
+--   * Tab A9+ 443a71fb: đã ghi individual nhưng chỉ có ĐÚNG 1 instance
+--     (TABA9PLUS-01) cho 325 dòng — trong đó 28 dòng đang mở (nhiều đơn
+--     thuê cùng lúc nhiều máy, ví dụ BQ11916 riêng 13 máy) LẼ RA không thể
+--     dùng chung 1 serial. Booqable thật: 47 cái (HN 14 + HCM 33). → tạo
+--     47 instance mới theo đúng chi nhánh, gán 28 dòng mở MỖI DÒNG 1 MÁY
+--     RIÊNG (không trùng — đã kiểm: 28 dòng mở ứng 28 instance khác
+--     nhau), 297 dòng lịch sử round-robin 47 máy; xoá instance ảo cũ.
+--
+-- CEO thay mã AUTO-* bằng serial thật khi rảnh (đặc biệt Tab A9/A9+, 60
+-- máy tổng cộng).
