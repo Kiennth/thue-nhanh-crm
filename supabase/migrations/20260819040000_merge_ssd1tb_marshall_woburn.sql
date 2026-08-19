@@ -1,0 +1,37 @@
+-- Gom 2 nhóm SKU trùng lặp (CEO 2026-08-19, sau khi làm rõ KIOXIA/LaCie là
+-- biến thể của SSD 1TB gốc). Đã áp qua REST service-role, đối chiếu thật
+-- với Booqable trước khi làm; file này là sổ sách.
+--
+-- 1. "Ổ cứng di động SSD 1TB" ca7c0874 (vốn individual — dữ liệu cũ lộn
+--    xộn: 3 unit nhãn KIOXIA/Samsung T7 Shield/Lacie 1TB không có kho,
+--    18 dòng lịch sử cũ dồn hết vào 1 instance ảo "ỔCỨNGDIĐỘNGSSD-01").
+--    Đối chiếu Booqable: "Ổ cứng di động SSD 1TB" thật là SẢN PHẨM BULK có
+--    2 biến thể (Samsung T7 Shield kho HN3+HCM1, KIOXIA EXCERIA PLUS G2
+--    kho HCM3); "LaCie Mobile SSD 1TB..." là SẢN PHẨM RIÊNG theo dõi 1
+--    serial (đang cho thuê, "Late").
+--    → Gom cả 3 làm 1 type quantity với 3 unit biến thể (theo mẫu Ghế
+--    massage): Samsung T7 Shield, KIOXIA EXCERIA PLUS G2, Lacie 1TB.
+--    Việc đã làm trên ca7c0874:
+--      a. Đóng băng cọc BQ11864 (đơn mở của LaCie) = 2.000.000 trước khi
+--         chuyển sang base (cọc 2tr→1tr sẽ đổi cọc tính live).
+--      b. Tách 1 dòng qty>1 của KIOXIA thành qty=1.
+--      c. tracking_type individual → quantity.
+--      d. 18 dòng lịch sử cũ: gỡ khỏi instance ảo, gán mặc định về unit
+--         Samsung T7 Shield (KHÔNG có cách xác định đúng nhãn gốc cho dữ
+--         liệu cũ — đây là giả định, CEO xem lại nếu cần).
+--      e. 11 dòng KIOXIA + 11 dòng LaCie chuyển sang base, gán đúng unit.
+--      f. Tạo equipment_stock theo SỐ THẬT từ Booqable cho 3 unit (không
+--         dùng số ảo 10/10/10 của 2 type cũ).
+--      g. Xoá 2 type con (KIOXIA e1edc840, LaCie 04cbe4d0) + web row của
+--         chúng, giữ trang web đẹp của base.
+--
+-- 2. "Loa để bàn Marshall Woburn 2 | 3 - Black" 5cff547a (quantity, kho ảo
+--    10/10/10, 12 dòng lịch sử, không đơn mở) GOM VÀO "Loa để bàn Marshall
+--    Woburn 2" 72648762 (individual, vốn rỗng — shell CEO tạo, có sẵn
+--    trang web đẹp trùng nội dung). Đối chiếu Booqable: sản phẩm thật là
+--    "Woburn 2 | 3" theo dõi 4 SERIAL THẬT — WOBURN2-7 (Black, HN),
+--    WOBURN2-6 (Cream, HCM), WOBURN2-5 (Black, HCM), WOBURN2-2 (Brown, HN,
+--    giá mua 8.6tr). Tạo đúng 4 instance này trên 72648762, gán 12 dòng
+--    lịch sử round-robin, xoá type + web row cũ.
+--    ("Loa để bàn Marshall Woburn 3" — sản phẩm riêng, KHÔNG đụng tới lần
+--    này, chưa có hàng thật trong Booqable.)
