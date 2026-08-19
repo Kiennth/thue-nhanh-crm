@@ -1,0 +1,33 @@
+-- Sửa lỗi "Photobooth không click vào được" + đồng bộ 2 sản phẩm Photo
+-- Booth với Booqable (CEO 2026-08-19). Đã áp qua REST service-role; file
+-- này là sổ sách.
+--
+-- NGUYÊN NHÂN LỖI CLICK: website_products.slug của sản phẩm "Photobooth"
+-- (e1e9d1d8) TRÙNG với website_categories.slug của danh mục "Photobooth"
+-- (0ed2c793, con của Thiết Bị Sự Kiện) — cả hai đều là "thue-photobooth".
+-- Route động [slug] resolve trúng danh mục trước, khiến trang sản phẩm
+-- không bao giờ tới được (bấm vào card luôn nhảy về trang danh mục).
+--
+-- 1. "Photobooth" e1e9d1d8 → đổi tên "Photo Booth Classic" (đúng theo
+--    Booqable), slug web thue-photobooth → thue-photo-booth-classic (SỬA
+--    LỖI TRÙNG). Đồng bộ giá 4 biến thể theo Booqable (equipment_units.
+--    price, hỗ trợ giá riêng/biến thể có sẵn từ 2026-08-04):
+--      2H Cơ Bản 4.5tr, 4H Tiêu Chuẩn 7tr (giữ = giá gốc type), 6H Nâng Cao
+--      10tr, thêm mới 12H Đỉnh Cao 25tr (kho 10/10/10 khớp 3 biến thể có
+--      sẵn — Booqable chính nó ghi 0 khắp nơi cho toàn bộ 4 biến thể, có
+--      vẻ theo dõi kiểu allow-shortage không đếm số, nên giữ nguyên kho ảo
+--      hiện có thay vì xoá về 0). Cọc 0đ khớp Booqable. Thêm đoạn mô tả gói
+--      12H (vi+en) vào description_html hiện có.
+--
+-- 2. "Photo Booth AI" 06672eef (đã có type + web row thue-photo-booth-ai
+--    từ 2026-08-18, nhưng CHƯA có unit/kho nào) → tạo 4 biến thể đúng giá
+--    + KHO THẬT theo Booqable:
+--      2H Cơ Bản 2.5tr (kho HN5+HCM5+ĐN10=20), 4H Tiêu Chuẩn 4.5tr
+--      (HN6+HCM5+ĐN10=21), 6H Nâng Cao 7tr (HN5+HCM5+ĐN10=20), 12H Đỉnh
+--      Cao 10tr (kho 0 khắp — Booqable thật cũng chưa có hàng cho gói
+--      này, không thêm mô tả public cho gói 12H AI để khỏi quảng cáo hàng
+--      chưa có).
+--
+-- Ảnh đại diện cả 2 type lấy từ Booqable. Redirect link Haravan cũ tự
+-- cập nhật khi build-legacy-redirects.mjs chạy lại (map theo
+-- equipment_type_id, không hardcode slug).
