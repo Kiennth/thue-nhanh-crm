@@ -1,0 +1,12 @@
+-- Đưa "Bút trình chiếu Logitech Presenter SPOTLIGHT" 47313546… lên web
+-- (CEO 2026-08-19: "logitech spotlight của tao đâu rồi, cho lên web dùm
+-- tao"). Type đã có sẵn trong CRM từ đợt import Booqable trước đó
+-- (300k/ngày, cọc 500k) nhưng chưa từng tạo website_products — chỉ thiếu
+-- bước publish. Đã áp qua REST service-role.
+--
+-- Tạo web row: slug thue-but-trinh-chieu-logitech-presenter-spotlight,
+-- danh mục "TV & Máy Chiếu" (df54cf14…, cùng nhóm với các phụ kiện trình
+-- chiếu khác — dây HDMI, adapter USB-C to HDMI), publish ngay.
+--
+-- Ghi chú: 2 anh em cùng lô Booqable hôm trước — Bút trình chiếu Logitech
+-- R800 và R400 — vẫn CHƯA publish (CEO chưa yêu cầu), còn chờ.
