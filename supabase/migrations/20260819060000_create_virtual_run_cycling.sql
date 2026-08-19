@@ -1,0 +1,12 @@
+-- Import 2 gói thiết bị VR từ Booqable (CEO 2026-08-19). Đã áp qua REST
+-- service-role; file này là sổ sách. Khuôn cũ: quantity/day/pricing
+-- structure template 88a44846, kho + giá + cọc + ảnh theo Booqable, nối
+-- dòng mồ côi, publish web luôn (đúng danh mục "Gói Thiết bị VR" đã có sẵn
+-- từ đợt tạo nhóm Thực tế ảo).
+--
+--   1. "gói thiết bị Virtual Run - chạy bộ ảo" 954a8c4b… — 2tr/ngày, cọc
+--      5tr, kho HN 2 + HCM 2; nối 4 dòng mồ côi (đơn đều đã đóng); web
+--      thue-goi-thiet-bi-virtual-run-chay-bo-ao.
+--   2. "Gói thiết bị Virtual Cycling - Đạp Xe Thực Tế Ảo" c36586f1… —
+--      2tr/ngày, cọc 5tr, kho HN 5 + HCM 5 + ĐN 5 (15 tổng); nối 4 dòng mồ
+--      côi; web thue-goi-thiet-bi-virtual-cycling-dap-xe-thuc-te-ao.
