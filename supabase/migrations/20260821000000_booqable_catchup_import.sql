@@ -143,3 +143,34 @@
 --     2021-2026, đậm nhất 2 khách thuê định kỳ SIGMA (~373k/đơn × ~20 đơn)
 --     và Mặt Tiền Á Châu (1.080k/đơn × ~20 đơn). Kiểm lại sau khi áp:
 --     78/78 đơn khớp đúng grand_total Booqable.
+--
+-- ## Đợt gắn lại DÒNG TỰ DO toàn CRM (CEO 2026-08-21 đợt 3):
+--   Phát hiện 3.600 dòng order_equipment không gắn SP (equipment_type_id
+--   null, 833 tên) trên TOÀN CRM — pattern seed cũ: SP Booqable không match
+--   được tên CRM thì để dòng tự do mang tên SP lúc seed. Đã xử lý:
+--   * Map CEO chỉ định từng tên (PATCH giữ nguyên giá trị; SP theo dõi
+--     riêng lẻ thì tách dòng theo SL + instance AUTO-HIST-* disposed):
+--     "[KHÔNG DÙNG] " (PRO_M2_11) 4 dòng→iPad Pro M2 11; "[KHÔNG DÙNG]"
+--     (PENCIL 1) 12 dòng→Apple Pencil 1; TMK22CAM 5 dòng→GoWithMe 22-inch
+--     màu TRẮNG; "{Không dùng} 4G" 103 dòng→Cục phát 4G; "[KHÔNG DÙNG] KS"
+--     16 dòng→Máy Chạy Bộ KingSmith (unit R1 PRO); "[ KHÔNG DÙNG ] JC" 49
+--     dòng/74 cặp→Nintendo JoyCon Controllers; "[KHÔNG DÙNG] DS" 150 dòng→
+--     Tay cầm PS4 DUALSHOCK; "[KHÔNG DÙNG} DS" 77 dòng→Tay cầm DualSense;
+--     "[KHONG DUNG} S20" 21 dòng/66 máy→TẠO MỚI equipment_type "Samsung
+--     Galaxy S20" (individual, 400k/cọc 2tr theo Booqable); "[KHÔNG DÙNG]
+--     Ổ cứng - Blue/Beige" 19 dòng→SSD 1TB (ghi chú T7 Shield); "[KHÔNG SỬ
+--     DỤNG ] Q3" 4 dòng→Meta Quest 3; "[ KHÔNG DÙNG] KTTA SONY" 8 dòng→
+--     PlayStation VR2; "[KHONG SU DUNG] S22U" 7 dòng→Samsung S22 Ultra;
+--     "[KHÔNG DÙNG]  SLD - Black" 17 dòng→Tai Nghe Bluetooth Chụp Tai
+--     (Soul Ultra Đen); "Máy chơi games Xbox + Kinect" 3 dòng→Xbox+Kinect.
+--   * Kiểm không cần sửa (đã gắn đúng từ seed): TAB9, iP12, IPADPRO129M2,
+--     IPPROM111, IPPROm211, GF65 (40 đơn), ACER4K (23 đơn), T7S 4T, Go9-12
+--     BLK, MX T70.
+--   * Auto-gắn theo tên khớp chính xác SP CRM: +329 dòng (164 individual +
+--     165 quantity, 0 lỗi) — gồm các SP vừa nhập hôm nay (Sony ZV-E10,
+--     RX100, Dell E7470, Latitude 5570...).
+--   * CÒN LẠI 722 tên / ~2.594 dòng / ~2,6 tỷ chờ CEO map — bảng tra cứu:
+--     artifact "Dòng Tự Do Chờ Map" (claude.ai/code, 21/08/2026). Đáng kể:
+--     [KHÔNG DÙNG] KS 2 (52tr — nghi là KingSmith R2), [KHONGDUNG} 58i,
+--     [KHONGDUNG} 43 HD Xiaomi, [KHONGDUNG] PC i5 12400F, Màn hình
+--     DHI-LM22-B200, thẻ game NSW/PS đã nghỉ kinh doanh.
