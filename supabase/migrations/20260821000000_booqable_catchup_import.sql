@@ -106,3 +106,37 @@
 --   xoá) ngay từ đầu. Không có dữ liệu nào thực sự bị thiếu — không insert
 --   thêm gì. Có 1 dòng test thủ công (Cục phát 4G, đơn BQ1008) bị lỡ tạo
 --   trùng trong lúc dò cấu trúc bảng, đã xoá lại ngay sau khi phát hiện.
+--
+-- ## Quét TOÀN BỘ 34 mã EOL/OEL Booqable (CEO 2026-08-21 đợt 2 — "lịch sử
+--    cho thuê phải chính xác xuyên suốt dù đổi tên"):
+--   547 đơn lịch sử duy nhất (2020-2026). Kết quả & việc đã làm qua REST:
+--   * 543/547 đơn đã có sẵn + dòng gắn đúng SP sống (kể cả các map CEO đưa
+--     thêm: EOL01→GoPro Media Mod, EOL111→K&F WM10, EOLBODAM→Bộ đàm Xiaomi,
+--     [EOL] MBA M2 16GB→MacBook Air M2 16GB, [EOL] MacBook Air M1→MacBook
+--     Air M1 (tự tách đúng biến thể 8GB/16GB theo tiêu đề dòng gốc),
+--     LG UltraFine + Samsung The Space→Màn hình 4K 32-inch, Marshall
+--     Kilburn 2, Seeone S901→Loa trợ giảng, Smart TV 75→TV 4k 75-inch,
+--     [EOL] RC→Xe điều khiển RC, EOL13→MacbooK Pro i5 8GB).
+--   * 47 dòng "[KHÔNG DÙNG ] OEL DJIMIC" nằm dạng DÒNG TỰ DO (seed không
+--     match được tên) → gắn lại vào DJI Mic 1 (2 TX 1 RX) 2463d322…, mỗi
+--     dòng 1 instance AUTO-HIST-DJIMIC1-* (disposed); 3 dòng qty>1 tách
+--     thành từng dòng riêng (ràng buộc theo dõi riêng lẻ).
+--   * BQ12087 thiếu dòng PS5 (0đ, qty 2 — đi kèm ghế lái giả lập) → thêm.
+--   * BQ12378 (15-17/08/2026, sau mốc seed) thiếu NGUYÊN ĐƠN → tạo đủ:
+--     khách Phạm Đức Nam Anh, PS5 400k + 2 DualSense 200k + ship 150k,
+--     10 khâu + đóng đơn, chưa thanh toán (công nợ 750k).
+--   * BQ37 + BQ40 (12/2020-03/2021, TRƯỚC mốc seed) thiếu NGUYÊN ĐƠN →
+--     tạo đủ: Zakarya Aghbal thuê Samsung The Space (map về Màn hình 4K
+--     32-inch), 1.5tr/đơn đã trả đủ, kèm order_payments.
+--   * SÁP NHẬP: "Mic không dây K&F WM10" (bb681832…, SP cũ seed) gộp vào
+--     "Microphone không dây K&F WM10" (cadb1207…, nhập Booqable hôm nay,
+--     kho thật HN5+HCM5) theo lệnh CEO — 7 dòng đơn cũ + website_products
+--     (slug thue-mic-khong-day-k-f-wm10) chuyển sang, xoá type/unit/stock cũ.
+--   * CHƯA làm (chờ CEO): EOL001 CEO nói = Zoom H6 nhưng 2 đơn lịch sử
+--     (BQ2809/BQ2922) tiêu đề dòng gốc là "ZOOM - H4N" và đã gắn đúng SP
+--     Zoom H4N — không di chuyển cho tới khi CEO xác nhận.
+--   * Ghi chú ngoài phạm vi EOL: 231 dòng tự do khác (thẻ game NSW/PS,
+--     "[ KHÔNG DÙNG ] JC", MacBook Pro 14 M2...) thuộc SP chưa nhập CRM;
+--     78 đơn CRM ghi giá GỐC trong khi Booqable có giảm giá cấp đơn (CRM
+--     cao hơn Booqable, tổng lệch ~50tr trải 2021-2026) — số liệu seed cũ,
+--     CEO quyết sau có chỉnh theo giá sau giảm hay không.
