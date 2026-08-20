@@ -265,3 +265,16 @@
 --     dòng/21,2tr); Macbook Pro 15.4 i9 2.4GHz 32GB (*400k; 13 dòng/
 --     20,7tr); MacBook Pro 16-inch i9 2.4GHz 64GB 1TB (*400k; 4 dòng/
 --     19,2tr).
+--
+-- ## Đợt map 8 (CEO 2026-08-21, tiếp):
+--   * "Bộ ghế lái Máy Bay Giả Lập": CEO đổi tên SP 65" cũ thành SP CHA
+--     và tự tạo đủ 6 biến thể trong CRM UI (43/55/65/75/98 inch + KHÔNG
+--     kèm màn, giá gói trên equipment_units.price). Gắn đủ lịch sử theo
+--     từng cỡ: 43" 2 dòng/17,9tr; 55" 1 dòng/3tr; 65" 3 dòng/31,5tr;
+--     75" 1 dòng/11,2tr; KHÔNG màn 1 dòng/4tr — tổng 8 dòng/67,6tr.
+--     Dọn 1 unit 43" tạo trùng, điền giá gói 98"=6tr theo Booqable.
+--   * TẠO RIÊNG theo lệnh: MacBook Pro 16-inch i9 2.4GHz 32GB 1TB 4GB
+--     GFX (*400k; 3 dòng/12,6tr); MacBook Pro 15.4" i7 2.7Ghz 16GB
+--     512GB MLH42 (*300k; 12 dòng/10,2tr).
+--   * "Gaming PC Core i5 12400F 16GB RAM RTX 3060 - i5 9400F..." 7
+--     dòng/17,8tr→PC Core i5 12th | 32GB RAM | RTX 3060 (CEO chỉ định).
