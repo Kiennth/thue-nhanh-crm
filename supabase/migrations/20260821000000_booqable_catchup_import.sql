@@ -135,7 +135,11 @@
 --   * EOL001: CEO xác nhận lại là Zoom H4N (không phải H6) — 2 đơn lịch
 --     sử BQ2809/BQ2922 đã gắn đúng SP Zoom H4N từ đầu, giữ nguyên.
 --   * Ghi chú ngoài phạm vi EOL: 231 dòng tự do khác (thẻ game NSW/PS,
---     "[ KHÔNG DÙNG ] JC", MacBook Pro 14 M2...) thuộc SP chưa nhập CRM;
---     78 đơn CRM ghi giá GỐC trong khi Booqable có giảm giá cấp đơn (CRM
---     cao hơn Booqable, tổng lệch ~50tr trải 2021-2026) — số liệu seed cũ,
---     CEO quyết sau có chỉnh theo giá sau giảm hay không.
+--     "[ KHÔNG DÙNG ] JC", MacBook Pro 14 M2...) thuộc SP chưa nhập CRM.
+--   * GIẢM GIÁ CẤP ĐƠN (CEO duyệt 2026-08-21): 78 đơn seed cũ ghi giá GỐC
+--     trong khi Booqable có giảm giá cấp đơn → thêm vào mỗi đơn 1 dòng tự
+--     do "Giảm giá (khớp Booqable)" giá trị ÂM (giữ nguyên dòng thiết bị
+--     gốc, trigger tự tính lại total_value). Tổng giảm 78.597.409đ trải
+--     2021-2026, đậm nhất 2 khách thuê định kỳ SIGMA (~373k/đơn × ~20 đơn)
+--     và Mặt Tiền Á Châu (1.080k/đơn × ~20 đơn). Kiểm lại sau khi áp:
+--     78/78 đơn khớp đúng grand_total Booqable.
