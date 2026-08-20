@@ -244,3 +244,24 @@
 --     thể 10/20 tấm, vá tay ngay sau đó). Ghi chú mỗi dòng có đuôi
 --     "[duyệt AUTO 2026-08-21]" để truy vết. Sau đợt này còn 1.916 dòng
 --     / 625 tên / 1,39 tỷ (nhóm cần chọn + không có SP + bỏ qua).
+--   * SỬA MAP SAI của máy: "S23 Ultra - White" bị subset-rule gắn nhầm
+--     vào S23 thường → chuyển 2 dòng (5,2tr) sang S23 Ultra đúng lệnh
+--     CEO (kèm chuyển instance).
+--
+-- ## Đợt map 7 (CEO 2026-08-21, tiếp — duyệt từ bảng đề xuất):
+--   * "Photobooth - 6H Nâng Cao" 2 dòng/4 lượt/32tr→Photo Booth (SP AI
+--     06672eef…, gói NÂNG CAO 6H) — CEO xác nhận Classic/AI cùng máy,
+--     khác cách vận hành.
+--   * TẠO MỚI + gom lịch sử (giá * = tạm, SP đã xoá khỏi Booqable, CEO
+--     chỉnh sau): Bộ ghế lái máy bay giả lập - Ghế kèm LCD 65" 4K
+--     (3,5tr/ngày theo Booqable sống; 3 dòng/9 bộ/31,5tr); Macbook Pro
+--     2019 i7 16GB 512GB 16-inch (*400k; 2 dòng/24tr); Điện thoại
+--     Samsung S22 (*400k/cọc 2tr; 7 dòng/23,4tr gồm cả tên "S22 Series
+--     - S22"); Trạm điện EcoFlow River2 Pro 768Wh 800W (mượn chuẩn
+--     RIVER 2: 300k/cọc 1tr; 25 dòng/22tr); Camera An Ninh - Camera
+--     trong nhà (200k/cọc 200k theo bản ngoài trời; 10 dòng/59 SL/
+--     21,8tr); Kính Meta Quest Pro (*600k/cọc 5tr; 9 dòng/21,5tr);
+--     Dell Latitude 7480 i7 2K Touch (300k/cọc 5tr theo bản i5; 14
+--     dòng/21,2tr); Macbook Pro 15.4 i9 2.4GHz 32GB (*400k; 13 dòng/
+--     20,7tr); MacBook Pro 16-inch i9 2.4GHz 64GB 1TB (*400k; 4 dòng/
+--     19,2tr).
