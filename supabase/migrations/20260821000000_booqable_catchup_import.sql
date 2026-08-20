@@ -92,3 +92,17 @@
 --     NINEBOT18W, EOL 06/iPad Pro M1 12.9in, EOL MBDP/Màn Hình Di Động,
 --     EOL IP11PRO/iPhone 11 Pro, EOL 03/iPad Pro M1 11in, EOL 12 + EOL 13/
 --     iPad Air 4 10.9in (2 mã cùng 1 SP), [EOL] iPhone 11/iPhone 11.
+--
+-- ## Đối chiếu "lịch sử thuê" của các mã EOL/[KHÔNG DÙNG] (CEO 2026-08-21):
+--   CEO lo các đơn thuê cũ của 18 SP đã xoá bên Booqable (Cục phát 4G, Loa
+--   trợ giảng STARGO/TAKSTAR, TV4K43, iPad Pro M2 11in, iPhone 14 Pro,
+--   YESOUL M1, Xe Scooter NINEBOT18W, iPad Pro M1 12.9in, Màn Hình Di Động,
+--   iPhone 11 Pro, Nintendo Switch, iPad Air 4 10.9in, iPhone 11, DJI Osmo
+--   Action 1, Playstation 5 kèm 2 tay cầm) bị mất khỏi CRM. Đối chiếu 266
+--   dòng đơn lịch sử (2021-2026, lấy qua Booqable API product_trackers +
+--   order lines thật) với 265 đơn CRM tương ứng (order_code = BQ{số đơn
+--   Booqable}) — KẾT QUẢ: cả 266 dòng đã có sẵn trong CRM từ đợt seed gốc,
+--   được khớp thẳng vào equipment_type SỐNG hiện tại (không phải mã EOL đã
+--   xoá) ngay từ đầu. Không có dữ liệu nào thực sự bị thiếu — không insert
+--   thêm gì. Có 1 dòng test thủ công (Cục phát 4G, đơn BQ1008) bị lỡ tạo
+--   trùng trong lúc dò cấu trúc bảng, đã xoá lại ngay sau khi phát hiện.
