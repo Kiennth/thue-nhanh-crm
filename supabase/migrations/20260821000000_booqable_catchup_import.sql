@@ -1,0 +1,94 @@
+-- CEO 2026-08-21: audit "bên Booqable còn SP nào chưa qua CRM không" tìm ra
+-- 179 sản phẩm thật (loại bỏ noise/EOL) chưa có trong CRM mới. CEO duyệt
+-- nhập theo từng nhóm, đã áp hết qua REST service-role — file này là sổ
+-- sách. Giá/cọc/tồn kho LẤY THẬT từ Booqable (API + trang inventory từng
+-- sản phẩm), KHÔNG bịa số.
+--
+-- Mọi equipment_types tạo mới đều dùng pricing_template_id
+-- '88a44846-ec1d-46bb-b508-09d5c5f60a78', pricing_method='pricing_structure',
+-- rental_period_unit='day', product_type='rental'. Sản phẩm 0 tồn kho thật
+-- vẫn tạo type (CEO nhập serial sau khi có hàng), theo đúng tiền lệ đã dùng
+-- cho Xbox Series S / Cục phát 5G WiFi 7 AI-tier.
+--
+-- ## Gaming (2 SP, CEO liệt kê riêng trước đợt lớn)
+--   * Vô lăng Logitech Driving Force G29 72c2bedf-e45f-4d82-be0a-da7306532e95
+--     — quantity, tồn thật HN2+HCM2=4
+--   * Máy chơi games Microsoft Xbox Series S 73b1a24c-478d-4645-b3cc-fce1f077772b
+--     — individual, 0 tồn thật hiện tại
+--
+-- ## Âm thanh (18 SP — "Âm thanh (loa/mic/mixer) nhập hết dùm tao")
+--   Amply Harman Kardon HK 3700, Apple HomePod (3 serial thật j12dfi/f6hhol/
+--   leotu4), Apple HomePod 2, Astell & Kern AK380 (0 tồn), Braven XXL (0 tồn),
+--   Bộ micro Excelvan, Cho thuê Loa Bose Soundlink Revolve Plus II (0 tồn,
+--   biến thể Đen/Trắng), Deity Pocket Wireless, Megaphone TOA ER-2215,
+--   SARAMONIC Blink500 B4 (serial thật), Soundmax MC-01, AKG ARA C22-USB,
+--   Microphone Hội Nghị, K&F WM10, Platinum KS-5000, Saramonic SmartRig+
+--   (serial thật), Vang số ACNOS Mi30s, Loa Harman Kardon Soundstick 4 (0 tồn).
+--   Lưu ý: chạy lỡ script 2 lần tạo trùng 18 dòng, CEO xác nhận xoá — đã dọn.
+--
+-- ## Laptop / PC / Workstation (17 SP)
+--   Dell Latitude 5490/5570/7470/7480/E7470, HP Workstation ZBook 15 G4,
+--   Laptop Acer NITRO 5, Laptop i5 11th (0 tồn), Lenovo X1 Carbon Gen 3/Gen 8,
+--   Lenovo X1 i5 8GB, Lenovo Yoga C740 (0 tồn), Mac Studio M1 MAX (0 tồn),
+--   Bộ Mini PC i5 Gen 6 (HN20+HCM20), Máy miniPC HP 800 G2 (34 serial thật),
+--   PC i5 Gen 10 (0 tồn), Dell Vostro 3550.
+--
+-- ## Lặt vặt: Kính/Wacom/Máy chiếu/DJ+office/Drone-gimbal/Đèn (18 SP)
+--   Rokid Glasses (0 tồn), Xreal BEAM, Wacom Intuos Pro (0 tồn), Màn chiếu
+--   120 inch (0 tồn), Optoma PS3166 (0 tồn), Xiaomi Projector L1 (0 tồn),
+--   Pioneer DJ XDJ-RX2 (0 tồn), Bộ lưu điện 5V 650VA UPS (32 serial thật),
+--   HP LaserJet Pro MFP 135W (0 tồn), Sunmi T1 POS (4 serial), Đầu đĩa than
+--   TEAC TN-180BT-A3 (0 tồn), DJI SDR Transmission Combo (0 tồn), Movmax
+--   Blade ARM (0 tồn), Đèn Aputure LS300X/amaran 200X/amaran 300x (0 tồn),
+--   Đèn Livestream 33cm, Đèn quay phim YOUGNO (3 serial).
+--
+-- ## Đồng hồ thông minh (11 SP)
+--   Garmin Enduro, Epix Gen 2, Fenix 6S Sapphire (0 tồn), Vivoactive 3 (3
+--   serial), Apple Watch Series 7/8/9/10/11 (0 tồn), Apple Watch Ultra 3
+--   (0 tồn), Samsung Galaxy Watch 6 LTE (0 tồn).
+--
+-- ## Camera / webcam 360 (15 SP)
+--   Camera IP IMOU (0 tồn), Matterport Axis (3 serial), Leica Q1/Q2/Q3
+--   (0 tồn — giá rất cao, CEO xác nhận đúng theo Booqable), OBSBOT Tiny,
+--   Ricoh THETA SC2 (0 tồn)/V/Z1/M15, Samsung Gear 360 (2017)/thường, Sony
+--   RX100 mark V, Sony ZV-E10 (3 serial HN1+HCM2), Webcam Poly Studio P15
+--   4K (0 tồn).
+--
+-- Danh sách đầy đủ id + tên: xem lịch sử REST trong phiên làm việc
+-- 2026-08-21 (không lưu lại toàn bộ id ở đây vì quá dài — tra theo tên
+-- trong equipment_types nếu cần).
+
+-- ## Chuyển sang theo dõi serial (quản lý theo từng máy)
+--   * Ổ cứng di động SSD 1TB ca7c0874-557a-42bc-9028-7e8ecfff7767 — tồn thật
+--     Booqable 7 máy (HN3 Samsung T7 Shield + HCM1 Samsung T7 Shield + HCM3
+--     KIOXIA), serial mã AUTO-SSD1TB-*. equipment_units/stock cũ (KIOXIA/
+--     Samsung T7 Shield/Lacie 1TB — số ảo) GIỮ NGUYÊN không xoá, chỉ không
+--     dùng nữa.
+--   * DJI Mic 1 (2 TX 1 RX) 2463d322-1212-4baf-8a71-3b59a8e88ac8 — tồn thật
+--     HN3+HCM3=6, serial AUTO-DJIMIC1-*.
+--   * DJI Mic 3 - 2TX + 1RX c639239f-bd47-4951-977b-faa1ffa9cff1 — tồn thật
+--     (chỉ tính biến thể 2TX+1RX, bỏ biến thể 1TX riêng) HN1+HCM5=6, serial
+--     AUTO-DJIMIC3-*.
+--   * DJI Mic Mini 2 (2 TX) 01a86360-18ba-4f37-ae1e-2ff0fefc9c15 — tồn thật
+--     HN3+HCM6=9, serial AUTO-DJIMICMINI2-*.
+--   Lưu ý: một số dòng order_equipment CŨ (đơn đã "nhap_kho_bao_tri" — lịch
+--   sử đóng) vẫn gắn equipment_unit_id kiểu số lượng cũ — theo đúng tiền lệ
+--   WiFi6/7 (20260819070000), KHÔNG động vào lịch sử cũ, chỉ vỡ nếu sau này
+--   sửa lại đúng dòng đó.
+
+-- ## Đối chiếu tồn kho thật theo yêu cầu CEO (EOL/[KHÔNG DÙNG] = SP CRM)
+--   * Cục phát 4G 8bdbb7dc-4489-42c5-9c66-d503b0ed0fcd (EOL-WF) — tồn thật 7,
+--     toàn bộ TP HCM.
+--   * Loa trợ giảng 2791e4f3-6a4e-4385-9f56-0e0dcbc15254, biến thể STARGO —
+--     tồn thật 24 (HN14+HCM10, trước đó CRM ghi 34 số ảo); biến thể TAKSTAR
+--     — tồn thật 1 (HCM, trước đó CRM ghi 32 số ảo).
+--   * Nintendo Switch 146a1730-f790-4887-8de9-38e16cac50db (EOL SW) — thêm 7
+--     serial thật NSW-01..07 (HN2+HCM5).
+--   * iPad Pro M2 11 inch 90603585-9453-4d3a-bba7-d90290a0c8d1 (EOL M2 11) —
+--     thêm 1 serial thật IPAD_PRO_11_INCH_M2-1 (HN).
+--   * Kiểm 0 tồn thật, không cần làm gì thêm: EOL 43-inch/TV 4K 43 inch,
+--     EOL 02/iPad Pro M2 11 inch (2 mã EOL trỏ cùng 1 SP), EOL 14PRO/iPhone
+--     14 Pro, EOL YESOUL/Máy tập đạp xe YESOUL M1, EOL 000/Xe Scooter Điện
+--     NINEBOT18W, EOL 06/iPad Pro M1 12.9in, EOL MBDP/Màn Hình Di Động,
+--     EOL IP11PRO/iPhone 11 Pro, EOL 03/iPad Pro M1 11in, EOL 12 + EOL 13/
+--     iPad Air 4 10.9in (2 mã cùng 1 SP), [EOL] iPhone 11/iPhone 11.
