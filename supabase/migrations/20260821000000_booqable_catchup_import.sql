@@ -239,3 +239,8 @@
 --     (443tr) + 317 cần chọn (1,08 tỷ) + 250 không có SP (125tr) + 55
 --     bỏ qua (151tr — thẻ game/phí phạt/dòng chung). Artifact "Đề Xuất
 --     Gắn Lịch Sử" đã đăng chờ CEO duyệt.
+--   * CEO "duyệt AUTO" → chạy bulk cả nhóm chắc chắn: 66/66 tên, 220
+--     dòng, 443,3tr gắn xong (2 dòng phim Instax là hàng BÁN cần biến
+--     thể 10/20 tấm, vá tay ngay sau đó). Ghi chú mỗi dòng có đuôi
+--     "[duyệt AUTO 2026-08-21]" để truy vết. Sau đợt này còn 1.916 dòng
+--     / 625 tên / 1,39 tỷ (nhóm cần chọn + không có SP + bỏ qua).
