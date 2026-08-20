@@ -191,3 +191,25 @@
 --   * Kiểm đã gắn đúng từ seed (không cần sửa): Pencil 2 (19/19 đơn),
 --     GG CC/Chromecast, Go9→HERO9, "[ KHÔNG DÙNG SP NÀY] PS5" (96 đơn→
 --     PS5 kèm 2 tay cầm), IP9 (65 đơn→iPad Gen 9 10.2-inch).
+--
+-- ## Đợt map 5 (CEO 2026-08-21, tiếp):
+--   * TẠO MỚI + gom lịch sử: "Màn Hình Gaming 1080P 24 inch 165Hz"
+--     (serial, 250k/cọc 0, 5 serial thật G24F-* đã nghỉ; gom 45 dòng/71
+--     chiếc từ 3 tên: mã 24F-EK + biến thể Gigabyte + biến thể ASUS TUF);
+--     "PC Core i5 14th 32GB RAM RTX 3080" (số lượng, 1tr/cọc 5tr, kho
+--     thật HN2+HCM1; gom 13 dòng/17 máy/53,15tr); "iMac 5K 27 inch 2019"
+--     (serial, 800k/cọc 5tr, serial thật C02C90Z7JV3Q; 14 dòng/47,3tr);
+--     "iMac 5K 27 inch 2015" (serial, 600k/cọc 5tr, serial IMAC_27-1/2;
+--     4 dòng/4,3tr).
+--   * Gom vào SP có sẵn: "[KHONGDUNG} 58i" 33 dòng/43 TV/53tr→TV 4k 58
+--     inch (ghi chú Xiaomi); "[KHÔNG DÙNG] Màn hình DHI-LM22-B200" 8
+--     dòng/67 chiếc/25,4tr→Màn Hình 1080P 22 inch; MacBook Pro M1 Pro
+--     16 inch 1 dòng 4,8tr. "IM27 - 2012" ban đầu dồn vào iMac 2017
+--     nhưng CEO đổi ý → TẠO RIÊNG "iMac 27 inch 2012" (serial, 500k/cọc
+--     5tr, serial thật IMAC_27-LAMND; 4 dòng/4 máy/3,52tr đã chuyển sang).
+--   * GIẢI TÁN SP BỘ: "Bộ Mini PC i5 Gen 6 + màn 22inch" (tạo sáng nay)
+--     tách 2 dòng lịch sử (23,4tr + 900k) thành dòng Mini PC i5 6th +
+--     Màn Hình 1080P 22 inch theo tỷ lệ giá chuẩn 200k:150k (tổng đơn
+--     không đổi), kho 40 bộ cộng +20HN+20HCM vào TỪNG SP con, xoá SP bộ.
+--   * Kiểm đã gắn đúng từ seed: Tay cầm Xbox Wireless Controller,
+--     MacBook Pro M3 Pro 36GB 16 inch (18/18 đơn).
