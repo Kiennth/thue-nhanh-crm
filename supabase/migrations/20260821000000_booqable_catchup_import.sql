@@ -132,9 +132,8 @@
 --     "Microphone không dây K&F WM10" (cadb1207…, nhập Booqable hôm nay,
 --     kho thật HN5+HCM5) theo lệnh CEO — 7 dòng đơn cũ + website_products
 --     (slug thue-mic-khong-day-k-f-wm10) chuyển sang, xoá type/unit/stock cũ.
---   * CHƯA làm (chờ CEO): EOL001 CEO nói = Zoom H6 nhưng 2 đơn lịch sử
---     (BQ2809/BQ2922) tiêu đề dòng gốc là "ZOOM - H4N" và đã gắn đúng SP
---     Zoom H4N — không di chuyển cho tới khi CEO xác nhận.
+--   * EOL001: CEO xác nhận lại là Zoom H4N (không phải H6) — 2 đơn lịch
+--     sử BQ2809/BQ2922 đã gắn đúng SP Zoom H4N từ đầu, giữ nguyên.
 --   * Ghi chú ngoài phạm vi EOL: 231 dòng tự do khác (thẻ game NSW/PS,
 --     "[ KHÔNG DÙNG ] JC", MacBook Pro 14 M2...) thuộc SP chưa nhập CRM;
 --     78 đơn CRM ghi giá GỐC trong khi Booqable có giảm giá cấp đơn (CRM
