@@ -213,3 +213,29 @@
 --     không đổi), kho 40 bộ cộng +20HN+20HCM vào TỪNG SP con, xoá SP bộ.
 --   * Kiểm đã gắn đúng từ seed: Tay cầm Xbox Wireless Controller,
 --     MacBook Pro M3 Pro 36GB 16 inch (18/18 đơn).
+--
+-- ## Đợt map 6 (CEO 2026-08-21, tiếp):
+--   * Gom vào SP có sẵn: MacBook Pro 14 M2 PRO 32GB 15 dòng/44,1tr→
+--     MacBook Pro M2 Pro 32GB RAM 14 inch; "[KHONGDUNG}  43 HD" 47 dòng/
+--     64 TV/62,3tr→Smart TV 1080p 43 inch (đủ 4 biến thể Xiaomi/Sharp/
+--     COCA×2 + 1 Sony 43X75K, ghi chú đúng từng biến thể); "[KHONGDUNG]
+--     PC - i5 12400F" 10 dòng/21 máy/25,6tr→PC Core i5 12th 32GB RTX 3060
+--     (2 biến thể i7 12700F + i7 14700 chờ CEO gật); Mac Mini M1 8GB 49
+--     dòng/52 máy/71,5tr→Mac Mini M1 8GB RAM; MacBook Air 13.3 M1 39
+--     dòng lẻ→tách 32 máy 16GB + 7 máy 8GB theo RAM trong tên (8 dòng
+--     tên trần không ghi RAM → 16GB theo map gốc CEO); "Smart TV 4K
+--     58-inch - XIAOMI_A2" 14 dòng/18 TV/22,4tr→TV 4k 58 inch.
+--   * TẠO MỚI: "Laptop 14inch i5 8th 8GB 256GB SSD" (SP xoá hẳn khỏi
+--     Booqable — giá tạm 200k theo mức phổ biến lịch sử, cọc 0, kho 0;
+--     20 dòng/110 máy/45,4tr); "Mac Studio M1 Max 64GB RAM" (Booqable
+--     sống: 1tr/cọc 15tr, kho HCM1; 6 dòng/25,3tr); "Mac Mini M2 16GB
+--     RAM 256GB SSD" (SP xoá hẳn — giá/cọc mượn chuẩn Mac Mini M1 16GB
+--     400k/5tr; 9 dòng/24,5tr); "Saramonic WiTalk9 Full-Duplex Wireless
+--     Intercom System" (200k/cọc 200k, kho HN10); "Quạt Không Cánh"
+--     (400k/cọc 1tr, kho HCM11; 10 dòng/44 chiếc/24,4tr).
+--   * MÁY ĐỀ XUẤT cho 688 tên còn lại (CEO quá tải, yêu cầu tự quét +
+--     đề xuất): so khớp tên cũ ↔ SP CRM, luật chặt "tên đích nằm trọn
+--     trong tên cũ" mới coi là chắc chắn. Kết quả: 66 tên chắc chắn
+--     (443tr) + 317 cần chọn (1,08 tỷ) + 250 không có SP (125tr) + 55
+--     bỏ qua (151tr — thẻ game/phí phạt/dòng chung). Artifact "Đề Xuất
+--     Gắn Lịch Sử" đã đăng chờ CEO duyệt.
