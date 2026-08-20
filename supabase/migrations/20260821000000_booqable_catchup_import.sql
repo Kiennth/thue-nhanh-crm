@@ -174,3 +174,20 @@
 --     [KHÔNG DÙNG] KS 2 (52tr — nghi là KingSmith R2), [KHONGDUNG} 58i,
 --     [KHONGDUNG} 43 HD Xiaomi, [KHONGDUNG] PC i5 12400F, Màn hình
 --     DHI-LM22-B200, thẻ game NSW/PS đã nghỉ kinh doanh.
+--
+-- ## Đợt map tiếp theo (CEO 2026-08-21 đợt 4, xử lý liền tay từng mã):
+--   * Gắn thêm: "[ Không dùng mã này  ] G331" 28 dòng/136 tai→Tai nghe
+--     Logitech G331; "[KHÔNG DÙNG] KS 2" 38 dòng/52,3tr→KingSmith unit R2
+--     (KS đợt trước nằm unit R1 PRO — lịch sử 2 đời máy tách đúng);
+--     "NSW V1 ( KHÔNG DÙNG MÃ NÀY )" 22 dòng/20,4tr→Nintendo Switch.
+--   * SÁP NHẬP SP trùng: "Ổ cứng di động SSD 2TB - Samsung T7 Shield"
+--     5eabc062… gộp vào "Ổ cứng di động SSD 2TB" 0a1bcceb… biến thể T7
+--     Shield (unit b4211cac…) — 35 dòng đơn chuyển (kèm 27 đơn lịch sử
+--     mã Booqable "[KHÔNG DÙNG] T7 Shield 2TB", verify 27/27), kho cộng
+--     dồn HN15(+1 đang thuê)/HCM12/DN14, đóng băng cọc đơn mở BQ12033
+--     (2tr, giá trị không đổi vì 2 SP cùng cọc), xoá type/unit/stock cũ.
+--     Trang web cũ thue-o-cung-di-dong-ssd-2tb-samsung-t7-shield bị xoá
+--     theo FK cascade — URL đó 404, SP đích vẫn còn trang riêng.
+--   * Kiểm đã gắn đúng từ seed (không cần sửa): Pencil 2 (19/19 đơn),
+--     GG CC/Chromecast, Go9→HERO9, "[ KHÔNG DÙNG SP NÀY] PS5" (96 đơn→
+--     PS5 kèm 2 tay cầm), IP9 (65 đơn→iPad Gen 9 10.2-inch).
