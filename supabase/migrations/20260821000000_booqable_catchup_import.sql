@@ -412,3 +412,250 @@
 --     khách sạn... — KHÔNG gắn vào SP thiết bị, chuyển sang mục "Bỏ
 --     qua" trong artifact đề xuất. Còn lại sau đợt này: ~159 tên cần
 --     chọn + ~205 tên không có SP (~78tr thiết bị thật).
+--
+-- ## Đợt map 10 (CEO 2026-08-21 → 2026-08-22):
+--   Tổng đợt: 193 cặp tên→SP / 843 dòng / 689,541,500đ, total_value đơn không đổi.
+--   * ĐỒNG BỘ BOOQABLE: chạy scripts/import-booqable-orders.mjs 2026-07→09:
+--     import 141 đơn mới (T8: 134, T9: 7 đặt trước), T7 đã đủ 348/348, 0
+--     lỗi. Importer khớp tên chính xác nên sinh 137 dòng tự do/87
+--     tên/307,8tr — 16 tên có tiền lệ áp lại tự động (30 dòng/81tr), còn lại
+--     đẩy vào artifact cho CEO duyệt (đã xử lý gần hết trong đợt này).
+--   * ĐỒNG BỘ TRẠNG THÁI: 132 đơn Booqable đã stopped nhưng CRM còn treo
+--     (79 vận hành, 48 chuẩn bị, 5 thu hồi/nghiệm thu; T6–T8/2026, ~466,5tr)
+--     — chèn đủ 10 khâu (employee=CEO, completed_date theo
+--     created/starts/stops Booqable), gọi deliver_order_stock (48 đơn) +
+--     return_order_stock (132 đơn), completed_at = stops_at. Nguyên nhân
+--     gốc: script import chỉ thêm đơn mới, không cập nhật trạng thái đơn đã
+--     import. Đây là lý do chính doanh số CRM thấp hơn Booqable.
+--   * Dòng gắn vào ĐƠN ĐANG CHẠY (chuẩn bị/vận hành) với SP theo dõi serial:
+--     tạo instance AUTO-SYNC-* status available tại chi nhánh đơn (không
+--     phải disposed như lịch sử), kho KHÔNG tự trừ vì đơn đã qua bước giao —
+--     danh sách cần kiểm kho tay lưu scratchpad
+--     sync_active_manual_check.json
+--     (BQ12316/12322/12325/12327/12334/12338/12440/12458/12130/12437/12444/12463/12366/12427/12428/12332/12345/11843/11844/12306/12415/12461/12426/12356/12410/12467/12432/12441/12452/12466/12462/12454/9579...).
+--   * BỎ QUA theo lệnh CEO: 47 tên phí/sự cố (sửa máy, vé máy bay, công tác
+--     phí, phụ thu mất/hư/vỡ thiết bị, phí sinh hoạt kỹ thuật... ~61,9tr) và
+--     78 dòng "Giảm giá (khớp Booqable)" (-78,6tr, dòng giảm giá cố ý)
+--     chuyển sang mục Bỏ qua trong artifact, không gắn SP.
+--   * SỬA SAI: "dây HDMI to HDMI 30m 4K" lỡ gắn vào SP trùng "dây HDMI to HDMI
+--     4K - 10m" → gộp cả 39 dòng (10m 23d/4,1tr + 30m 16d/4,4tr) về SP chính
+--     "dây HDMI to HDMI 4K" đúng biến thể, xoá SP trùng. Tạo thêm biến thể
+--     3m.
+--   * ĐỔI CÁCH QUẢN LÝ: "Sạc dự phòng 20K" serial→số lượng (16 dòng instance
+--     gộp thành 3 dòng theo đơn, xoá 16 instance tạm, tồn HCM=15). "ổ cứng
+--     để bàn HDD 8TB" CEO đổi sang serial trong UI — CRM tự chuyển dòng, tao
+--     chỉ dọn 1 unit rỗng.
+--   * TẠO SP (không có lịch sử): Mac Mini M4 16GB/256GB (500k), 24GB/256GB
+--     (600k), 24GB/512GB (700k) — giá thật Booqable, cọc 5tr; Cột Chắn INOX
+--     màu ĐEN gắn bảng A3 (125k) + A4 (100k), mỗi SP 2 biến thể bảng
+--     DỌC/bảng NGANG; xoá SP rỗng "Cột Chắn INOX phân làn 5m màu ĐEN".
+--   * Combo tách 2 SP theo tỷ lệ giá chuẩn: "Shure MV7X kèm Soundcard -
+--     Combo 2 Mic" → 2× Mic MV7X + 1× UMC202HD; "miniPC EliteDesk 800 G2 +
+--     22inch LCD" → Mini PC i5 6th (HD) + Màn 22 inch. Combo Camera An Ninh
+--     2/3/4 → 2/3/4× Camera trong nhà (đổi quantity, giữ line_total). "Phim
+--     máy chụp ảnh lấy liền" 30 tấm@30k → 3 gói 10 tấm.
+--   * TẠO MỚI + gom lịch sử (59 SP, giá tạm CEO chỉnh sau):
+--     Apple Lightning to Digital AV (12d/4.7tr); Apple Watch Series 6
+--     (4d/2.6tr); Bàn ủi hơi nước đứng (4d/1.6tr); Bút cảm ứng Apple Pencil
+--     Pro (2d/900k); Bút cảm ứng Apple Pencil USB-C (1d/150k); Bảng menu
+--     nâng hạ inox trắng A4 (24d/3.8tr); Bộ Truyền Nhận Tín Hiệu HDMI Qua
+--     Mạng LAN 100m - 1 RX - 1 TX (9d/3.6tr); Bộ chia HDMI 1 ra 2
+--     (21d/2.4tr); Bộ chuột phím gaming cho PC (17d/2.4tr); Card màn hình
+--     VGA GeForce RTX 3060 2X 12G OC (2d/2.7tr); Cho thuê tay cầm chống rung
+--     máy ảnh DJI RS 4 Mini (4d/1.5tr); Cục phát 5G Wi-Fi 6 - Linksys
+--     FGHSAX1800 (có pin) (8d/3.7tr); DJI Mavic Air Fly More Combo
+--     (2d/1.6tr); Giá Đỡ TV E1290 32-65 inch (Ngang - Dọc) (31d/1.4tr); Giá
+--     đỡ TV AVA1800 75-100 inch (18d/900k); Google Pixel 6 Pro (2d/2.7tr);
+--     Kính RayBan Meta Gen 1 (8d/5.7tr); Laptop Acer NITRO V15 15-inch RYZEN
+--     5 7535HS | 16GB | 512GB FHD | RTX 4050 (2d/1.8tr); Laptop MSI Modern
+--     14 i5 1235U 16GB 512GB (5d/3tr); Loa di động Bang & Olufsen Beosound
+--     Explore (1d/1.3tr); Loa di động Bang Olufsen Beolit 17 (4d/1.5tr); Loa
+--     di động Marshall Stockwell 2 - Brass (4d/1.2tr); MSI Cyborg i7 12th |
+--     16GB DDR5 | 512GB SSD | RTX 4050 6GB | 144Hz (1d/1.1tr); Mac Mini Core
+--     i5 8GB RAM 128GB SSD (5d/3.6tr); Mac Mini M4 16GB RAM - 512GB
+--     (1d/5.4tr); Mac Studio M2 Max 32GB RAM (2d/4tr); Màn Hình 2K 27 inch
+--     (7d/4.6tr); Màn Hình ASUS ProArt PA32QCV 6K HDR (2d/4.2tr); Màn Hình
+--     Apple 27-inch Studio Display Standard Glass (3d/4.1tr); Máy In 3D -
+--     Bonion (3d/1.5tr); Máy In Ảnh CANON SELPHY CP1000 (11d/5tr); Máy Phát
+--     Điện EcoFlow Dual Fuel Smart Generator 1800W (1d/1.4tr); Máy chiếu
+--     EPSON EB-1930 (3d/1.2tr); Máy chụp ảnh lấy liền FUJIFILM INSTAX mini
+--     Evo Cinema (1d/1.1tr); Máy duỗi sấy Dyson Airstrait 2in1 (1d/2.8tr);
+--     Quạt Điều Hòa Cao Cấp (67d/24.4tr); Sạc dự phòng 20K (1d/1.5tr); Tai
+--     nghe Apple AirPods 4 - ANC (1d/1.8tr); Tai nghe Logitech G431 Headsets
+--     (11d/3.2tr); Tay cầm chống rung DJI Osmo Mobile 2 (8d/2.1tr); Tay cầm
+--     chống rung DJI Osmo Mobile 3 (14d/3.7tr); Tay cầm chống rung DJI Osmo
+--     Mobile 6 (11d/4.8tr); Thrustmaster TCA Captain Pack X Airbus Edition
+--     (1d/2.4tr); Tripod điện thoại | máy ảnh KNF ConCept (25d/2.5tr); iMac
+--     21-inch - i5 16BG (2017) (3d/1.2tr); iMac 21-inch - i5 16GB 256GB
+--     (2020) (3d/2tr); kính thực tế ảo XREAL AIR - Xreal 1 (6d/3.9tr); Điện
+--     thoại Google Pixel 6A 5G (4d/2.7tr); Điện thoại Honor Magic 6 Pro
+--     (1d/1.8tr); Điện thoại Samsung A54 5G (2d/1tr); Điện thoại Samsung A73
+--     (4d/2.2tr); Điện thoại Samsung Galaxy A12 (6d/2.3tr); Điện thoại
+--     Samsung Note 20 (9d/4.7tr); Điện thoại Samsung S10 (1d/1.6tr); Điện
+--     thoại VIVO Y27 (2d/2.2tr); Điện thoại Xiaomi - REDMI K40 Gaming
+--     (3d/2.4tr); Điện thoại gấp Samsung Galaxy Z Flip 5 (1d/3.6tr); Điện
+--     thoại gấp Samsung Galaxy Z Fold 5 (1d/3.6tr); Đồng hồ thông minh
+--     Garmin - ForeRunner 245 (3d/1.2tr)
+--   * GOM VÀO SP CÓ SẴN (129 cặp, CEO chỉ định từng dòng):
+--     "Bộ ghế lái xe hơi giả lập - Ghế + LCD 32inch 4K"→Bộ ghế Lái Xe Hơi
+--     Giả Lập, biến thể kèm Màn Hình 4K 32 inch (2d/90.8tr); "Tai nghe chống
+--     ồn AirPods Max - Silver"→Tai nghe chống ồn AirPods Max (32d/25.5tr);
+--     "Điện thoại Samsung S25 Ultra"→Samsung S25 Ultra (5d/24.7tr); "Mac
+--     Mini M1 16GB RAM 512GB SSD"→Mac Mini M1 16GB RAM (4d/15tr); "Phí dịch
+--     vụ hỗ trợ kỹ thuật| On site support"→Phí dịch vụ hỗ trợ kỹ thuật | On
+--     site support (10d/14.3tr); "SFPX - SQ1 8GB 128GB"→Surface Pro X SQ1
+--     8GB 128GB (10d/13.1tr); "Máy quay Insta360 One X5"→Insta360 ONE X5
+--     (4d/12.2tr); "Màn hình quảng cáo Standee LED ( Không cảm ứng ) -
+--     43-inch 1080P"→Standee Led 65 inch (Không cảm ứng) (3d/10.6tr); "S24U
+--     - 256GB"→Điện thoại Samsung S24 Ultra (3d/8.5tr); "Mini PC i5 Gen 10
+--     16GB RAM 512GB SSD"→PC i5 Gen 10 16GB RAM 512GB SSD (2d/8.2tr); "Điện
+--     thoại iPhone 15 Plus"→iPhone 15 Plus (10d/8.2tr); "Photo Booth AI -
+--     NÂNG CAO 6H"→Photobooth, gói NÂNG CAO 6H (1d/8tr); "Smart TV 4K
+--     98-inch - TCL 98"→TV 4k 98-inch (2d/8tr); "Laptop MSI Katana i7 13620H
+--     | 16GB DDR5 | 512GB SSD | RTX 4050 6GB | 144Hz"→MSI Katana i7 13620H |
+--     16GB DDR5 | 512GB SSD | RTX 4050 6GB IPS 144Hz (10d/7tr); "Camera An
+--     Ninh - Combo 4"→Camera An Ninh trong nhà (4d/6.8tr); "MacBook Pro M1
+--     PRO 16GB 512GB 14-inch"→MacBook Pro 14-inch M1 Pro 16GB RAM
+--     (6d/6.5tr); "Điện thoại Samsung Galaxy A16 4G"→Samsung Galaxy A16 4G
+--     (2d/6tr); "Combo Podcast Shure MV7X kèm máy ghi âm Zoom - 4 Mic
+--     Combo"→Combo Podcast Shure MV7X kèm máy ghi âm Zoom, biến thể 4 Mic
+--     (3d/5.7tr); "Màn Hình Quảng Cáo Chân Quỳ 55-inch"→Màn hình tương tác
+--     55 inch (1d/5.6tr); "Ghế Gaming  - EDRA"→Ghế Gaming, biến thể EDRA
+--     (2d/5.6tr); "Camera An Ninh - Combo 3"→Camera An Ninh trong nhà
+--     (4d/5.5tr); "Màn hình 27-inch HD"→Màn Hình 1080P 27 inch (6d/5.4tr);
+--     "PC Core i5 12th 32GB RAM RTX 3060"→PC Core i5 12th | 32GB RAM | RTX
+--     3060 (3d/5.3tr); "Màn hình LG 27UL850-W 27"→Màn Hình 4K 27 inch, biến
+--     thể LG (4d/5.2tr); "Laptop MSI GF65 i7 16GB RAM 512GB SSD RTX
+--     3060"→Laptop MSI GF65 i5 | 16GB | 512GB | RTX 3060 Super (2d/5tr);
+--     "Smart TV 4K 85-inch"→TV 4k 85-inch (2d/5tr); "Laptop i5 16 GB RAM
+--     256GB SSD"→Laptop i5 11th 16 GB RAM 256 GB SSD (3d/5tr); "MacBook Air
+--     13.6-inch M2 16GB 256GB - Midnight"→MacBook Air M2 16GB RAM 13 inch
+--     (2d/4.9tr); "màn hình Dell S2721Q 27Inch 4K UltraSharp IPS"→Màn Hình
+--     4K 27 inch, biến thể DELL (6d/4.8tr); "Combo Podcast Shure MV7+ kèm
+--     máy ghi âm Zoom - 2 Mic + ZOOM"→Microphone podcast Shure MV7+, biến
+--     thể ĐEN (5d/4.6tr); "Điện thoại Samsung S21 | S21 FE"→Samsung S21 |
+--     S21 FE (3d/4.6tr); "dây HDMI to HDMI 30m 4K"→dây HDMI to HDMI 4K, biến
+--     thể 30m (16d/4.4tr); "iPad Pro M1 11 inch  - Wi-Fi + 5G"→iPad Pro M1
+--     11 inch, biến thể Wi-Fi + 5G (7d/4.2tr); "EOL MSI - Intel i5
+--     10500H"→Laptop MSI GF65 i5 | 16GB | 512GB | RTX 3060 Super (2d/4.1tr);
+--     "Phone 12 Pro 256GB"→iPhone 12 Pro (2d/4tr); "Màn hình quảng cáo
+--     Standee LED (cảm ứng) - 50-inch"→Standee Led 50 inch (Cảm ứng)
+--     (2d/4tr); "Kính thực tế ảo Meta Quest 3S"→Meta Quest 3S (10d/4tr);
+--     "Kính thực tế ảo Meta Quest 3"→Meta Quest 3 (1d/3.6tr); "Soundcard
+--     Behringer - UMC404HD"→Soundcard Behringer U-Phoria UMC404HD
+--     (16d/3.6tr); "Ổ cứng di động SSD 4TB 2000MB/s - HP"→Ổ cứng di động SSD
+--     4TB, biến thể HP (2d/3.5tr); "iPhone SE 2020 128GB"→iPhone SE 2 (2020)
+--     (1d/3.5tr); "Apple Watch Series 8 - 41mm, ALuminium, Silver"→Đồng hồ
+--     Apple Watch Series 8 (6d/3.2tr); "Cột Chắn INOX phân làn dây căng 3m
+--     màu INOX - Dây Xanh"→Cột Chắn INOX phân làn dây căng 3m màu INOX, biến
+--     thể dây XANH (2d/3.2tr); "Bộ ghế lái xe hơi giả lập - Ghế + TV 55inch
+--     4K"→Bộ ghế Lái Xe Hơi Giả Lập, biến thể kèm TV 4K 55 inch (1d/3tr);
+--     "Smart TV 4K 75-inch  - SAMSUNG"→TV 4k 75-inch, biến thể Samsung
+--     (2d/3tr); "màn hình quảng cáo Standee LED ( Không cảm ứng ) - 49
+--     inch"→Standee Led 50 inch (Cảm ứng) (1d/3tr); "ổ cứng để bàn HDD 8TB
+--     USB 3.0"→ổ cứng để bàn HDD 8TB (2d/2.8tr); "Surface Pro 6 - i5 8GB
+--     256GB"→Surface Pro 6 i5 8GB 256GB (8d/2.8tr); "Ổ Cứng Seagate
+--     Expansion Desktop 8TB 3.5 inch USB 3.0 STEB8000402"→ổ cứng để bàn HDD
+--     8TB (3d/2.7tr); "Màn Chiếu 100  inch"→Màn chiếu 120 inch (6d/2.6tr);
+--     "MacBook Pro M1 PRO 16GB 512GB 16-inch"→MacBook Pro M1 Pro 16GB RAM 16
+--     inch (1d/2.5tr); "Apple Watch Series 9 - Stainless Steel, Silver,
+--     41mm"→Đồng hồ Apple Watch Series 9 (3d/2.5tr); "PC Core i7 12th 32GB
+--     RAM RTX 3060"→PC Core i7 12th | 32GB RAM | RTX 3060 (3d/2.4tr); "iMac
+--     5K  - i7 32GB RAM - 2017"→iMac 5K 27 inch 2017 (3d/2.4tr); "Combo
+--     Podcast Shure MV7X kèm máy ghi âm Zoom - 3 Mic Combo"→Combo Podcast
+--     Shure MV7X kèm máy ghi âm Zoom, biến thể 3 Mic (2d/2.3tr); "Ghế giả
+--     lập lái xe Gygameseat tương thích Logitech G29"→Bộ ghế Lái Xe Hơi Giả
+--     Lập, biến thể không kèm Màn Hình (2d/2.3tr); "Smart TV 4K 55-inch -
+--     COCAA"→TV 4K 55 inch, biến thể COCA (2d/2.3tr); "Smart TV 65-inch 4K -
+--     TCL 65C645"→Smart TV 65-inch 4K, biến thể TCL 65C645 (1d/2.2tr); "màn
+--     hình HP Z24I IPS Full HD"→Màn Hình 1080P 24 inch, biến thể HP
+--     (1d/2.2tr); "Surface Pro 7 i7 16GB RAM - i7 16GB 512GB"→Surface Pro 7
+--     i7 | 16GB | 256GB (4d/2.2tr); "Camera An Ninh - Combo 2"→Camera An
+--     Ninh trong nhà (4d/2.2tr); "PC Core i5 14th 32GB RAM RTX 3060"→PC Core
+--     i5 14th | 32GB RAM | RTX 3060 (1d/2.2tr); "macbook pro 14 inch
+--     M2"→MacBook Pro 14-inch M2 Pro 16GB RAM (2d/2.1tr); "Tai nghe chống ồn
+--     AirPods Max - Blue"→Tai nghe chống ồn AirPods Max (3d/2.1tr); "Màn
+--     Hình Gaming 1080p IPS 240Hz 27 inch - EGM27F240S"→Màn Hình Gaming
+--     1080P 240Hz  27 inch, biến thể EGM27F240S (1d/2.1tr); "MacBook Air M2
+--     16GB RAM 256GB SSD 13-inch - 13.6 inch"→MacBook Air M2 16GB RAM 13
+--     inch (1d/2.1tr); "Giá đỡ máy tính bảng chân đứng chống trộm 7 inch tới
+--     13 inch - Trắng"→Giá đỡ máy tính bảng chân đứng chống trộm 7 inch tới
+--     13 inch, biến thể Trắng (3d/2tr); "Camera An Ninh - Camera trong
+--     nhà"→Camera An Ninh trong nhà (1d/2tr); "Cột Chắn INOX gắn bảng thông
+--     báo chỉ dẫn A3 (3m) - Bảng Ngang, Đen"→Cột Chắn INOX màu ĐEN gắn bảng
+--     thông báo chỉ dẫn A3, biến thể bảng NGANG (2d/2tr); "Laptop MSI GF65
+--     I7 | 16GB | 512GB SSD | RTX 3060"→Laptop MSI GF65 i5 | 16GB | 512GB |
+--     RTX 3060 Super (1d/2tr); "Soundcard Behringer - UMC202HD"→Soundcard
+--     Behringer U-Phoria UMC202HD (10d/1.9tr); "Phí di chuyển bằng xe
+--     máy"→Phí dịch vụ giao hàng bằng xe máy | Bike Delivery (9d/1.9tr);
+--     "iPhone SE 2020 - 256GB, Black"→iPhone SE 2 (2020) (2d/1.9tr); "Cục
+--     phát 5G WiFi 6 - GALAXY-SCR01 (có pin)"→Cục phát 5G WiFi 6 có pin (kèm
+--     sim 5G) (5d/1.9tr); "Máy Chạy Bộ Thông Minh KingSmith - R1 PRO"→Máy
+--     Chạy Bộ Thông Minh KingSmith, biến thể R1 Pro (1d/1.8tr); "iPad Air 4
+--     10.9"→iPad Air 4 10.9 inch (1d/1.8tr); "dây HDMI to HDMI 4K - 30m"→dây
+--     HDMI to HDMI 4K, biến thể 30m (4d/1.8tr); "DJI Pocket 2 Creator
+--     Combo"→DJI Osmo Pocket 2 Creator Combo (4d/1.8tr); "Ghế công thái học
+--     HyperWork HPW01"→Ghế công thái học - Đen (3d/1.8tr); "dây HDMI to HDMI
+--     4K - 20m"→dây HDMI to HDMI 4K, biến thể 20m (15d/1.7tr); "Máy tập đạp
+--     xe YESOUL M1 - Black"→Máy tập đạp xe YESOUL M1 (1d/1.6tr); "Máy chơi
+--     games Xbox + Kinect"→Xbox + Kinect (2d/1.6tr); "Combo Podcast Shure
+--     MV7X kèm Soundcard Behringer - Combo 2 Mic"→Microphone podcast Shure
+--     MV7X + Soundcard Behringer U-Phoria UMC202HD (4d/1.6tr); "dây HDMI to
+--     HDMI 50m 4K"→dây HDMI to HDMI 4K, biến thể 50m (3d/1.6tr); "Apple
+--     Watch 45mm - Series 7 Aluminium"→Đồng hồ Apple Watch Series 7
+--     (2d/1.5tr); "TV khung tranh QLED 4K - Samsung 65LS03D"→TV khung tranh
+--     QLED 4K 65 inch, biến thể Samsung 65LS03D (1d/1.5tr); "Màn Chiếu 3
+--     Chân Apollo 100 inch"→Màn chiếu 120 inch (9d/1.5tr); "Máy miniPC -
+--     EliteDesk 800 G2 + 22inch LCD"→Mini PC i5 6th 8GB RAM (biến thể HD) +
+--     Màn Hình 1080P 22 inch (2d/1.5tr); "Tay cầm chống rung Insta360 Flow -
+--     Standalone"→Insta360 Flow - Creator Kit (2d/1.5tr); "Mini PC i5 Gen 6
+--     8GB RAM 256GB SSD"→Mini PC i5 6th 8GB RAM (2d/1.4tr); "Cục phát 5G
+--     WiFi 6 - Linksys FGMM1000 (Cắm điện)"→Cục phát 5G WiFi 6 Linksys
+--     FGMM1000 (Cắm điện, kèm sim 5G)) (1d/1.4tr); "Apple Watch Series 8 -
+--     45mm, Aluminium, Space Gray"→Đồng hồ Apple Watch Series 8 (2d/1.2tr);
+--     "Cục phát WiFi 7 - Archer BE220"→Cục phát WiFi 7, biến thể Cục phát
+--     WiFi 7 (Archer BE220) (1d/1.2tr); "Combo Podcast Shure MV7X kèm máy
+--     ghi âm Zoom - 1 Mic Combo"→Combo Podcast Shure MV7X kèm máy ghi âm
+--     Zoom, biến thể 1 Mic (3d/1.2tr); "Insta360 Ace Pro 2 Action
+--     Camera"→Insta360 Ace Pro 2 (1d/1.1tr); "iMac 21-inch - i5 16GB 512GB
+--     (2020)"→iMac 21-inch - i5 16GB 256GB (2020) (1d/1.1tr); "Máy In 3D
+--     Bambu Lab P1S - Combo"→Máy In 3D Bambu Lab P1S, biến thể Combo
+--     (1d/1.1tr); "Xe Scooter Điện - NINEBOT18W"→Xe Scooter Điện, biến thể
+--     NINEBOT18W (2d/1.1tr); "Đầu Đĩa Than TEAC TN-180BT-A3 - TN-180BT-A3
+--     Black"→Đầu Đĩa Than TEAC TN-180BT-A3, biến thể Black (2d/1tr); "DJI
+--     Osmo Pocket 3 Creator Combo"→DJI Osmo Pocket 3 Combo (2d/1tr); "Smart
+--     TV 65-inch 4K - Hisense_65A6500K"→Smart TV 65-inch 4K, biến thể
+--     Hisense_65A6500K (1d/1tr); "iPad Air 5 M1 10.9 inch - Wi-Fi Only"→iPad
+--     Air 4 10.9 inch (CEO gộp Air 5 vào) (2d/1tr); "Cục phát 5G WiFi 6 -
+--     Linksys FGW3000 (cắm điện)"→Cục phát 5G WiFi 6 Linksys FGW3000 (cắm
+--     điện, kèm sim 5G)) (2d/975k); "Bút cảm ứng Apple Pencil 2"→Apple
+--     Pencil 2 (2d/900k); "pin sạc 20000mAh"→Sạc dự phòng 20K (2d/900k);
+--     "Smart TV 4K 50-inch - Samsung"→Smart TV 4K 50 inch, biến thể Samsung
+--     (1d/900k); "Phim máy chụp ảnh lấy liền"→Phim máy ảnh lấy liền FUJIFILM
+--     IINSTAX MINI (10 tấm) (1d/900k); "Màn Hình 1080P 22-inch"→Màn Hình
+--     1080P 22 inch (2d/800k); "Máy In 3D Bambu Lab A1 Standard"→Máy In 3D
+--     Bambu Lab P1S, biến thể Standard (CEO gộp A1 Standard vào) (2d/800k);
+--     "Apple AirPods Max - Green - H0YDV1KQP3WC"→Tai nghe chống ồn AirPods
+--     Max (1d/675k); "Combo Podcast Shure MV7X kèm máy ghi âm Zoom - 2 Mic
+--     Combo"→Combo Podcast Shure MV7X kèm máy ghi âm Zoom, biến thể 2 Mic
+--     Combo (1d/640k); "Surface Pro 7 i7 16GB RAM"→Surface Pro 7 i7 | 16GB |
+--     256GB (1d/600k); "Máy tính bảng Samsung Galaxy Tab S9 - Wi-Fi
+--     Only"→Samsung Galaxy Tab S9 (1d/600k); "dây HDMI to HDMI 4K 15m"→dây
+--     HDMI to HDMI 4K, biến thể 15m (2d/550k); "dây HDMI to HDMI 4K -
+--     3m"→dây HDMI to HDMI 4K, biến thể 3m (3d/500k); "Đầu Đĩa Than TEAC
+--     TN-180BT-A3 - TN-180BT-A3 Cherry"→Đầu Đĩa Than TEAC TN-180BT-A3, biến
+--     thể Cherry (1d/500k); "Tai nghe chống ồn AirPods Max - Space Gray"→Tai
+--     nghe chống ồn AirPods Max (1d/500k); "Xe điện cân bằng Ninebot Mini -
+--     Màu Trắng"→Xe điện cân bằng Ninebot Mini (1d/400k); "Đèn Led Aputure
+--     amaran 200X Bi-Color - Đèn + SoftBox"→Đèn Led Aputure amaran 200X
+--     Bi-Color (1d/400k); "Surface Pro 7 - i5 8GB 128GB"→Surface Pro 7 i5
+--     8GB RAM 128GB SSD (1d/400k); "dây HDMI to HDMI 4K - 15m"→dây HDMI to
+--     HDMI 4K, biến thể 15m (4d/375k); "Smart TV 1080p 32-inch - COCA
+--     32S3U"→Smart TV 1080p 32-inch (1d/300k); "Loa Kiểm Âm Thonet & Vander
+--     Kumpel (Cặp) - Trắng"→Loa Kiểm Âm Thonet & Vander Kumpel (Cặp)
+--     (1d/300k); "Trạm sạc 30 cổng  kèm dây Lightning"→Cục sạc 30 cổng
+--     (1d/300k); "dây HDMI to HDMI 4K - 5m"→dây HDMI to HDMI 4K, biến thể 5m
+--     (3d/245k); "Soundcard Behringer - UMC22"→Soundcard Behringer U-Phoria
+--     UMC22 (1d/100k); "Smart TV 4K 55-inch - SAMSUNG QLED"→TV 4K 55-inch
+--     (1d/0đ); "Máy tính bảng Samsung Galaxy Tab A9+"→Samsung Galaxy Tab A9+
+--     (2d/0đ); "Bát treo tường cho Tivi 55 inch"→Bát treo tường TV (1d/0đ)
