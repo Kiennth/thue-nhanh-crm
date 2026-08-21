@@ -64,6 +64,27 @@ export async function toggleProductFeatured(id: string): Promise<ActionState> {
   return { success: true };
 }
 
+// Cờ "Sản phẩm mới" (CEO 2026-08-22) — web hiện dải trên trang chủ + trang
+// /san-pham-moi; bật/tắt y hệt Thuê nhiều nhất, làm mới cả 2 trang đó.
+export async function toggleProductNew(id: string): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("website_products")
+    .select("is_new")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) return { error: "Không tìm thấy sản phẩm web." };
+  const { error } = await supabase
+    .from("website_products")
+    .update({ is_new: !row.is_new })
+    .eq("id", id);
+  if (error) return { error: "Không đổi được Sản phẩm mới: " + error.message };
+  revalidatePath("/website");
+  await pingWebsiteRevalidate(["/", "/san-pham-moi", "/en", "/en/san-pham-moi"]);
+  return { success: true };
+}
+
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const GALLERY_MAX = 10;
 

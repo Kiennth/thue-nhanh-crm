@@ -46,6 +46,7 @@ export default async function WebsitePage({
   if (activeFilter === "published") query = query.eq("is_published", true);
   if (activeFilter === "draft") query = query.eq("is_published", false);
   if (activeFilter === "featured") query = query.eq("is_featured", true);
+  if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
   if (activeSearch) query = query.ilike("slug", `%${activeSearch.toLowerCase().replace(/\s+/g, "-")}%`);
 
@@ -53,7 +54,7 @@ export default async function WebsitePage({
     await Promise.all([
       query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
       supabase.from("website_categories").select("*").order("sort_order"),
-      supabase.from("website_products").select("is_published, is_featured, website_category_id"),
+      supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
       // Danh sách nhẹ cho bộ chọn "sản phẩm liên quan" trong dialog (tên
       // hiển thị = tên marketing, trống thì tên CRM).
@@ -97,10 +98,11 @@ export default async function WebsitePage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <StatCard label="Đang hiện trên web" value={publishedCount} />
         <StatCard label="Đang ẩn" value={all.length - publishedCount} />
         <StatCard label="Thuê nhiều nhất" value={all.filter((p) => p.is_featured).length} />
+        <StatCard label="Sản phẩm mới" value={all.filter((p) => p.is_new).length} />
         <StatCard label="Chưa có danh mục" value={noCategoryCount} />
       </div>
 
@@ -146,6 +148,7 @@ export default async function WebsitePage({
         {filterLink("published", "Đang hiện")}
         {filterLink("draft", "Đang ẩn")}
         {filterLink("featured", "Thuê nhiều nhất")}
+        {filterLink("new", "Sản phẩm mới")}
         {filterLink("no-category", "Chưa có danh mục")}
       </div>
 
@@ -205,6 +208,7 @@ export default async function WebsitePage({
                       slug={p.slug}
                       isPublished={p.is_published}
                       isFeatured={p.is_featured}
+                      isNew={p.is_new}
                     />
                   </div>
                 </TableCell>

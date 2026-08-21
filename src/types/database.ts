@@ -844,6 +844,9 @@ export interface Database {
           website_category_id: string | null;
           sort_order: number;
           is_featured: boolean;
+          // Cờ "Sản phẩm mới" trên web (CEO 2026-08-22) — dải trang chủ +
+          // trang /san-pham-moi, bật/tắt từ CRM như is_featured.
+          is_new: boolean;
           is_published: boolean;
           tags: string[];
           related_product_ids: string[];
@@ -871,6 +874,7 @@ export interface Database {
           website_category_id?: string | null;
           sort_order?: number;
           is_featured?: boolean;
+          is_new?: boolean;
           is_published?: boolean;
           tags?: string[];
           related_product_ids?: string[];

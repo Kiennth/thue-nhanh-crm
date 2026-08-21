@@ -1,11 +1,12 @@
 "use client";
 
 import { useTransition } from "react";
-import { Eye, EyeOff, Star, RefreshCw, ExternalLink } from "lucide-react";
+import { Eye, EyeOff, Star, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   toggleProductFeatured,
+  toggleProductNew,
   toggleProductPublished,
   refreshWebsiteNow,
 } from "@/lib/actions/website";
@@ -17,11 +18,13 @@ export function WebsiteProductRowActions({
   slug,
   isPublished,
   isFeatured,
+  isNew,
 }: {
   id: string;
   slug: string;
   isPublished: boolean;
   isFeatured: boolean;
+  isNew: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -43,6 +46,15 @@ export function WebsiteProductRowActions({
         onClick={() => run(() => toggleProductFeatured(id), "Đã cập nhật Thuê nhiều nhất.")}
       >
         <Star className={`size-4 ${isFeatured ? "fill-amber-400 text-amber-400" : ""}`} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        disabled={pending}
+        title={isNew ? "Bỏ khỏi Sản phẩm mới" : "Đưa vào Sản phẩm mới"}
+        onClick={() => run(() => toggleProductNew(id), "Đã cập nhật Sản phẩm mới.")}
+      >
+        <Sparkles className={`size-4 ${isNew ? "fill-emerald-400 text-emerald-500" : ""}`} />
       </Button>
       <Button
         variant="ghost"
