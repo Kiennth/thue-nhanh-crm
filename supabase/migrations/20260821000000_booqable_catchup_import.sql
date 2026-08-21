@@ -325,3 +325,90 @@
 --     biến thể Xiaomi A2, từ "Smart TV 4K 58-inch - XIAOMI_A2" (18
 --     dòng/22,38tr); Điện thoại Samsung S22, bổ sung 6 dòng còn sót
 --     (22,4tr).
+--
+-- ## Đợt map 10 (CEO 2026-08-21, tiếp — chuỗi lệnh đơn lẻ):
+--   Tổng đợt: ~75 tên / 461 dòng / ~251,8tr, không đổi total_value.
+--   * TẠO MỚI (giá/cọc tạm, CEO chỉnh sau): Tai nghe chống ồn AirPods
+--     Max — gộp 4 màu Silver/Blue/Green/Space Gray (30 dòng/28,8tr);
+--     Quạt Điều Hòa Cao Cấp — gộp SHD7777 + tên trần (27 dòng/24,4tr);
+--     Kính RayBan Meta Gen 1, từ "RayBan Meta Wayfarer SHINY BLACK|
+--     GREEN" (8 dòng/5,7tr); Máy In Ảnh CANON SELPHY CP1000 (11 dòng/5
+--     tr); Tay cầm DJI Osmo Mobile 6 (11 dòng/4,8tr), Osmo Mobile 3 (14
+--     dòng/3,7tr), Osmo Mobile 2 (8 dòng/2,1tr); Apple Lightning to
+--     Digital AV (2 dòng/4,7tr); Màn Hình ASUS ProArt PA32QCV 6K HDR (2
+--     dòng/4,2tr); Màn Hình Apple 27-inch Studio Display Standard Glass
+--     (3 dòng/4,1tr); Mac Studio M2 Max 32GB RAM (2 dòng/4tr); kính
+--     XREAL AIR - Xreal 1 (6 dòng/3,9tr); Điện thoại Samsung Note 20 (5
+--     dòng/3,85tr); Bảng menu nâng hạ inox trắng A4 (3 dòng/3,84tr);
+--     Cục phát 5G Linksys FGHSAX1800 (7 dòng/3,7tr); Z Fold 5 + Z Flip
+--     5 (mỗi cái 1 dòng/3,6tr); Mac Mini Core i5 8GB 128GB (4 dòng/3,56
+--     tr); Màn Hình 2K 27 inch, từ "Dell U2719DC" (3 dòng/3,35tr); Tai
+--     nghe Logitech G431 (3 dòng/3,24tr); Laptop MSI Modern 14 i5 1235U
+--     (5 dòng/3tr); Máy duỗi sấy Dyson Airstrait 2in1 (1 dòng/2,75tr);
+--     Card VGA RTX 3060 2X 12G OC (1 dòng/2,73tr); Google Pixel 6 Pro
+--     (2 dòng/2,7tr); Pixel 6A 5G (4 dòng/2,7tr); Tripod KNF ConCept
+--     (14 dòng/2,45tr); REDMI K40 Gaming (3 dòng/2,4tr); Bộ chia HDMI 1
+--     ra 2 (12 dòng/2,4tr); Thrustmaster TCA Captain Pack X Airbus (1
+--     dòng/2,4tr); Galaxy A12 (6 dòng/2,3tr); Samsung A73 (2 dòng/2,25
+--     tr); Apple Watch Series 6 — gộp 44mm+40mm (4 dòng/2,65tr); VIVO
+--     Y27 (2 dòng/2,2tr); iMac 21-inch i5 16GB 256GB 2020 — gộp thêm
+--     bản 512GB theo lệnh CEO (4 dòng/3,15tr); iMac 21-inch i5 16BG
+--     2017 (3 dòng/1,2tr); Honor Magic 6 Pro (1 dòng/1,8tr); Acer NITRO
+--     V15 RYZEN 5 7535HS RTX 4050 (2 dòng/1,8tr); Samsung S10 (1 dòng/
+--     1,6tr); DJI Mavic Air Fly More Combo (2 dòng/1,6tr); B&O Beolit
+--     17 (4 dòng/1,5tr); Máy In 3D Bonion (3 dòng/1,5tr); Sạc dự phòng
+--     20K (1 dòng/1,5tr); DJI RS 4 Mini (4 dòng/1,5tr); Giá Đỡ TV E1290
+--     (23 dòng/1,4tr); Máy Phát Điện EcoFlow Dual Fuel 1800W (1 dòng/
+--     1,4tr); B&O Beosound Explore (1 dòng/1,26tr); Máy chiếu EPSON
+--     EB-1930 (3 dòng/1,2tr); Garmin ForeRunner 245 (2 dòng/1,16tr);
+--     Marshall Stockwell 2 Brass (4 dòng/1,16tr); INSTAX mini Evo
+--     Cinema (1 dòng/1,1tr); Bàn ủi hơi nước đứng (2 dòng/1,64tr).
+--   * GOM VÀO SP CÓ SẴN: Surface Pro X SQ1, từ "SFPX - SQ1" (10 dòng/
+--     13,1tr); Standee Led 65 inch (Không cảm ứng), từ bản 43-inch
+--     1080P theo lệnh CEO (3 dòng/10,6tr); Samsung S24 Ultra, từ "S24U
+--     - 256GB" (3 dòng/8,5tr); Camera An Ninh trong nhà — Combo 4/3/2
+--     quy đổi 4-3-2 camera/combo (12 dòng/64 camera/14,5tr); Combo
+--     Podcast Shure MV7X kèm Zoom biến thể 4/3/1 Mic (8 dòng/9,2tr);
+--     Microphone Shure MV7+ ĐEN, từ combo "2 Mic + ZOOM" quy đổi 2 mic
+--     (5 dòng/4,6tr); Màn Hình 1080P 27 inch, từ "27-inch HD" (6 dòng/
+--     5,4tr); MSI GF65 i5 RTX 3060 Super — gộp cả tên i7 + EOL i5
+--     10500H (5 dòng/11,2tr); MacBook Air M2 16GB 13 inch (2 dòng/4,9
+--     tr); Màn Hình 4K 27 inch biến thể DELL (6 dòng/4,85tr) + biến thể
+--     LG 27UL850-W (4 dòng/5,15tr); iPhone 12 Pro (2 dòng/4tr); iPhone
+--     SE 2 (2020) — 128GB + 256GB Black (3 dòng/5,4tr); Soundcard
+--     Behringer UMC404HD (16 dòng/3,6tr) + UMC22 (15 dòng/2,2tr) +
+--     UMC202HD (10 dòng/1,9tr); Đồng hồ Apple Watch Series 8 — 41mm
+--     Silver + 45mm Space Gray (8 dòng/4,5tr), Series 9 Stainless (3
+--     dòng/2,5tr), Series 7 45mm (2 dòng/1,5tr); Màn chiếu 120 inch, từ
+--     "100 inch" + "3 Chân Apollo 100 inch" (15 dòng/4,1tr); Ổ cứng SSD
+--     500GB Samsung, từ "[KHÔNG DÙNG] T7 500GB Blue" (7 dòng/1,9tr);
+--     Surface Pro 7 i7|16GB|256GB — gộp bản 512GB (4 dòng/2,2tr);
+--     Surface Pro 6 i5 8GB 256GB, từ tên có dấu gạch (2 dòng/2,8tr);
+--     Mini PC i5 6th 8GB RAM, từ "Gen 6 256GB SSD" (2 dòng/1,4tr); Phí
+--     giao hàng xe máy Bike Delivery, từ "Phí di chuyển bằng xe máy" (8
+--     dòng/1,8tr); iPad Air 4 10.9 inch (1 dòng/1,8tr); Ghế công thái
+--     học Đen, từ "HyperWork HPW01" (3 dòng/1,75tr); DJI Osmo Pocket 2
+--     Creator Combo (4 dòng/1,75tr); Ghế Lái Xe Hơi Giả Lập KHÔNG màn,
+--     từ "Gygameseat G29" (2 dòng/2,3tr); Standee Led 50 inch (Cảm
+--     ứng), từ bản 49" không cảm ứng theo lệnh CEO (1 dòng/3tr);
+--     Insta360 Flow Creator Kit, từ "Standalone" (2 dòng/1,47tr); iMac
+--     5K 27 inch 2017, từ "i7 32GB 2017" (2 dòng/2,4tr); MacBook Pro
+--     14-inch M2 Pro 16GB, từ "macbook pro 14 inch M2" đơn BQ11556 (1
+--     dòng/2,15tr); Máy In 3D Bambu Lab P1S biến thể Combo (1 dòng/
+--     1,1tr); Màn Hình 1080P 24 inch biến thể HP, từ "HP Z24I" (1 dòng/
+--     2,24tr); ổ cứng để bàn HDD 8TB, từ "Seagate Expansion 8TB" (2
+--     dòng/2,7tr); Bộ Truyền Nhận... (đợi CEO các tên còn lại).
+--   * TÁCH COMBO 2 SP (giữ nguyên tổng tiền, chia theo tỷ lệ giá
+--     chuẩn): "Shure MV7X kèm Soundcard Behringer Combo 2 Mic" → 2 mic
+--     MV7X + 1 soundcard UMC202HD (2 dòng/1,6tr); "Máy miniPC EliteDesk
+--     800 G2 + 22inch LCD" → Mini PC i5 6th (HD) + Màn Hình 1080P 22
+--     inch (1 dòng/1,5tr).
+--   * SỬA LỖI GẮN NHẦM: 39 dòng dây HDMI (10m + 30m) bị gắn vào SP
+--     trùng "dây HDMI to HDMI 4K - 10m" → chuyển hết về SP chính "dây
+--     HDMI to HDMI 4K" biến thể 10 mét (23 dòng/4,1tr) + 30 mét (16
+--     dòng/4,4tr), xoá SP trùng.
+--   * QUYẾT ĐỊNH BỎ QUA (CEO 2026-08-21): 47 tên dòng phí/sự cố (~61,9
+--     tr) — sửa chữa, vé máy bay, công tác phí, mất/hư/vỡ thiết bị,
+--     khách sạn... — KHÔNG gắn vào SP thiết bị, chuyển sang mục "Bỏ
+--     qua" trong artifact đề xuất. Còn lại sau đợt này: ~159 tên cần
+--     chọn + ~205 tên không có SP (~78tr thiết bị thật).
