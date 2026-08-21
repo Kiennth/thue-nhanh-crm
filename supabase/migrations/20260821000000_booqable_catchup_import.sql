@@ -278,3 +278,50 @@
 --     512GB MLH42 (*300k; 12 dòng/10,2tr).
 --   * "Gaming PC Core i5 12400F 16GB RAM RTX 3060 - i5 9400F..." 7
 --     dòng/17,8tr→PC Core i5 12th | 32GB RAM | RTX 3060 (CEO chỉ định).
+--
+-- ## Đợt map 9 (CEO 2026-08-21, tiếp — chuỗi lệnh đơn lẻ liên tiếp):
+--   Tổng đợt: 49 tên / 381 dòng / 487.967.867đ, không đổi total_value.
+--   * TẠO MỚI (giá/cọc tạm — SP đã xoá khỏi Booqable hoặc chưa có giá
+--     chuẩn, CEO chỉnh sau): Điện thoại gấp Samsung Galaxy Z Fold 4 (5
+--     dòng/15,8tr), Z Fold 3 (3 dòng/8,45tr), Z Flip 3 (5 dòng/12,1tr);
+--     Điện thoại Google Pixel 9 Pro (2 dòng/15tr); Điện thoại Samsung
+--     S20 Plus (17 dòng/10,5tr); Điện thoại Samsung S26 Ultra — gộp 2
+--     màu Sky Blue + Tím chung 1 SP (9 dòng/11,4tr); Điện thoại Xiaomi
+--     REDMI Note 11 Pro 5G (9 dòng/6tr); Dell Latitude E7470 i7 16GB
+--     256GB 14-inch 2K Touch (9 dòng/14,55tr); Surface Pro 4 i5 16GB
+--     512GB (11 dòng/12,55tr), Surface Pro 6 i5 8GB 256GB (6 dòng/
+--     5,78tr), Surface Pro 7 i5 8GB RAM 128GB SSD (8 dòng/10,74tr),
+--     Surface Pro X SQ1 8GB 128GB (6 dòng/8,64tr); MacBook Pro 13 inch
+--     i5 16GB RAM 1TB 2020 (5 dòng/11,76tr), MacBook Pro 13.3-inch
+--     3.1Ghz (6 dòng/10,8tr), MacBook Pro 13.3 inch M1 - 256GB, 8GB (1
+--     dòng/8tr); Mac Mini M2 8GB 256GB SSD (6 dòng/7,11tr); Laptop MSI
+--     GL75 Leopard i7 16GB 512GB 1660Ti (7 dòng/9,51tr); Máy ảnh lấy
+--     liền Fujifilm Instax Mini 70 (25 dòng/14,22tr); Màn Hình Cong
+--     Xiaomi Redmi 30 Inch 200Hz 1800R 21:9 (17 dòng/14,22tr); Trạm
+--     điện di động EcoFlow Delta 2 Max 2400W 4096Wh (3 dòng/10,4tr);
+--     Máy in phun màu Epson 8050 (A4/USB/WiFi) (11 dòng/10,38tr); Cột
+--     Chắn INOX Vàng dây chùng (7 dòng/10tr); Máy quay Insta360 GO
+--     Ultra Creator Bundle (8 dòng/10tr); Gimbal máy ảnh DJI Ronin RS 3
+--     Combo (7 dòng/6,19tr); Combo LiveStream GoPro (9 dòng/7,6tr); Máy
+--     chơi game cầm tay Steam Deck 512GB (2 dòng/8,4tr).
+--   * GOM VÀO SP CÓ SẴN (CEO chỉ định từng dòng): Ghế Gaming biến thể
+--     CENTAUR (14 dòng/16,78tr); Khoá chống trộm điện thoại|Máy tính
+--     bảng biến thể USB-C (9 dòng/16,22tr); Surface Pro 7 i7|16GB|256GB
+--     (14 dòng/14,7tr); MSI Katana i7 13620H|16GB DDR5|512GB SSD|RTX
+--     4050 6GB IPS 144Hz (9 dòng/11,34tr); DJI Osmo Action 2 (13 dòng/
+--     9,17tr), DJI Osmo Action 4 (4 dòng/9,09tr); Standee Led 50 inch
+--     (Cảm ứng) (3 dòng/9tr); Màn Hình Gaming 1080P 24 inch 165Hz —
+--     biến thể Gigabyte G24F-EK (16 dòng/8,92tr) + biến thể ASUS TUF
+--     VG249Q3A (9 dòng/3,05tr); Samsung Galaxy Tab S9 FE Plus 12.4 inch
+--     (10 dòng/9,99tr); Màn hình tương tác 75 inch, từ "70-inch 4K" (1
+--     dòng/8,4tr); Màn hình tương tác 43 inch, từ "Chân Quỳ 43-inch" (3
+--     dòng/8tr); Smart TV 1080p 43 inch biến thể SHARP (11 dòng/6,76
+--     tr); Đèn Led Aputure amaran 200X Bi-Color, từ "Amaran Halo" (6
+--     dòng/6,26tr); Màn hình tương tác GoWithMe 22-inch màu TRẮNG, từ
+--     "TMK22CAM" (5 dòng/5,46tr); Điện thoại Samsung S22 Ultra, từ
+--     "S22U" (8 dòng/8,14tr); Điện thoại Samsung S23 Ultra, bổ sung 2
+--     dòng còn sót (5,23tr); MacBook Pro M1 Pro 16GB RAM 16 inch, bổ
+--     sung 1 dòng (4,8tr); Xbox + Kinect (3 dòng/1,48tr); TV 4k 58 inch
+--     biến thể Xiaomi A2, từ "Smart TV 4K 58-inch - XIAOMI_A2" (18
+--     dòng/22,38tr); Điện thoại Samsung S22, bổ sung 6 dòng còn sót
+--     (22,4tr).
