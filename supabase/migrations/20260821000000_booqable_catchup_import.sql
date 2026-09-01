@@ -659,3 +659,54 @@
 --     UMC22 (1d/100k); "Smart TV 4K 55-inch - SAMSUNG QLED"→TV 4K 55-inch
 --     (1d/0đ); "Máy tính bảng Samsung Galaxy Tab A9+"→Samsung Galaxy Tab A9+
 --     (2d/0đ); "Bát treo tường cho Tivi 55 inch"→Bát treo tường TV (1d/0đ)
+--
+-- ## Đợt map 11 (CEO 2026-08-26 → 2026-09-01):
+--   * GẮN THEO LỆNH CEO (6 cặp / 18 dòng / 18,18tr): " iMac 5K 27 inch
+--     2017 - i5 32GB RAM - 2015"→iMac 5K 27 inch 2015 (2d/10,59tr — tên
+--     ghi 2017 nhưng CEO xác nhận là máy 2015); "Mic không dây DJI Mic -
+--     1 Transmitter"→DJI Mic 1 (2d/2,42tr); "mini PC"→Mini PC i5 6th 8GB
+--     RAM (3d/1,2tr); "Dây HDMI to HDMI 15m"→dây HDMI to HDMI 4K biến
+--     thể 15m (7d/1,16tr); "Camera An Ninh - Combo 1"→Camera An Ninh
+--     trong nhà (2d/810k); "Cột Chắn INOX gắn bảng thông báo chỉ dẫn A3
+--     (3m) - Bảng Ngang, Đen"→SP MỚI "Cột Chắn INOX màu ĐEN gắn bảng
+--     thông báo chỉ dẫn A3" biến thể bảng NGANG (2d/2tr).
+--   * ĐỒNG BỘ BOOQABLE 2026-08-27 (lần 2): import 103 đơn (T8: 74, T9:
+--     26, T10: 3 đặt trước, ~274tr, 0 lỗi); áp tiền lệ tự động 37 tên /
+--     56 dòng / 77,83tr (đánh dấu "sync 2026-08-27"); 35 dòng thuộc đơn
+--     đang chạy tạo instance AUTO-SYNC available cần kiểm kho tay
+--     (BQ12222/12492/12584/12471/12482...). Đóng 17 đơn Booqable đã
+--     stopped mà CRM còn treo (đủ 10 khâu + deliver/return stock +
+--     completed_at=stops_at, chạy 2 lượt vì lượt đầu quá 10 phút).
+--   * ĐỔI CÁCH QUẢN LÝ serial→số lượng (7 SP phụ kiện giá mua thấp,
+--     không cần serial — tiêu chí CEO chốt 2026-08-27, KHÔNG áp cho đồ
+--     điện tử dù rẻ): Bộ chia HDMI 1 ra 2 (12 đơn/2,4tr, tồn HN1);
+--     Tripod KNF ConCept (14 đơn/2,45tr, tồn HCM1); DJI Osmo Mobile 2
+--     (8 đơn/2,1tr) / Mobile 3 (14 đơn/3,67tr) / Mobile 6 (11 đơn/
+--     4,84tr); Bàn ủi hơi nước đứng (2 đơn/1,64tr); Bảng menu nâng hạ
+--     inox trắng A4 (3 đơn/3,84tr). Dòng instance gộp theo đơn, giữ
+--     tổng tiền, instance available→equipment_stock, xoá instance AUTO.
+--   * ĐỔI CÁCH QUẢN LÝ số lượng→serial (17 SP theo lệnh CEO): Amply
+--     Harman Kardon HK 3700, Apple HomePod 2, Leica Q1/Q2/Q3, EcoFlow
+--     DELTA Pro 3600W (tồn 30→30 instance HN/HCM/ĐN), DELTA Pro 3,
+--     Delta E2000 (30→30 instance), Màn hình tương tác 43 inch, MOMENTO
+--     COFFEE 120, và TOÀN BỘ Apple Watch (S7/S8/S9/S10/S11/Ultra 3 —
+--     S6 đã serial sẵn; S9 phải chạy 2 lượt vì tracking bị form CRM
+--     đang mở ghi đè ngược). Dòng lịch sử tách 1 máy/dòng gắn
+--     AUTO-HIST disposed; tồn kho thành instance AUTO-* available đúng
+--     chi nhánh — CEO thay serial thật khi kiểm kho.
+--   * GỘP SP TRÙNG HomePod: "Apple HomePod"→"Loa thông minh Apple
+--     Homepod" (chuyển 3 serial thật j12dfi/f6hhol/leotu4, xoá SP +
+--     trang web trùng); "Apple HomePod 2"→"Loa thông minh Apple Homepod
+--     2" (1 dòng 700k + 2 instance).
+--   * ĐỒNG BỘ TÊN SP THEO WEBSITE (CEO 2026-09-01): 34 equipment_types
+--     đổi tên theo tên marketing web ("iPhone 11"→"Điện thoại iPhone
+--     11"...), 1 biến thể mặc định đổi theo; xoá 47 website_products.name
+--     trùng để tên CRM thành nguồn duy nhất (web fallback tự lấy).
+--   * WEBSITE (thao tác dữ liệu, code commit riêng): publish 3 màn hình
+--     gaming; tạo hàng loạt 79 trang SP còn tồn (hiện, 69 đã xếp danh
+--     mục) + 141 trang SP hết tồn (ẩn, 125 xếp danh mục theo luật tên,
+--     CEO hậu kiểm); danh mục mới Thiết Bị Quay Chụp (5 đèn + 10 mic
+--     không dây DJI/Rode), Máy In (con Máy tính), Máy in 3D (con Thiết
+--     Bị Sự Kiện); SP mới Cột Chắn INOX màu ĐEN A3 + A4 (biến thể bảng
+--     DỌC/NGANG), xoá SP rỗng "Cột Chắn INOX phân làn 5m màu ĐEN"; ẩn
+--     2 đèn YOUGNO/Livestream 33cm theo lệnh.
