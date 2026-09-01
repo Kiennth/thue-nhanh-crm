@@ -94,6 +94,11 @@ export default async function OrderPrintPage({
   const vatAmount = Math.round(order.total_value * VAT_RATE * 100) / 100;
   const grandTotal = order.total_value + vatAmount;
 
+  // Biên bản bàn giao/thu hồi là chứng từ KIỂM ĐẾM — chỉ danh mục + số lượng,
+  // không hiện tiền (CEO 2026-09-01): người ký là kỹ thuật/khách tại hiện
+  // trường, giá cả đã nằm ở hợp đồng/báo giá.
+  const showPrices = docType !== "handover" && docType !== "collection";
+
   return (
     <div className="min-h-screen bg-neutral-100 py-8 print:bg-white print:py-0">
       <style>{`@page { size: A4; margin: 1.5cm; }`}</style>
@@ -149,8 +154,8 @@ export default async function OrderPrintPage({
               <th className="py-2 font-medium">Hàng hoá</th>
               <th className="py-2 font-medium">Chi tiết</th>
               <th className="py-2 text-right font-medium">SL</th>
-              <th className="py-2 text-right font-medium">Đơn giá</th>
-              <th className="py-2 text-right font-medium">Thành tiền</th>
+              {showPrices && <th className="py-2 text-right font-medium">Đơn giá</th>}
+              {showPrices && <th className="py-2 text-right font-medium">Thành tiền</th>}
             </tr>
           </thead>
           <tbody>
@@ -182,14 +187,18 @@ export default async function OrderPrintPage({
                   <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>
                   <td className="py-2">{detail}</td>
                   <td className="py-2 text-right">{line.quantity}</td>
-                  <td className="py-2 text-right">{currencyFormatter.format(line.unit_price)}đ</td>
-                  <td className="py-2 text-right">{currencyFormatter.format(line.line_total)}đ</td>
+                  {showPrices && (
+                    <td className="py-2 text-right">{currencyFormatter.format(line.unit_price)}đ</td>
+                  )}
+                  {showPrices && (
+                    <td className="py-2 text-right">{currencyFormatter.format(line.line_total)}đ</td>
+                  )}
                 </tr>
               );
             })}
             {!lines?.length && (
               <tr>
-                <td colSpan={5} className="py-4 text-center text-neutral-400">
+                <td colSpan={showPrices ? 5 : 3} className="py-4 text-center text-neutral-400">
                   Chưa có dòng hàng nào.
                 </td>
               </tr>
@@ -197,15 +206,17 @@ export default async function OrderPrintPage({
           </tbody>
         </table>
 
-        <div className="mt-4 flex flex-col items-end gap-1">
-          <p>Tạm tính (chưa VAT): {currencyFormatter.format(order.total_value)}đ</p>
-          <p>
-            VAT ({VAT_RATE * 100}%): {currencyFormatter.format(vatAmount)}đ
-          </p>
-          <p className="text-base font-semibold">
-            Tổng cộng: {currencyFormatter.format(grandTotal)}đ
-          </p>
-        </div>
+        {showPrices && (
+          <div className="mt-4 flex flex-col items-end gap-1">
+            <p>Tạm tính (chưa VAT): {currencyFormatter.format(order.total_value)}đ</p>
+            <p>
+              VAT ({VAT_RATE * 100}%): {currencyFormatter.format(vatAmount)}đ
+            </p>
+            <p className="text-base font-semibold">
+              Tổng cộng: {currencyFormatter.format(grandTotal)}đ
+            </p>
+          </div>
+        )}
 
         {(docType === "contract" || docType === "quote") && (
           <div className="mt-6 space-y-1">
