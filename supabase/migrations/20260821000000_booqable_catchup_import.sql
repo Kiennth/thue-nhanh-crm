@@ -737,3 +737,40 @@
 --     UPS-5V-650VA-* + mã ngẫu nhiên, 66 AUTO-HIST disposed).
 --   * CODE (commit riêng 53299e9): ô tìm /website bỏ dấu tiếng Việt
 --     trước khi so slug + tìm cả tên marketing (fix gõ "kính" không ra).
+--
+-- ## Đợt map 13 (CEO 2026-09-02 — chốt sổ cắt Booqable):
+--   * CHỐT SỔ BOOQABLE (đồng bộ lần cuối, 3 lượt trong ngày): import 6
+--     đơn thiếu (BQ12252 12,2tr started từ 10/04; BQ12132/12133 đặt trước
+--     T11-T12; BQ12603/12604/12605 mới trong ngày — dòng tự do gắn hết
+--     theo tiền lệ, 0 tồn); đóng 16 đơn BQ stopped còn treo (6 quét thường
+--     + 10 đơn cũ 2024-10→2026-05 lọt cửa sổ stops>=06/2026); đồng bộ 4
+--     đơn started thiếu khâu giao (BQ11614/12129/12315/12452); MỞ LẠI 4
+--     đơn khách GIA HẠN sau khi từng stopped (BQ12441/12347/12322 28,8tr/
+--     12247 — xoá completed, ngày trả mới 07–17/09, ghi lại xuất kho).
+--     7 đơn BQ draft: huỷ 5 (BQ12302/12412/11926/12442/12095), hoàn tất
+--     2 đơn thật (BQ11756 9,38tr; BQ12455 600k); huỷ theo 2 đơn BQ đã
+--     canceled (BQ11612/12229). Audit 2 chiều chốt: 0 lệch — CRM mở đúng
+--     các đơn sống, cắt Booqable được về mặt dữ liệu.
+--   * GỘP SP TRÙNG: "Kính RayBan Meta Gen 1" (8 đơn lịch sử, giá 150k)
+--     → "Kính Meta Rayban 1" (giá 500k giữ theo SP mới): chuyển 8 đơn +
+--     8 instance disposed, chép mô tả + gộp ảnh trang web, tạo máy
+--     AUTO-RAYBAN1-HN-1 available HN, xoá SP + trang Gen 1.
+--   * Kính thông minh Rokid Glasses: số lượng→serial, bỏ biến thể tên
+--     dài, dòng BQ11285 gắn AUTO-SYNC-ROKID-1 (chính là 1 máy tồn HCM).
+--   * ĐỔI TÊN: 7 GoPro thêm "Máy quay" (HERO9/10/11/12/13, Hero, MAX
+--     360 — bỏ qua 2 combo + Media Mod); ghi nhận thanh toán 1.976.400đ
+--     chuyển khoản cho BQ12603 (trong lúc fix bug step=1000).
+--   * QUY TẮC MỚI (migrations 20260902100000/110000/140000, memory đã
+--     cập nhật): doanh số = đơn ĐÃ GIAO (delivered_at) GỒM VAT, toàn hệ
+--     thống; thanh thu tiền cùng nền nên Đã thu + Còn thiếu = Tổng doanh
+--     số; CÔNG NỢ cũng chỉ đơn đã giao (đơn đặt trước chưa phải nợ).
+--     Backfill delivered_at 10.397 đơn.
+--   * SỔ HOÁ ĐƠN ĐỎ (migration 20260902120000): đơn hoàn tất tự vào
+--     /invoices chờ xuất; backfill 10.341 đơn trước 09/2026 = "không
+--     cần" (đã xử lý bên Booqable).
+--   * CODE COMMIT RIÊNG (CRM 53299e9→2fef725, web 127a709): fix ô tìm
+--     /website bỏ dấu; fix thêm dòng hàng thiếu thời gian thuê (500);
+--     fix ô số tiền thanh toán step=1000 chặn số lẻ VAT; list "sắp về"
+--     tính từ lúc giao; 2 khối đơn sắp tới/về màu nhận diện + khung ô;
+--     link hồ sơ khách trên trang đơn; tìm khách theo MST + cột
+--     MST/CCCD; web: hover ảnh 2 + dropdown tìm kiếm khớp từng từ.
