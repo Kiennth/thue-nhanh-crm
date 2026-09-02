@@ -890,14 +890,32 @@ export async function addOrderEquipmentLine(
     equipmentUnitId,
     parsed.data.equipment_instance_id ?? null,
   );
-  const computed = computeLinePrice(
-    equipmentType,
-    tiers,
-    order?.rental_start_at ?? null,
-    order?.rental_end_at ?? null,
-    parsed.data.quantity,
-    unitPriceOverride,
-  );
+  // Đơn mới tạo chưa đặt thời gian thuê mà thêm hàng cho thuê thì không tính
+  // được giá — computeOrderLinePrice sẽ throw, Server Action nổ 500 và người
+  // dùng chỉ thấy "click không ăn" (CEO gặp 2026-09-02). Chặn sớm với thông
+  // báo chỉ đúng việc cần làm.
+  if (
+    equipmentType.product_type === "rental" &&
+    (!order?.rental_start_at || !order?.rental_end_at)
+  ) {
+    return {
+      error: 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.',
+    };
+  }
+
+  let computed;
+  try {
+    computed = computeLinePrice(
+      equipmentType,
+      tiers,
+      order?.rental_start_at ?? null,
+      order?.rental_end_at ?? null,
+      parsed.data.quantity,
+      unitPriceOverride,
+    );
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
+  }
 
   const { error } = await supabase.from("order_equipment").insert({
     order_id: parsed.data.order_id,
