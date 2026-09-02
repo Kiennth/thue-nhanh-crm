@@ -22,7 +22,6 @@ export interface OrdersToHandleResult {
 
 const CHOT_DON_INDEX = TASK_TYPE_SEQUENCE.indexOf("chot_don");
 const GIAO_HANG_INDEX = TASK_TYPE_SEQUENCE.indexOf("giao_hang_ban_giao");
-const VAN_HANH_INDEX = TASK_TYPE_SEQUENCE.indexOf("van_hanh_xu_ly_su_co");
 const THU_HOI_INDEX = TASK_TYPE_SEQUENCE.indexOf("thu_hoi");
 
 function statusIndex(status: TaskType) {
@@ -50,8 +49,8 @@ function isLate(actionDate: string, now: Date): boolean {
 }
 
 // "Đơn hàng sắp tới" (cần giao) — hiện ngay khi đã Chốt đơn xong, cho đến khi
-// Giao hàng & bàn giao xong thì thôi. "Đơn hàng cần thu hồi" — hiện khi đã
-// Vận hành/xử lý sự cố xong, cho đến khi Thu hồi xong. Dùng orders.status
+// Giao hàng & bàn giao xong thì thôi. "Đơn hàng cần thu hồi" — hiện ngay khi
+// đã Giao hàng xong (hàng đang ở chỗ khách), cho đến khi Thu hồi xong. Dùng orders.status
 // (= khâu sớm nhất chưa hoàn thành, tự đồng bộ qua trigger) để suy ra khâu
 // nào đã/chưa xong mà không cần join order_tasks.
 //
@@ -137,8 +136,11 @@ export async function getOrdersToHandle(
       }
     }
 
+    // Đơn đã giao xong là bắt đầu "cần thu hồi" theo ngày trả — gồm cả khâu
+    // vận hành/xử lý sự cố (thực tế không ai tick khâu này khi hàng đang ở
+    // chỗ khách, nên trước đây list trống trơn — CEO phát hiện 2026-09-02).
     if (
-      idx > VAN_HANH_INDEX &&
+      idx > GIAO_HANG_INDEX &&
       idx <= THU_HOI_INDEX &&
       order.rental_end_at &&
       (!branchId || order.return_branch_id === branchId)
