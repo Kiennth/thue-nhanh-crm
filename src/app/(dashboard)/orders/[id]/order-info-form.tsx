@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +41,19 @@ export function OrderInfoForm({ orderId, customer, ordererName, ordererPhone, or
     <form action={handleSubmit} className="col-span-2 space-y-3">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="customer_id">Khách hàng</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="customer_id">Khách hàng</Label>
+            {/* Nhảy thẳng tới hồ sơ khách để sửa SĐT/địa chỉ/MST mà không
+                phải tự mò sang trang Khách hàng (CEO 2026-09-02). */}
+            {customer && (
+              <Link
+                href={`/customers/${customer.id}`}
+                className="text-xs text-primary hover:underline"
+              >
+                Mở hồ sơ khách →
+              </Link>
+            )}
+          </div>
           <CustomerCombobox name="customer_id" defaultCustomer={customer ?? undefined} />
         </div>
         <div className="space-y-1">
