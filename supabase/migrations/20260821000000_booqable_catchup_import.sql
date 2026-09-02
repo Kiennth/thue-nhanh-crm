@@ -710,3 +710,30 @@
 --     Bị Sự Kiện); SP mới Cột Chắn INOX màu ĐEN A3 + A4 (biến thể bảng
 --     DỌC/NGANG), xoá SP rỗng "Cột Chắn INOX phân làn 5m màu ĐEN"; ẩn
 --     2 đèn YOUGNO/Livestream 33cm theo lệnh.
+--
+-- ## Đợt map 12 (CEO 2026-09-01 → 2026-09-02):
+--   * BẬT TRANG WEB HÀNG LOẠT (lệnh "bật" từng đợt rồi chốt "bật hết"):
+--     toàn bộ ~145 trang ẩn được publish — đáng kể: 3 Leica Q1/Q2/Q3,
+--     Apple Watch S9/S10/S11/Ultra 3, 22 điện thoại (Samsung/Pixel/
+--     Xiaomi/VIVO/Honor), 6 đồng hồ (AW S6/S7/S8, Galaxy Watch 6,
+--     Garmin Enduro/FR245), 5 loa (Marshall/HK/B&O x2/Bose), 7 cột
+--     chắn INOX, 11 Mac Mini + iMac, 4 máy chiếu/TV khung tranh, kính
+--     AR/VR (RayBan Meta, Rokid, Quest Pro, PICO 4, XREAL), 2 Instax,
+--     Nintendo Switch 2, 4 tay chống rung, nhóm máy ảnh còn lại...
+--     Sau đó ẨN LẠI theo lệnh: Đèn quay phim YOUGNO + Đèn Livestream
+--     33cm (CEO đã ẩn từ trước). Chốt: 634 hiện / 2 ẩn — phủ 100%
+--     catalog CRM.
+--   * XOÁ SP "Ferrari 488" (15tr/ngày — SP test, 0 đơn/0 máy/0 biến
+--     thể, trang web bay theo FK cascade).
+--   * ĐỔI TÊN "Cho thuê Loa Bose Soundlink Revolve Plus II"→"Loa Bose
+--     Soundlink Revolve Plus II" + sửa slug thue-cho-thue-loa-...→
+--     thue-loa-bose-soundlink-revolve-plus-ii (trang mới bật, chưa
+--     index nên đổi URL an toàn).
+--   * ĐỔI CÁCH QUẢN LÝ serial→số lượng: Bộ Lưu Điện UPS Offline
+--     CyberPower BU600E 360W-600VA (phụ kiện nguồn giá thấp — CEO chỉ
+--     định 2026-09-02): 66 dòng đơn (1 máy/dòng) gộp còn 10 dòng theo
+--     đơn+đơn giá, tổng SL 66 / 12,15tr giữ nguyên; 32 máy available
+--     (toàn bộ HN) → stock HN=32; xoá 98 instance (32 serial thật
+--     UPS-5V-650VA-* + mã ngẫu nhiên, 66 AUTO-HIST disposed).
+--   * CODE (commit riêng 53299e9): ô tìm /website bỏ dấu tiếng Việt
+--     trước khi so slug + tìm cả tên marketing (fix gõ "kính" không ra).
