@@ -104,7 +104,10 @@ export function OrderPaymentDialog({
               name="amount"
               type="number"
               min={0}
-              step={1000}
+              // step=1000 cũ chặn số tiền lẻ: tổng đã VAT (×1.08) thường không
+              // chia hết cho 1000 (vd 1.830.000 → 1.976.400đ) — trình duyệt từ
+              // chối submit "enter a valid value" (CEO gặp 2026-09-02).
+              step="any"
               defaultValue={defaultAmount && defaultAmount > 0 ? defaultAmount : undefined}
               required
             />
