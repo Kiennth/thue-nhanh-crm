@@ -77,10 +77,11 @@ interface OrderRow {
 }
 
 interface OrdersPageListStats {
+  // Doanh số = đơn ĐÃ GIAO HÀNG, GỒM VAT (CEO 2026-09-02) — cùng nền với
+  // vatRevenue nên khớp thanh "Tiến độ thu tiền" khi cả kỳ đã giao hết.
   totalRevenue: number;
   // Tổng giá trị ĐÃ GỒM VAT của đơn chưa huỷ — cùng nền với unpaidAmount,
-  // dùng để vẽ thanh "Đã thu/Còn thiếu" (collected = vatRevenue - unpaidAmount)
-  // mà không lệch số như khi trừ thẳng vào totalRevenue (chưa gồm VAT).
+  // dùng để vẽ thanh "Đã thu/Còn thiếu" (collected = vatRevenue - unpaidAmount).
   vatRevenue: number;
   completedCount: number;
   cancelledCount: number;

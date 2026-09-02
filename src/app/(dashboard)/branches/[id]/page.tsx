@@ -57,17 +57,20 @@ export default async function BranchDashboardPage({
     ordersOverview,
   ] = await Promise.all([
     supabase.from("branches").select("*").eq("id", id).single(),
-    // CEO chốt 2026-08-08: doanh thu chỉ tính đơn hoàn tất.
+    // CEO chốt 2026-09-02: doanh thu tính đơn ĐÃ GIAO HÀNG, GỒM VAT (khớp
+    // "Tổng doanh số" trang Đơn hàng).
     fetchAllRows<{ order_date: string; total_value: number }>((from, to) =>
       supabase
         .from("orders")
         .select("order_date, total_value")
         .eq("pickup_branch_id", id)
         .is("cancelled_at", null)
-        .not("completed_at", "is", null)
+        .not("delivered_at", "is", null)
         .gte("order_date", rangeStart)
         .lte("order_date", rangeEnd)
         .range(from, to),
+    ).then((rows) =>
+      rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),
     ),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.rpc("equipment_page_report", { p_branch_id: id, p_start: null, p_end: null }),

@@ -144,17 +144,19 @@ export default async function DashboardHomePage({
             supabase
               .from("orders")
               .select("pickup_branch_id, order_date, total_value")
-              // Đơn huỷ không phải doanh thu; đơn chưa hoàn thành cũng không
-              // (CEO chốt 2026-08-08, áp toàn hệ thống) — doanh thu so sánh
-              // chi nhánh + lãi/lỗ gộp chỉ tính đơn đủ 10 khâu.
+              // Đơn huỷ không phải doanh thu; doanh số ghi nhận khi ĐÃ GIAO
+              // HÀNG và GỒM VAT (CEO 2026-09-02, thay quy tắc đơn-hoàn-tất
+              // 2026-08-08) — lưu ý lãi/lỗ gộp vì thế cũng gồm phần VAT 8%.
               .is("cancelled_at", null)
-              .not("completed_at", "is", null)
+              .not("delivered_at", "is", null)
               // BranchComparisonSection chỉ đọc lại đúng 3 mốc Ngày/Tháng/
               // Năm đang chọn — trước đây fetch NGUYÊN bảng orders all-time
               // (10.020 dòng) chỉ để dùng khoảng này.
               .gte("order_date", comparisonRangeStart)
               .lt("order_date", comparisonRangeEndExclusive)
               .range(from, to),
+        ).then((rows) =>
+          rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),
         )
       : Promise.resolve([]),
     getOrdersToHandle(handleBranchId, HANDLE_LIMIT, {

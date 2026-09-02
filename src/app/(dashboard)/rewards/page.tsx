@@ -79,17 +79,20 @@ export default async function RewardsPage({
       .select("id, rule_type, label, amount, threshold_amount, employee_id, is_active")
       .eq("is_active", true)
       .order("created_at"),
-    // Doanh số tháng đang xem cho qui tắc doanh_so — CHỈ đơn hoàn tất, chưa
-    // VAT (khớp "Tổng doanh số" trang Đơn hàng, quy tắc 2026-08-08).
+    // Doanh số tháng đang xem cho qui tắc doanh_so — đơn ĐÃ GIAO HÀNG, GỒM
+    // VAT (khớp "Tổng doanh số" trang Đơn hàng, CEO 2026-09-02 — lưu ý các
+    // mốc thưởng doanh_so đặt theo nền cũ giờ dễ đạt hơn ~8%).
     fetchAllRows<{ total_value: number }>((from, to) =>
       supabase
         .from("orders")
         .select("total_value")
         .is("cancelled_at", null)
-        .not("completed_at", "is", null)
+        .not("delivered_at", "is", null)
         .gte("order_date", rangeStart)
         .lt("order_date", rangeEnd)
         .range(from, to),
+    ).then((rows) =>
+      rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),
     ),
   ]);
 
