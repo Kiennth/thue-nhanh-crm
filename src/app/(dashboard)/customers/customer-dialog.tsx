@@ -136,11 +136,11 @@ export function CustomerDialog({ customer, editTriggerVariant = "icon" }: Custom
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tax_code">Mã số thuế (MST)</Label>
+            <Label htmlFor="tax_code">MST / CCCD</Label>
             <Input
               id="tax_code"
               name="tax_code"
-              placeholder="VD: 0312345678"
+              placeholder="Công ty: mã số thuế · Cá nhân: số CCCD"
               defaultValue={customer?.tax_code ?? ""}
             />
           </div>

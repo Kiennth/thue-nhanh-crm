@@ -177,6 +177,9 @@ export default async function CustomersPage({
               <SortableTableHead sortKey="name" label="Tên" />
               <SortableTableHead sortKey="customer_type" label="Loại" />
               <TableHead>Điện thoại</TableHead>
+              {/* Cùng cột tax_code: công ty là MST, cá nhân là số CCCD
+                  (CEO 2026-09-02) — không tách cột DB riêng. */}
+              <TableHead>MST / CCCD</TableHead>
               <TableHead>Địa chỉ</TableHead>
               <SortableTableHead sortKey="orderCount" label="Số lượng đơn" />
               <SortableTableHead sortKey="totalRevenue" label="Tổng doanh số" />
@@ -196,6 +199,7 @@ export default async function CustomersPage({
                   <Badge variant="secondary">{CUSTOMER_TYPE_LABELS[customer.customer_type]}</Badge>
                 </TableCell>
                 <TableCell>{customer.phone ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">{customer.tax_code ?? "—"}</TableCell>
                 <TableCell className="max-w-80 truncate">{customer.address ?? "—"}</TableCell>
                 <TableCell>{customer.orderCount}</TableCell>
                 <TableCell>{currencyFormatter.format(customer.totalRevenue)}đ</TableCell>

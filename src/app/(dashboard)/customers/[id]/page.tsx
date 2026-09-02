@@ -124,7 +124,7 @@ export default async function CustomerDetailPage({
             <p className="font-medium">{customer.email ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Mã số thuế</p>
+            <p className="text-xs text-muted-foreground">MST / CCCD</p>
             <p className="font-medium">{customer.tax_code ?? "—"}</p>
           </div>
           <div>
