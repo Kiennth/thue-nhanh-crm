@@ -166,7 +166,7 @@ export default async function CustomersPage({
         <SearchInput
           key={activeSearch}
           paramName="search"
-          placeholder="Tìm theo tên, số điện thoại..."
+          placeholder="Tìm theo tên, SĐT, mã số thuế..."
           value={activeSearch}
           resetParams={["page"]}
         />

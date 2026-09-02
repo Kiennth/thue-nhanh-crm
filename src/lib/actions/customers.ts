@@ -108,7 +108,7 @@ export async function searchCustomers(query: string): Promise<{ id: string; name
   const { data } = await supabase
     .from("customers")
     .select("id, name")
-    .or(`name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%`)
+    .or(`name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%`)
     .order("name")
     .limit(20);
 
