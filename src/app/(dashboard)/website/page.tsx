@@ -48,7 +48,18 @@ export default async function WebsitePage({
   if (activeFilter === "featured") query = query.eq("is_featured", true);
   if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
-  if (activeSearch) query = query.ilike("slug", `%${activeSearch.toLowerCase().replace(/\s+/g, "-")}%`);
+  if (activeSearch) {
+    // Slug toàn chữ không dấu nên phải bỏ dấu tiếng Việt trước khi so
+    // ("kính" → "kinh"), kèm tìm cả tên marketing (có dấu). Bỏ ký tự đặc
+    // biệt của cú pháp or= PostgREST để chuỗi tìm không phá filter.
+    const cleaned = activeSearch.toLowerCase().replace(/[,()"\\]/g, " ").trim();
+    const slugTerm = cleaned
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/\s+/g, "-");
+    query = query.or(`slug.ilike.%${slugTerm}%,name.ilike.%${cleaned}%`);
+  }
 
   const [{ data: products, count }, { data: categories }, statsRes, leadRes, allLiteRes] =
     await Promise.all([
@@ -140,7 +151,7 @@ export default async function WebsitePage({
         <SearchInput
           key={activeSearch}
           paramName="search"
-          placeholder="Tìm theo slug..."
+          placeholder="Tìm theo tên hoặc slug..."
           value={activeSearch}
           resetParams={["page"]}
         />
