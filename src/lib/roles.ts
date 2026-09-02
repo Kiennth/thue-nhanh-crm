@@ -115,6 +115,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: [...MANAGE_ROLES],
   },
   {
+    href: "/invoices",
+    label: "Hoá đơn",
+    // Sổ hoá đơn đỏ (CEO 2026-09-02): đơn hoàn tất chờ kế toán xuất HĐ —
+    // dữ liệu tài chính, cùng bộ role với Công nợ.
+    roles: [...MANAGE_ROLES],
+  },
+  {
     href: "/rewards",
     label: "Thưởng",
     // Module thưởng (CEO 2026-08-09): sổ thưởng trao tay + tóm tắt thưởng

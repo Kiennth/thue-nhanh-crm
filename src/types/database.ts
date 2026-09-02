@@ -401,6 +401,14 @@ export interface Database {
           // Dùng cho các trường hợp hiếm: đơn cũ bị đổi sang sản phẩm khác có
           // cọc khác lúc dọn danh mục, nhưng khách chưa từng được yêu cầu cọc.
           deposit_override_amount: number | null;
+          // Đóng dấu khi khâu giao hàng hoàn thành (trigger sync_order_status
+          // duy trì) — mốc ghi nhận doanh số từ 2026-09-02.
+          delivered_at: string | null;
+          // Theo dõi hoá đơn đỏ (CEO 2026-09-02): chờ xuất = hoàn tất mà chưa
+          // có invoice_issued_at và không bị đánh "không cần".
+          invoice_issued_at: string | null;
+          invoice_number: string | null;
+          invoice_not_needed: boolean;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -424,6 +432,10 @@ export interface Database {
           delivery_stock_moved_at?: string | null;
           return_stock_transferred_at?: string | null;
           deposit_override_amount?: number | null;
+          delivered_at?: string | null;
+          invoice_issued_at?: string | null;
+          invoice_number?: string | null;
+          invoice_not_needed?: boolean;
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;

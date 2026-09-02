@@ -187,7 +187,7 @@ export async function OrdersListSection({
   // hoàn toàn với mọi bộ lọc của bảng (trạng thái/tìm kiếm/chưa thanh toán),
   // chỉ khác nhau ở khoảng ngày (kỳ tổng quan) — page_size=1 vì chỉ cần
   // .stats/.totalCount, không cần rows.
-  const [rpcRes, overviewRes, { data: branches }] = await Promise.all([
+  const [rpcRes, overviewRes, { data: branches }, invoicePendingRes] = await Promise.all([
     supabase.rpc("orders_page_list", {
       p_branch_id: branchId,
       p_status: activeStatus,
@@ -215,6 +215,18 @@ export async function OrdersListSection({
         })
       : Promise.resolve({ data: null }),
     supabase.from("branches").select("id, name").order("position"),
+    // Sổ hoá đơn đỏ (CEO 2026-09-02): đếm đơn hoàn tất chưa xuất HĐ để kế
+    // toán thấy việc ngay từ trang Đơn hàng — không theo kỳ tổng quan vì
+    // việc tồn là tồn, bất kể đơn thuộc tháng nào.
+    showStats
+      ? supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .not("completed_at", "is", null)
+          .is("cancelled_at", null)
+          .is("invoice_issued_at", null)
+          .eq("invoice_not_needed", false)
+      : Promise.resolve({ count: null }),
   ]);
 
   const branchList = branches ?? [];
@@ -316,6 +328,17 @@ export async function OrdersListSection({
                 </p>
               </StatCard>
             </Link>
+            {invoicePendingRes.count !== null && (
+              <Link href="/invoices" className="block">
+                <StatCard
+                  className="transition hover:border-primary/50 hover:ring-1 hover:ring-primary/30"
+                  label="Chờ xuất hoá đơn"
+                  value={invoicePendingRes.count ?? 0}
+                >
+                  <p className="text-xs text-muted-foreground">Mở sổ hoá đơn →</p>
+                </StatCard>
+              </Link>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
