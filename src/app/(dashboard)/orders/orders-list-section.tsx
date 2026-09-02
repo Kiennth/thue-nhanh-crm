@@ -80,9 +80,13 @@ interface OrdersPageListStats {
   // Doanh số = đơn ĐÃ GIAO HÀNG, GỒM VAT (CEO 2026-09-02) — cùng nền với
   // vatRevenue nên khớp thanh "Tiến độ thu tiền" khi cả kỳ đã giao hết.
   totalRevenue: number;
-  // Tổng giá trị ĐÃ GỒM VAT của đơn chưa huỷ — cùng nền với unpaidAmount,
-  // dùng để vẽ thanh "Đã thu/Còn thiếu" (collected = vatRevenue - unpaidAmount).
+  // Tổng giá trị ĐÃ GỒM VAT của mọi đơn chưa huỷ (kể cả chưa giao).
   vatRevenue: number;
+  // Còn thiếu của RIÊNG đơn đã giao — thanh "Tiến độ thu tiền" dùng cặp
+  // (totalRevenue, deliveredUnpaidAmount) nên Đã thu + Còn thiếu luôn cộng
+  // đúng bằng Tổng doanh số (CEO 2026-09-02). Nợ đơn đặt trước chưa giao
+  // vẫn nằm đủ ở unpaidCount/unpaidAmount (thẻ "Chưa thanh toán hết").
+  deliveredUnpaidAmount: number;
   completedCount: number;
   cancelledCount: number;
   unpaidCount: number;
@@ -98,6 +102,7 @@ interface OrdersPageListResult {
 const EMPTY_STATS: OrdersPageListStats = {
   totalRevenue: 0,
   vatRevenue: 0,
+  deliveredUnpaidAmount: 0,
   completedCount: 0,
   cancelledCount: 0,
   unpaidCount: 0,
@@ -320,8 +325,8 @@ export async function OrdersListSection({
               cancelledCount={overviewStats.cancelledCount}
             />
             <OrdersCollectionProgress
-              vatRevenue={overviewStats.vatRevenue}
-              unpaidAmount={overviewStats.unpaidAmount}
+              vatRevenue={overviewStats.totalRevenue}
+              unpaidAmount={overviewStats.deliveredUnpaidAmount}
             />
           </div>
         </div>
