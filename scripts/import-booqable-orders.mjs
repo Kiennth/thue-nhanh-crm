@@ -172,8 +172,19 @@ async function fetchOrderLines(orderId) {
 const customerCache = new Map(); // booqable customer id -> our customer id
 async function fetchBqCustomer(customerId) {
   const r = await bqFetch(`${BQ_BASE}/customers/${customerId}`);
-  const j = await r.json();
-  return j.data;
+  if (r.ok) {
+    const j = await r.json();
+    return j.data;
+  }
+  // Endpoint chi tiết bị Booqable chặn 402 (gói hết hạn mức, 2026-09-08) —
+  // endpoint DANH SÁCH vẫn trả đủ attributes, tra qua filter[id] thay thế.
+  // Không được thả trôi về "Khách lẻ" khi Booqable vẫn có dữ liệu khách.
+  const r2 = await bqFetch(`${BQ_BASE}/customers?filter[id]=${customerId}`);
+  if (r2.ok) {
+    const j2 = await r2.json();
+    if (j2.data?.length) return j2.data[0];
+  }
+  throw new Error(`Không tra được khách Booqable ${customerId} (HTTP ${r.status}/${r2.status})`);
 }
 
 const NO_CUSTOMER_KEY = "__no_customer__";
