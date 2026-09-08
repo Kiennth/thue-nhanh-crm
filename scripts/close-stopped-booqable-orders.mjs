@@ -59,20 +59,30 @@ for (const o of open) {
   const bq = stopped.get(o.order_code);
   if (!bq) { skippedNoBq++; continue; }
   try {
-    const { data: tasks, error: tErr } = await db.from("order_tasks").select("task_type").eq("order_id", o.id);
+    const { data: tasks, error: tErr } = await db
+      .from("order_tasks")
+      .select("id, task_type, completed_date")
+      .eq("order_id", o.id);
     if (tErr) throw new Error(tErr.message);
-    const have = new Set(tasks.map((t) => t.task_type));
+    // Khâu "tạo sẵn nhưng chưa tick" (completed_date null — nhân viên mở
+    // khâu trên CRM rồi bỏ đó) phải UPDATE cho xong thay vì bỏ qua — trigger
+    // check thứ tự khâu sẽ chặn khâu sau nếu khâu trước còn treo (BQ12550).
+    const byType = new Map(tasks.map((t) => [t.task_type, t]));
+    const done = new Set(tasks.filter((t) => t.completed_date).map((t) => t.task_type));
     const orderDate = o.order_date;
     const startsDate = (bq.starts_at || o.rental_start_at || orderDate).slice(0, 10);
     const stopsDate = (bq.stops_at || startsDate).slice(0, 10);
-    const needDeliver = !have.has("giao_hang_ban_giao");
-    const needReturn = !have.has("thu_hoi");
+    const needDeliver = !done.has("giao_hang_ban_giao");
+    const needReturn = !done.has("thu_hoi");
     for (let i = 0; i < 10; i++) {
-      if (have.has(TASKS[i])) continue;
+      if (done.has(TASKS[i])) continue;
       const completed_date = i < 4 ? orderDate : i < 6 ? startsDate : stopsDate;
-      const { error } = await db.from("order_tasks").insert({
-        order_id: o.id, task_type: TASKS[i], employee_id: CEO_EMPLOYEE, completed_date,
-      });
+      const existing = byType.get(TASKS[i]);
+      const { error } = existing
+        ? await db.from("order_tasks").update({ completed_date }).eq("id", existing.id)
+        : await db.from("order_tasks").insert({
+            order_id: o.id, task_type: TASKS[i], employee_id: CEO_EMPLOYEE, completed_date,
+          });
       if (error) throw new Error(`task ${TASKS[i]}: ` + error.message);
     }
     if (needDeliver) {
