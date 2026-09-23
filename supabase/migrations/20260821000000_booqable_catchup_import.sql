@@ -774,3 +774,38 @@
 --     tính từ lúc giao; 2 khối đơn sắp tới/về màu nhận diện + khung ô;
 --     link hồ sơ khách trên trang đơn; tìm khách theo MST + cột
 --     MST/CCCD; web: hover ảnh 2 + dropdown tìm kiếm khớp từng từ.
+--
+-- ## Đợt map 14 (CEO 2026-09-02 chiều → 2026-09-23):
+--   * XREAL (CEO 2026-09-02): Air2 Pro số lượng→serial (5 dòng lịch sử
+--     giữ 8,16tr; tồn AUTO-XREAL2PRO HN 1 + HCM 1, xoá stock ảo 10/10/10
+--     + biến thể cũ); Beam Pro +1 máy AUTO HCM; BEAM: XREAL_BEAM-1
+--     disposed hết tồn theo kiểm kê.
+--   * KHÁCH HÀNG: BQ7370 tách về khách mới "Huỳnh Văn Dự" (trùng SĐT
+--     CMECH nên import gắn nhầm — 4 đơn kia CEO xác nhận đúng là CMECH);
+--     LEVIOSA đổi hồ sơ thành "CÔNG TY CỔ PHẦN SPIDERUM MEDIA" (18 đơn
+--     theo); 9 đơn "Cấn Thị Hương Giang" gộp về hồ sơ DT&C Vina có sẵn.
+--     Quét toàn bộ 146 ca lệch tên BQ↔CRM: phần còn lại là pháp nhân độc
+--     lập chung người liên lạc — giữ nguyên (memory đã ghi).
+--   * SỰ CỐ BOOQABLE 402 (2026-09-08): endpoint /customers/{id} bị chặn
+--     Payment Required làm 77 đơn import rơi "Khách lẻ" — gắn lại đúng
+--     khách toàn bộ (tạo 12 hồ sơ mới: HIVELAB, AURIS, BTS Asia Pacific,
+--     HATICO, CADENA...), chỉ 1 đơn khách lẻ thật; script import vá
+--     fallback qua endpoint danh sách (commit fcaa03d). Script đóng đơn
+--     vá ca "khâu tạo sẵn chưa tick" (BQ12550, commit d680682).
+--   * ĐỒNG BỘ ĐỊNH KỲ 18→23/09 (4 lượt): import 207 đơn (147+45+14+1),
+--     đóng 124 đơn stopped, giao 17, huỷ theo BQ 5; tiền lệ tự áp 76+
+--     dòng. Đơn đặc biệt: mở lại 4 đơn khách GIA HẠN sau khi từng
+--     stopped (BQ12441/12347/12322/12247 — xoá completed, ghi lại xuất
+--     kho) [lượt 18/09].
+--   * CEO DUYỆT 19 TÊN DÒNG TỰ DO (22–23/09, ~700tr): TV QLED 152tr →
+--     Smart TV 4K 55 inch bt SAMSUNG QLED (42 dòng tách máy, 6 AUTO-SYNC
+--     HN); MacBook M1 Pro 16" 70tr; Tab A9 8.7" (BQ12799 73 máy — 60
+--     AUTO-SYNC HN CẦN KIỂM KHO xác nhận đội thật); S25 Ultra 24tr (đổi
+--     tên SP thêm "Điện thoại"); Ghế Gaming bt EDRA + bt mới EDRA
+--     DIGNITY; Photobooth-AI bt CƠ BẢN 2H; GoWithMe 32" + 27" bt TRẮNG;
+--     Quest 3S; iPad Pro M1 11; Amaran 200x/300x; Linksys FGW3000; Booth
+--     VR bt TV 55-inch; S21|S21 FE; TV bt COCA; WiFi 7; Laptop i7 11th
+--     bt Dell 5320; MacBook M3 Pro 14". Backlog 1,03 tỉ → còn ~366tr
+--     cần chọn + 96tr không khớp (artifact theo dõi).
+--   * CODE COMMIT RIÊNG: trigger tạo trang web SP mới mặc định ẨN
+--     (a295eff); 2 fix script sync (d680682, fcaa03d).
