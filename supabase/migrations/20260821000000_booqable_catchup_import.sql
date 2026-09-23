@@ -809,3 +809,34 @@
 --     cần chọn + 96tr không khớp (artifact theo dõi).
 --   * CODE COMMIT RIÊNG: trigger tạo trang web SP mới mặc định ẨN
 --     (a295eff); 2 fix script sync (d680682, fcaa03d).
+--
+-- ## Đợt map 15 (CEO 2026-09-23, tiếp Đợt 14 cùng ngày):
+--   * ĐỒNG BỘ 23/09: import 14 đơn, đóng 13, giao 7, huỷ theo BQ 1
+--     (BQ12677); tiền lệ tự áp 9/15 dòng mới.
+--   * CEO DUYỆT ~60 TÊN DÒNG TỰ DO (~160tr) — gắn theo tiền lệ chuẩn,
+--     đáng kể: Amaran HALO 200x/300x → Đèn Led amaran (20tr+1,6tr);
+--     Booth Thực Tế Ảo VR bt TV 55-inch (19,2tr); Smart TV 4K 75-inch
+--     bt SAMSUNG (BQ12939 7 máy 18,9tr) + TCL; TV 65-inch bt mới TCL
+--     65P755Pro; TV 98-inch bt mới TCL (7,2tr); iPhone 17 Pro Max
+--     (12tr+); Bộ lưu điện 5V 650VA (10tr); Mini PC Gen 10→PC i5 Gen 10
+--     + Gen 6→Mini PC i5 6th (15,5tr); MacBook M3 Pro 14" 18GB/36GB;
+--     MacBook Air M1 13"; Surface Pro 7 i7 (11tr); Màn hình tương tác
+--     65" (11,6tr) + GoWithMe 27" bt TRẮNG (11,2tr); Tab A9+ 11" (BQ12701
+--     10 máy 12,25tr) + Tab S10 Ultra; iPad Gen 9/Gen 11/Air 5/Pro M2
+--     12.9/Pro M5 13; Quest... PS5 (kèm 2 tay cầm); PC Core i5 12th;
+--     Saramonic WiTalk9; GALAXY-SCR01→WiFi 6 có pin; Linksys FGMM1000;
+--     Loa trợ giảng bt STARGO; Bộ đàm Motorola; Dalton TS-12G380N; JBL
+--     Partybox 710; Zebra DS9308 + Xprinter; S21|S21 FE; TV COCA/1080p
+--     43/Xiaomi A2; Quạt Điều Hòa SHD7777 + Quạt Sàn CN; Cột chắn INOX
+--     (A3 INOX, 5m ĐEN, Vàng dây ĐỎ); Photo Booth Classic + bt CƠ BẢN
+--     2H (Photobooth-AI); SSD 2TB bt KINGSTON XS2000; Ổ cứng, dây HDMI
+--     10m, Zoom H1N, Elgato Capture Card, KingSmith R1/R2, Bambulab
+--     P2S, Epson Pro, Hộp mực Canon KP-108IN, UWQHD 34", LG Stanbyme,
+--     Acer NITRO 5 15", MSI Modern 15.6, giá đỡ máy tính bảng, Xe
+--     Scooter Điện, phim Instax...
+--   * Sửa nhánh: nhiều SP quantity chưa có biến thể nào (Bộ lưu điện
+--     650VA, Dalton, Photo Booth Classic, Cột 5m ĐEN, Xprinter, Elgato,
+--     Acer 15") → tạo biến thể mặc định trùng tên khi gắn.
+--   * TỒN CUỐI NGÀY: 1.253 dòng treo — cần chọn 216 tên/113,7tr, không
+--     khớp 192 tên/91,8tr, bỏ qua 152 tên/149,9tr. Từ đỉnh 1,03 tỉ
+--     (22/09) đã về đúng chỗ ~920tr sau 2 ngày duyệt.
