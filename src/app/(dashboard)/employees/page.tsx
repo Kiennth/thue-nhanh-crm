@@ -10,7 +10,7 @@ import {
 import { BranchBadge } from "@/components/branch-badge";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { DIRECTOR_ONLY, MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
+import { ALL_ROLES, DIRECTOR_ONLY, MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
 import { EmployeeDialog } from "./employee-dialog";
 import { ToggleActiveButton } from "./toggle-active-button";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -29,10 +29,10 @@ export default async function EmployeesPage() {
 
   const isHr = HR_ROLES.includes(currentEmployee.role);
   const branchList = branches ?? [];
-  // Đang hoạt động lên trước, người đã vô hiệu xuống cuối; trong mỗi nhóm gom
-  // theo kho (đúng thứ tự branches.position, chưa gán kho xếp cuối) rồi ABC
-  // tiếng Việt (CEO 2026-09-24). Sort ở JS vì collation Postgres không xếp
-  // đúng dấu tiếng Việt (Đ, Â, Ơ...).
+  // Thứ tự (CEO 2026-09-24): đang hoạt động trước → kho (theo
+  // branches.position, chưa gán kho cuối) → cấp bậc (ALL_ROLES đã xếp từ
+  // Giám đốc xuống Kỹ thuật/Sales) → ABC tiếng Việt. Sort ở JS vì collation
+  // Postgres không xếp đúng dấu tiếng Việt (Đ, Â, Ơ...).
   const branchRank = new Map(branchList.map((b, i) => [b.id, i]));
   const rankOf = (branchId: string | null) =>
     branchId ? (branchRank.get(branchId) ?? branchList.length) : branchList.length;
@@ -40,6 +40,7 @@ export default async function EmployeesPage() {
     (a, b) =>
       Number(b.is_active) - Number(a.is_active) ||
       rankOf(a.branch_id) - rankOf(b.branch_id) ||
+      ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role) ||
       a.name.localeCompare(b.name, "vi"),
   );
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
