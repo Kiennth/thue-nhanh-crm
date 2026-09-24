@@ -29,12 +29,18 @@ export default async function EmployeesPage() {
 
   const isHr = HR_ROLES.includes(currentEmployee.role);
   const branchList = branches ?? [];
-  // Đang hoạt động lên trước, người đã vô hiệu xuống cuối; trong mỗi nhóm xếp
-  // ABC theo tiếng Việt (CEO 2026-09-24). Sort ở JS vì collation Postgres
-  // không xếp đúng dấu tiếng Việt (Đ, Â, Ơ...).
+  // Đang hoạt động lên trước, người đã vô hiệu xuống cuối; trong mỗi nhóm gom
+  // theo kho (đúng thứ tự branches.position, chưa gán kho xếp cuối) rồi ABC
+  // tiếng Việt (CEO 2026-09-24). Sort ở JS vì collation Postgres không xếp
+  // đúng dấu tiếng Việt (Đ, Â, Ơ...).
+  const branchRank = new Map(branchList.map((b, i) => [b.id, i]));
+  const rankOf = (branchId: string | null) =>
+    branchId ? (branchRank.get(branchId) ?? branchList.length) : branchList.length;
   const sortedEmployees = [...(employees ?? [])].sort(
     (a, b) =>
-      Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name, "vi"),
+      Number(b.is_active) - Number(a.is_active) ||
+      rankOf(a.branch_id) - rankOf(b.branch_id) ||
+      a.name.localeCompare(b.name, "vi"),
   );
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
