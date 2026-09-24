@@ -29,6 +29,13 @@ export default async function EmployeesPage() {
 
   const isHr = HR_ROLES.includes(currentEmployee.role);
   const branchList = branches ?? [];
+  // Đang hoạt động lên trước, người đã vô hiệu xuống cuối; trong mỗi nhóm xếp
+  // ABC theo tiếng Việt (CEO 2026-09-24). Sort ở JS vì collation Postgres
+  // không xếp đúng dấu tiếng Việt (Đ, Â, Ơ...).
+  const sortedEmployees = [...(employees ?? [])].sort(
+    (a, b) =>
+      Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name, "vi"),
+  );
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
   return (
@@ -53,7 +60,7 @@ export default async function EmployeesPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {employees?.map((emp) => (
+          {sortedEmployees.map((emp) => (
             <TableRow key={emp.id}>
               <TableCell className="font-medium">{emp.name}</TableCell>
               <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
