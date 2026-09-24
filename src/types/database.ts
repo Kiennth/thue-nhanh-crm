@@ -20,6 +20,43 @@ export type RfidScanType = "giao_hang" | "thu_hoi";
 export type DeliveryMethod = "self_ride" | "external_service";
 export type RecurringFrequency = "monthly" | "quarterly" | "yearly";
 
+// Module đào tạo (migration 20260920000000_training_module.sql).
+// Đáp án trong ngân hàng câu hỏi / snapshot bài thi — CÓ cờ correct, chỉ
+// người soạn đọc được (người học nhận TrainingQuizQuestion đã bóc cờ).
+export interface TrainingOption {
+  id: string;
+  text: string;
+  correct: boolean;
+}
+export interface TrainingSnapshotQuestion {
+  id: string;
+  text: string;
+  explanation: string | null;
+  options: TrainingOption[];
+}
+// Kết quả RPC training_active_attempt — đề đã bóc đáp án.
+export interface TrainingQuizQuestion {
+  id: string;
+  text: string;
+  multi: boolean;
+  options: { id: string; text: string }[];
+}
+export interface TrainingActiveAttempt {
+  id: string;
+  total_count: number;
+  pass_percent: number;
+  seconds_left: number | null;
+  questions: TrainingQuizQuestion[];
+}
+// Tài liệu TipTap (JSON) của bài học — render bằng lesson-content.tsx.
+export interface TrainingDocNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TrainingDocNode[];
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  text?: string;
+}
+
 export type TaskType =
   | "tiep_nhan_yeu_cau"
   | "bao_gia"
@@ -910,6 +947,117 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      training_courses: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          cover_image_url: string | null;
+          required_roles: UserRole[];
+          pass_percent: number;
+          questions_per_attempt: number;
+          time_limit_minutes: number | null;
+          max_attempts: number | null;
+          is_published: boolean;
+          sort_order: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          cover_image_url?: string | null;
+          required_roles?: UserRole[];
+          pass_percent?: number;
+          questions_per_attempt?: number;
+          time_limit_minutes?: number | null;
+          max_attempts?: number | null;
+          is_published?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["training_courses"]["Insert"]>;
+        Relationships: [];
+      };
+      training_lessons: {
+        Row: {
+          id: string;
+          course_id: string;
+          title: string;
+          content_json: TrainingDocNode;
+          video_url: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          course_id: string;
+          title: string;
+          content_json?: TrainingDocNode;
+          video_url?: string | null;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["training_lessons"]["Insert"]>;
+        Relationships: [];
+      };
+      training_questions: {
+        Row: {
+          id: string;
+          course_id: string;
+          question_text: string;
+          options: TrainingOption[];
+          explanation: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          course_id: string;
+          question_text: string;
+          options: TrainingOption[];
+          explanation?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["training_questions"]["Insert"]>;
+        Relationships: [];
+      };
+      training_lesson_completions: {
+        Row: {
+          employee_id: string;
+          lesson_id: string;
+          completed_at: string;
+        };
+        Insert: {
+          employee_id: string;
+          lesson_id: string;
+          completed_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      // Chỉ RPC training_* ghi bảng này — không có policy insert/update.
+      training_attempts: {
+        Row: {
+          id: string;
+          course_id: string;
+          employee_id: string;
+          started_at: string;
+          expires_at: string | null;
+          submitted_at: string | null;
+          snapshot: TrainingSnapshotQuestion[];
+          answers: Record<string, string[]> | null;
+          total_count: number;
+          correct_count: number | null;
+          score_percent: number | null;
+          pass_percent: number;
+          passed: boolean | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       employees_public: {
@@ -1115,6 +1263,19 @@ export interface Database {
           p_disposal_date: string;
           p_note?: string | null;
         };
+        Returns: void;
+      };
+      // Module đào tạo — mở bài / lấy đề đã bóc đáp án / nộp + chấm.
+      training_start_attempt: {
+        Args: { p_course_id: string };
+        Returns: string;
+      };
+      training_active_attempt: {
+        Args: { p_course_id: string };
+        Returns: unknown;
+      };
+      training_submit_attempt: {
+        Args: { p_attempt_id: string; p_answers: Record<string, string[]> };
         Returns: void;
       };
     };

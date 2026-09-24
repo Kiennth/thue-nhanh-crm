@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTopLoader } from "nextjs-toploader";
 import { Search } from "lucide-react";
@@ -16,6 +16,8 @@ interface SearchInputProps {
   className?: string;
 }
 
+// CEO 2026-09-22: không tìm ngay khi gõ (trước debounce 300ms) — chỉ tìm khi
+// bấm Enter hoặc bấm nút kính lúp, để gõ hết từ khoá rồi mới tải lại trang.
 export function SearchInput({
   paramName,
   placeholder,
@@ -28,34 +30,45 @@ export function SearchInput({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [text, setText] = useState(value);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleChange(next: string) {
-    setText(next);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (next.trim()) {
-        params.set(paramName, next.trim());
-      } else {
-        params.delete(paramName);
-      }
-      for (const p of resetParams) params.delete(p);
-      const query = params.toString();
-      start();
-      router.push(query ? `${pathname}?${query}` : pathname);
-    }, 300);
+  function submit() {
+    const next = text.trim();
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === (searchParams.get(paramName) ?? "")) return;
+    if (next) {
+      params.set(paramName, next);
+    } else {
+      params.delete(paramName);
+    }
+    for (const p of resetParams) params.delete(p);
+    const query = params.toString();
+    start();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   return (
-    <div className={`relative ${className}`}>
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+    <form
+      className={`relative ${className}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <button
+        type="submit"
+        aria-label="Tìm kiếm"
+        title="Tìm kiếm (Enter)"
+        className="absolute top-1/2 left-1.5 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <Search className="size-4" />
+      </button>
       <Input
+        type="search"
         value={text}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(e) => setText(e.target.value)}
         placeholder={placeholder}
         className="pl-8"
       />
-    </div>
+    </form>
   );
 }

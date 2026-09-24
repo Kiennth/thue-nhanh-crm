@@ -34,6 +34,10 @@ export const COMMISSION_VIEW_ROLES: UserRole[] = ["giam_doc", "ke_toan"];
 // Chi phí vận hành: Giám đốc/Admin/Kế toán toàn hệ thống; Cửa hàng trưởng
 // nhập và xem đúng kho mình (RLS + check trong actions/expenses.ts).
 export const EXPENSE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
+// Đào tạo nội bộ (CEO 2026-09-18): ai cũng học + thi; SOẠN khoá học/câu hỏi
+// và xem bảng tiến độ chỉ Giám đốc/Admin — khớp RLS training_* (câu hỏi có
+// cờ đáp án đúng nên người học không được đọc thẳng bảng).
+export const TRAINING_MANAGE_ROLES: UserRole[] = ["giam_doc", "admin"];
 
 export interface NavItem {
   href: string;
@@ -132,6 +136,13 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/expenses",
     label: "Chi phí",
     roles: [...EXPENSE_ROLES],
+  },
+  {
+    href: "/training",
+    label: "Đào tạo",
+    // Học bài + thi trắc nghiệm kiểu ASTO — mọi nhân viên; phần soạn khoá
+    // gate riêng bằng TRAINING_MANAGE_ROLES trong từng trang/action.
+    roles: [...ALL_ROLES],
   },
   {
     href: "/website",
