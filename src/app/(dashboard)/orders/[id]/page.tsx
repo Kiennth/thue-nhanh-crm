@@ -108,7 +108,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("order_tasks").select("*").eq("order_id", id),
     supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
     supabase.from("branches").select("id, name").order("position"),
-    supabase.from("employees_public").select("id, name").order("name"),
+    supabase.from("employees_public").select("id, name, is_active").order("name"),
     supabase
       .from("equipment_types")
       .select(
@@ -179,6 +179,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const employeeList = employees ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
   const employeeNameById = new Map(employeeList.map((e) => [e.id, e.name]));
+  // Ô chọn người phụ trách chỉ hiện nhân viên ĐANG HOẠT ĐỘNG (CEO 2026-09-25:
+  // người đã khoá vẫn lọt vào ô 10 khâu khoán). Người đã khoá nhưng đang được
+  // gán sẵn thì vẫn giữ trong ô của chính dòng/khâu đó để tên không biến mất
+  // khỏi lịch sử khoán. employeeNameById giữ đủ mọi người để hiển thị tên cũ.
+  const activeEmployeeList = employeeList.filter((e) => e.is_active);
+  const employeeOptionsFor = (assignedId: string | null | undefined) =>
+    assignedId && !activeEmployeeList.some((e) => e.id === assignedId)
+      ? [...activeEmployeeList, ...employeeList.filter((e) => e.id === assignedId)]
+      : activeEmployeeList;
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
@@ -740,7 +749,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                       <OrderLineEmployeeForm
                                         lineId={line.id}
                                         employeeId={line.employee_id}
-                                        employees={employeeList}
+                                        employees={employeeOptionsFor(line.employee_id)}
                                         isTransportLine={isTransportLine}
                                         deliveryMethod={line.delivery_method}
                                       />
@@ -938,7 +947,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     orderId={order.id}
                                     taskType={taskType}
                                     label={TASK_TYPE_LABELS[taskType]}
-                                    employees={employeeList}
+                                    employees={employeeOptionsFor(task?.employee_id)}
                                     task={task}
                                     status={status}
                                     canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}
@@ -996,7 +1005,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <Card>
                   <CardHeader className="flex-row items-center justify-between">
                     <CardTitle className="text-base">OT (tăng ca)</CardTitle>
-                    <OvertimeDialog orderId={order.id} employees={employeeList} />
+                    <OvertimeDialog orderId={order.id} employees={activeEmployeeList} />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
