@@ -70,7 +70,7 @@ export function StockValueSnapshotCard({
           này, số thực tế hồi đó cao hơn.
         </p>
       )}
-      <RevenueBarList points={pointsBySnapshot[snapshot]} labelWidthClassName="w-32" />
+      <RevenueBarList points={pointsBySnapshot[snapshot]} labelWidthClassName="w-32" colorByLabel />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { ChartSpline } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AccentTitle, accentCard, accentColor, accentHeader } from "@/components/section-accent";
 import {
   ChartContainer,
   ChartLegend,
@@ -49,14 +51,18 @@ export function EquipmentValueTrendChart({
   const rows = toChartRows(trend[granularity], metric);
   const showPreviousYear = granularity !== "year";
   const config = {
-    current: { label: METRIC_LABELS[metric], color: "var(--chart-1)" },
-    previousYear: { label: "Cùng kỳ năm trước", color: "var(--muted-foreground)" },
+    // Tím cho kỳ hiện tại, cam cho cùng kỳ năm trước — 2 sắc tương phản rõ,
+    // đọc được trên cả nền sáng lẫn tối (CEO 2026-09-25: chart vui mắt hơn).
+    current: { label: METRIC_LABELS[metric], color: accentColor("violet") },
+    previousYear: { label: "Cùng kỳ năm trước", color: accentColor("orange") },
   } satisfies ChartConfig;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle className="text-base">Giá trị thiết bị theo thời gian</CardTitle>
+    <Card className={accentCard("violet")}>
+      <CardHeader className={accentHeader("violet", "flex flex-wrap items-center justify-between gap-2")}>
+        <CardTitle className="text-base">
+          <AccentTitle accent="violet" icon={ChartSpline}>Giá trị thiết bị theo thời gian</AccentTitle>
+        </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex overflow-hidden rounded-md border">
             {(Object.keys(GRANULARITY_LABELS) as Granularity[]).map((g) => (
@@ -90,12 +96,19 @@ export function EquipmentValueTrendChart({
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
-          <LineChart data={rows} margin={{ left: 8 }}>
+          <AreaChart data={rows} margin={{ left: 8 }}>
+            <defs>
+              <linearGradient id="fillEquipmentCurrent" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-current)" stopOpacity={0.45} />
+                <stop offset="95%" stopColor="var(--color-current)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis
               tickLine={false}
               axisLine={false}
+              width={metric === "value" ? 96 : 48}
               tickFormatter={(v) => (metric === "value" ? currencyFormatter.format(v) : v)}
             />
             <ChartTooltip
@@ -118,24 +131,27 @@ export function EquipmentValueTrendChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Line
-              dataKey="current"
-              type="monotone"
-              stroke="var(--color-current)"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-            />
             {showPreviousYear && (
-              <Line
+              <Area
                 dataKey="previousYear"
                 type="monotone"
                 stroke="var(--color-previousYear)"
+                fill="none"
                 strokeWidth={2}
-                strokeDasharray="4 4"
+                strokeDasharray="5 4"
                 dot={false}
               />
             )}
-          </LineChart>
+            <Area
+              dataKey="current"
+              type="monotone"
+              stroke="var(--color-current)"
+              fill="url(#fillEquipmentCurrent)"
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: "var(--color-current)", strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: "var(--color-current)", stroke: "var(--background)", strokeWidth: 2 }}
+            />
+          </AreaChart>
         </ChartContainer>
       </CardContent>
     </Card>

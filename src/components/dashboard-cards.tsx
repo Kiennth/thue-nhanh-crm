@@ -1,3 +1,4 @@
+import { Crown, Repeat, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   RevenueBarList,
@@ -6,6 +7,7 @@ import {
   type RevenuePoint,
 } from "@/components/revenue-bar-list";
 import { PeriodPicker } from "@/components/period-picker";
+import { AccentTitle, accentCard, accentHeader } from "@/components/section-accent";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -91,28 +93,44 @@ export function ProductHighlightCards({
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Cho thuê nhiều nhất</CardTitle>
+      <Card className={accentCard("sky")}>
+        <CardHeader className={accentHeader("sky")}>
+          <CardTitle className="text-base">
+            <AccentTitle accent="sky" icon={Repeat}>Cho thuê nhiều nhất</AccentTitle>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <RevenueBarList points={mostRented} formatValue={formatCount} labelWidthClassName="w-32" />
+          <RevenueBarList
+            points={mostRented}
+            formatValue={formatCount}
+            labelWidthClassName="w-32"
+            colorByLabel
+          />
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Sản phẩm chủ lực (doanh thu cao nhất)</CardTitle>
+      <Card className={accentCard("emerald")}>
+        <CardHeader className={accentHeader("emerald")}>
+          <CardTitle className="text-base">
+            <AccentTitle accent="emerald" icon={Crown}>Sản phẩm chủ lực (doanh thu cao nhất)</AccentTitle>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <RevenueBarList points={flagship} labelWidthClassName="w-32" />
+          <RevenueBarList points={flagship} labelWidthClassName="w-32" colorByLabel />
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tỉ suất lợi nhuận cao nhất</CardTitle>
+      <Card className={accentCard("violet")}>
+        <CardHeader className={accentHeader("violet")}>
+          <CardTitle className="text-base">
+            <AccentTitle accent="violet" icon={TrendingUp}>Tỉ suất lợi nhuận cao nhất</AccentTitle>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <RevenueBarList points={topMargin} formatValue={formatPercent} labelWidthClassName="w-32" />
+          <RevenueBarList
+            points={topMargin}
+            formatValue={formatPercent}
+            labelWidthClassName="w-32"
+            colorByLabel
+          />
         </CardContent>
       </Card>
     </div>

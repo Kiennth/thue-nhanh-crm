@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ImageOff } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ImageOff, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AccentTitle, accentCard, accentColor, accentHeader } from "@/components/section-accent";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -421,27 +422,36 @@ export default async function EquipmentPage({
           khác. */}
 
       {reportSummary && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tổng quan tồn kho</CardTitle>
+        <Card className={accentCard("amber")}>
+          <CardHeader className={accentHeader("amber")}>
+            <CardTitle className="text-base">
+              <AccentTitle accent="amber" icon={Warehouse}>Tổng quan tồn kho</AccentTitle>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <div>
+            {/* Mỗi con số một ô nhuộm màu riêng (CEO 2026-09-25: báo cáo
+                sặc sỡ cho dễ nhìn); tăng xanh / giảm đỏ. */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-indigo-500/10 p-3">
                 <p className="text-xs text-muted-foreground">Tổng giá trị tồn kho</p>
-                <p className="text-lg font-medium">
+                <p className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
                   {currencyFormatter.format(reportSummary.totalInventoryValue)}đ
                 </p>
                 {/* CEO yêu cầu 2026-08-06: biết ngay đang tăng/giảm bao nhiêu
                     so với tháng trước mà không phải đọc biểu đồ bên dưới. */}
                 {equipmentValueOverview && (
                   <p
-                    className={`text-xs ${
+                    className={`mt-0.5 flex items-center gap-0.5 text-xs font-medium ${
                       equipmentValueOverview.monthOverMonth.deltaValue >= 0
-                        ? "text-primary"
-                        : "text-destructive"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
                     }`}
                   >
+                    {equipmentValueOverview.monthOverMonth.deltaValue >= 0 ? (
+                      <ArrowUpRight className="size-3.5 shrink-0" />
+                    ) : (
+                      <ArrowDownRight className="size-3.5 shrink-0" />
+                    )}
                     {equipmentValueOverview.monthOverMonth.deltaValue >= 0 ? "+" : ""}
                     {currencyFormatter.format(equipmentValueOverview.monthOverMonth.deltaValue)}đ
                     {equipmentValueOverview.monthOverMonth.deltaPercent != null &&
@@ -450,13 +460,15 @@ export default async function EquipmentPage({
                   </p>
                 )}
               </div>
-              <div>
+              <div className="rounded-lg bg-sky-500/10 p-3">
                 <p className="text-xs text-muted-foreground">Số thiết bị đang giữ</p>
-                <p className="text-lg font-medium">{reportSummary.totalUnitsInStock}</p>
+                <p className="text-lg font-semibold text-sky-600 dark:text-sky-400">
+                  {reportSummary.totalUnitsInStock}
+                </p>
               </div>
-              <div>
+              <div className="rounded-lg bg-fuchsia-500/10 p-3">
                 <p className="text-xs text-muted-foreground">Giá trị trung bình / thiết bị</p>
-                <p className="text-lg font-medium">
+                <p className="text-lg font-semibold text-fuchsia-600 dark:text-fuchsia-400">
                   {currencyFormatter.format(reportSummary.averageInventoryValue)}đ
                 </p>
               </div>
@@ -479,15 +491,21 @@ export default async function EquipmentPage({
                 lại ở đâu", khác khối trên vốn là số TĨNH tại 1 thời điểm. */}
             {topStockIncreasePoints.length > 0 && (
               <div className="mt-6 border-t pt-4">
-                <p className="mb-3 text-xs text-muted-foreground">
+                <p className="mb-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <ArrowUpRight className="size-3.5" />
                   Tăng tồn kho nhiều nhất trong tháng
                 </p>
-                <RevenueBarList points={topStockIncreasePoints} labelWidthClassName="w-32" />
+                <RevenueBarList
+                  points={topStockIncreasePoints}
+                  labelWidthClassName="w-32"
+                  barColor={accentColor("emerald")}
+                />
               </div>
             )}
             {topStockDecreasePoints.length > 0 && (
               <div className="mt-6 border-t pt-4">
-                <p className="mb-3 text-xs text-muted-foreground">
+                <p className="mb-3 flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
+                  <ArrowDownRight className="size-3.5" />
                   Giảm tồn kho nhiều nhất trong tháng
                 </p>
                 <RevenueBarList points={topStockDecreasePoints} labelWidthClassName="w-32" />
