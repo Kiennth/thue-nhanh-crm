@@ -69,6 +69,7 @@ import { OvertimeDialog } from "./overtime-dialog";
 import { PrintMenu } from "./print-menu";
 import { OrderConflictAlert } from "./order-conflict-alert";
 import { SendDocumentEmailDialog } from "./send-document-email-dialog";
+import { OrderComments } from "./order-comments";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -155,6 +156,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .select("id, name, email, deposit_percentage")
     .eq("id", order.customer_id)
     .maybeSingle();
+
+  const { data: commentRows } = await supabase
+    .from("order_comments")
+    .select("id, parent_id, body, created_at, employees(name)")
+    .eq("order_id", id)
+    .order("created_at");
+  const orderComments = (commentRows ?? []).map((c) => ({
+    id: c.id,
+    parentId: c.parent_id,
+    body: c.body,
+    createdAt: c.created_at,
+    authorName: (c.employees as unknown as { name: string } | null)?.name ?? "Nhân viên",
+  }));
 
   const canManage = !!employee && MANAGE_ROLES.includes(employee.role);
   // Dòng vận chuyển (giao/thu hồi xe máy) — Cửa hàng trưởng/Kỹ thuật-Sale
@@ -1176,6 +1190,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </CardContent>
             </Card>
           </div>
+
+      <OrderComments
+        orderId={order.id}
+        comments={orderComments}
+        canDelete={employee?.role === "giam_doc"}
+      />
     </div>
   );
 }
