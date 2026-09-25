@@ -108,7 +108,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("order_tasks").select("*").eq("order_id", id),
     supabase.from("order_payments").select("*").eq("order_id", id).order("paid_at"),
     supabase.from("branches").select("id, name").order("position"),
-    supabase.from("employees_public").select("id, name, is_active").order("name"),
+    supabase.from("employees_public").select("id, name, is_active, branch_id").order("name"),
     supabase
       .from("equipment_types")
       .select(
@@ -188,6 +188,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     assignedId && !activeEmployeeList.some((e) => e.id === assignedId)
       ? [...activeEmployeeList, ...employeeList.filter((e) => e.id === assignedId)]
       : activeEmployeeList;
+  // Ô chọn ở 10 khâu (CEO 2026-09-25): người của kho phụ trách khâu đó lên
+  // đầu — khâu thu hồi/nghiệm thu/nhập kho thuộc kho THU HỒI, các khâu còn
+  // lại thuộc kho GIAO. Mỗi nhóm xếp ABC tiếng Việt.
+  const RETURN_SIDE_TASKS: TaskType[] = ["thu_hoi", "nghiem_thu", "nhap_kho_bao_tri"];
+  const taskEmployeeOptions = (taskType: TaskType, assignedId: string | null | undefined) => {
+    const branchId = RETURN_SIDE_TASKS.includes(taskType)
+      ? order.return_branch_id
+      : order.pickup_branch_id;
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "vi");
+    const options = employeeOptionsFor(assignedId);
+    const local = options.filter((e) => e.branch_id === branchId).sort(byName);
+    const others = options.filter((e) => e.branch_id !== branchId).sort(byName);
+    return {
+      employees: [...local, ...others],
+      priorityCount: local.length,
+      priorityLabel: `Kho ${branchNameById.get(branchId) ?? "phụ trách"}`,
+    };
+  };
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
@@ -947,7 +965,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     orderId={order.id}
                                     taskType={taskType}
                                     label={TASK_TYPE_LABELS[taskType]}
-                                    employees={employeeOptionsFor(task?.employee_id)}
+                                    {...taskEmployeeOptions(taskType, task?.employee_id)}
                                     task={task}
                                     status={status}
                                     canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}

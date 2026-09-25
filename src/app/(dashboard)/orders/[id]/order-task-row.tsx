@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -33,6 +36,10 @@ interface OrderTaskRowProps {
   taskType: TaskType;
   label: string;
   employees: EmployeeOption[];
+  // `employees` đã xếp sẵn: priorityCount người đầu là nhân sự của kho phụ
+  // trách khâu này (hiện thành nhóm riêng có nhãn priorityLabel).
+  priorityCount?: number;
+  priorityLabel?: string;
   task?: {
     employee_id: string | null;
     note: string | null;
@@ -112,6 +119,8 @@ export function OrderTaskRow({
   taskType,
   label,
   employees,
+  priorityCount = 0,
+  priorityLabel,
   task,
   status,
   canUncomplete,
@@ -173,11 +182,33 @@ export function OrderTaskRow({
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {employees.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
-                {e.name}
-              </SelectItem>
-            ))}
+            {priorityCount > 0 && priorityCount < employees.length ? (
+              <>
+                <SelectGroup>
+                  <SelectLabel>{priorityLabel}</SelectLabel>
+                  {employees.slice(0, priorityCount).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Kho khác</SelectLabel>
+                  {employees.slice(priorityCount).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            ) : (
+              employees.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
 
