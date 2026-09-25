@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ImageOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -92,6 +93,7 @@ export default async function EquipmentPage({
     range?: string;
     from?: string;
     to?: string;
+    tab?: string;
   }>;
 }) {
   const {
@@ -103,6 +105,7 @@ export default async function EquipmentPage({
     range,
     from: rangeFrom,
     to: rangeTo,
+    tab,
   } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const activeCategory = category?.trim() || null;
@@ -133,6 +136,14 @@ export default async function EquipmentPage({
   // Xếp hạng sản phẩm (cho thuê nhiều nhất / chủ lực / tỉ suất lợi nhuận) là
   // thông tin điều hành danh mục — Cửa hàng trưởng và Admin không cần biết.
   const canViewProductHighlights = canViewEquipmentReports;
+  // 2 tab (CEO 2026-09-25): "Hàng hoá" mặc định — ô tìm/lọc nằm ngay trên
+  // bảng, không phải cuộn qua báo cáo; "Báo cáo" chỉ ai có quyền xem báo cáo
+  // và chỉ tính khi mở đúng tab.
+  const activeTab: "list" | "report" = tab === "report" && canViewEquipmentReports ? "report" : "list";
+  const isReportTab = activeTab === "report";
+  // Tab Hàng hoá chỉ cần tồn kho/giá trị tồn kho (luôn là số hiện tại) từ
+  // RPC — truyền kỳ rỗng để hàm khỏi quét doanh thu/lượt thuê toàn bảng.
+  const nowIso = new Date().toISOString().slice(0, 10);
 
   // Trước đây trang này fetch theo 3 CHẶNG TUẦN TỰ (giá trị tồn kho đứng một
   // mình → allTypes đứng một mình → units/instances/stock → rồi mới tới khối
@@ -175,14 +186,14 @@ export default async function EquipmentPage({
     // canViewInventoryTrend giờ chỉ true cho Giám đốc/Kế toán (canManageCatalog
     // luôn true theo đó) nên không còn cần nhánh branch_id riêng cho Cửa hàng
     // trưởng nữa — xem toàn công ty.
-    canViewInventoryTrend ? computeEquipmentValueOverview(null) : Promise.resolve(null),
+    canViewInventoryTrend && isReportTab ? computeEquipmentValueOverview(null) : Promise.resolve(null),
     // Tên/loại hàng cho khối "Báo cáo" — TOÀN BỘ danh mục, không bị giới hạn
     // bởi bộ lọc tìm kiếm/danh mục đang áp cho bảng chính.
     supabase.from("equipment_types").select("id, name, product_type").order("name"),
     supabase.rpc("equipment_page_report", {
       p_branch_id: null,
-      p_start: reportDateRange?.start ?? null,
-      p_end: reportDateRange?.end ?? null,
+      p_start: isReportTab ? (reportDateRange?.start ?? null) : nowIso,
+      p_end: isReportTab ? (reportDateRange?.end ?? null) : nowIso,
     }),
   ]);
 
@@ -245,9 +256,8 @@ export default async function EquipmentPage({
   const typeList = sortedTypes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ---------------------------------------------------------------------
-  // Báo cáo — hiển thị thẳng trên trang, không tách tab riêng: tổng quan
-  // gọn gồm top thiết bị doanh thu cao, cho thuê nhiều lần, tỉ suất lợi
-  // nhuận cao, và vốn đọng (đã mua nhưng chưa từng cho thuê). KHÔNG liệt
+  // Báo cáo (tab "Báo cáo", tách riêng từ 2026-09-25): tổng quan gọn gồm
+  // top thiết bị doanh thu cao, cho thuê nhiều lần, tỉ suất lợi nhuận cao, và vốn đọng (đã mua nhưng chưa từng cho thuê). KHÔNG liệt
   // kê toàn bộ danh mục — chỉ top 10 mỗi mục.
   // ---------------------------------------------------------------------
 
@@ -264,7 +274,7 @@ export default async function EquipmentPage({
   // Cửa hàng trưởng cũng xem được báo cáo này, nhưng mọi số liệu bên trong
   // đã bị lọc sẵn về đúng kho/đơn hàng chi nhánh mình (RPC tự ép branch_id
   // — xem comment ở lời gọi rpc phía trên).
-  if (canViewInventoryTrend) {
+  if (canViewInventoryTrend && isReportTab) {
     const reportRows = reportTypeList.map((type) => ({
       type,
       report: reportByTypeId.get(type.id)!,
@@ -342,20 +352,46 @@ export default async function EquipmentPage({
           scroll ngang. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput
-            key={activeSearch}
-            paramName="search"
-            placeholder="Tìm theo tên hàng hoá..."
-            value={activeSearch}
-            resetParams={["page"]}
-          />
-          <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
-          {canManageCatalog && (
-            <EquipmentTypeDialog templates={templateList} categories={categoryList} />
-          )}
-        </div>
+        {!isReportTab && (
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              key={activeSearch}
+              paramName="search"
+              placeholder="Tìm theo tên hàng hoá..."
+              value={activeSearch}
+              resetParams={["page"]}
+            />
+            <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
+            {canManageCatalog && (
+              <EquipmentTypeDialog templates={templateList} categories={categoryList} />
+            )}
+          </div>
+        )}
       </div>
+
+      {canViewEquipmentReports && (
+        <div className="flex items-center gap-1 border-b">
+          {(
+            [
+              { value: "list", label: "Hàng hoá", href: "/equipment" },
+              { value: "report", label: "Báo cáo", href: "/equipment?tab=report" },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.value}
+              href={t.href}
+              className={cn(
+                "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                activeTab === t.value
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* CEO yêu cầu 2026-08-06: 3 card Cho thuê nhiều nhất/Sản phẩm chủ
           lực/Tỉ suất lợi nhuận lên đầu trang — thứ cần thấy ngay khi mở
@@ -363,7 +399,7 @@ export default async function EquipmentPage({
       {reportSummary && canViewProductHighlights && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Báo cáo</h2>
+            <h2 className="text-lg font-semibold">Xếp hạng sản phẩm</h2>
             <OrderDateRangeFilter
               preset={activeRange}
               from={rangeFrom ?? ""}
@@ -463,105 +499,109 @@ export default async function EquipmentPage({
 
       {equipmentValueOverview && <EquipmentValueTrendChart trend={equipmentValueOverview.trend} />}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <SortableTableHead sortKey="name" label="Tên hàng hoá" />
-            <SortableTableHead sortKey="productType" label="Loại hàng hoá" />
-            <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
-            <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
-            <SortableTableHead sortKey="price" label="Giá" />
-            <SortableTableHead sortKey="stock" label="Tồn kho" />
-            <SortableTableHead sortKey="stockValue" label="Tổng giá trị tồn kho" />
-            <TableHead className="w-16"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {typeList.map((type) => {
-            const priceLine =
-              type.product_type === "rental"
-                ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}`
-                : `${currencyFormatter.format(type.price)}đ`;
+      {!isReportTab && (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead sortKey="name" label="Tên hàng hoá" />
+                <SortableTableHead sortKey="productType" label="Loại hàng hoá" />
+                <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
+                <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
+                <SortableTableHead sortKey="price" label="Giá" />
+                <SortableTableHead sortKey="stock" label="Tồn kho" />
+                <SortableTableHead sortKey="stockValue" label="Tổng giá trị tồn kho" />
+                <TableHead className="w-16"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {typeList.map((type) => {
+                const priceLine =
+                  type.product_type === "rental"
+                    ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}`
+                    : `${currencyFormatter.format(type.price)}đ`;
 
-            const stockDisplay =
-              type.product_type === "service"
-                ? "—"
-                : type.tracking_type === "individual"
-                  ? `${stockValue(type)} sản phẩm`
-                  : `${stockValue(type)}`;
+                const stockDisplay =
+                  type.product_type === "service"
+                    ? "—"
+                    : type.tracking_type === "individual"
+                      ? `${stockValue(type)} sản phẩm`
+                      : `${stockValue(type)}`;
 
-            const stockValueDisplay =
-              type.product_type === "service"
-                ? "—"
-                : `${currencyFormatter.format(inventoryValueByTypeId.get(type.id) ?? 0)}đ`;
+                const stockValueDisplay =
+                  type.product_type === "service"
+                    ? "—"
+                    : `${currencyFormatter.format(inventoryValueByTypeId.get(type.id) ?? 0)}đ`;
 
-            return (
-              <ClickableTableRow key={type.id} href={`/equipment/${type.id}`}>
-                <TableCell className="font-medium">
-                  <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
-                    {type.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={type.image_url}
-                        alt=""
-                        className="size-9 shrink-0 rounded-md border object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-                        <ImageOff className="size-4" />
-                      </div>
-                    )}
-                    <span>
-                      {type.name}
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        {categoryNameById.get(type.category_id ?? "") ?? "Chưa phân loại"}
-                      </span>
-                    </span>
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
-                <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
-                <TableCell className="text-muted-foreground">{priceLine}</TableCell>
-                <TableCell>{stockDisplay}</TableCell>
-                <TableCell>{stockValueDisplay}</TableCell>
-                <TableCell>
-                  {(canManageCatalog || canManageStock) && (
-                    <div className="flex items-center gap-1">
-                      {canManageCatalog && (
-                        <EquipmentTypeDialog
-                          templates={templateList}
-                          categories={categoryList}
-                          equipmentType={type}
-                        />
+                return (
+                  <ClickableTableRow key={type.id} href={`/equipment/${type.id}`}>
+                    <TableCell className="font-medium">
+                      <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
+                        {type.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={type.image_url}
+                            alt=""
+                            className="size-9 shrink-0 rounded-md border object-cover"
+                          />
+                        ) : (
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                            <ImageOff className="size-4" />
+                          </div>
+                        )}
+                        <span>
+                          {type.name}
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {categoryNameById.get(type.category_id ?? "") ?? "Chưa phân loại"}
+                          </span>
+                        </span>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{PRODUCT_TYPE_LABELS[type.product_type]}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
+                    <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
+                    <TableCell className="text-muted-foreground">{priceLine}</TableCell>
+                    <TableCell>{stockDisplay}</TableCell>
+                    <TableCell>{stockValueDisplay}</TableCell>
+                    <TableCell>
+                      {(canManageCatalog || canManageStock) && (
+                        <div className="flex items-center gap-1">
+                          {canManageCatalog && (
+                            <EquipmentTypeDialog
+                              templates={templateList}
+                              categories={categoryList}
+                              equipmentType={type}
+                            />
+                          )}
+                          {canManageCatalog && (
+                            <ConfirmDeleteButton
+                              confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
+                              successMessage="Đã xoá."
+                              action={deleteEquipmentType}
+                              actionArg={type.id}
+                            />
+                          )}
+                        </div>
                       )}
-                      {canManageCatalog && (
-                        <ConfirmDeleteButton
-                          confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
-                          successMessage="Đã xoá."
-                          action={deleteEquipmentType}
-                          actionArg={type.id}
-                        />
-                      )}
-                    </div>
-                  )}
-                </TableCell>
-              </ClickableTableRow>
-            );
-          })}
-          {!typeList.length && (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
-                {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                    </TableCell>
+                  </ClickableTableRow>
+                );
+              })}
+              {!typeList.length && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
 
-      <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="loại hàng hoá" />
+          <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="loại hàng hoá" />
+        </>
+      )}
     </div>
   );
 }
