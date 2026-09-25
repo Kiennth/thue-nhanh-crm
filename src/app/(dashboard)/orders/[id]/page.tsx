@@ -17,7 +17,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
-import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
+import { deleteOrderEquipmentLine, deleteOrderEquipmentLines } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
 import { deleteOvertimeEntry } from "@/lib/actions/overtime";
 import {
@@ -70,6 +70,8 @@ import { PrintMenu } from "./print-menu";
 import { OrderConflictAlert } from "./order-conflict-alert";
 import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { OrderComments } from "./order-comments";
+import { OrderLineGroupPriceForm } from "./order-line-group-price-form";
+import { SerialChipList } from "./serial-chip-list";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -632,7 +634,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <div className="overflow-x-auto">
                 {lines?.length ? (
                   (() => {
-                    const lineRows = lines.map((line) => {
+                    const renderSingleLine = (line: (typeof lines)[number]) => {
                         const type = line.equipment_type_id
                           ? equipmentTypeById.get(line.equipment_type_id)
                           : undefined;
@@ -672,7 +674,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           content: (
                             <>
                               <TableCell
-                                className="max-w-[200px] font-medium"
+                                className="font-medium"
                                 title={type?.name ?? line.custom_name ?? undefined}
                               >
                                 <div className="flex items-center gap-2">
@@ -700,11 +702,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="max-w-[140px] truncate" title={detail}>
+                              <TableCell className="truncate" title={detail}>
                                 {detail}
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   {canManage && !line.equipment_instance_id ? (
                                     <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
                                   ) : (
@@ -743,7 +745,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   `${currencyFormatter.format(line.unit_price)}đ`
                                 )}
                                 {charge && (
-                                  <p className="mt-0.5 text-xs whitespace-nowrap text-muted-foreground">
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
                                     {currencyFormatter.format(charge.basePrice)}đ/{charge.unitLabel} ×{" "}
                                     {charge.duration} {charge.unitLabel}
                                     {charge.tier &&
@@ -752,14 +754,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                 )}
                                 {charge?.isCustom && (
                                   <p
-                                    className="mt-0.5 text-xs whitespace-nowrap text-amber-600 dark:text-amber-500"
+                                    className="mt-0.5 text-xs text-amber-600 dark:text-amber-500"
                                     title={`Giá theo gói mặc định: ${currencyFormatter.format(charge.defaultUnitPrice)}đ`}
                                   >
                                     Giá tuỳ chỉnh
                                   </p>
                                 )}
                               </TableCell>
-                              <TableCell>{currencyFormatter.format(line.line_total)}đ</TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {currencyFormatter.format(line.line_total)}đ
+                              </TableCell>
                               <TableCell>
                                 <div className="flex flex-col items-start gap-1.5">
                                   {type?.payout_percentage != null || isTransportLine ? (
@@ -800,21 +804,135 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             </>
                           ),
                         };
+                      };
+
+                    // Gộp máy serial cùng sản phẩm + cùng đơn giá thành 1 dòng
+                    // (kiểu Booqable, CEO 2026-09-25): SL = số máy, serial thành
+                    // chip bên dưới. Chỉ gộp dòng thiết bị serial thuần — dòng
+                    // dịch vụ/vận chuyển có người thực hiện, ghi chú giao nhận vẫn
+                    // tách riêng từng dòng. Nhóm đứng ở vị trí máy đầu tiên.
+                    const isGroupable = (line: (typeof lines)[number]) => {
+                      if (!line.equipment_instance_id || !line.equipment_type_id) return false;
+                      const t = equipmentTypeById.get(line.equipment_type_id);
+                      return (
+                        !!t &&
+                        t.payout_percentage == null &&
+                        !(line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID) &&
+                        !DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id)
+                      );
+                    };
+                    const groupKey = (line: (typeof lines)[number]) =>
+                      `${line.equipment_type_id}|${line.unit_price}`;
+                    const groupMembers = new Map<string, (typeof lines)[number][]>();
+                    for (const line of lines) {
+                      if (!isGroupable(line)) continue;
+                      const key = groupKey(line);
+                      groupMembers.set(key, [...(groupMembers.get(key) ?? []), line]);
+                    }
+                    const renderGroup = (members: (typeof lines)[number][]) => {
+                      const first = members[0];
+                      const type = equipmentTypeById.get(first.equipment_type_id!)!;
+                      const memberIds = members.map((m) => m.id);
+                      const charge = describeCharge(type, first.unit_price);
+                      const chips = members.map((m) => {
+                        const inst = equipmentInstanceById.get(m.equipment_instance_id!);
+                        const variant = inst?.equipment_unit_id
+                          ? equipmentUnitById.get(inst.equipment_unit_id)?.brand_model
+                          : null;
+                        const showVariant =
+                          !!variant && variant !== type.name && (unitCountByType.get(type.id) ?? 0) > 1;
+                        return {
+                          lineId: m.id,
+                          label: inst?.identifier_code ?? "—",
+                          variant: showVariant ? variant : null,
+                        };
                       });
+                      return {
+                        id: first.id,
+                        memberIds,
+                        content: (
+                          <>
+                            <TableCell className="font-medium" title={type.name}>
+                              <div className="flex items-center gap-2">
+                                {type.image_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
+                                  <img src={type.image_url} alt="" className="size-8 shrink-0 rounded object-cover" />
+                                ) : (
+                                  <span className="bg-muted size-8 shrink-0 rounded" />
+                                )}
+                                <Link
+                                  href={`/equipment/${type.id}`}
+                                  className="truncate underline-offset-2 hover:underline"
+                                >
+                                  {type.name}
+                                </Link>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <SerialChipList items={chips} canRemove={canManage} />
+                            </TableCell>
+                            <TableCell className="tabular-nums">{members.length}</TableCell>
+                            <TableCell>
+                              {canManage ? (
+                                <OrderLineGroupPriceForm lineIds={memberIds} unitPrice={first.unit_price} />
+                              ) : (
+                                `${currencyFormatter.format(first.unit_price)}đ`
+                              )}
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                /máy
+                                {charge &&
+                                  ` · ${currencyFormatter.format(charge.basePrice)}đ/${charge.unitLabel} × ${charge.duration} ${charge.unitLabel}`}
+                                {charge?.tier &&
+                                  ` · gói ≥${charge.tier.min_duration} ${charge.unitLabel} −${charge.tier.discount_percentage}%`}
+                              </p>
+                              {charge?.isCustom && (
+                                <p
+                                  className="mt-0.5 text-xs text-amber-600 dark:text-amber-500"
+                                  title={`Giá theo gói mặc định: ${currencyFormatter.format(charge.defaultUnitPrice)}đ`}
+                                >
+                                  Giá tuỳ chỉnh
+                                </p>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {currencyFormatter.format(members.reduce((sum, m) => sum + m.line_total, 0))}đ
+                            </TableCell>
+                            <TableCell>—</TableCell>
+                            <TableCell>
+                              <ConfirmDeleteButton
+                                confirmMessage={`Xoá cả ${members.length} máy ${type.name} khỏi đơn?`}
+                                successMessage="Đã xoá dòng hàng."
+                                action={deleteOrderEquipmentLines}
+                                actionArg={memberIds}
+                              />
+                            </TableCell>
+                          </>
+                        ),
+                      };
+                    };
+                    const lineRows: { id: string; memberIds: string[]; content: React.ReactNode }[] = [];
+                    for (const line of lines) {
+                      const members = isGroupable(line) ? groupMembers.get(groupKey(line)) : undefined;
+                      if (members && members.length > 1) {
+                        if (members[0].id === line.id) lineRows.push(renderGroup(members));
+                        continue;
+                      }
+                      lineRows.push({ ...renderSingleLine(line), memberIds: [line.id] });
+                    }
 
                     return canManage ? (
                       <OrderLinesSortableTable orderId={order.id} rows={lineRows} />
                     ) : (
-                      <Table>
+                      <Table className="min-w-[960px] table-fixed">
                         <TableHeader>
                           <TableRow>
                             <TableHead>Hàng hoá</TableHead>
-                            <TableHead>Biến thể/Sản phẩm</TableHead>
-                            <TableHead>SL</TableHead>
-                            <TableHead>Giá thuê</TableHead>
-                            <TableHead>Thành tiền</TableHead>
-                            <TableHead>Người thực hiện</TableHead>
-                            <TableHead className="w-16"></TableHead>
+                            <TableHead className="w-[200px]">Biến thể/Sản phẩm</TableHead>
+                            <TableHead className="w-[120px]">SL</TableHead>
+                            <TableHead className="w-[170px]">Giá thuê</TableHead>
+                            <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
+                            <TableHead className="w-[150px]">Người thực hiện</TableHead>
+                            <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

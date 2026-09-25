@@ -283,6 +283,69 @@ export async function updateOrderEquipmentLinePrice(
   return { success: true };
 }
 
+// Sửa đơn giá cho CẢ NHÓM dòng serial đang gộp hiển thị (cùng sản phẩm, mỗi
+// máy 1 dòng) — 1 lần nhập áp cho mọi máy trong nhóm.
+export async function updateOrderEquipmentLinesPrice(
+  lineIds: string[],
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = OrderLinePriceSchema.safeParse({ unit_price: formData.get("unit_price") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  if (!lineIds.length) return { error: "Không có dòng hàng nào." };
+
+  const supabase = await createClient();
+  const { data: lines, error: linesError } = await supabase
+    .from("order_equipment")
+    .select("id, order_id, quantity")
+    .in("id", lineIds);
+  if (linesError || !lines?.length) {
+    return { error: "Không tìm thấy dòng hàng." };
+  }
+
+  const results = await Promise.all(
+    lines.map((line) =>
+      supabase
+        .from("order_equipment")
+        .update({
+          unit_price: parsed.data.unit_price,
+          line_total: round2(parsed.data.unit_price * line.quantity),
+        })
+        .eq("id", line.id),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    return { error: "Không thể sửa đơn giá: " + failed.error.message };
+  }
+
+  revalidatePath(`/orders/${lines[0].order_id}`);
+  return { success: true };
+}
+
+// Xoá cả nhóm dòng serial đang gộp hiển thị.
+export async function deleteOrderEquipmentLines(lineIds: string[]) {
+  await requireRole([...ALL_ROLES]);
+  if (!lineIds.length) return;
+
+  const supabase = await createClient();
+  const { data: first } = await supabase
+    .from("order_equipment")
+    .select("order_id")
+    .eq("id", lineIds[0])
+    .single();
+
+  const { error } = await supabase.from("order_equipment").delete().in("id", lineIds);
+  if (error) {
+    throw new Error("Không thể xoá dòng hàng: " + error.message);
+  }
+  if (first) revalidatePath(`/orders/${first.order_id}`);
+}
+
 const AssignOrderLineEmployeeSchema = z.object({
   employee_id: z.string().uuid().optional(),
   // Chỉ có ý nghĩa với 2 dòng phí vận chuyển (giao/thu hồi bằng xe máy).

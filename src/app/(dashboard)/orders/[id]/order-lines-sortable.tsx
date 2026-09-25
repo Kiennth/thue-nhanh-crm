@@ -31,6 +31,10 @@ import { reorderOrderEquipmentLines } from "@/lib/actions/orders";
 
 interface OrderLineRow {
   id: string;
+  // Các dòng order_equipment thật mà hàng hiển thị này đại diện — 1 phần tử
+  // với dòng thường, nhiều phần tử với nhóm máy serial đã gộp (kéo thả cả
+  // nhóm đi cùng nhau).
+  memberIds: string[];
   content: ReactNode;
 }
 
@@ -45,6 +49,7 @@ interface OrderLineRow {
 export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; rows: OrderLineRow[] }) {
   const [order, setOrder] = useState(() => rows.map((r) => r.id));
   const contentById = new Map(rows.map((r) => [r.id, r.content]));
+  const membersById = new Map(rows.map((r) => [r.id, r.memberIds]));
 
   // State chỉ khởi tạo lúc mount, nhưng danh sách dòng có thể đổi NGOÀI bảng
   // này (thêm dòng qua dialog, xoá dòng → server revalidate) — đối chiếu lại
@@ -72,7 +77,10 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
     const oldIndex = prev.indexOf(String(active.id));
     const newIndex = prev.indexOf(String(over.id));
     const next = arrayMove(prev, oldIndex, newIndex);
-    reorderOrderEquipmentLines(orderId, next).catch(() => setOrder(prev));
+    reorderOrderEquipmentLines(
+      orderId,
+      next.flatMap((rowId) => membersById.get(rowId) ?? [rowId]),
+    ).catch(() => setOrder(prev));
     setOrder(next);
   }
 
@@ -85,17 +93,19 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <Table>
+      {/* table-fixed + bề rộng cố định cho cột số (CEO 2026-09-25: SL/Giá
+          thuê/Thành tiền bị giãn quá to) — phần thừa dồn cho cột Hàng hoá. */}
+      <Table className="min-w-[960px] table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
             <TableHead>Hàng hoá</TableHead>
-            <TableHead>Biến thể/Sản phẩm</TableHead>
-            <TableHead>SL</TableHead>
-            <TableHead>Giá thuê</TableHead>
-            <TableHead>Thành tiền</TableHead>
-            <TableHead>Người thực hiện</TableHead>
-            <TableHead className="w-16"></TableHead>
+            <TableHead className="w-[200px]">Biến thể/Sản phẩm</TableHead>
+            <TableHead className="w-[120px]">SL</TableHead>
+            <TableHead className="w-[170px]">Giá thuê</TableHead>
+            <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
+            <TableHead className="w-[150px]">Người thực hiện</TableHead>
+            <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <SortableContext items={displayOrder} strategy={verticalListSortingStrategy}>
