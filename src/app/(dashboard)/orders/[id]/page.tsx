@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Check, Lock } from "lucide-react";
+import { CalendarClock, Check, Clock, Coins, ListChecks, Lock, Package, UserRound, Wallet } from "lucide-react";
 import type { TaskType } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { AccentTitle, accentCard, accentHeader } from "@/components/section-accent";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -565,9 +566,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Thông tin đơn</CardTitle>
+        <Card className={accentCard("indigo")}>
+          <CardHeader className={accentHeader("indigo")}>
+            <CardTitle className="text-base">
+              <AccentTitle accent="indigo" icon={UserRound}>Thông tin đơn</AccentTitle>
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
@@ -593,9 +596,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Thời gian thuê</CardTitle>
+        <Card className={accentCard("sky")}>
+          <CardHeader className={accentHeader("sky")}>
+            <CardTitle className="text-base">
+              <AccentTitle accent="sky" icon={CalendarClock}>Thời gian thuê</AccentTitle>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <RentalPeriodForm
@@ -612,9 +617,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           sau mỗi lần thêm dòng/đổi khoảng thuê (trang revalidate). */}
       <OrderConflictAlert orderId={order.id} />
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-base">Danh sách thiết bị</CardTitle>
+      <Card className={accentCard("blue")}>
+        <CardHeader className={accentHeader("blue", "flex-row items-center justify-between")}>
+          <CardTitle className="text-base">
+            <AccentTitle accent="blue" icon={Package}>Danh sách thiết bị</AccentTitle>
+          </CardTitle>
               <AddOrderLineDialog
                 orderId={order.id}
                 equipmentTypes={equipmentTypes ?? []}
@@ -1001,10 +1008,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-4">
-              <Card>
-                <CardHeader>
+              <Card className={accentCard("violet")}>
+                <CardHeader className={accentHeader("violet")}>
                   <CardTitle className="text-base">
-                    10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
+                    <AccentTitle accent="violet" icon={ListChecks}>
+                      10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
+                    </AccentTitle>
                   </CardTitle>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
@@ -1116,9 +1125,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </Card>
 
               {canManage && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Khoán dự kiến</CardTitle>
+                <Card className={accentCard("amber")}>
+                  <CardHeader className={accentHeader("amber")}>
+                    <CardTitle className="text-base">
+                      <AccentTitle accent="amber" icon={Coins}>Khoán dự kiến</AccentTitle>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
@@ -1138,9 +1149,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
 
               {canManage && (
-                <Card>
-                  <CardHeader className="flex-row items-center justify-between">
-                    <CardTitle className="text-base">OT (tăng ca)</CardTitle>
+                <Card className={accentCard("orange")}>
+                  <CardHeader className={accentHeader("orange", "flex-row items-center justify-between")}>
+                    <CardTitle className="text-base">
+                      <AccentTitle accent="orange" icon={Clock}>OT (tăng ca)</AccentTitle>
+                    </CardTitle>
                     <OvertimeDialog orderId={order.id} employees={activeEmployeeList} />
                   </CardHeader>
                   <CardContent>
@@ -1178,9 +1191,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
             </div>
 
-            <Card>
-              <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="text-base">Thanh toán</CardTitle>
+            <Card className={accentCard("emerald")}>
+              <CardHeader className={accentHeader("emerald", "flex-row items-center justify-between")}>
+                <CardTitle className="text-base">
+                  <AccentTitle accent="emerald" icon={Wallet}>Thanh toán</AccentTitle>
+                </CardTitle>
                 <div className="flex gap-1">
                   <OrderPaymentDialog orderId={order.id} defaultAmount={remaining} />
                   {rawDeposit > 0 && (

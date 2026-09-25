@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { AccentTitle, accentCard, accentHeader } from "@/components/section-accent";
 import { addOrderComment, deleteOrderComment } from "@/lib/actions/order-comments";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 
@@ -141,11 +142,12 @@ export function OrderComments({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="size-4 text-muted-foreground" />
-          Ghi chú nội bộ ({comments.length})
+    <Card className={accentCard("rose")}>
+      <CardHeader className={accentHeader("rose")}>
+        <CardTitle className="text-base">
+          <AccentTitle accent="rose" icon={MessageSquare}>
+            Ghi chú nội bộ ({comments.length})
+          </AccentTitle>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
