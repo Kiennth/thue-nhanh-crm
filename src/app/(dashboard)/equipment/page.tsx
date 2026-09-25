@@ -541,9 +541,11 @@ export default async function EquipmentPage({
                 const stockDisplay =
                   type.product_type === "service"
                     ? "—"
-                    : type.tracking_type === "individual"
-                      ? `${stockValue(type)} sản phẩm`
-                      : `${stockValue(type)}`;
+                    : type.tracking_type === "combo"
+                      ? "Combo"
+                      : type.tracking_type === "individual"
+                        ? `${stockValue(type)} sản phẩm`
+                        : `${stockValue(type)}`;
 
                 const stockValueDisplay =
                   type.product_type === "service"

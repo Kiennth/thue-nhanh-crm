@@ -15,6 +15,7 @@ export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
 export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
   quantity: "Theo số lượng",
   individual: "Theo từng sản phẩm",
+  combo: "Combo (gồm nhiều sản phẩm)",
 };
 
 export const PRICING_METHOD_LABELS: Record<PricingMethod, string> = {

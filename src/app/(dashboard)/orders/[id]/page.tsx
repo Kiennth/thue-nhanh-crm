@@ -73,6 +73,8 @@ import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { OrderComments } from "./order-comments";
 import { OrderLineGroupPriceForm } from "./order-line-group-price-form";
 import { SerialChipList } from "./serial-chip-list";
+import { ComboChildSwapButton, ComboPriceForm } from "./combo-line-controls";
+import { countAssemblableSets } from "@/lib/combo";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -144,12 +146,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     equipment_unit_id: string | null;
     identifier_code: string;
     status: string;
+    branch_id: string | null;
   }>((from, to) =>
     supabase
       .from("equipment_instances")
-      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status")
+      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status, branch_id")
       .range(from, to),
   );
+
+  // Món con của các combo (CEO 2026-09-26) — để ô thêm nhanh báo số bộ ghép
+  // được tại kho giao.
+  const { data: comboComponents } = await supabase
+    .from("equipment_type_components")
+    .select("combo_type_id, component_type_id, quantity");
 
   // Danh sách customers ở trên bị Supabase giới hạn 1.000 dòng (nay có hơn
   // 5.800 khách hàng) nên không đảm bảo chứa đúng khách của đơn này — luôn
@@ -282,7 +291,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // gọn — không tính VAT, thu cùng lúc với đơn, hoàn lại sau khi nghiệm thu.
   const rawDeposit = (lines ?? []).reduce((sum, line) => {
     const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
-    if (type?.product_type !== "rental") return sum;
+    // Combo không cọc riêng — cọc nằm ở các món con.
+    if (type?.product_type !== "rental" || type.tracking_type === "combo") return sum;
     return sum + (type.deposit_amount ?? 0) * line.quantity;
   }, 0);
   const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
@@ -505,7 +515,51 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     list.push(u);
     unitsByType.set(u.equipment_type_id, list);
   }
+  // Số bộ combo ghép được tại kho giao = món con ít nhất (máy serial sẵn có /
+  // tồn kho theo số lượng) — chỉ để tham khảo, lúc thêm vẫn kiểm lại thật.
+  const componentsByCombo = new Map<string, { component_type_id: string; quantity: number }[]>();
+  for (const c of comboComponents ?? []) {
+    componentsByCombo.set(c.combo_type_id, [...(componentsByCombo.get(c.combo_type_id) ?? []), c]);
+  }
+  const unitsByTypeForStock = new Map<string, string[]>();
+  for (const u of equipmentUnits ?? []) {
+    unitsByTypeForStock.set(u.equipment_type_id, [
+      ...(unitsByTypeForStock.get(u.equipment_type_id) ?? []),
+      u.id,
+    ]);
+  }
+  const availableAtPickup = (typeId: string) => {
+    const type = equipmentTypeById.get(typeId);
+    if (type?.tracking_type === "individual") {
+      return (equipmentInstances ?? []).filter(
+        (i) =>
+          i.equipment_type_id === typeId &&
+          i.status === "available" &&
+          i.branch_id === order.pickup_branch_id,
+      ).length;
+    }
+    return (unitsByTypeForStock.get(typeId) ?? []).reduce(
+      (sum, unitId) => sum + (availableByUnit.get(unitId) ?? 0),
+      0,
+    );
+  };
   const quickAddOptions = (equipmentTypes ?? []).flatMap((t) => {
+    if (t.tracking_type === "combo") {
+      const components = componentsByCombo.get(t.id) ?? [];
+      const sets = countAssemblableSets(
+        components.map((c) => ({ quantity: c.quantity, available: availableAtPickup(c.component_type_id) })),
+      );
+      return [
+        {
+          key: `c-${t.id}`,
+          label: components.length
+            ? `${t.name} — Combo ${components.length} món (ghép được ${sets} bộ tại kho)`
+            : `${t.name} — Combo (chưa khai báo món con)`,
+          imageUrl: t.image_url,
+          equipmentTypeId: t.id,
+        },
+      ];
+    }
     if (t.product_type === "rental" && t.tracking_type === "individual") {
       return (equipmentInstances ?? [])
         .filter((i) => i.equipment_type_id === t.id && i.status === "available")
@@ -824,6 +878,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     // tách riêng từng dòng. Nhóm đứng ở vị trí máy đầu tiên.
                     const isGroupable = (line: (typeof lines)[number]) => {
                       if (!line.equipment_instance_id || !line.equipment_type_id) return false;
+                      if (line.parent_line_id) return false;
                       const t = equipmentTypeById.get(line.equipment_type_id);
                       return (
                         !!t &&
@@ -921,8 +976,123 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         ),
                       };
                     };
+                    // Combo (CEO 2026-09-26): 1 dòng hiển thị = dòng combo + danh
+                    // sách món con kèm nút "Đổi món". Tiền combo = tổng các món
+                    // con (đã chia theo giá lẻ); dòng combo tự nó 0đ.
+                    const childrenByParent = new Map<string, (typeof lines)[number][]>();
+                    for (const line of lines) {
+                      if (!line.parent_line_id) continue;
+                      childrenByParent.set(line.parent_line_id, [
+                        ...(childrenByParent.get(line.parent_line_id) ?? []),
+                        line,
+                      ]);
+                    }
+                    const childLabel = (line: (typeof lines)[number]) => {
+                      const t = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
+                      const inst = line.equipment_instance_id
+                        ? equipmentInstanceById.get(line.equipment_instance_id)
+                        : undefined;
+                      const detail = inst
+                        ? inst.identifier_code
+                        : line.equipment_unit_id && (unitCountByType.get(t?.id ?? "") ?? 0) > 1
+                          ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
+                          : null;
+                      return [t?.name ?? "—", detail].filter(Boolean).join(" — ");
+                    };
+                    const renderCombo = (parent: (typeof lines)[number]) => {
+                      const type = equipmentTypeById.get(parent.equipment_type_id!)!;
+                      const children = childrenByParent.get(parent.id) ?? [];
+                      const comboTotal = children.reduce((sum, c) => sum + c.line_total, 0);
+                      const perSet = Math.round(comboTotal / Math.max(1, parent.quantity));
+                      const editable = !order.completed_at && !order.cancelled_at;
+                      return {
+                        id: parent.id,
+                        memberIds: [parent.id, ...children.map((c) => c.id)],
+                        content: (
+                          <>
+                            <TableCell className="font-medium" title={type.name}>
+                              <div className="flex items-center gap-2">
+                                {type.image_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
+                                  <img src={type.image_url} alt="" className="size-8 shrink-0 rounded object-cover" />
+                                ) : (
+                                  <span className="bg-muted size-8 shrink-0 rounded" />
+                                )}
+                                <div className="min-w-0">
+                                  <Link
+                                    href={`/equipment/${type.id}`}
+                                    className="block truncate underline-offset-2 hover:underline"
+                                  >
+                                    {type.name}
+                                  </Link>
+                                  <Badge variant="secondary" className="mt-0.5 h-4 px-1.5 text-[10px]">
+                                    Combo · {children.length} dòng món
+                                  </Badge>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <ul className="space-y-0.5 text-xs">
+                                {children.map((c) => {
+                                  const label = childLabel(c);
+                                  const shortage = c.equipment_unit_id
+                                    ? shortageByUnit.get(c.equipment_unit_id)
+                                    : undefined;
+                                  return (
+                                    <li key={c.id} className="flex items-center gap-1" title={c.note ?? label}>
+                                      <span className="truncate">
+                                        {c.quantity > 1 && `${c.quantity}× `}
+                                        {label}
+                                      </span>
+                                      {shortage && (
+                                        <span className="shrink-0 rounded-full bg-destructive/10 px-1 text-[10px] text-destructive">
+                                          thiếu {shortage.shortage}
+                                        </span>
+                                      )}
+                                      {editable && (
+                                        <ComboChildSwapButton childLineId={c.id} currentLabel={label} />
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </TableCell>
+                            <TableCell className="tabular-nums">{parent.quantity}</TableCell>
+                            <TableCell>
+                              {canManage ? (
+                                <ComboPriceForm parentLineId={parent.id} unitPrice={perSet} />
+                              ) : (
+                                `${currencyFormatter.format(perSet)}đ`
+                              )}
+                              <p className="mt-0.5 text-xs text-muted-foreground">/bộ · chia theo giá lẻ từng món</p>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {currencyFormatter.format(comboTotal)}đ
+                            </TableCell>
+                            <TableCell>—</TableCell>
+                            <TableCell>
+                              <ConfirmDeleteButton
+                                confirmMessage={`Xoá combo "${type.name}" cùng ${children.length} dòng món bên trong?`}
+                                successMessage="Đã xoá combo."
+                                action={deleteOrderEquipmentLine}
+                                actionArg={parent.id}
+                              />
+                            </TableCell>
+                          </>
+                        ),
+                      };
+                    };
                     const lineRows: { id: string; memberIds: string[]; content: React.ReactNode }[] = [];
                     for (const line of lines) {
+                      if (line.parent_line_id) continue;
+                      if (
+                        childrenByParent.has(line.id) ||
+                        (line.equipment_type_id &&
+                          equipmentTypeById.get(line.equipment_type_id)?.tracking_type === "combo")
+                      ) {
+                        lineRows.push(renderCombo(line));
+                        continue;
+                      }
                       const members = isGroupable(line) ? groupMembers.get(groupKey(line)) : undefined;
                       if (members && members.length > 1) {
                         if (members[0].id === line.id) lineRows.push(renderGroup(members));

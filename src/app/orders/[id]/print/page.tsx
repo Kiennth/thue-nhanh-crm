@@ -45,7 +45,7 @@ export default async function OrderPrintPage({
     { data: equipmentUnits },
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
-    supabase.from("order_equipment").select("*").eq("order_id", id).order("created_at"),
+    supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
     supabase.from("branches").select("id, name"),
     supabase.from("equipment_types").select("id, name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
@@ -159,7 +159,7 @@ export default async function OrderPrintPage({
             </tr>
           </thead>
           <tbody>
-            {(lines ?? []).map((line) => {
+            {(lines ?? []).filter((line) => !line.parent_line_id).flatMap((line) => {
               const equipmentType = line.equipment_type_id
                 ? equipmentTypeById.get(line.equipment_type_id)
                 : undefined;
@@ -182,7 +182,62 @@ export default async function OrderPrintPage({
                   !!equipmentType &&
                   unitCountByType.get(equipmentType.id) === 1,
               });
-              return (
+              // Combo (CEO 2026-09-26): khách thấy 1 dòng giá bộ, các món bên
+              // trong liệt kê ngay dưới, không tách giá từng món.
+              const children = (lines ?? []).filter((l) => l.parent_line_id === line.id);
+              if (children.length) {
+                const comboTotal = children.reduce((sum, c) => sum + c.line_total, 0);
+                return [
+                  <tr key={line.id} className="border-b border-neutral-100">
+                    <td className="py-2 font-medium">{equipmentType?.name ?? "—"}</td>
+                    <td className="py-2 text-neutral-500">Combo gồm:</td>
+                    <td className="py-2 text-right">{line.quantity}</td>
+                    {showPrices && (
+                      <td className="py-2 text-right">
+                        {currencyFormatter.format(comboTotal / Math.max(1, line.quantity))}đ
+                      </td>
+                    )}
+                    {showPrices && (
+                      <td className="py-2 text-right">{currencyFormatter.format(comboTotal)}đ</td>
+                    )}
+                  </tr>,
+                  ...children.map((child, index) => {
+                    const childType = child.equipment_type_id
+                      ? equipmentTypeById.get(child.equipment_type_id)
+                      : undefined;
+                    const childInstance = child.equipment_instance_id
+                      ? equipmentInstanceById.get(child.equipment_instance_id)
+                      : undefined;
+                    const childDetail = child.equipment_unit_id
+                      ? equipmentUnitById.get(child.equipment_unit_id)?.brand_model
+                      : (childInstance?.identifier_code ?? null);
+                    return (
+                      <tr
+                        key={child.id}
+                        className={
+                          index === children.length - 1
+                            ? "border-b border-neutral-200 text-neutral-600"
+                            : "text-neutral-600"
+                        }
+                      >
+                        <td className="py-1 pl-4">• {childType?.name ?? "—"}</td>
+                        <td className="py-1">
+                          {equipmentDetailLabel(childType?.name, childDetail ?? null, {
+                            soleVariant:
+                              !!child.equipment_unit_id &&
+                              !!childType &&
+                              unitCountByType.get(childType.id) === 1,
+                          })}
+                        </td>
+                        <td className="py-1 text-right">{child.quantity}</td>
+                        {showPrices && <td />}
+                        {showPrices && <td />}
+                      </tr>
+                    );
+                  }),
+                ];
+              }
+              return [
                 <tr key={line.id} className="border-b border-neutral-200">
                   <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>
                   <td className="py-2">{detail}</td>
@@ -193,8 +248,8 @@ export default async function OrderPrintPage({
                   {showPrices && (
                     <td className="py-2 text-right">{currencyFormatter.format(line.line_total)}đ</td>
                   )}
-                </tr>
-              );
+                </tr>,
+              ];
             })}
             {!lines?.length && (
               <tr>

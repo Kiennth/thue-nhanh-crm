@@ -10,6 +10,7 @@ import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { DELIVERY_NOTE_TYPE_IDS, TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
+import { splitTotalByWeights } from "@/lib/combo";
 import type { TaskType } from "@/types/database";
 
 const DELETE_ROLES = MANAGE_ROLES;
@@ -145,9 +146,13 @@ export async function overrideOrderTotal(
   const typeIds = [...new Set(lineList.map((l) => l.equipment_type_id).filter((tid): tid is string => tid !== null))];
   const { data: types } = await supabase
     .from("equipment_types")
-    .select("id, product_type")
+    .select("id, product_type, tracking_type")
     .in("id", typeIds);
   const productTypeById = new Map((types ?? []).map((t) => [t.id, t.product_type]));
+  // Dòng combo (dòng mẹ) luôn 0đ — tiền nằm ở dòng con, giảm giá rơi vào đó.
+  const comboTypeIds = new Set(
+    (types ?? []).filter((t) => t.tracking_type === "combo").map((t) => t.id),
+  );
 
   const currentSum = round2(lineList.reduce((sum, l) => sum + l.line_total, 0));
   const diff = round2(currentSum - parsed.data.total_value);
@@ -157,7 +162,10 @@ export async function overrideOrderTotal(
   }
 
   const eligible = lineList.filter(
-    (l) => l.equipment_type_id !== null && productTypeById.get(l.equipment_type_id) === "rental",
+    (l) =>
+      l.equipment_type_id !== null &&
+      productTypeById.get(l.equipment_type_id) === "rental" &&
+      !comboTypeIds.has(l.equipment_type_id),
   );
   if (!eligible.length) {
     return { error: "Không có dòng hàng cho thuê nào để phân bổ (không trừ vào dịch vụ/bán hàng)." };
@@ -214,12 +222,25 @@ export async function updateOrderEquipmentLineQuantity(
   const supabase = await createClient();
   const { data: line, error: lineError } = await supabase
     .from("order_equipment")
-    .select("order_id, unit_price, equipment_instance_id")
+    .select("order_id, unit_price, equipment_instance_id, parent_line_id, line_total")
     .eq("id", lineId)
     .single();
 
   if (lineError || !line) {
     return { error: "Không tìm thấy dòng hàng." };
+  }
+
+  if (line.parent_line_id) {
+    return { error: "Món trong combo — số lượng theo combo, không sửa riêng được." };
+  }
+  if (line.unit_price === 0 && line.line_total === 0) {
+    const { count } = await supabase
+      .from("order_equipment")
+      .select("id", { count: "exact", head: true })
+      .eq("parent_line_id", lineId);
+    if (count) {
+      return { error: "Combo không sửa số lượng được — xoá combo rồi thêm lại với số lượng mới." };
+    }
   }
 
   if (line.equipment_instance_id) {
@@ -307,20 +328,17 @@ export async function updateOrderEquipmentLinesPrice(
     return { error: "Không tìm thấy dòng hàng." };
   }
 
-  const results = await Promise.all(
-    lines.map((line) =>
-      supabase
-        .from("order_equipment")
-        .update({
-          unit_price: parsed.data.unit_price,
-          line_total: round2(parsed.data.unit_price * line.quantity),
-        })
-        .eq("id", line.id),
-    ),
-  );
-  const failed = results.find((r) => r.error);
-  if (failed?.error) {
-    return { error: "Không thể sửa đơn giá: " + failed.error.message };
+  // Lần lượt từng dòng — song song thì trigger recalc_order_total đọc số cũ
+  // của nhau, tổng đơn lệch.
+  for (const line of lines) {
+    const { error } = await supabase
+      .from("order_equipment")
+      .update({
+        unit_price: parsed.data.unit_price,
+        line_total: round2(parsed.data.unit_price * line.quantity),
+      })
+      .eq("id", line.id);
+    if (error) return { error: "Không thể sửa đơn giá: " + error.message };
   }
 
   revalidatePath(`/orders/${lines[0].order_id}`);
@@ -338,6 +356,15 @@ export async function deleteOrderEquipmentLines(lineIds: string[]) {
     .select("order_id")
     .eq("id", lineIds[0])
     .single();
+
+  const { count: childCount } = await supabase
+    .from("order_equipment")
+    .select("id", { count: "exact", head: true })
+    .in("id", lineIds)
+    .not("parent_line_id", "is", null);
+  if (childCount) {
+    throw new Error('Có món nằm trong combo — dùng "Đổi món", hoặc xoá cả combo.');
+  }
 
   const { error } = await supabase.from("order_equipment").delete().in("id", lineIds);
   if (error) {
@@ -519,11 +546,26 @@ export async function updateOrderRentalPeriod(
 
   const { data: lines } = await supabase
     .from("order_equipment")
-    .select("id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity")
+    .select("id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, parent_line_id")
     .eq("order_id", id);
 
+  const period = {
+    rentalStartAt: parsed.data.rental_start_at,
+    rentalEndAt: parsed.data.rental_end_at,
+  };
   for (const line of lines ?? []) {
     if (!line.equipment_type_id) continue; // dòng tự do — giá do người nhập tự gõ, không tính lại
+    // Dòng con combo không tự tính giá — nhận phần chia từ dòng combo bên dưới.
+    if (line.parent_line_id) continue;
+    if ((lines ?? []).some((l) => l.parent_line_id === line.id)) {
+      const comboError = await repriceComboLine(
+        supabase,
+        { id: line.id, equipment_type_id: line.equipment_type_id, quantity: line.quantity },
+        period,
+      );
+      if (comboError) return { error: "Không tính lại được giá combo: " + comboError };
+      continue;
+    }
 
     const unitPriceOverride = await resolveUnitPriceOverride(
       supabase,
@@ -538,7 +580,7 @@ export async function updateOrderRentalPeriod(
       line.quantity,
       unitPriceOverride,
     );
-    if (equipmentType.product_type !== "rental") continue;
+    if (equipmentType.product_type !== "rental" || equipmentType.tracking_type === "combo") continue;
 
     await supabase
       .from("order_equipment")
@@ -704,9 +746,10 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
     )
-    .eq("order_id", id);
+    .eq("order_id", id)
+    .order("position");
 
   if (linesError) {
     return { error: "Không đọc được dòng hàng gốc: " + linesError.message };
@@ -733,20 +776,38 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   }
 
   if (sourceLines?.length) {
-    const { error: copyError } = await supabase.from("order_equipment").insert(
-      sourceLines.map((line) => ({
-        order_id: newOrder.id,
-        equipment_type_id: line.equipment_type_id,
-        custom_name: line.custom_name,
-        equipment_unit_id: line.equipment_unit_id,
-        equipment_instance_id: line.equipment_instance_id,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        line_total: line.line_total,
-      })),
-    );
-    if (copyError) {
-      return { error: "Đã tạo đơn nháp nhưng copy dòng hàng lỗi: " + copyError.message };
+    const copyOf = (line: (typeof sourceLines)[number]) => ({
+      order_id: newOrder.id,
+      equipment_type_id: line.equipment_type_id,
+      custom_name: line.custom_name,
+      equipment_unit_id: line.equipment_unit_id,
+      equipment_instance_id: line.equipment_instance_id,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      line_total: line.line_total,
+    });
+    // Dòng thường + dòng combo trước, rồi mới tới món con (trỏ về id dòng
+    // combo MỚI) — giữ nguyên cấu trúc combo ở đơn nhân bản.
+    const topLevel = sourceLines.filter((l) => !l.parent_line_id);
+    const { data: inserted, error: copyError } = await supabase
+      .from("order_equipment")
+      .insert(topLevel.map(copyOf))
+      .select("id");
+    if (copyError || !inserted) {
+      return { error: "Đã tạo đơn nháp nhưng copy dòng hàng lỗi: " + (copyError?.message ?? "") };
+    }
+    const newIdByOldId = new Map(topLevel.map((l, i) => [l.id, inserted[i]?.id]));
+    const children = sourceLines.filter((l) => l.parent_line_id);
+    if (children.length) {
+      const { error: childError } = await supabase.from("order_equipment").insert(
+        children.map((l) => ({
+          ...copyOf(l),
+          parent_line_id: newIdByOldId.get(l.parent_line_id!) ?? null,
+        })),
+      );
+      if (childError) {
+        return { error: "Đã tạo đơn nháp nhưng copy món trong combo lỗi: " + childError.message };
+      }
     }
   }
 
@@ -861,6 +922,316 @@ async function resolveUnitPriceOverride(
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Combo (CEO 2026-09-26) — dòng mẹ 0đ + dòng con cho từng món. Tiền combo chia
+// cho dòng con theo tỉ lệ giá thuê lẻ (CEO chọn phương án b) để tổng đơn và
+// báo cáo doanh thu theo thiết bị tự đúng.
+// ---------------------------------------------------------------------------
+
+type RentalPeriod = { rentalStartAt: string | null; rentalEndAt: string | null };
+
+// Giá thuê lẻ của từng dòng con (loại hàng × SL) cho cùng khung thuê — trọng
+// số chia tiền combo. Loại hàng không tính được giá thì trọng số 0.
+async function componentListTotals(
+  supabase: SupabaseServerClient,
+  items: { typeId: string; quantity: number }[],
+  period: RentalPeriod,
+): Promise<number[]> {
+  const pricingByType = new Map<string, Awaited<ReturnType<typeof fetchEquipmentTypeForPricing>>>();
+  const totals: number[] = [];
+  for (const item of items) {
+    try {
+      let pricing = pricingByType.get(item.typeId);
+      if (!pricing) {
+        pricing = await fetchEquipmentTypeForPricing(supabase, item.typeId);
+        pricingByType.set(item.typeId, pricing);
+      }
+      totals.push(
+        computeLinePrice(
+          pricing.equipmentType,
+          pricing.tiers,
+          period.rentalStartAt,
+          period.rentalEndAt,
+          item.quantity,
+        ).lineTotal,
+      );
+    } catch {
+      totals.push(0);
+    }
+  }
+  return totals;
+}
+
+// Chia lại tổng tiền 1 combo xuống các dòng con hiện có.
+async function allocateComboTotal(
+  supabase: SupabaseServerClient,
+  children: { id: string; equipment_type_id: string | null; quantity: number }[],
+  total: number,
+  period: RentalPeriod,
+): Promise<string | null> {
+  if (!children.length) return null;
+  const weights = await componentListTotals(
+    supabase,
+    children.map((c) => ({ typeId: c.equipment_type_id ?? "", quantity: c.quantity })),
+    period,
+  );
+  const shares = splitTotalByWeights(total, weights);
+  // Cập nhật LẦN LƯỢT, không Promise.all: mỗi UPDATE kích trigger
+  // recalc_order_total cộng lại tổng đơn — chạy song song thì các trigger đọc
+  // số cũ của nhau và orders.total_value lệch (gặp khi test 2026-09-26).
+  for (const [i, c] of children.entries()) {
+    const { error } = await supabase
+      .from("order_equipment")
+      .update({ unit_price: round2(shares[i] / c.quantity), line_total: shares[i] })
+      .eq("id", c.id);
+    if (error) return error.message;
+  }
+  return null;
+}
+
+// Máy sẵn có của 1 loại hàng tại kho, bỏ máy đang nằm trên đơn CHƯA ĐÓNG
+// (status vẫn "available" tới lúc giao nên phải lọc tay — bài học mapper
+// 2026-09-24 lấy trùng máy).
+async function pickAvailableInstances(
+  supabase: SupabaseServerClient,
+  typeId: string,
+  branchId: string,
+  count: number,
+  exclude: Set<string>,
+): Promise<string[]> {
+  if (count <= 0) return [];
+  const { data: candidates } = await supabase
+    .from("equipment_instances")
+    .select("id, identifier_code")
+    .eq("equipment_type_id", typeId)
+    .eq("branch_id", branchId)
+    .eq("status", "available")
+    .order("identifier_code");
+  const candidateIds = (candidates ?? []).map((c) => c.id).filter((cid) => !exclude.has(cid));
+  if (!candidateIds.length) return [];
+
+  const { data: busyRows } = await supabase
+    .from("order_equipment")
+    .select("equipment_instance_id, orders!inner(completed_at, cancelled_at)")
+    .in("equipment_instance_id", candidateIds)
+    .is("orders.completed_at", null)
+    .is("orders.cancelled_at", null);
+  const busy = new Set(
+    ((busyRows ?? []) as unknown as { equipment_instance_id: string | null }[]).map(
+      (r) => r.equipment_instance_id,
+    ),
+  );
+  // Máy serial thật trước, mã tạm AUTO-* sau — cùng thứ tự ưu tiên mapper.
+  const free = (candidates ?? []).filter((c) => candidateIds.includes(c.id) && !busy.has(c.id));
+  free.sort(
+    (a, b) =>
+      Number(a.identifier_code.startsWith("AUTO")) - Number(b.identifier_code.startsWith("AUTO")),
+  );
+  return free.slice(0, count).map((c) => c.id);
+}
+
+// Biến thể cho món con theo số lượng: 1 biến thể thì dùng, chưa có thì tạo
+// biến thể mặc định, nhiều biến thể thì lấy biến thể còn nhiều hàng nhất tại
+// kho giao (nhân viên đổi lại được bằng nút "Đổi món").
+async function resolveComponentUnit(
+  supabase: SupabaseServerClient,
+  typeId: string,
+  branchId: string,
+): Promise<string | null> {
+  const { data: units } = await supabase
+    .from("equipment_units")
+    .select("id")
+    .eq("equipment_type_id", typeId);
+  if (units && units.length === 1) return units[0].id;
+  if (!units?.length) {
+    const { data: newUnitId } = await supabase.rpc("ensure_default_equipment_unit", {
+      p_equipment_type_id: typeId,
+    });
+    return newUnitId ?? null;
+  }
+  const { data: stock } = await supabase
+    .from("equipment_stock")
+    .select("equipment_unit_id, quantity_in_stock")
+    .eq("branch_id", branchId)
+    .in(
+      "equipment_unit_id",
+      units.map((u) => u.id),
+    );
+  const best = [...(stock ?? [])].sort((a, b) => b.quantity_in_stock - a.quantity_in_stock)[0];
+  return best?.equipment_unit_id ?? units[0].id;
+}
+
+// Thêm N bộ combo vào đơn: kiểm đủ hàng từng món trước, rồi tạo dòng mẹ + dòng
+// con (máy serial thì mỗi máy 1 dòng) và chia tiền combo xuống dòng con.
+async function addComboLines(
+  supabase: SupabaseServerClient,
+  order: { id: string; pickup_branch_id: string } & RentalPeriod,
+  combo: {
+    id: string;
+    equipmentType: Awaited<ReturnType<typeof fetchEquipmentTypeForPricing>>["equipmentType"];
+    tiers: PricingTierInput[];
+  },
+  quantity: number,
+): Promise<ActionState> {
+  const { data: components } = await supabase
+    .from("equipment_type_components")
+    .select("component_type_id, quantity")
+    .eq("combo_type_id", combo.id)
+    .order("position");
+  if (!components?.length) {
+    return {
+      error: `Combo "${combo.equipmentType.name}" chưa khai báo món con — vào trang sản phẩm, mục "Thành phần combo" để thêm trước.`,
+    };
+  }
+
+  const { data: componentTypes } = await supabase
+    .from("equipment_types")
+    .select("id, name, product_type, tracking_type")
+    .in(
+      "id",
+      components.map((c) => c.component_type_id),
+    );
+  const componentTypeById = new Map((componentTypes ?? []).map((t) => [t.id, t]));
+
+  const { data: existing } = await supabase
+    .from("order_equipment")
+    .select("equipment_instance_id")
+    .eq("order_id", order.id)
+    .not("equipment_instance_id", "is", null);
+  const taken = new Set((existing ?? []).map((l) => l.equipment_instance_id!));
+
+  const childSpecs: {
+    equipment_type_id: string;
+    equipment_unit_id: string | null;
+    equipment_instance_id: string | null;
+    quantity: number;
+  }[] = [];
+  const shortages: string[] = [];
+  for (const component of components) {
+    const type = componentTypeById.get(component.component_type_id);
+    if (!type) continue;
+    const need = component.quantity * quantity;
+    if (type.tracking_type === "individual") {
+      const ids = await pickAvailableInstances(
+        supabase,
+        type.id,
+        order.pickup_branch_id,
+        need,
+        taken,
+      );
+      ids.forEach((iid) => taken.add(iid));
+      if (ids.length < need) {
+        shortages.push(`${type.name} (cần ${need}, còn ${ids.length} máy trống)`);
+        continue;
+      }
+      for (const iid of ids) {
+        childSpecs.push({
+          equipment_type_id: type.id,
+          equipment_unit_id: null,
+          equipment_instance_id: iid,
+          quantity: 1,
+        });
+      }
+    } else {
+      const unitId = await resolveComponentUnit(supabase, type.id, order.pickup_branch_id);
+      if (!unitId) {
+        shortages.push(`${type.name} (chưa có biến thể)`);
+        continue;
+      }
+      childSpecs.push({
+        equipment_type_id: type.id,
+        equipment_unit_id: unitId,
+        equipment_instance_id: null,
+        quantity: need,
+      });
+    }
+  }
+  if (shortages.length) {
+    return {
+      error: `Kho giao không đủ máy trống cho combo: ${shortages.join("; ")}. Bổ sung/điều chuyển máy rồi thêm lại.`,
+    };
+  }
+
+  let comboTotal: number;
+  try {
+    comboTotal = computeLinePrice(
+      combo.equipmentType,
+      combo.tiers,
+      order.rentalStartAt,
+      order.rentalEndAt,
+      quantity,
+    ).lineTotal;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Không tính được giá combo." };
+  }
+
+  const { data: parent, error: parentError } = await supabase
+    .from("order_equipment")
+    .insert({
+      order_id: order.id,
+      equipment_type_id: combo.id,
+      quantity,
+      unit_price: 0,
+      line_total: 0,
+    })
+    .select("id")
+    .single();
+  if (parentError || !parent) {
+    return { error: "Không thể thêm combo: " + (parentError?.message ?? "") };
+  }
+
+  const weights = await componentListTotals(
+    supabase,
+    childSpecs.map((c) => ({ typeId: c.equipment_type_id, quantity: c.quantity })),
+    order,
+  );
+  const shares = splitTotalByWeights(comboTotal, weights);
+  const { error: childError } = await supabase.from("order_equipment").insert(
+    childSpecs.map((c, i) => ({
+      ...c,
+      order_id: order.id,
+      parent_line_id: parent.id,
+      unit_price: round2(shares[i] / c.quantity),
+      line_total: shares[i],
+    })),
+  );
+  if (childError) {
+    await supabase.from("order_equipment").delete().eq("id", parent.id);
+    return { error: "Không thể thêm món trong combo: " + childError.message };
+  }
+
+  return { success: true };
+}
+
+// Đổi thời gian thuê / sửa giá combo: tính lại tổng combo rồi chia lại.
+async function repriceComboLine(
+  supabase: SupabaseServerClient,
+  parent: { id: string; equipment_type_id: string; quantity: number },
+  period: RentalPeriod,
+  totalOverride?: number,
+): Promise<string | null> {
+  let total = totalOverride;
+  if (total === undefined) {
+    try {
+      const { computed } = await computeLineForEquipmentType(
+        supabase,
+        parent.equipment_type_id,
+        period.rentalStartAt,
+        period.rentalEndAt,
+        parent.quantity,
+      );
+      total = computed.lineTotal;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Không tính được giá combo.";
+    }
+  }
+  const { data: children } = await supabase
+    .from("order_equipment")
+    .select("id, equipment_type_id, quantity")
+    .eq("parent_line_id", parent.id);
+  return allocateComboTotal(supabase, children ?? [], total, period);
+}
+
 const OrderEquipmentLineSchema = z.object({
   order_id: z.string().uuid(),
   equipment_type_id: z.string().uuid({ message: "Vui lòng chọn hàng hoá." }),
@@ -891,7 +1262,7 @@ export async function addOrderEquipmentLine(
 
   const { data: order } = await supabase
     .from("orders")
-    .select("rental_start_at, rental_end_at")
+    .select("rental_start_at, rental_end_at, pickup_branch_id")
     .eq("id", parsed.data.order_id)
     .single();
 
@@ -904,6 +1275,28 @@ export async function addOrderEquipmentLine(
     ));
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
+  }
+
+  if (equipmentType.tracking_type === "combo") {
+    if (!order?.rental_start_at || !order?.rental_end_at) {
+      return {
+        error: 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.',
+      };
+    }
+    const result = await addComboLines(
+      supabase,
+      {
+        id: parsed.data.order_id,
+        pickup_branch_id: order.pickup_branch_id,
+        rentalStartAt: order.rental_start_at,
+        rentalEndAt: order.rental_end_at,
+      },
+      { id: parsed.data.equipment_type_id, equipmentType, tiers },
+      parsed.data.quantity,
+    );
+    if (result && "error" in result) return result;
+    revalidatePath(`/orders/${parsed.data.order_id}`);
+    return { success: true };
   }
 
   // Hàng bán/cho thuê theo số lượng bắt buộc gắn biến thể (tồn kho bám theo
@@ -1051,9 +1444,13 @@ export async function deleteOrderEquipmentLine(id: string) {
   const supabase = await createClient();
   const { data: line } = await supabase
     .from("order_equipment")
-    .select("order_id")
+    .select("order_id, parent_line_id")
     .eq("id", id)
     .single();
+
+  if (line?.parent_line_id) {
+    throw new Error('Món nằm trong combo — dùng "Đổi món", hoặc xoá cả combo.');
+  }
 
   const { error } = await supabase.from("order_equipment").delete().eq("id", id);
 
@@ -1064,6 +1461,254 @@ export async function deleteOrderEquipmentLine(id: string) {
   if (line) {
     revalidatePath(`/orders/${line.order_id}`);
   }
+}
+
+// Sửa giá 1 bộ combo trên đơn — tổng mới chia lại xuống các món con theo tỉ
+// lệ giá lẻ (giống lúc thêm combo).
+export async function updateComboLinePrice(
+  parentLineId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = OrderLinePriceSchema.safeParse({ unit_price: formData.get("unit_price") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: parent } = await supabase
+    .from("order_equipment")
+    .select("id, order_id, equipment_type_id, quantity, orders(rental_start_at, rental_end_at)")
+    .eq("id", parentLineId)
+    .single();
+  if (!parent?.equipment_type_id) return { error: "Không tìm thấy dòng combo." };
+  const orderPeriod = parent.orders as unknown as {
+    rental_start_at: string | null;
+    rental_end_at: string | null;
+  } | null;
+
+  const error = await repriceComboLine(
+    supabase,
+    { id: parent.id, equipment_type_id: parent.equipment_type_id, quantity: parent.quantity },
+    {
+      rentalStartAt: orderPeriod?.rental_start_at ?? null,
+      rentalEndAt: orderPeriod?.rental_end_at ?? null,
+    },
+    round2(parsed.data.unit_price * parent.quantity),
+  );
+  if (error) return { error: "Không thể sửa giá combo: " + error };
+
+  revalidatePath(`/orders/${parent.order_id}`);
+  return { success: true };
+}
+
+export interface ComboSwapOption {
+  key: string;
+  label: string;
+  equipmentTypeId: string;
+  equipmentUnitId?: string;
+  equipmentInstanceId?: string;
+}
+
+// Danh sách hàng để đổi 1 món trong combo: mọi hàng cho thuê (trừ combo) —
+// máy serial thì chỉ máy sẵn có tại kho giao của đơn. Tải khi mở hộp thoại
+// "Đổi món", không nhồi sẵn vào trang đơn.
+export async function getComboSwapOptions(childLineId: string): Promise<ComboSwapOption[]> {
+  await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+
+  const { data: child } = await supabase
+    .from("order_equipment")
+    .select("order_id, orders(pickup_branch_id)")
+    .eq("id", childLineId)
+    .single();
+  const branchId = (child?.orders as unknown as { pickup_branch_id: string } | null)?.pickup_branch_id;
+  if (!branchId) return [];
+
+  const [{ data: types }, { data: units }, { data: instances }] = await Promise.all([
+    supabase
+      .from("equipment_types")
+      .select("id, name, tracking_type")
+      .eq("product_type", "rental")
+      .in("tracking_type", ["individual", "quantity"])
+      .order("name"),
+    supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
+    supabase
+      .from("equipment_instances")
+      .select("id, equipment_type_id, identifier_code")
+      .eq("branch_id", branchId)
+      .eq("status", "available")
+      .order("identifier_code"),
+  ]);
+
+  const unitsByType = new Map<string, { id: string; brand_model: string }[]>();
+  for (const u of units ?? []) {
+    unitsByType.set(u.equipment_type_id, [...(unitsByType.get(u.equipment_type_id) ?? []), u]);
+  }
+  const instancesByType = new Map<string, { id: string; identifier_code: string }[]>();
+  for (const i of instances ?? []) {
+    instancesByType.set(i.equipment_type_id, [...(instancesByType.get(i.equipment_type_id) ?? []), i]);
+  }
+
+  return (types ?? []).flatMap((t): ComboSwapOption[] => {
+    if (t.tracking_type === "individual") {
+      return (instancesByType.get(t.id) ?? []).map((i) => ({
+        key: `i-${i.id}`,
+        label: `${t.name} — ${i.identifier_code}`,
+        equipmentTypeId: t.id,
+        equipmentInstanceId: i.id,
+      }));
+    }
+    const typeUnits = unitsByType.get(t.id) ?? [];
+    if (typeUnits.length > 1) {
+      return typeUnits.map((u) => ({
+        key: `u-${u.id}`,
+        label: `${t.name} — ${u.brand_model}`,
+        equipmentTypeId: t.id,
+        equipmentUnitId: u.id,
+      }));
+    }
+    return [{ key: `t-${t.id}`, label: t.name, equipmentTypeId: t.id }];
+  });
+}
+
+// Đổi 1 món trong combo (CEO 2026-09-26 cho phép) — vd hết Zoom H1N thì thay
+// Zoom H4n. Phần doanh thu của món cũ chuyển nguyên sang món mới; ghi chú dòng
+// lưu ai đổi, đổi từ gì sang gì.
+export async function swapComboChild(
+  childLineId: string,
+  option: { equipmentTypeId: string; equipmentUnitId?: string; equipmentInstanceId?: string },
+): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+
+  const { data: child } = await supabase
+    .from("order_equipment")
+    .select(
+      "id, order_id, parent_line_id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, line_total, note, orders(pickup_branch_id)",
+    )
+    .eq("id", childLineId)
+    .single();
+  if (!child?.parent_line_id) return { error: "Dòng này không nằm trong combo." };
+  const branchId = (child.orders as unknown as { pickup_branch_id: string } | null)?.pickup_branch_id;
+  if (!branchId) return { error: "Không tìm thấy kho giao của đơn." };
+
+  const [{ data: newType }, { data: oldType }] = await Promise.all([
+    supabase
+      .from("equipment_types")
+      .select("id, name, product_type, tracking_type")
+      .eq("id", option.equipmentTypeId)
+      .single(),
+    supabase
+      .from("equipment_types")
+      .select("name")
+      .eq("id", child.equipment_type_id ?? "")
+      .maybeSingle(),
+  ]);
+  if (
+    !newType ||
+    newType.product_type !== "rental" ||
+    (newType.tracking_type !== "individual" && newType.tracking_type !== "quantity")
+  ) {
+    return { error: "Chỉ đổi sang hàng cho thuê (máy serial hoặc theo số lượng)." };
+  }
+
+  const describe = async (unitId: string | null, instanceId: string | null) => {
+    if (instanceId) {
+      const { data } = await supabase
+        .from("equipment_instances")
+        .select("identifier_code")
+        .eq("id", instanceId)
+        .maybeSingle();
+      return data?.identifier_code ?? "";
+    }
+    if (unitId) {
+      const { data } = await supabase
+        .from("equipment_units")
+        .select("brand_model")
+        .eq("id", unitId)
+        .maybeSingle();
+      return data?.brand_model ?? "";
+    }
+    return "";
+  };
+  const oldDetail = await describe(child.equipment_unit_id, child.equipment_instance_id);
+  // Biến thể mặc định trùng tên sản phẩm thì không lặp lại trong ghi chú.
+  const labelOf = (name: string, detail: string) =>
+    detail && detail !== name ? `${name} ${detail}` : name;
+  const oldLabel = labelOf(oldType?.name ?? "—", oldDetail);
+
+  let rows: { unitId: string | null; instanceId: string | null; quantity: number }[];
+  if (newType.tracking_type === "individual") {
+    if (!option.equipmentInstanceId) return { error: "Chọn máy cụ thể để đổi." };
+    // Dòng cũ theo số lượng (vd 3 cái) đổi sang máy serial: máy đã chọn + tự
+    // bốc thêm cho đủ số lượng.
+    const extra = await pickAvailableInstances(
+      supabase,
+      newType.id,
+      branchId,
+      child.quantity - 1,
+      new Set([option.equipmentInstanceId]),
+    );
+    if (extra.length < child.quantity - 1) {
+      return { error: `Kho giao chỉ còn ${extra.length + 1} máy ${newType.name} trống, cần ${child.quantity}.` };
+    }
+    rows = [option.equipmentInstanceId, ...extra].map((iid) => ({
+      unitId: null,
+      instanceId: iid,
+      quantity: 1,
+    }));
+  } else {
+    const unitId =
+      option.equipmentUnitId ?? (await resolveComponentUnit(supabase, newType.id, branchId));
+    if (!unitId) return { error: "Hàng này chưa có biến thể." };
+    rows = [{ unitId, instanceId: null, quantity: child.quantity }];
+  }
+
+  const newDetail = await describe(rows[0].unitId, rows[0].instanceId);
+  const newLabel = labelOf(newType.name, newDetail);
+  const swapNote = `Đổi món combo: ${oldLabel} → ${newLabel} (${employee.name}, ${formatVNDate(vnNow())})`;
+  const note = child.note ? `${child.note}\n${swapNote}` : swapNote;
+
+  const shares = splitTotalByWeights(
+    child.line_total,
+    rows.map(() => 1),
+  );
+  const { error: updateError } = await supabase
+    .from("order_equipment")
+    .update({
+      equipment_type_id: newType.id,
+      equipment_unit_id: rows[0].unitId,
+      equipment_instance_id: rows[0].instanceId,
+      quantity: rows[0].quantity,
+      unit_price: round2(shares[0] / rows[0].quantity),
+      line_total: shares[0],
+      note,
+    })
+    .eq("id", child.id);
+  if (updateError) return { error: "Không đổi được món: " + updateError.message };
+
+  if (rows.length > 1) {
+    const { error: insertError } = await supabase.from("order_equipment").insert(
+      rows.slice(1).map((r, i) => ({
+        order_id: child.order_id,
+        parent_line_id: child.parent_line_id,
+        equipment_type_id: newType.id,
+        equipment_unit_id: r.unitId,
+        equipment_instance_id: r.instanceId,
+        quantity: r.quantity,
+        unit_price: shares[i + 1],
+        line_total: shares[i + 1],
+        note: swapNote,
+      })),
+    );
+    if (insertError) return { error: "Đã đổi 1 máy nhưng thêm máy còn lại lỗi: " + insertError.message };
+  }
+
+  revalidatePath(`/orders/${child.order_id}`);
+  return { success: true };
 }
 
 // Kéo thả sắp xếp lại thứ tự dòng hàng trong "Danh sách thiết bị" —

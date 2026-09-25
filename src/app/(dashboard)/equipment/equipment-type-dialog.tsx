@@ -277,8 +277,15 @@ export function EquipmentTypeDialog({
                   <SelectContent>
                     <SelectItem value="quantity">Theo số lượng</SelectItem>
                     <SelectItem value="individual">Theo từng sản phẩm</SelectItem>
+                    <SelectItem value="combo">Combo (gồm nhiều sản phẩm)</SelectItem>
                   </SelectContent>
                 </Select>
+                {!isEdit && (
+                  <p className="text-xs text-muted-foreground">
+                    Combo: tạo xong vào trang sản phẩm để khai báo món con. Combo không có tồn kho
+                    và tiền cọc riêng — lấy theo các món con.
+                  </p>
+                )}
                 {isEdit && (
                   <>
                     <input

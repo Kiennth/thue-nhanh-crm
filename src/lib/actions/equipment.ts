@@ -68,7 +68,7 @@ const EquipmentTypeSchema = z
   .object({
     name: z.string().trim().min(1, { message: "Tên không được để trống." }),
     product_type: z.enum(["rental", "sale", "service"]),
-    tracking_type: z.enum(["individual", "quantity"]).optional(),
+    tracking_type: z.enum(["individual", "quantity", "combo"]).optional(),
     pricing_method: z.enum(["flat_fee", "pricing_structure"]).optional(),
     price: z.coerce.number().min(0, { message: "Giá không được âm." }),
     rental_period_unit: z.enum(["hour", "day", "week", "month", "year"]).optional(),
@@ -127,7 +127,8 @@ function normalizeEquipmentType(
       rental_period_unit: data.rental_period_unit ?? null,
       pricing_template_id:
         data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
-      deposit_amount: data.deposit_amount ?? 0,
+      // Cọc của combo = cọc các món con (tính ở trang đơn) — combo không cọc riêng.
+      deposit_amount: data.tracking_type === "combo" ? 0 : (data.deposit_amount ?? 0),
       payout_percentage: null,
       category_id: data.category_id ?? null,
     };
@@ -1070,4 +1071,113 @@ export async function deleteEquipmentCategory(id: string) {
 
   revalidatePath("/equipment-categories");
   revalidatePath("/equipment");
+}
+
+// ---------------------------------------------------------------------------
+// equipment_type_components — món con của combo (CEO 2026-09-26). Món con chỉ
+// là hàng cho thuê có tồn kho thật (máy serial / theo số lượng), không lồng
+// combo trong combo.
+// ---------------------------------------------------------------------------
+
+const ComboComponentSchema = z.object({
+  component_type_id: z.string().uuid({ message: "Vui lòng chọn sản phẩm." }),
+  quantity: z.coerce.number().int().min(1, { message: "Số lượng phải lớn hơn 0." }),
+});
+
+export async function addComboComponent(
+  comboTypeId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = ComboComponentSchema.safeParse({
+    component_type_id: formData.get("component_type_id"),
+    quantity: formData.get("quantity") || 1,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data: types } = await supabase
+    .from("equipment_types")
+    .select("id, product_type, tracking_type")
+    .in("id", [comboTypeId, parsed.data.component_type_id]);
+  const combo = types?.find((t) => t.id === comboTypeId);
+  const component = types?.find((t) => t.id === parsed.data.component_type_id);
+  if (combo?.tracking_type !== "combo") return { error: "Sản phẩm này không phải combo." };
+  if (
+    !component ||
+    component.product_type !== "rental" ||
+    (component.tracking_type !== "individual" && component.tracking_type !== "quantity")
+  ) {
+    return { error: "Món con phải là hàng cho thuê có tồn kho (máy serial hoặc theo số lượng)." };
+  }
+
+  // Chọn lại món đã có thì cộng dồn số lượng thay vì báo trùng.
+  const { data: existing } = await supabase
+    .from("equipment_type_components")
+    .select("id, component_type_id, quantity")
+    .eq("combo_type_id", comboTypeId);
+  const duplicate = existing?.find((c) => c.component_type_id === parsed.data.component_type_id);
+
+  const { error } = duplicate
+    ? await supabase
+        .from("equipment_type_components")
+        .update({ quantity: duplicate.quantity + parsed.data.quantity })
+        .eq("id", duplicate.id)
+    : await supabase.from("equipment_type_components").insert({
+        combo_type_id: comboTypeId,
+        component_type_id: parsed.data.component_type_id,
+        quantity: parsed.data.quantity,
+        position: existing?.length ?? 0,
+      });
+  if (error) return { error: "Không thêm được món con: " + error.message };
+
+  revalidatePath(`/equipment/${comboTypeId}`);
+  return { success: true };
+}
+
+export async function updateComboComponentQuantity(
+  componentId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = z.coerce
+    .number()
+    .int()
+    .min(1, { message: "Số lượng phải lớn hơn 0." })
+    .safeParse(formData.get("quantity"));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("equipment_type_components")
+    .update({ quantity: parsed.data })
+    .eq("id", componentId)
+    .select("combo_type_id")
+    .single();
+  if (error || !data) return { error: "Không sửa được số lượng: " + (error?.message ?? "") };
+
+  revalidatePath(`/equipment/${data.combo_type_id}`);
+  return { success: true };
+}
+
+export async function removeComboComponent(componentId: string) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("equipment_type_components")
+    .delete()
+    .eq("id", componentId)
+    .select("combo_type_id")
+    .single();
+  if (error) throw new Error("Không xoá được món con: " + error.message);
+  if (data) revalidatePath(`/equipment/${data.combo_type_id}`);
 }

@@ -7,7 +7,9 @@ export type UserRole = "giam_doc" | "admin" | "ke_toan" | "cua_hang_truong" | "k
 export type CustomerType = "individual" | "company";
 
 export type ProductType = "rental" | "sale" | "service";
-export type TrackingType = "individual" | "quantity";
+// "combo" (2026-09-26): mã gồm nhiều sản phẩm con (equipment_type_components),
+// không có tồn kho riêng — thêm vào đơn thì tách thành dòng con.
+export type TrackingType = "individual" | "quantity" | "combo";
 export type PricingMethod = "flat_fee" | "pricing_structure";
 export type RentalPeriodUnit = "hour" | "day" | "week" | "month" | "year";
 export type EquipmentInstanceStatus = "available" | "rented" | "maintenance" | "disposed";
@@ -504,11 +506,15 @@ export interface Database {
           // lại; dòng mới tự nối cuối danh sách nếu không truyền (xem trigger
           // set_order_equipment_position).
           position: number;
+          // Dòng con của combo trỏ về dòng combo (dòng mẹ, 0đ) — doanh thu
+          // combo đã chia xuống các dòng con theo tỉ lệ giá lẻ.
+          parent_line_id: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           order_id: string;
+          parent_line_id?: string | null;
           equipment_type_id?: string | null;
           custom_name?: string | null;
           equipment_unit_id?: string | null;
@@ -523,6 +529,25 @@ export interface Database {
           position?: number;
         };
         Update: Partial<Database["public"]["Tables"]["order_equipment"]["Insert"]>;
+        Relationships: [];
+      };
+      equipment_type_components: {
+        Row: {
+          id: string;
+          combo_type_id: string;
+          component_type_id: string;
+          quantity: number;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          combo_type_id: string;
+          component_type_id: string;
+          quantity?: number;
+          position?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_type_components"]["Insert"]>;
         Relationships: [];
       };
       order_tasks: {

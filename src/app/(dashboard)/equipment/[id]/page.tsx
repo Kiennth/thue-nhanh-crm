@@ -47,6 +47,9 @@ import { EquipmentPurchaseDialog } from "../equipment-purchase-dialog";
 import { EquipmentCostAdjustmentDialog } from "../equipment-cost-adjustment-dialog";
 import { EquipmentDisposalDialog } from "../equipment-disposal-dialog";
 import { RfidTagDialog } from "../rfid-tag-dialog";
+import { AddComboComponentForm, ComboComponentQuantityForm } from "./combo-components-editor";
+import { removeComboComponent } from "@/lib/actions/equipment";
+import { countAssemblableSets } from "@/lib/combo";
 import type { Database, TaskType } from "@/types/database";
 
 type EquipmentUnitRow = Database["public"]["Tables"]["equipment_units"]["Row"];
@@ -196,6 +199,85 @@ export default async function EquipmentDetailPage({
         : Promise.resolve({ data: [] as EquipmentTransferRow[] }),
     ]);
   const rfidTags = [...(unitRfidTags ?? []), ...(instanceRfidTags ?? [])];
+
+  // Combo (CEO 2026-09-26): món con + số hàng sẵn có từng kho để biết ghép
+  // được bao nhiêu bộ ở đâu.
+  const isCombo = type.tracking_type === "combo";
+  let comboRows: {
+    id: string;
+    componentTypeId: string;
+    name: string;
+    quantity: number;
+    availableByBranch: Map<string, number>;
+  }[] = [];
+  let comboPickerOptions: { key: string; label: string }[] = [];
+  if (isCombo && activeTab === "stock") {
+    const [{ data: components }, { data: rentalTypes }] = await Promise.all([
+      supabase
+        .from("equipment_type_components")
+        .select("id, component_type_id, quantity")
+        .eq("combo_type_id", id)
+        .order("position"),
+      supabase
+        .from("equipment_types")
+        .select("id, name, tracking_type")
+        .eq("product_type", "rental")
+        .in("tracking_type", ["individual", "quantity"])
+        .order("name"),
+    ]);
+    const componentTypeIds = (components ?? []).map((c) => c.component_type_id);
+    const [{ data: availableInstances }, { data: componentUnits }] = componentTypeIds.length
+      ? await Promise.all([
+          supabase
+            .from("equipment_instances")
+            .select("equipment_type_id, branch_id")
+            .in("equipment_type_id", componentTypeIds)
+            .eq("status", "available"),
+          supabase
+            .from("equipment_units")
+            .select("id, equipment_type_id")
+            .in("equipment_type_id", componentTypeIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+    const componentUnitIds = (componentUnits ?? []).map((u) => u.id);
+    const { data: componentStock } = componentUnitIds.length
+      ? await supabase
+          .from("equipment_stock")
+          .select("equipment_unit_id, branch_id, quantity_in_stock")
+          .in("equipment_unit_id", componentUnitIds)
+      : { data: [] };
+    const typeIdByUnit = new Map((componentUnits ?? []).map((u) => [u.id, u.equipment_type_id]));
+    const rentalTypeById = new Map((rentalTypes ?? []).map((t) => [t.id, t]));
+
+    comboRows = (components ?? []).map((c) => {
+      const componentType = rentalTypeById.get(c.component_type_id);
+      const availableByBranch = new Map<string, number>();
+      if (componentType?.tracking_type === "individual") {
+        for (const i of availableInstances ?? []) {
+          if (i.equipment_type_id !== c.component_type_id || !i.branch_id) continue;
+          availableByBranch.set(i.branch_id, (availableByBranch.get(i.branch_id) ?? 0) + 1);
+        }
+      } else {
+        for (const st of componentStock ?? []) {
+          if (typeIdByUnit.get(st.equipment_unit_id) !== c.component_type_id) continue;
+          availableByBranch.set(
+            st.branch_id,
+            (availableByBranch.get(st.branch_id) ?? 0) + st.quantity_in_stock,
+          );
+        }
+      }
+      return {
+        id: c.id,
+        componentTypeId: c.component_type_id,
+        name: componentType?.name ?? "—",
+        quantity: c.quantity,
+        availableByBranch,
+      };
+    });
+    comboPickerOptions = (rentalTypes ?? [])
+      .filter((t) => t.id !== id)
+      .map((t) => ({ key: t.id, label: t.name }));
+  }
 
   // Lịch sử thuê — chỉ tải khi mở đúng tab (giống lịch sử chuyển kho): lấy
   // dòng order_equipment của loại hàng này trước, rồi tra ngược sang
@@ -431,6 +513,96 @@ export default async function EquipmentDetailPage({
         <div className="space-y-4">
           {isService && (
             <p className="text-sm text-muted-foreground">Hàng dịch vụ không có tồn kho.</p>
+          )}
+
+          {isCombo && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Thành phần combo</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Thêm combo vào đơn thì mỗi món dưới đây thành 1 dòng thật (tự chọn máy trống ở kho
+                  giao), tiền combo chia cho từng món theo giá thuê lẻ. Combo không có tồn kho
+                  riêng.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {comboRows.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Món</TableHead>
+                          <TableHead className="w-32">SL / bộ</TableHead>
+                          {(branches ?? []).map((b) => (
+                            <TableHead key={b.id} className="text-right">
+                              Sẵn có {b.name}
+                            </TableHead>
+                          ))}
+                          <TableHead className="w-12"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {comboRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-medium">
+                              <Link
+                                href={`/equipment/${row.componentTypeId}`}
+                                className="underline-offset-2 hover:underline"
+                              >
+                                {row.name}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              {canManageCatalog ? (
+                                <ComboComponentQuantityForm componentId={row.id} quantity={row.quantity} />
+                              ) : (
+                                row.quantity
+                              )}
+                            </TableCell>
+                            {(branches ?? []).map((b) => (
+                              <TableCell key={b.id} className="text-right tabular-nums">
+                                {row.availableByBranch.get(b.id) ?? 0}
+                              </TableCell>
+                            ))}
+                            <TableCell>
+                              {canManageCatalog && (
+                                <ConfirmDeleteButton
+                                  confirmMessage={`Bỏ "${row.name}" khỏi combo? Đơn đã có combo này không bị ảnh hưởng.`}
+                                  successMessage="Đã bỏ món khỏi combo."
+                                  action={removeComboComponent}
+                                  actionArg={row.id}
+                                />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40 font-medium">
+                          <TableCell colSpan={2}>Ghép được (bộ)</TableCell>
+                          {(branches ?? []).map((b) => (
+                            <TableCell key={b.id} className="text-right tabular-nums">
+                              {countAssemblableSets(
+                                comboRows.map((r) => ({
+                                  quantity: r.quantity,
+                                  available: r.availableByBranch.get(b.id) ?? 0,
+                                })),
+                              )}
+                            </TableCell>
+                          ))}
+                          <TableCell />
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Combo chưa có món nào — thêm món bên dưới trước khi đưa vào đơn.
+                  </p>
+                )}
+                {canManageCatalog && (
+                  <AddComboComponentForm comboTypeId={type.id} options={comboPickerOptions} />
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {showUnitsBlock &&
