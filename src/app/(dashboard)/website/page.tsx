@@ -19,7 +19,8 @@ import { WebsiteProductRowActions, RefreshWebsiteButton } from "./row-actions";
 import { WebsiteProductDialog } from "./product-dialog";
 import { WebsiteCategoryDialog } from "./category-dialog";
 
-const PAGE_SIZE = 30;
+// CEO 2026-09-26: danh sách dài hết trang, đỡ bấm chuyển trang (30 → 100).
+const PAGE_SIZE = 100;
 
 // Quản trị nội dung web công khai new.thuenhanh.vn (CEO yêu cầu 2026-08-16).
 // Nội dung nằm ở bảng website_* cùng Supabase — sửa xong web tự làm mới qua
