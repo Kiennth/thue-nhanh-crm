@@ -99,8 +99,8 @@ export function EquipmentValueTrendChart({
           <AreaChart data={rows} margin={{ left: 8 }}>
             <defs>
               <linearGradient id="fillEquipmentCurrent" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-current)" stopOpacity={0.45} />
-                <stop offset="95%" stopColor="var(--color-current)" stopOpacity={0.02} />
+                <stop offset="5%" stopColor="var(--color-current)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--color-current)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />

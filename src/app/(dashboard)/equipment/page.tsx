@@ -429,12 +429,11 @@ export default async function EquipmentPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Mỗi con số một ô nhuộm màu riêng (CEO 2026-09-25: báo cáo
-                sặc sỡ cho dễ nhìn); tăng xanh / giảm đỏ. */}
+            {/* 3 con số trong ô nền nhạt trung tính; tăng xanh / giảm đỏ. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-indigo-500/10 p-3">
+              <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">Tổng giá trị tồn kho</p>
-                <p className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+                <p className="text-lg font-semibold">
                   {currencyFormatter.format(reportSummary.totalInventoryValue)}đ
                 </p>
                 {/* CEO yêu cầu 2026-08-06: biết ngay đang tăng/giảm bao nhiêu
@@ -460,15 +459,15 @@ export default async function EquipmentPage({
                   </p>
                 )}
               </div>
-              <div className="rounded-lg bg-sky-500/10 p-3">
+              <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">Số thiết bị đang giữ</p>
-                <p className="text-lg font-semibold text-sky-600 dark:text-sky-400">
+                <p className="text-lg font-semibold">
                   {reportSummary.totalUnitsInStock}
                 </p>
               </div>
-              <div className="rounded-lg bg-fuchsia-500/10 p-3">
+              <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">Giá trị trung bình / thiết bị</p>
-                <p className="text-lg font-semibold text-fuchsia-600 dark:text-fuchsia-400">
+                <p className="text-lg font-semibold">
                   {currencyFormatter.format(reportSummary.averageInventoryValue)}đ
                 </p>
               </div>

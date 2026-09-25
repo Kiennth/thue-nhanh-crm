@@ -21,12 +21,12 @@ export function formatPercent(value: number): string {
   return `${value.toFixed(0)}%`;
 }
 
-// Bảng màu tươi cho chế độ colorByLabel — sắc 500, đọc được trên cả nền
-// sáng lẫn tối.
+// Bảng màu dịu (độ bão hoà vừa phải — CEO 2026-09-25 chê bản sắc 500 loè
+// loẹt) cho chế độ colorByLabel; đọc được trên cả nền sáng lẫn tối.
 const PRODUCT_PALETTE = [
-  "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899",
-  "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6",
-  "#e11d48", "#a855f7", "#eab308", "#0ea5e9", "#22c55e",
+  "#6b8fd6", "#5fb49c", "#e0a458", "#9a86d1", "#d98ca8",
+  "#5ab4c8", "#e59a6f", "#9bbf6a", "#8a8fd8", "#6fb8b0",
+  "#d77c7c", "#b38fd1", "#cdb35e", "#7fb0d8", "#7cbf84",
 ];
 
 // Màu cố định theo TÊN (băm chuỗi) — cùng 1 sản phẩm luôn cùng màu ở mọi
