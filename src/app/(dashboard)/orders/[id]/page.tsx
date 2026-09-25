@@ -226,6 +226,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // khâu CUỐI CÙNG đã hoàn thành mới cho bỏ, để giữ đúng tính tuần tự.
   const canUncompleteTask =
     canManage || (!!employee && employee.role === "cua_hang_truong");
+  // Tiền khoán (quỹ khoán đơn + % từng khâu) — CEO chốt 2026-09-25 chỉ
+  // Giám đốc/Admin/Kế toán/Cửa hàng trưởng xem; Kỹ thuật/Sales không thấy.
+  const canSeeCommission =
+    canManage || (!!employee && employee.role === "cua_hang_truong");
   let lastDoneTaskType: TaskType | null = null;
   for (let i = TASK_TYPE_SEQUENCE.length - 1; i >= 0; i--) {
     if (taskByType.get(TASK_TYPE_SEQUENCE[i])?.completed_date) {
@@ -252,10 +256,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
     return type?.product_type === "rental" ? sum + line.line_total : sum;
   }, 0);
-  const commissionRate = canManage
+  const commissionRate = canSeeCommission
     ? findCommissionRate(commissionTiers ?? [], order.pickup_branch_id, poolValue)
     : 0;
-  const commissionFund = canManage ? computeOrderCommissionFund(poolValue, commissionRate) : 0;
+  const commissionFund = canSeeCommission ? computeOrderCommissionFund(poolValue, commissionRate) : 0;
 
   // Giá trong đơn (total_value) chưa gồm VAT — chỉ cộng thêm để hiển thị số
   // tổng phải thu của khách, không dùng số đã gồm VAT để tính khoán.
@@ -1108,7 +1112,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   />
                                 )}
                               </div>
-                              {canManage && task?.employee_id && (
+                              {canSeeCommission && task?.employee_id && (
                                 <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                                   {employeeNameById.get(task.employee_id) ?? "—"}
                                   <span className="text-muted-foreground/50">·</span>
@@ -1124,7 +1128,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 </CardContent>
               </Card>
 
-              {canManage && (
+              {canSeeCommission && (
                 <Card className={accentCard("amber")}>
                   <CardHeader className={accentHeader("amber")}>
                     <CardTitle className="text-base">
