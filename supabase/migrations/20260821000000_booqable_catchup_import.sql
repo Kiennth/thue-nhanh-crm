@@ -869,3 +869,16 @@
 --     trên đơn đã đóng giữ nguyên.
 --   * TỒN CUỐI 25/09: 1.202 dòng treo / 518 tên / 310,5tr (gồm cả nhóm
 --     bỏ qua & không khớp).
+--
+-- ## Đợt map 17 (CEO 2026-09-25 chiều tối → 2026-09-26):
+--   * ĐỒNG BỘ lượt 2 ngày 25/09: import 4 (BQ12987/12988/12989/12991 —
+--     không dòng tự do), đóng 1, giao 4 (BQ8432/12934/12983/12976).
+--   * ĐỒNG BỘ lượt 3: import 6 (BQ12986/12994/12995/12996/12997/12999),
+--     đóng 2, giao 5 (BQ12979/12967/12991/12989/12987), huỷ theo BQ 0.
+--   * TIỀN LỆ TỰ ÁP 6/6 dòng mới (+1 dòng cũ cùng tên): Playstation 5 kèm
+--     2 tay cầm (BQ12986/12996, tách máy); WiFi 7 Archer BE220 → Cục phát
+--     WiFi 7 bt Archer BE220 (BQ12994 + dòng cũ BQ12882 720k); GALAXY-SCR01
+--     → 5G WiFi 6 có pin; 5G WiFi 7 có pin (BQ12995); Photo Booth Classic
+--     - CƠ BẢN 2H → Photo Booth Classic (BQ12999 2,5tr).
+--   * TỒN CUỐI: 1.201 dòng treo / 517 tên / 309,8tr (gồm cả nhóm bỏ qua &
+--     không khớp).
