@@ -840,3 +840,32 @@
 --   * TỒN CUỐI NGÀY: 1.253 dòng treo — cần chọn 216 tên/113,7tr, không
 --     khớp 192 tên/91,8tr, bỏ qua 152 tên/149,9tr. Từ đỉnh 1,03 tỉ
 --     (22/09) đã về đúng chỗ ~920tr sau 2 ngày duyệt.
+--
+-- ## Đợt map 16 (CEO 2026-09-24 → 2026-09-25):
+--   * ĐỒNG BỘ 23/09 tối: không thay đổi. 24/09: import 17, đóng 8, giao 4
+--     (BQ12355/12853/12735/12706); tiền lệ tự áp 10/19 tên dòng mới.
+--     25/09: import 8, đóng 4, giao 4 (BQ12944/12974/12971/12962).
+--   * CEO DUYỆT TÊN DÒNG TỰ DO: Vỡ màn hình 27" → Phí dịch vụ Sửa Chữa
+--     (BQ8431 2,4tr); Máy chiếu EPSON EB-960 (SP mới); Epson L3250; Sony
+--     X5 Mark 3 (SP mới); Photo Booth Classic; TV 4K 65/85-inch; PC i7
+--     14th RTX 4070 Ti; MacBook Pro 13.3 M1 16GB; Canon SELPHY CP1500;
+--     Bộ chia HDMI 1 ra 4 (SP mới theo mẫu 1 ra 2, 11 dòng); Insta360
+--     Ace Pro 2; MSI Cyborg; Acer NITRO V15 + NITRO 5 17.3"; Cột chắn
+--     A3 ĐEN; MH 22"; Rokid Glasses; HDD 8TB; Màn Hình Di Động; Kandao
+--     Meeting Pro; Loa JBL Eon One MK2 (SP mới); Ghế lái xe giả lập bt
+--     không kèm Màn Hình; Shure MV7+ bt ĐEN; TV 4K 43-inch bt SAMSUNG +
+--     SONY; MH 24-inch bt EGM24F120S; Tai nghe chụp tai bt Soul Ultra;
+--     Tai nghe On-Ear EH11 (SP mới, bt Black, 6 dòng); bàn phím có dây →
+--     Combo chuột phím có dây.
+--   * ĐỢT 25/09: SHD7777 → Quạt Điều Hòa Cao Cấp; Tab S9 Wi-Fi Only →
+--     Galaxy Tab S9; Xe Scooter Điện bt mới E22 (BQ12722 + BQ12967);
+--     LG 27MR400-B; EDRA CITIZEN; Linksys FGW3000; Instax 20 tấm.
+--     2 SP BÁN MỚI: "Giấy in nhãn 24mm" 420k (BQ12980) và "Giấy in nhãn
+--     máy in mã vạch" 60k (BQ12509 — CEO chỉ rõ không phải giấy 24mm).
+--   * TRÙNG SERIAL: mapper từng lấy lại máy đang nằm trên đơn mở (TV 43
+--     SONY/SAMSUNG trên BQ12970) → sửa dữ liệu + mapper loại máy bận;
+--     tách máy trùng trên DH20260722-204 và BQ6917 (VIP thuê dài hạn gia
+--     hạn tháng — hợp lệ). Trùng serial trên đơn mở về 0; ~757 cặp trùng
+--     trên đơn đã đóng giữ nguyên.
+--   * TỒN CUỐI 25/09: 1.202 dòng treo / 518 tên / 310,5tr (gồm cả nhóm
+--     bỏ qua & không khớp).
