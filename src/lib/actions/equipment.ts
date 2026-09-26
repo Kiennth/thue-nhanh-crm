@@ -1181,3 +1181,68 @@ export async function removeComboComponent(componentId: string) {
   if (error) throw new Error("Không xoá được món con: " + error.message);
   if (data) revalidatePath(`/equipment/${data.combo_type_id}`);
 }
+
+// Món thay thế cho 1 món con (vd "Zoom H4N hoặc H4N Pro hoặc H6") — thêm vào
+// cuối danh sách ưu tiên; lúc thêm combo vào đơn lấy máy trống theo đúng thứ
+// tự món chính → các món thay thế.
+export async function addComboAlternative(componentId: string, alternativeTypeId: string): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const [{ data: component }, { data: altType }, { data: existing }] = await Promise.all([
+    supabase
+      .from("equipment_type_components")
+      .select("combo_type_id, component_type_id")
+      .eq("id", componentId)
+      .single(),
+    supabase
+      .from("equipment_types")
+      .select("product_type, tracking_type")
+      .eq("id", alternativeTypeId)
+      .single(),
+    supabase
+      .from("equipment_type_component_alternatives")
+      .select("alternative_type_id")
+      .eq("component_id", componentId),
+  ]);
+  if (!component) return { error: "Không tìm thấy món con." };
+  if (
+    !altType ||
+    altType.product_type !== "rental" ||
+    (altType.tracking_type !== "individual" && altType.tracking_type !== "quantity")
+  ) {
+    return { error: "Món thay thế phải là hàng cho thuê có tồn kho (máy serial hoặc theo số lượng)." };
+  }
+  if (
+    alternativeTypeId === component.component_type_id ||
+    (existing ?? []).some((a) => a.alternative_type_id === alternativeTypeId)
+  ) {
+    return { error: "Sản phẩm này đã có trong lựa chọn của món." };
+  }
+
+  const { error } = await supabase.from("equipment_type_component_alternatives").insert({
+    component_id: componentId,
+    alternative_type_id: alternativeTypeId,
+    position: existing?.length ?? 0,
+  });
+  if (error) return { error: "Không thêm được món thay thế: " + error.message };
+
+  revalidatePath(`/equipment/${component.combo_type_id}`);
+  return { success: true };
+}
+
+export async function removeComboAlternative(alternativeId: string) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("equipment_type_component_alternatives")
+    .delete()
+    .eq("id", alternativeId)
+    .select("component_id, equipment_type_components(combo_type_id)")
+    .single();
+  if (error) throw new Error("Không xoá được món thay thế: " + error.message);
+  const comboTypeId = (data?.equipment_type_components as unknown as { combo_type_id: string } | null)
+    ?.combo_type_id;
+  if (comboTypeId) revalidatePath(`/equipment/${comboTypeId}`);
+}

@@ -550,6 +550,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["equipment_type_components"]["Insert"]>;
         Relationships: [];
       };
+      equipment_type_component_alternatives: {
+        Row: {
+          id: string;
+          component_id: string;
+          alternative_type_id: string;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          component_id: string;
+          alternative_type_id: string;
+          position?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["equipment_type_component_alternatives"]["Insert"]>;
+        Relationships: [];
+      };
       order_tasks: {
         Row: {
           id: string;

@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductSearchPicker } from "@/components/product-search-picker";
-import { addComboComponent, updateComboComponentQuantity } from "@/lib/actions/equipment";
+import {
+  addComboAlternative,
+  addComboComponent,
+  removeComboAlternative,
+  updateComboComponentQuantity,
+} from "@/lib/actions/equipment";
 
 // Thêm món con cho combo: chọn số lượng trước, gõ tên sản phẩm rồi chọn là
 // thêm luôn (chọn lại món đã có thì cộng dồn số lượng).
@@ -78,5 +83,65 @@ export function ComboComponentQuantityForm({
       </Button>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </form>
+  );
+}
+
+// "+ máy thay thế": gõ tên chọn sản phẩm dự phòng cho 1 món (lấy khi món
+// chính hết máy trống).
+export function AddComboAlternativeButton({
+  componentId,
+  options,
+}: {
+  componentId: string;
+  options: { key: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+      >
+        + máy thay thế
+      </button>
+    );
+  }
+  return (
+    <div className="mt-1 max-w-sm">
+      <ProductSearchPicker
+        options={options}
+        autoFocus
+        placeholder="Gõ tên máy thay thế..."
+        onPick={async (option) => {
+          const result = await addComboAlternative(componentId, option.key);
+          if (!result || !("error" in result)) setOpen(false);
+          return result;
+        }}
+      />
+    </div>
+  );
+}
+
+export function RemoveComboAlternativeButton({
+  alternativeId,
+  label,
+}: {
+  alternativeId: string;
+  label: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => startTransition(() => removeComboAlternative(alternativeId))}
+      className="ml-0.5 text-muted-foreground hover:text-destructive"
+      aria-label={`Bỏ ${label} khỏi lựa chọn`}
+      title="Bỏ khỏi lựa chọn"
+    >
+      ×
+    </button>
   );
 }

@@ -1030,6 +1030,69 @@ async function pickAvailableInstances(
   return free.slice(0, count).map((c) => c.id);
 }
 
+// Hàng theo số lượng còn trống thật tại kho giao cho khung thuê của đơn: tồn
+// "trong kho" trừ nhu cầu các đơn chưa giao, cùng kho, trùng lịch (cùng cách
+// tính cảnh báo thiếu hàng trên trang đơn). Trả từng biến thể, nhiều trước.
+async function availableQuantityUnits(
+  supabase: SupabaseServerClient,
+  typeId: string,
+  branchId: string,
+  period: RentalPeriod,
+  taken: Map<string, number>,
+): Promise<{ unitId: string; available: number }[]> {
+  const { data: units } = await supabase
+    .from("equipment_units")
+    .select("id")
+    .eq("equipment_type_id", typeId);
+  const unitIds = (units ?? []).map((u) => u.id);
+  if (!unitIds.length) return [];
+
+  const [{ data: stock }, { data: demandRows }] = await Promise.all([
+    supabase
+      .from("equipment_stock")
+      .select("equipment_unit_id, quantity_in_stock")
+      .eq("branch_id", branchId)
+      .in("equipment_unit_id", unitIds),
+    supabase
+      .from("order_equipment")
+      .select(
+        "equipment_unit_id, quantity, orders!inner(completed_at, cancelled_at, delivery_stock_moved_at, pickup_branch_id, rental_start_at, rental_end_at)",
+      )
+      .in("equipment_unit_id", unitIds)
+      .is("orders.completed_at", null)
+      .is("orders.cancelled_at", null)
+      .is("orders.delivery_stock_moved_at", null)
+      .eq("orders.pickup_branch_id", branchId),
+  ]);
+
+  const overlaps = (start: string | null, end: string | null) =>
+    !period.rentalStartAt ||
+    !period.rentalEndAt ||
+    !start ||
+    !end ||
+    (new Date(start) < new Date(period.rentalEndAt) && new Date(period.rentalStartAt) < new Date(end));
+  const demandByUnit = new Map<string, number>();
+  for (const row of (demandRows ?? []) as unknown as {
+    equipment_unit_id: string;
+    quantity: number;
+    orders: { rental_start_at: string | null; rental_end_at: string | null };
+  }[]) {
+    if (!overlaps(row.orders.rental_start_at, row.orders.rental_end_at)) continue;
+    demandByUnit.set(row.equipment_unit_id, (demandByUnit.get(row.equipment_unit_id) ?? 0) + row.quantity);
+  }
+
+  return unitIds
+    .map((unitId) => ({
+      unitId,
+      available:
+        (stock?.find((st) => st.equipment_unit_id === unitId)?.quantity_in_stock ?? 0) -
+        (demandByUnit.get(unitId) ?? 0) -
+        (taken.get(unitId) ?? 0),
+    }))
+    .filter((u) => u.available > 0)
+    .sort((a, b) => b.available - a.available);
+}
+
 // Biến thể cho món con theo số lượng: 1 biến thể thì dùng, chưa có thì tạo
 // biến thể mặc định, nhiều biến thể thì lấy biến thể còn nhiều hàng nhất tại
 // kho giao (nhân viên đổi lại được bằng nút "Đổi món").
@@ -1075,7 +1138,7 @@ async function addComboLines(
 ): Promise<ActionState> {
   const { data: components } = await supabase
     .from("equipment_type_components")
-    .select("component_type_id, quantity")
+    .select("id, component_type_id, quantity")
     .eq("combo_type_id", combo.id)
     .order("position");
   if (!components?.length) {
@@ -1084,13 +1147,32 @@ async function addComboLines(
     };
   }
 
+  // Món thay thế (vd "Zoom H4N hoặc H4N Pro hoặc H6") — xếp sau món chính
+  // theo thứ tự ưu tiên đã khai.
+  const { data: alternatives } = await supabase
+    .from("equipment_type_component_alternatives")
+    .select("component_id, alternative_type_id, position")
+    .in(
+      "component_id",
+      components.map((c) => c.id),
+    )
+    .order("position");
+  const candidatesByComponent = new Map(
+    components.map((c) => [
+      c.id,
+      [
+        c.component_type_id,
+        ...(alternatives ?? [])
+          .filter((a) => a.component_id === c.id)
+          .map((a) => a.alternative_type_id),
+      ],
+    ]),
+  );
+
   const { data: componentTypes } = await supabase
     .from("equipment_types")
     .select("id, name, product_type, tracking_type")
-    .in(
-      "id",
-      components.map((c) => c.component_type_id),
-    );
+    .in("id", [...new Set([...candidatesByComponent.values()].flat())]);
   const componentTypeById = new Map((componentTypes ?? []).map((t) => [t.id, t]));
 
   const { data: existing } = await supabase
@@ -1099,6 +1181,7 @@ async function addComboLines(
     .eq("order_id", order.id)
     .not("equipment_instance_id", "is", null);
   const taken = new Set((existing ?? []).map((l) => l.equipment_instance_id!));
+  const takenUnits = new Map<string, number>();
 
   const childSpecs: {
     equipment_type_id: string;
@@ -1108,42 +1191,69 @@ async function addComboLines(
   }[] = [];
   const shortages: string[] = [];
   for (const component of components) {
-    const type = componentTypeById.get(component.component_type_id);
-    if (!type) continue;
-    const need = component.quantity * quantity;
-    if (type.tracking_type === "individual") {
-      const ids = await pickAvailableInstances(
-        supabase,
-        type.id,
-        order.pickup_branch_id,
-        need,
-        taken,
-      );
-      ids.forEach((iid) => taken.add(iid));
-      if (ids.length < need) {
-        shortages.push(`${type.name} (cần ${need}, còn ${ids.length} máy trống)`);
-        continue;
+    const candidateIds = candidatesByComponent.get(component.id) ?? [component.component_type_id];
+    let remaining = component.quantity * quantity;
+
+    // Lần lượt từng lựa chọn theo ưu tiên, lấy phần còn trống thật.
+    for (const typeId of candidateIds) {
+      if (remaining <= 0) break;
+      const type = componentTypeById.get(typeId);
+      if (!type) continue;
+      if (type.tracking_type === "individual") {
+        const ids = await pickAvailableInstances(supabase, type.id, order.pickup_branch_id, remaining, taken);
+        for (const iid of ids) {
+          taken.add(iid);
+          childSpecs.push({
+            equipment_type_id: type.id,
+            equipment_unit_id: null,
+            equipment_instance_id: iid,
+            quantity: 1,
+          });
+        }
+        remaining -= ids.length;
+      } else if (type.tracking_type === "quantity") {
+        const units = await availableQuantityUnits(
+          supabase,
+          type.id,
+          order.pickup_branch_id,
+          order,
+          takenUnits,
+        );
+        for (const unit of units) {
+          if (remaining <= 0) break;
+          const take = Math.min(unit.available, remaining);
+          takenUnits.set(unit.unitId, (takenUnits.get(unit.unitId) ?? 0) + take);
+          childSpecs.push({
+            equipment_type_id: type.id,
+            equipment_unit_id: unit.unitId,
+            equipment_instance_id: null,
+            quantity: take,
+          });
+          remaining -= take;
+        }
       }
-      for (const iid of ids) {
-        childSpecs.push({
-          equipment_type_id: type.id,
-          equipment_unit_id: null,
-          equipment_instance_id: iid,
-          quantity: 1,
-        });
+    }
+
+    if (remaining > 0) {
+      // Hết sạch mọi lựa chọn: món chính theo số lượng vẫn cho thêm (trang đơn
+      // hiện cảnh báo "thiếu" như dòng thường); máy serial thì phải có máy thật.
+      const primary = componentTypeById.get(candidateIds[0]);
+      if (primary?.tracking_type === "quantity") {
+        const unitId = await resolveComponentUnit(supabase, primary.id, order.pickup_branch_id);
+        if (unitId) {
+          childSpecs.push({
+            equipment_type_id: primary.id,
+            equipment_unit_id: unitId,
+            equipment_instance_id: null,
+            quantity: remaining,
+          });
+          remaining = 0;
+        }
       }
-    } else {
-      const unitId = await resolveComponentUnit(supabase, type.id, order.pickup_branch_id);
-      if (!unitId) {
-        shortages.push(`${type.name} (chưa có biến thể)`);
-        continue;
+      if (remaining > 0) {
+        const names = candidateIds.map((cid) => componentTypeById.get(cid)?.name ?? "—").join(" / ");
+        shortages.push(`${names} (thiếu ${remaining} máy trống)`);
       }
-      childSpecs.push({
-        equipment_type_id: type.id,
-        equipment_unit_id: unitId,
-        equipment_instance_id: null,
-        quantity: need,
-      });
     }
   }
   if (shortages.length) {

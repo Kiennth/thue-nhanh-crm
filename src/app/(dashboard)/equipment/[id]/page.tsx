@@ -47,7 +47,12 @@ import { EquipmentPurchaseDialog } from "../equipment-purchase-dialog";
 import { EquipmentCostAdjustmentDialog } from "../equipment-cost-adjustment-dialog";
 import { EquipmentDisposalDialog } from "../equipment-disposal-dialog";
 import { RfidTagDialog } from "../rfid-tag-dialog";
-import { AddComboComponentForm, ComboComponentQuantityForm } from "./combo-components-editor";
+import {
+  AddComboAlternativeButton,
+  AddComboComponentForm,
+  ComboComponentQuantityForm,
+  RemoveComboAlternativeButton,
+} from "./combo-components-editor";
 import { removeComboComponent } from "@/lib/actions/equipment";
 import { countAssemblableSets } from "@/lib/combo";
 import type { Database, TaskType } from "@/types/database";
@@ -208,6 +213,7 @@ export default async function EquipmentDetailPage({
     componentTypeId: string;
     name: string;
     quantity: number;
+    alternatives: { id: string; name: string }[];
     availableByBranch: Map<string, number>;
   }[] = [];
   let comboPickerOptions: { key: string; label: string }[] = [];
@@ -225,7 +231,22 @@ export default async function EquipmentDetailPage({
         .in("tracking_type", ["individual", "quantity"])
         .order("name"),
     ]);
-    const componentTypeIds = (components ?? []).map((c) => c.component_type_id);
+    const { data: alternatives } = (components ?? []).length
+      ? await supabase
+          .from("equipment_type_component_alternatives")
+          .select("id, component_id, alternative_type_id, position")
+          .in(
+            "component_id",
+            (components ?? []).map((c) => c.id),
+          )
+          .order("position")
+      : { data: [] };
+    const componentTypeIds = [
+      ...new Set([
+        ...(components ?? []).map((c) => c.component_type_id),
+        ...(alternatives ?? []).map((a) => a.alternative_type_id),
+      ]),
+    ];
     const [{ data: availableInstances }, { data: componentUnits }] = componentTypeIds.length
       ? await Promise.all([
           supabase
@@ -249,28 +270,41 @@ export default async function EquipmentDetailPage({
     const typeIdByUnit = new Map((componentUnits ?? []).map((u) => [u.id, u.equipment_type_id]));
     const rentalTypeById = new Map((rentalTypes ?? []).map((t) => [t.id, t]));
 
-    comboRows = (components ?? []).map((c) => {
-      const componentType = rentalTypeById.get(c.component_type_id);
-      const availableByBranch = new Map<string, number>();
-      if (componentType?.tracking_type === "individual") {
+    // Sẵn có từng kho của 1 loại hàng (máy serial "sẵn có" / tồn "trong kho").
+    const availableOf = (typeId: string) => {
+      const byBranch = new Map<string, number>();
+      if (rentalTypeById.get(typeId)?.tracking_type === "individual") {
         for (const i of availableInstances ?? []) {
-          if (i.equipment_type_id !== c.component_type_id || !i.branch_id) continue;
-          availableByBranch.set(i.branch_id, (availableByBranch.get(i.branch_id) ?? 0) + 1);
+          if (i.equipment_type_id !== typeId || !i.branch_id) continue;
+          byBranch.set(i.branch_id, (byBranch.get(i.branch_id) ?? 0) + 1);
         }
       } else {
         for (const st of componentStock ?? []) {
-          if (typeIdByUnit.get(st.equipment_unit_id) !== c.component_type_id) continue;
-          availableByBranch.set(
-            st.branch_id,
-            (availableByBranch.get(st.branch_id) ?? 0) + st.quantity_in_stock,
-          );
+          if (typeIdByUnit.get(st.equipment_unit_id) !== typeId) continue;
+          byBranch.set(st.branch_id, (byBranch.get(st.branch_id) ?? 0) + st.quantity_in_stock);
+        }
+      }
+      return byBranch;
+    };
+
+    comboRows = (components ?? []).map((c) => {
+      const rowAlternatives = (alternatives ?? []).filter((a) => a.component_id === c.id);
+      // Món có máy thay thế: sẵn có = cộng dồn mọi lựa chọn.
+      const availableByBranch = new Map<string, number>();
+      for (const typeId of [c.component_type_id, ...rowAlternatives.map((a) => a.alternative_type_id)]) {
+        for (const [branchId, qty] of availableOf(typeId)) {
+          availableByBranch.set(branchId, (availableByBranch.get(branchId) ?? 0) + qty);
         }
       }
       return {
         id: c.id,
         componentTypeId: c.component_type_id,
-        name: componentType?.name ?? "—",
+        name: rentalTypeById.get(c.component_type_id)?.name ?? "—",
         quantity: c.quantity,
+        alternatives: rowAlternatives.map((a) => ({
+          id: a.id,
+          name: rentalTypeById.get(a.alternative_type_id)?.name ?? "—",
+        })),
         availableByBranch,
       };
     });
@@ -551,6 +585,23 @@ export default async function EquipmentDetailPage({
                               >
                                 {row.name}
                               </Link>
+                              {row.alternatives.length > 0 && (
+                                <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                                  hết thì lấy:{" "}
+                                  {row.alternatives.map((alt, i) => (
+                                    <span key={alt.id} className="whitespace-nowrap">
+                                      {i > 0 && " → "}
+                                      {alt.name}
+                                      {canManageCatalog && (
+                                        <RemoveComboAlternativeButton alternativeId={alt.id} label={alt.name} />
+                                      )}
+                                    </span>
+                                  ))}
+                                </p>
+                              )}
+                              {canManageCatalog && (
+                                <AddComboAlternativeButton componentId={row.id} options={comboPickerOptions} />
+                              )}
                             </TableCell>
                             <TableCell>
                               {canManageCatalog ? (

@@ -156,9 +156,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   // Món con của các combo (CEO 2026-09-26) — để ô thêm nhanh báo số bộ ghép
   // được tại kho giao.
-  const { data: comboComponents } = await supabase
-    .from("equipment_type_components")
-    .select("combo_type_id, component_type_id, quantity");
+  const [{ data: comboComponents }, { data: comboAlternatives }] = await Promise.all([
+    supabase.from("equipment_type_components").select("id, combo_type_id, component_type_id, quantity"),
+    supabase.from("equipment_type_component_alternatives").select("component_id, alternative_type_id"),
+  ]);
 
   // Danh sách customers ở trên bị Supabase giới hạn 1.000 dòng (nay có hơn
   // 5.800 khách hàng) nên không đảm bảo chứa đúng khách của đơn này — luôn
@@ -517,7 +518,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
   // Số bộ combo ghép được tại kho giao = món con ít nhất (máy serial sẵn có /
   // tồn kho theo số lượng) — chỉ để tham khảo, lúc thêm vẫn kiểm lại thật.
-  const componentsByCombo = new Map<string, { component_type_id: string; quantity: number }[]>();
+  const componentsByCombo = new Map<
+    string,
+    { id: string; component_type_id: string; quantity: number }[]
+  >();
   for (const c of comboComponents ?? []) {
     componentsByCombo.set(c.combo_type_id, [...(componentsByCombo.get(c.combo_type_id) ?? []), c]);
   }
@@ -546,8 +550,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const quickAddOptions = (equipmentTypes ?? []).flatMap((t) => {
     if (t.tracking_type === "combo") {
       const components = componentsByCombo.get(t.id) ?? [];
+      // Món có máy thay thế: sẵn có = cộng dồn món chính + các máy thay thế.
       const sets = countAssemblableSets(
-        components.map((c) => ({ quantity: c.quantity, available: availableAtPickup(c.component_type_id) })),
+        components.map((c) => ({
+          quantity: c.quantity,
+          available: [
+            c.component_type_id,
+            ...(comboAlternatives ?? [])
+              .filter((a) => a.component_id === c.id)
+              .map((a) => a.alternative_type_id),
+          ].reduce((sum, typeId) => sum + availableAtPickup(typeId), 0),
+        })),
       );
       return [
         {
