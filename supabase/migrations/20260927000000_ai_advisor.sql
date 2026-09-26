@@ -1,6 +1,6 @@
 -- ---------------------------------------------------------------------
 -- Trang TƯ VẤN MÁY CHẠY AI (CEO chốt 2026-09-26): web riêng, thương hiệu
--- riêng (repo du-may), đọc CHÍNH Supabase này bằng anon key — cùng cơ chế
+-- riêng AICheck (repo aicheck), đọc CHÍNH Supabase này bằng anon key — cùng cơ chế
 -- web công khai (20260816000000_website_catalog.sql):
 --
 --   1. advisor_hardware: danh mục máy để tính "chạy model X cần máy gì" —
@@ -58,7 +58,7 @@ create trigger advisor_hardware_set_updated_at
 create table if not exists public.advisor_benchmarks (
   id uuid primary key default gen_random_uuid(),
   hardware_id uuid not null references public.advisor_hardware(id) on delete cascade,
-  -- Khớp slug model trong danh mục model của web du-may (src/data/models.ts).
+  -- Khớp slug model trong danh mục model của web AICheck (src/data/models.ts).
   model_slug text not null,
   -- q4 | q5 | q6 | q8 | fp16 | native — khớp danh sách mức nén của web.
   quant text not null,

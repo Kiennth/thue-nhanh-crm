@@ -28,7 +28,7 @@ const INTENT_LABELS: Record<string, string> = {
 };
 
 // Tóm tắt cấu hình khách vừa tính trên trang tư vấn máy AI (details jsonb
-// do web du-may gửi) — chỉ đọc các khoá đã biết, khoá lạ bỏ qua.
+// do web AICheck gửi) — chỉ đọc các khoá đã biết, khoá lạ bỏ qua.
 function advisorSummary(details: Record<string, unknown> | null): string[] {
   if (!details) return [];
   const pick = (key: string) => {
