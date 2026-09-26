@@ -95,13 +95,15 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
       onDragEnd={handleDragEnd}
     >
       {/* table-fixed + bề rộng cố định cho cột số (CEO 2026-09-25: SL/Giá
-          thuê/Thành tiền bị giãn quá to) — phần thừa dồn cho cột Hàng hoá. */}
+          thuê/Thành tiền bị giãn quá to). Hàng hoá cũng cố định (2026-09-26:
+          cột này phình quá to) — phần thừa dồn cho cột Biến thể/Sản phẩm,
+          nơi chứa chip serial. */}
       <Table className={ORDER_LINES_TABLE_CLASS}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
-            <TableHead>Hàng hoá</TableHead>
-            <TableHead className="w-[190px]">Biến thể/Sản phẩm</TableHead>
+            <TableHead className="w-[220px]">Hàng hoá</TableHead>
+            <TableHead>Biến thể/Sản phẩm</TableHead>
             <TableHead className="w-[105px]">SL</TableHead>
             <TableHead className="w-[110px]">Số kỳ tính</TableHead>
             <TableHead className="w-[160px]">Giá thuê</TableHead>

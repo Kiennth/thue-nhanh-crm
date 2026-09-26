@@ -1154,8 +1154,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       <Table className={ORDER_LINES_TABLE_CLASS}>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Hàng hoá</TableHead>
-                            <TableHead className="w-[190px]">Biến thể/Sản phẩm</TableHead>
+                            <TableHead className="w-[220px]">Hàng hoá</TableHead>
+                            <TableHead>Biến thể/Sản phẩm</TableHead>
                             <TableHead className="w-[105px]">SL</TableHead>
                             <TableHead className="w-[110px]">Số kỳ tính</TableHead>
                             <TableHead className="w-[160px]">Giá thuê</TableHead>
