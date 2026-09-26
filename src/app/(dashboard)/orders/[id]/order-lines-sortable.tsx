@@ -28,6 +28,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { reorderOrderEquipmentLines } from "@/lib/actions/orders";
+import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 
 interface OrderLineRow {
   id: string;
@@ -95,7 +96,7 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
     >
       {/* table-fixed + bề rộng cố định cho cột số (CEO 2026-09-25: SL/Giá
           thuê/Thành tiền bị giãn quá to) — phần thừa dồn cho cột Hàng hoá. */}
-      <Table className="min-w-[1080px] table-fixed">
+      <Table className={ORDER_LINES_TABLE_CLASS}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>

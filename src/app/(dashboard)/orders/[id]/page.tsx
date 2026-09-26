@@ -75,6 +75,7 @@ import { OrderLineGroupPriceForm } from "./order-line-group-price-form";
 import { SerialChipList } from "./serial-chip-list";
 import { ComboChildSwapButton, ComboPriceForm } from "./combo-line-controls";
 import { OrderLineChargeDurationForm } from "./order-line-charge-duration-form";
+import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 import { countAssemblableSets } from "@/lib/combo";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
@@ -713,7 +714,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               {!order.completed_at && !order.cancelled_at && (
                 <QuickAddProductSearch orderId={order.id} options={quickAddOptions} />
               )}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border">
                 {lines?.length ? (
                   (() => {
                     // Cột "Số kỳ tính" — số ngày/giờ... tính tiền của dòng, sửa
@@ -870,7 +871,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   </p>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right tabular-nums">
+                              <TableCell className="text-right font-medium tabular-nums">
                                 {currencyFormatter.format(line.line_total)}đ
                               </TableCell>
                               <TableCell>
@@ -1005,7 +1006,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                 </p>
                               )}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums">
+                            <TableCell className="text-right font-medium tabular-nums">
                               {currencyFormatter.format(members.reduce((sum, m) => sum + m.line_total, 0))}đ
                             </TableCell>
                             <TableCell>—</TableCell>
@@ -1112,7 +1113,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               )}
                               <p className="mt-0.5 text-xs text-muted-foreground">/bộ · chia theo giá lẻ từng món</p>
                             </TableCell>
-                            <TableCell className="text-right tabular-nums">
+                            <TableCell className="text-right font-medium tabular-nums">
                               {currencyFormatter.format(comboTotal)}đ
                             </TableCell>
                             <TableCell>—</TableCell>
@@ -1150,7 +1151,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     return canManage ? (
                       <OrderLinesSortableTable orderId={order.id} rows={lineRows} />
                     ) : (
-                      <Table className="min-w-[1080px] table-fixed">
+                      <Table className={ORDER_LINES_TABLE_CLASS}>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Hàng hoá</TableHead>
