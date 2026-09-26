@@ -985,6 +985,12 @@ export interface Database {
           message: string | null;
           product_slug: string | null;
           source_page: string | null;
+          // "website" (form web cho thuê) | "advisor" (trang tư vấn máy AI)
+          source: string;
+          // buy | rent | rent_to_buy | advice — chỉ lead từ trang tư vấn
+          intent: string | null;
+          // Cấu hình khách vừa tính trên trang tư vấn (model, mức nén...)
+          details: Record<string, unknown> | null;
           created_at: string;
         };
         Insert: never;

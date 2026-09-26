@@ -20,8 +20,49 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeZone: VN_TIME_ZONE,
 });
 
-// Hộp thư khách hỏi thuê từ form web new.thuenhanh.vn (bảng website_leads).
-// Mỗi lead cũng đã gửi email về ceo@ lúc khách bấm gửi — đây là sổ lưu đầy đủ.
+const INTENT_LABELS: Record<string, string> = {
+  buy: "Muốn mua",
+  rent: "Muốn thuê",
+  rent_to_buy: "Thuê thử rồi mua",
+  advice: "Cần tư vấn",
+};
+
+// Tóm tắt cấu hình khách vừa tính trên trang tư vấn máy AI (details jsonb
+// do web du-may gửi) — chỉ đọc các khoá đã biết, khoá lạ bỏ qua.
+function advisorSummary(details: Record<string, unknown> | null): string[] {
+  if (!details) return [];
+  const pick = (key: string) => {
+    const value = details[key];
+    return typeof value === "string" || typeof value === "number" ? String(value) : null;
+  };
+  const lines: string[] = [];
+  const model = pick("model");
+  if (model) {
+    const quant = pick("quant");
+    lines.push(`Model: ${model}${quant ? ` (${quant})` : ""}`);
+  }
+  const context = pick("context");
+  const users = pick("users");
+  if (context || users) {
+    lines.push(
+      [context && `ngữ cảnh ${context} token`, users && `${users} người dùng`]
+        .filter(Boolean)
+        .join(", "),
+    );
+  }
+  const need = pick("memory_needed_gb");
+  if (need) lines.push(`Cần ~${need} GB bộ nhớ`);
+  const hardware = pick("hardware");
+  if (hardware) {
+    const tps = pick("est_tps");
+    lines.push(`Máy chọn: ${hardware}${tps ? ` · ~${tps} token/s` : ""}`);
+  }
+  return lines;
+}
+
+// Hộp thư khách hỏi từ web: form new.thuenhanh.vn (source = website) và
+// trang tư vấn máy chạy AI (source = advisor, kèm nhu cầu + cấu hình đã tính).
+// Mỗi lead web cho thuê cũng đã gửi email về ceo@ — đây là sổ lưu đầy đủ.
 export default async function WebsiteLeadsPage() {
   await requireRole([...MANAGE_ROLES]);
 
@@ -36,7 +77,7 @@ export default async function WebsiteLeadsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Khách hỏi thuê từ web</h1>
+        <h1 className="text-2xl font-semibold">Khách hỏi từ web</h1>
         <Link href="/website" className="text-sm font-medium text-primary hover:underline">
           ← Quản trị website
         </Link>
@@ -74,9 +115,30 @@ export default async function WebsiteLeadsPage() {
                   </a>
                 </div>
               </TableCell>
-              <TableCell className="max-w-md text-sm">{lead.message ?? "—"}</TableCell>
+              <TableCell className="max-w-md text-sm">
+                {lead.source === "advisor" && (
+                  <div className="mb-1 flex flex-wrap gap-1">
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                      Tư vấn máy AI
+                    </span>
+                    {lead.intent && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+                        {INTENT_LABELS[lead.intent] ?? lead.intent}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <p>{lead.message ?? (lead.source === "advisor" ? "" : "—")}</p>
+                {advisorSummary(lead.details).map((line) => (
+                  <p key={line} className="text-xs text-muted-foreground">
+                    {line}
+                  </p>
+                ))}
+              </TableCell>
               <TableCell className="text-sm">
-                {lead.product_slug ? (
+                {lead.source === "advisor" ? (
+                  lead.product_slug ?? "—"
+                ) : lead.product_slug ? (
                   <a
                     className="text-primary hover:underline"
                     href={`https://new.thuenhanh.vn/${lead.product_slug}`}
