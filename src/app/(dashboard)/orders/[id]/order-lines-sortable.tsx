@@ -95,16 +95,17 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
     >
       {/* table-fixed + bề rộng cố định cho cột số (CEO 2026-09-25: SL/Giá
           thuê/Thành tiền bị giãn quá to) — phần thừa dồn cho cột Hàng hoá. */}
-      <Table className="min-w-[960px] table-fixed">
+      <Table className="min-w-[1080px] table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
             <TableHead>Hàng hoá</TableHead>
-            <TableHead className="w-[200px]">Biến thể/Sản phẩm</TableHead>
-            <TableHead className="w-[120px]">SL</TableHead>
-            <TableHead className="w-[170px]">Giá thuê</TableHead>
+            <TableHead className="w-[190px]">Biến thể/Sản phẩm</TableHead>
+            <TableHead className="w-[105px]">SL</TableHead>
+            <TableHead className="w-[110px]">Số kỳ tính</TableHead>
+            <TableHead className="w-[160px]">Giá thuê</TableHead>
             <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-            <TableHead className="w-[150px]">Người thực hiện</TableHead>
+            <TableHead className="w-[130px]">Người thực hiện</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>

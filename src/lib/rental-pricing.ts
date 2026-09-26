@@ -15,6 +15,9 @@ export interface ComputeLinePriceInput {
   rentalStartAt: string | null;
   rentalEndAt: string | null;
   quantity: number;
+  // Số kỳ tính tiền sửa tay trên dòng (order_equipment.charge_duration) — có
+  // thì dùng thay cho số kỳ suy từ thời gian thuê của đơn.
+  durationOverride?: number | null;
 }
 
 export interface ComputedLinePrice {
@@ -121,15 +124,14 @@ export function computeOrderLinePrice(input: ComputeLinePriceInput): ComputedLin
     return { unitPrice: price, lineTotal: round2(price * quantity) };
   }
 
-  if (!input.rentalStartAt || !input.rentalEndAt || !input.rentalPeriodUnit) {
+  const hasOverride = input.durationOverride != null && input.durationOverride > 0;
+  if (!input.rentalPeriodUnit || (!hasOverride && (!input.rentalStartAt || !input.rentalEndAt))) {
     throw new Error("Hàng cho thuê phải có ngày giờ bắt đầu, kết thúc và đơn vị thời gian.");
   }
 
-  const durationInUnit = computeRentalDurationInUnit(
-    input.rentalStartAt,
-    input.rentalEndAt,
-    input.rentalPeriodUnit,
-  );
+  const durationInUnit = hasOverride
+    ? input.durationOverride!
+    : computeRentalDurationInUnit(input.rentalStartAt!, input.rentalEndAt!, input.rentalPeriodUnit);
   const linear = price * durationInUnit;
 
   let unitPrice = linear;

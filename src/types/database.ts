@@ -509,12 +509,16 @@ export interface Database {
           // Dòng con của combo trỏ về dòng combo (dòng mẹ, 0đ) — doanh thu
           // combo đã chia xuống các dòng con theo tỉ lệ giá lẻ.
           parent_line_id: string | null;
+          // Số kỳ tính tiền sửa tay (vd khách cầm 5 ngày, tính 3 ngày) — null =
+          // tự tính theo thời gian thuê của đơn. Đơn vị = rental_period_unit.
+          charge_duration: number | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           order_id: string;
           parent_line_id?: string | null;
+          charge_duration?: number | null;
           equipment_type_id?: string | null;
           custom_name?: string | null;
           equipment_unit_id?: string | null;

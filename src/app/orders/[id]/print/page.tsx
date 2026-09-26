@@ -5,7 +5,12 @@ import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
 import { VN_TIME_ZONE } from "@/lib/date-format";
-import { equipmentDetailLabel, equipmentInstanceLabel } from "@/lib/equipment-labels";
+import {
+  RENTAL_PERIOD_UNIT_LABELS,
+  equipmentDetailLabel,
+  equipmentInstanceLabel,
+} from "@/lib/equipment-labels";
+import type { RentalPeriodUnit } from "@/types/database";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
 import { PrintButton } from "./print-button";
@@ -21,6 +26,17 @@ const PRINT_DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "colle
 
 function isPrintDocType(value: string | undefined): value is PrintDocType {
   return !!value && (PRINT_DOC_TYPES as string[]).includes(value);
+}
+
+// Dòng sửa tay số kỳ tính tiền (khách cầm 5 ngày, tính 3 ngày — CEO
+// 2026-09-26) ghi rõ trên chứng từ để khách hiểu đơn giá.
+function chargeNote(chargeDuration: number | null, unit: RentalPeriodUnit | null | undefined) {
+  if (chargeDuration == null || !unit) return null;
+  return (
+    <span className="block text-xs text-neutral-500">
+      Tính {chargeDuration} {RENTAL_PERIOD_UNIT_LABELS[unit]}
+    </span>
+  );
 }
 
 export default async function OrderPrintPage({
@@ -47,7 +63,7 @@ export default async function OrderPrintPage({
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
     supabase.from("branches").select("id, name"),
-    supabase.from("equipment_types").select("id, name"),
+    supabase.from("equipment_types").select("id, name, rental_period_unit"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
   ]);
 
@@ -190,7 +206,9 @@ export default async function OrderPrintPage({
                 return [
                   <tr key={line.id} className="border-b border-neutral-100">
                     <td className="py-2 font-medium">{equipmentType?.name ?? "—"}</td>
-                    <td className="py-2 text-neutral-500">Combo gồm:</td>
+                    <td className="py-2 text-neutral-500">
+                      Combo gồm:{chargeNote(line.charge_duration, equipmentType?.rental_period_unit)}
+                    </td>
                     <td className="py-2 text-right">{line.quantity}</td>
                     {showPrices && (
                       <td className="py-2 text-right">
@@ -240,7 +258,10 @@ export default async function OrderPrintPage({
               return [
                 <tr key={line.id} className="border-b border-neutral-200">
                   <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>
-                  <td className="py-2">{detail}</td>
+                  <td className="py-2">
+                    {detail}
+                    {chargeNote(line.charge_duration, equipmentType?.rental_period_unit)}
+                  </td>
                   <td className="py-2 text-right">{line.quantity}</td>
                   {showPrices && (
                     <td className="py-2 text-right">{currencyFormatter.format(line.unit_price)}đ</td>

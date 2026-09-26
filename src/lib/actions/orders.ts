@@ -546,7 +546,9 @@ export async function updateOrderRentalPeriod(
 
   const { data: lines } = await supabase
     .from("order_equipment")
-    .select("id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, parent_line_id")
+    .select(
+      "id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, parent_line_id, charge_duration",
+    )
     .eq("order_id", id);
 
   const period = {
@@ -561,7 +563,7 @@ export async function updateOrderRentalPeriod(
       const comboError = await repriceComboLine(
         supabase,
         { id: line.id, equipment_type_id: line.equipment_type_id, quantity: line.quantity },
-        period,
+        { ...period, durationOverride: line.charge_duration },
       );
       if (comboError) return { error: "Không tính lại được giá combo: " + comboError };
       continue;
@@ -579,6 +581,8 @@ export async function updateOrderRentalPeriod(
       parsed.data.rental_end_at,
       line.quantity,
       unitPriceOverride,
+      // Dòng đã sửa tay số kỳ tính tiền giữ nguyên số kỳ đó khi đổi lịch.
+      line.charge_duration,
     );
     if (equipmentType.product_type !== "rental" || equipmentType.tracking_type === "combo") continue;
 
@@ -746,7 +750,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration",
     )
     .eq("order_id", id)
     .order("position");
@@ -785,6 +789,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       quantity: line.quantity,
       unit_price: line.unit_price,
       line_total: line.line_total,
+      charge_duration: line.charge_duration,
     });
     // Dòng thường + dòng combo trước, rồi mới tới món con (trỏ về id dòng
     // combo MỚI) — giữ nguyên cấu trúc combo ở đơn nhân bản.
@@ -855,6 +860,8 @@ function computeLinePrice(
   // Giá riêng của biến thể (equipment_units.price) khi đã xác định được biến
   // thể cụ thể — null/undefined = dùng giá chung của sản phẩm như trước.
   unitPriceOverride?: number | null,
+  // Số kỳ tính tiền sửa tay trên dòng (charge_duration) — null = theo đơn.
+  durationOverride?: number | null,
 ) {
   return computeOrderLinePrice({
     productType: equipmentType.product_type,
@@ -865,6 +872,7 @@ function computeLinePrice(
     rentalStartAt,
     rentalEndAt,
     quantity,
+    durationOverride,
   });
 }
 
@@ -875,6 +883,7 @@ async function computeLineForEquipmentType(
   rentalEndAt: string | null,
   quantity: number,
   unitPriceOverride?: number | null,
+  durationOverride?: number | null,
 ) {
   const { equipmentType, tiers } = await fetchEquipmentTypeForPricing(supabase, equipmentTypeId);
   const computed = computeLinePrice(
@@ -884,6 +893,7 @@ async function computeLineForEquipmentType(
     rentalEndAt,
     quantity,
     unitPriceOverride,
+    durationOverride,
   );
   return { equipmentType, computed };
 }
@@ -928,7 +938,13 @@ async function resolveUnitPriceOverride(
 // báo cáo doanh thu theo thiết bị tự đúng.
 // ---------------------------------------------------------------------------
 
-type RentalPeriod = { rentalStartAt: string | null; rentalEndAt: string | null };
+// durationOverride = số kỳ tính tiền sửa tay của dòng combo (charge_duration)
+// — áp cho cả giá combo lẫn trọng số chia xuống món con.
+type RentalPeriod = {
+  rentalStartAt: string | null;
+  rentalEndAt: string | null;
+  durationOverride?: number | null;
+};
 
 // Giá thuê lẻ của từng dòng con (loại hàng × SL) cho cùng khung thuê — trọng
 // số chia tiền combo. Loại hàng không tính được giá thì trọng số 0.
@@ -953,6 +969,8 @@ async function componentListTotals(
           period.rentalStartAt,
           period.rentalEndAt,
           item.quantity,
+          null,
+          period.durationOverride,
         ).lineTotal,
       );
     } catch {
@@ -1329,6 +1347,8 @@ async function repriceComboLine(
         period.rentalStartAt,
         period.rentalEndAt,
         parent.quantity,
+        null,
+        period.durationOverride,
       );
       total = computed.lineTotal;
     } catch (e) {
@@ -1590,7 +1610,7 @@ export async function updateComboLinePrice(
   const supabase = await createClient();
   const { data: parent } = await supabase
     .from("order_equipment")
-    .select("id, order_id, equipment_type_id, quantity, orders(rental_start_at, rental_end_at)")
+    .select("id, order_id, equipment_type_id, quantity, charge_duration, orders(rental_start_at, rental_end_at)")
     .eq("id", parentLineId)
     .single();
   if (!parent?.equipment_type_id) return { error: "Không tìm thấy dòng combo." };
@@ -1605,12 +1625,122 @@ export async function updateComboLinePrice(
     {
       rentalStartAt: orderPeriod?.rental_start_at ?? null,
       rentalEndAt: orderPeriod?.rental_end_at ?? null,
+      durationOverride: parent.charge_duration,
     },
     round2(parsed.data.unit_price * parent.quantity),
   );
   if (error) return { error: "Không thể sửa giá combo: " + error };
 
   revalidatePath(`/orders/${parent.order_id}`);
+  return { success: true };
+}
+
+const ChargeDurationSchema = z.object({
+  // Bỏ trống = về lại số kỳ tự tính theo thời gian thuê của đơn.
+  charge_duration: z.union([
+    z.literal(""),
+    z.coerce.number().positive({ message: "Số kỳ tính tiền phải lớn hơn 0." }).max(9999),
+  ]),
+});
+
+// Sửa số kỳ tính tiền của dòng (CEO 2026-09-26, học Booqable "charge length"):
+// khách cầm 5 ngày nhưng chỉ tính 3 ngày. Đơn giá tính lại từ giá gốc × số kỳ
+// mới (xét cả bậc giảm theo số kỳ đó); nhận nhiều id để áp 1 lần cho nhóm máy
+// serial đang gộp. Dòng combo thì tính lại giá combo rồi chia lại món con.
+export async function updateOrderLineChargeDuration(
+  lineIds: string[],
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+
+  const parsed = ChargeDurationSchema.safeParse({ charge_duration: formData.get("charge_duration") ?? "" });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const chargeDuration = parsed.data.charge_duration === "" ? null : parsed.data.charge_duration;
+  if (!lineIds.length) return { error: "Không có dòng hàng nào." };
+
+  const supabase = await createClient();
+  const { data: lines } = await supabase
+    .from("order_equipment")
+    .select(
+      "id, order_id, parent_line_id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, orders(rental_start_at, rental_end_at)",
+    )
+    .in("id", lineIds);
+  if (!lines?.length) return { error: "Không tìm thấy dòng hàng." };
+
+  for (const line of lines) {
+    if (!line.equipment_type_id || line.parent_line_id) continue;
+    const orderPeriod = line.orders as unknown as {
+      rental_start_at: string | null;
+      rental_end_at: string | null;
+    } | null;
+    const period = {
+      rentalStartAt: orderPeriod?.rental_start_at ?? null,
+      rentalEndAt: orderPeriod?.rental_end_at ?? null,
+      durationOverride: chargeDuration,
+    };
+
+    const { data: childCheck } = await supabase
+      .from("order_equipment")
+      .select("id")
+      .eq("parent_line_id", line.id)
+      .limit(1);
+    if (childCheck?.length) {
+      const { error } = await supabase
+        .from("order_equipment")
+        .update({ charge_duration: chargeDuration })
+        .eq("id", line.id);
+      if (error) return { error: "Không lưu được số kỳ tính tiền: " + error.message };
+      const comboError = await repriceComboLine(
+        supabase,
+        { id: line.id, equipment_type_id: line.equipment_type_id, quantity: line.quantity },
+        period,
+      );
+      if (comboError) return { error: "Không tính lại được giá combo: " + comboError };
+      continue;
+    }
+
+    let computed;
+    let productType;
+    try {
+      const unitPriceOverride = await resolveUnitPriceOverride(
+        supabase,
+        line.equipment_unit_id,
+        line.equipment_instance_id,
+      );
+      const result = await computeLineForEquipmentType(
+        supabase,
+        line.equipment_type_id,
+        period.rentalStartAt,
+        period.rentalEndAt,
+        line.quantity,
+        unitPriceOverride,
+        chargeDuration,
+      );
+      computed = result.computed;
+      productType = result.equipmentType.product_type;
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
+    }
+    if (productType !== "rental") {
+      return { error: "Chỉ hàng cho thuê mới có số kỳ tính tiền." };
+    }
+
+    // Lần lượt từng dòng — song song thì trigger tổng đơn đọc số cũ của nhau.
+    const { error } = await supabase
+      .from("order_equipment")
+      .update({
+        charge_duration: chargeDuration,
+        unit_price: computed.unitPrice,
+        line_total: computed.lineTotal,
+      })
+      .eq("id", line.id);
+    if (error) return { error: "Không lưu được số kỳ tính tiền: " + error.message };
+  }
+
+  revalidatePath(`/orders/${lines[0].order_id}`);
   return { success: true };
 }
 

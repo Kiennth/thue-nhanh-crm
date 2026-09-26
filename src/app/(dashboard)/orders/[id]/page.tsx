@@ -74,6 +74,7 @@ import { OrderComments } from "./order-comments";
 import { OrderLineGroupPriceForm } from "./order-line-group-price-form";
 import { SerialChipList } from "./serial-chip-list";
 import { ComboChildSwapButton, ComboPriceForm } from "./combo-line-controls";
+import { OrderLineChargeDurationForm } from "./order-line-charge-duration-form";
 import { countAssemblableSets } from "@/lib/combo";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
@@ -436,19 +437,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // hoặc đơn chưa có khung thời gian (khi đó chỉ hiện số tiền như cũ).
   const orderRentalStartAt = order.rental_start_at;
   const orderRentalEndAt = order.rental_end_at;
-  function describeCharge(type: (NonNullable<typeof equipmentTypes>)[number], unitPrice: number) {
-    if (
-      type.product_type !== "rental" ||
-      !type.rental_period_unit ||
-      !orderRentalStartAt ||
-      !orderRentalEndAt
-    )
-      return null;
-    const duration = computeRentalDurationInUnit(
-      orderRentalStartAt,
-      orderRentalEndAt,
-      type.rental_period_unit,
-    );
+  // durationOverride = số kỳ tính tiền sửa tay trên dòng (charge_duration,
+  // CEO 2026-09-26) — có thì diễn giải theo số đó thay vì theo thời gian thuê.
+  function describeCharge(
+    type: (NonNullable<typeof equipmentTypes>)[number],
+    unitPrice: number,
+    durationOverride?: number | null,
+  ) {
+    if (type.product_type !== "rental" || !type.rental_period_unit) return null;
+    const autoDuration =
+      orderRentalStartAt && orderRentalEndAt
+        ? computeRentalDurationInUnit(orderRentalStartAt, orderRentalEndAt, type.rental_period_unit)
+        : null;
+    const duration = durationOverride ?? autoDuration;
+    if (duration == null) return null;
     const tier =
       type.pricing_method === "pricing_structure" && type.pricing_template_id
         ? findApplicableTier(
@@ -467,6 +469,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       // Giá lưu trên dòng lệch giá tính mặc định → đã được sửa tay.
       isCustom: Math.abs(defaultUnitPrice - unitPrice) > 0.5,
       defaultUnitPrice,
+      autoDuration,
+      isDurationCustom: durationOverride != null,
     };
   }
 
@@ -712,6 +716,32 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <div className="overflow-x-auto">
                 {lines?.length ? (
                   (() => {
+                    // Cột "Số kỳ tính" — số ngày/giờ... tính tiền của dòng, sửa
+                    // tay được (khách cầm 5 ngày, tính 3 ngày).
+                    const durationCell = (
+                      type: (NonNullable<typeof equipmentTypes>)[number] | undefined,
+                      lineIds: string[],
+                      unitPrice: number,
+                      durationOverride: number | null,
+                    ) => {
+                      const c = type ? describeCharge(type, unitPrice, durationOverride) : null;
+                      return (
+                        <TableCell>
+                          {c ? (
+                            <OrderLineChargeDurationForm
+                              lineIds={lineIds}
+                              duration={c.duration}
+                              autoDuration={c.autoDuration}
+                              isCustom={c.isDurationCustom}
+                              unitLabel={c.unitLabel}
+                              canEdit={canManage}
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                      );
+                    };
                     const renderSingleLine = (line: (typeof lines)[number]) => {
                         const type = line.equipment_type_id
                           ? equipmentTypeById.get(line.equipment_type_id)
@@ -746,7 +776,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         const shortage = line.equipment_unit_id
                           ? shortageByUnit.get(line.equipment_unit_id)
                           : undefined;
-                        const charge = type ? describeCharge(type, line.unit_price) : null;
+                        const charge = type ? describeCharge(type, line.unit_price, line.charge_duration) : null;
                         return {
                           id: line.id,
                           content: (
@@ -816,6 +846,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   )}
                                 </div>
                               </TableCell>
+                              {durationCell(type, [line.id], line.unit_price, line.charge_duration)}
                               <TableCell>
                                 {canManage ? (
                                   <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
@@ -912,7 +943,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       const first = members[0];
                       const type = equipmentTypeById.get(first.equipment_type_id!)!;
                       const memberIds = members.map((m) => m.id);
-                      const charge = describeCharge(type, first.unit_price);
+                      const charge = describeCharge(type, first.unit_price, first.charge_duration);
                       const chips = members.map((m) => {
                         const inst = equipmentInstanceById.get(m.equipment_instance_id!);
                         const variant = inst?.equipment_unit_id
@@ -951,6 +982,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               <SerialChipList items={chips} canRemove={canManage} />
                             </TableCell>
                             <TableCell className="tabular-nums">{members.length}</TableCell>
+                            {durationCell(type, memberIds, first.unit_price, first.charge_duration)}
                             <TableCell>
                               {canManage ? (
                                 <OrderLineGroupPriceForm lineIds={memberIds} unitPrice={first.unit_price} />
@@ -1071,6 +1103,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               </ul>
                             </TableCell>
                             <TableCell className="tabular-nums">{parent.quantity}</TableCell>
+                            {durationCell(type, [parent.id], perSet, parent.charge_duration)}
                             <TableCell>
                               {canManage ? (
                                 <ComboPriceForm parentLineId={parent.id} unitPrice={perSet} />
@@ -1117,15 +1150,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     return canManage ? (
                       <OrderLinesSortableTable orderId={order.id} rows={lineRows} />
                     ) : (
-                      <Table className="min-w-[960px] table-fixed">
+                      <Table className="min-w-[1080px] table-fixed">
                         <TableHeader>
                           <TableRow>
                             <TableHead>Hàng hoá</TableHead>
-                            <TableHead className="w-[200px]">Biến thể/Sản phẩm</TableHead>
-                            <TableHead className="w-[120px]">SL</TableHead>
-                            <TableHead className="w-[170px]">Giá thuê</TableHead>
+                            <TableHead className="w-[190px]">Biến thể/Sản phẩm</TableHead>
+                            <TableHead className="w-[105px]">SL</TableHead>
+                            <TableHead className="w-[110px]">Số kỳ tính</TableHead>
+                            <TableHead className="w-[160px]">Giá thuê</TableHead>
                             <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-                            <TableHead className="w-[150px]">Người thực hiện</TableHead>
+                            <TableHead className="w-[130px]">Người thực hiện</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
