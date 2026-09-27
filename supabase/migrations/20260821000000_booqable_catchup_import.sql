@@ -882,3 +882,27 @@
 --     - CƠ BẢN 2H → Photo Booth Classic (BQ12999 2,5tr).
 --   * TỒN CUỐI: 1.201 dòng treo / 517 tên / 309,8tr (gồm cả nhóm bỏ qua &
 --     không khớp).
+--
+-- ## Đợt map 18 (CEO 2026-09-26 → 2026-09-27):
+--   * ĐỒNG BỘ 26/09: import 12 (BQ12811/12943/12985/13002–13010), đóng 8,
+--     giao 11 (BQ12860/12850/12793/12953/12956/12975/12966/12977/12988/
+--     12996/12994), huỷ theo BQ 0.
+--   * TIỀN LỆ TỰ ÁP 10/11 dòng mới: Photo Booth Classic - CƠ BẢN 2H
+--     (BQ12811 + BQ13002); TV 98-inch TCL ×4 (BQ12943 36tr, tách máy); MH
+--     Gaming 27" EGM27F240S ×6; DJI Mic Mini (2 TX); Linksys FGW3000 ×2; TV
+--     43-inch SAMSUNG; Meta Quest 3S; Galaxy Tab A9+ ×3 (tách máy).
+--   * SP MỚI: "TV khung tranh QLED 4K 55-inch" (1tr/ngày, cọc 3tr, serial)
+--     — gắn BQ12985 The Bros ×3 (24tr, 01/10–30/11) + BQ12845 cũ ×1. CEO:
+--     HCM thật có 1 máy; 2 máy còn lại CÔNG TY MUA TRƯỚC 01/10 → giữ 2 mã
+--     AUTO-SYNC có ghi chú "CHỜ MUA", mua về thay serial + nhập giá mua.
+--   * SP MỚI khác (ngoài map): "Tay cầm Nintendo Switch 2 JoyCon Controllers
+--     (1 cặp)" 200k/ngày, giá nhập 2,3tr/cặp (chưa nhập kho — chờ số cặp);
+--     "Máy ghi âm Zoom - H4N Pro" 250k/ngày (có bên Booqable, CRM thiếu —
+--     chờ số máy từng kho).
+--   * COMBO THẬT (tính năng mới 2026-09-26): tách "Combo Podcast Shure
+--     MV7X kèm máy ghi âm Zoom" thành 6 combo 1–6 mic (không biến thể), máy
+--     Zoom lấy theo thứ tự ưu tiên (1–2 mic: H4N → H4N Pro → H6; 3–4 mic:
+--     H6 → H6essential → H8; 5–6 mic: H8). Mã cũ GIỮ NGUYÊN vì đơn Booqable
+--     import còn map vào nó.
+--   * TỒN CUỐI 27/09: 1.200 dòng treo / 516 tên / 308,8tr (gồm cả nhóm bỏ
+--     qua & không khớp).
