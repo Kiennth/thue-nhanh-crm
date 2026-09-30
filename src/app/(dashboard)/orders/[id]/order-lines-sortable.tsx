@@ -94,21 +94,17 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      {/* table-fixed + bề rộng cố định cho cột số (CEO 2026-09-25: SL/Giá
-          thuê/Thành tiền bị giãn quá to). Hàng hoá và Biến thể/Sản phẩm không
-          đặt bề rộng — chia đều phần còn lại, 2 cột to bằng nhau (CEO
-          2026-09-30, sau khi thử cố định Hàng hoá 220px thấy hẹp). */}
+      {/* Bố cục kiểu Booqable (CEO 2026-09-30): Hàng hoá ăn hết phần còn lại
+          (tên + serial + ghi chú xếp dọc), các cột số cố định bề rộng. */}
       <Table className={ORDER_LINES_TABLE_CLASS}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
             <TableHead>Hàng hoá</TableHead>
-            <TableHead>Biến thể/Sản phẩm</TableHead>
+            <TableHead className="w-[92px]">Còn hàng</TableHead>
             <TableHead className="w-[125px]">SL</TableHead>
-            <TableHead className="w-[110px]">Số kỳ tính</TableHead>
-            <TableHead className="w-[210px]">Giá thuê</TableHead>
-            <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-            <TableHead className="w-[165px]">Người thực hiện</TableHead>
+            <TableHead className="w-[290px]">Tính tiền</TableHead>
+            <TableHead className="w-[125px] text-right">Thành tiền</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>

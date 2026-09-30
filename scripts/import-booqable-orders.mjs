@@ -163,6 +163,9 @@ async function fetchOrderLines(orderId) {
       quantity: l.attributes.quantity,
       unitPriceCents: l.attributes.price_each_in_cents,
       lineTotalCents: l.attributes.price_in_cents,
+      // Ghi chú dưới dòng của Booqable ("Kèm Remote | Dây nguồn", địa chỉ + SĐT
+      // giao hàng...) — trước 2026-09-30 bị bỏ lại, nhân viên phải mở Booqable.
+      extraInformation: l.attributes.extra_information?.trim() || null,
       product,
     });
   }
@@ -331,6 +334,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
         quantity: line.quantity,
         unit_price: unitPrice,
         line_total: lineTotal,
+        extra_information: line.extraInformation,
       });
     } else if (et.product_type === "service") {
       rows.push({
@@ -340,6 +344,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
         quantity: line.quantity,
         unit_price: unitPrice,
         line_total: lineTotal,
+        extra_information: line.extraInformation,
       });
     } else if (et.product_type === "sale") {
       // order_equipment_check_line requires equipment_unit_id for 'sale' too.
@@ -351,6 +356,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
         quantity: line.quantity,
         unit_price: unitPrice,
         line_total: lineTotal,
+        extra_information: line.extraInformation,
       });
     } else if (et.product_type === "rental" && et.tracking_type === "quantity") {
       const unitId = await getOrCreateEquipmentUnit(et);
@@ -362,6 +368,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
         quantity: line.quantity,
         unit_price: unitPrice,
         line_total: lineTotal,
+        extra_information: line.extraInformation,
       });
     } else if (et.product_type === "rental" && et.tracking_type === "individual") {
       const instanceIds = await getOrCreateInstances(et, pickupBranchId, line.quantity);
@@ -374,6 +381,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
           quantity: 1,
           unit_price: unitPrice,
           line_total: perUnitTotal,
+          extra_information: line.extraInformation,
         });
       }
     }

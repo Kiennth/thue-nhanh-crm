@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -68,6 +69,7 @@ interface EquipmentTypeDialogProps {
     image_url: string | null;
     payout_percentage: number | null;
     category_id: string | null;
+    default_extra_information?: string | null;
   };
   // Biến thể nút "Sửa" — icon-only ở bảng danh sách (mặc định), outline có
   // chữ ở trang chi tiết.
@@ -434,6 +436,22 @@ export function EquipmentTypeDialog({
               </p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="default_extra_information">Ghi chú mặc định trên đơn</Label>
+            <Textarea
+              id="default_extra_information"
+              name="default_extra_information"
+              defaultValue={equipmentType?.default_extra_information ?? ""}
+              placeholder="VD: Kèm Remote | Dây nguồn | Chân đế tuỳ chọn"
+              className="min-h-16"
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">
+              Thêm sản phẩm này vào đơn thì ghi chú tự điền dưới tên dòng hàng (sửa được trên từng
+              đơn) và in ra chứng từ.
+            </p>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

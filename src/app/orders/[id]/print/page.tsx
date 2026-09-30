@@ -28,6 +28,13 @@ function isPrintDocType(value: string | undefined): value is PrintDocType {
   return !!value && (PRINT_DOC_TYPES as string[]).includes(value);
 }
 
+// Ghi chú hiển thị của dòng (phụ kiện đi kèm, địa chỉ + SĐT giao/thu hồi) in
+// ngay dưới tên hàng — như chứng từ Booqable.
+function lineNote(note: string | null) {
+  if (!note) return null;
+  return <span className="block text-xs font-normal whitespace-pre-wrap text-neutral-500">{note}</span>;
+}
+
 // Dòng sửa tay số kỳ tính tiền (khách cầm 5 ngày, tính 3 ngày — CEO
 // 2026-09-26) ghi rõ trên chứng từ để khách hiểu đơn giá.
 function chargeNote(chargeDuration: number | null, unit: RentalPeriodUnit | null | undefined) {
@@ -97,6 +104,7 @@ export default async function OrderPrintPage({
     .maybeSingle();
 
   const branchNameById = new Map((branches ?? []).map((b) => [b.id, b.name]));
+  const printedNotes = new Set<string>();
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
@@ -176,6 +184,15 @@ export default async function OrderPrintPage({
           </thead>
           <tbody>
             {(lines ?? []).filter((line) => !line.parent_line_id).flatMap((line) => {
+              // Máy serial cùng sản phẩm in mỗi máy 1 dòng nhưng dùng chung 1
+              // ghi chú — chỉ in ghi chú ở dòng đầu, khỏi lặp.
+              const noteOnce = (l: typeof line) => {
+                if (!l.extra_information) return null;
+                const key = `${l.equipment_type_id ?? l.custom_name}|${l.extra_information}`;
+                if (printedNotes.has(key)) return null;
+                printedNotes.add(key);
+                return l.extra_information;
+              };
               const equipmentType = line.equipment_type_id
                 ? equipmentTypeById.get(line.equipment_type_id)
                 : undefined;
@@ -205,7 +222,10 @@ export default async function OrderPrintPage({
                 const comboTotal = children.reduce((sum, c) => sum + c.line_total, 0);
                 return [
                   <tr key={line.id} className="border-b border-neutral-100">
-                    <td className="py-2 font-medium">{equipmentType?.name ?? "—"}</td>
+                    <td className="py-2 font-medium">
+                      {equipmentType?.name ?? "—"}
+                      {lineNote(line.extra_information)}
+                    </td>
                     <td className="py-2 text-neutral-500">
                       Combo gồm:{chargeNote(line.charge_duration, equipmentType?.rental_period_unit)}
                     </td>
@@ -257,7 +277,10 @@ export default async function OrderPrintPage({
               }
               return [
                 <tr key={line.id} className="border-b border-neutral-200">
-                  <td className="py-2">{equipmentType?.name ?? line.custom_name ?? "—"}</td>
+                  <td className="py-2">
+                    {equipmentType?.name ?? line.custom_name ?? "—"}
+                    {lineNote(noteOnce(line))}
+                  </td>
                   <td className="py-2">
                     {detail}
                     {chargeNote(line.charge_duration, equipmentType?.rental_period_unit)}

@@ -205,6 +205,9 @@ export interface Database {
           payout_percentage: number | null;
           // Danh mục PHẲNG (1 sản phẩm = 1 category) — null = chưa phân loại.
           category_id: string | null;
+          // Ghi chú mặc định của dòng khi thêm SP này vào đơn (vd "Kèm Remote
+          // | Dây nguồn") — xem order_equipment.extra_information.
+          default_extra_information: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -221,6 +224,7 @@ export interface Database {
           image_url?: string | null;
           payout_percentage?: number | null;
           category_id?: string | null;
+          default_extra_information?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];
@@ -512,6 +516,10 @@ export interface Database {
           // Số kỳ tính tiền sửa tay (vd khách cầm 5 ngày, tính 3 ngày) — null =
           // tự tính theo thời gian thuê của đơn. Đơn vị = rental_period_unit.
           charge_duration: number | null;
+          // Ghi chú hiển thị của dòng (học Booqable "extra information"): phụ
+          // kiện đi kèm, địa chỉ + SĐT giao/thu hồi... In ra chứng từ. Khác
+          // `note` (nhật ký nội bộ: gắn lại dòng tự do, đổi món combo).
+          extra_information: string | null;
           created_at: string;
         };
         Insert: {
@@ -519,6 +527,7 @@ export interface Database {
           order_id: string;
           parent_line_id?: string | null;
           charge_duration?: number | null;
+          extra_information?: string | null;
           equipment_type_id?: string | null;
           custom_name?: string | null;
           equipment_unit_id?: string | null;

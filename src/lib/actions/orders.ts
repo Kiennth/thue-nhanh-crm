@@ -8,7 +8,7 @@ import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
-import { DELIVERY_NOTE_TYPE_IDS, TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
+import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 import { splitTotalByWeights } from "@/lib/combo";
 import type { TaskType } from "@/types/database";
@@ -457,60 +457,41 @@ export async function assignOrderLineEmployee(
   return { success: true };
 }
 
-const OrderLineNoteSchema = z.object({
-  note: z.string().max(500, { message: "Ghi chú tối đa 500 ký tự." }).optional(),
+const OrderLineExtraInfoSchema = z.object({
+  extra_information: z.string().max(1000, { message: "Ghi chú tối đa 1.000 ký tự." }).optional(),
 });
 
-// Ghi chú tự do cho 4 dòng phí vận chuyển (giao/thu hồi bằng xe máy hoặc ô
-// tô) — chỗ điền địa chỉ + SĐT nhận/trả hàng. Tách khỏi
-// assignOrderLineEmployee vì độc lập hoàn toàn với việc gán nhân viên/tính
-// khoán (2 dòng ô tô hiện còn CHƯA gán nhân viên được — xem comment tại
-// assignOrderLineEmployee — nhưng vẫn cần ghi chú được như thường).
-// Quyền giống hệt gán nhân viên dòng vận chuyển: CHT/Kỹ thuật-Sale tự điền
-// được (theo yêu cầu CEO), không giới hạn Admin/Kế toán/Giám đốc.
-export async function updateOrderLineNote(
-  lineId: string,
+// Ghi chú hiển thị của dòng hàng — học Booqable "extra information" (CEO
+// 2026-09-30): dòng nào cũng ghi được (phụ kiện đi kèm, địa chỉ + SĐT giao/
+// thu hồi...), in ra chứng từ. Nhận nhiều id để nhóm máy serial đang gộp 1
+// dòng dùng chung 1 ghi chú. Mọi nhân viên được ghi — giống Booqable, đây là
+// thông tin vận hành chứ không đụng tới tiền.
+export async function updateOrderLineExtraInfo(
+  lineIds: string[],
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const viewer = await getCurrentEmployee();
-  if (!viewer) {
-    redirect("/");
-  }
+  await requireRole([...ALL_ROLES]);
 
-  const parsed = OrderLineNoteSchema.safeParse({ note: formData.get("note") || undefined });
+  const parsed = OrderLineExtraInfoSchema.safeParse({
+    extra_information: formData.get("extra_information") || undefined,
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+  if (!lineIds.length) return { error: "Không có dòng hàng nào." };
 
   const supabase = await createClient();
-  const { data: line, error: lineError } = await supabase
+  const { data, error } = await supabase
     .from("order_equipment")
-    .select("order_id, equipment_type_id")
-    .eq("id", lineId)
-    .single();
-
-  if (lineError || !line) {
-    return { error: "Không tìm thấy dòng hàng." };
-  }
-  if (!line.equipment_type_id || !DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id)) {
-    return { error: "Dòng hàng này không phải dịch vụ vận chuyển." };
-  }
-  const allowedRoles = [...MANAGE_ROLES, ...BRANCH_SCOPED_ROLES];
-  if (!allowedRoles.includes(viewer.role)) {
-    return { error: "Bạn không có quyền ghi chú dòng hàng này." };
-  }
-
-  const { error } = await supabase
-    .from("order_equipment")
-    .update({ note: parsed.data.note?.trim() || null })
-    .eq("id", lineId);
-
+    .update({ extra_information: parsed.data.extra_information?.trim() || null })
+    .in("id", lineIds)
+    .select("order_id");
   if (error) {
     return { error: "Không thể lưu ghi chú: " + error.message };
   }
 
-  revalidatePath(`/orders/${line.order_id}`);
+  if (data?.[0]) revalidatePath(`/orders/${data[0].order_id}`);
   return { success: true };
 }
 
@@ -750,7 +731,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information",
     )
     .eq("order_id", id)
     .order("position");
@@ -790,6 +771,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       unit_price: line.unit_price,
       line_total: line.line_total,
       charge_duration: line.charge_duration,
+      extra_information: line.extra_information,
     });
     // Dòng thường + dòng combo trước, rồi mới tới món con (trỏ về id dòng
     // combo MỚI) — giữ nguyên cấu trúc combo ở đơn nhân bản.
@@ -830,7 +812,7 @@ async function fetchEquipmentTypeForPricing(supabase: SupabaseServerClient, equi
   const { data: equipmentType, error: typeError } = await supabase
     .from("equipment_types")
     .select(
-      "name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id",
+      "name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id, default_extra_information",
     )
     .eq("id", equipmentTypeId)
     .single();
@@ -1189,7 +1171,7 @@ async function addComboLines(
 
   const { data: componentTypes } = await supabase
     .from("equipment_types")
-    .select("id, name, product_type, tracking_type")
+    .select("id, name, product_type, tracking_type, default_extra_information")
     .in("id", [...new Set([...candidatesByComponent.values()].flat())]);
   const componentTypeById = new Map((componentTypes ?? []).map((t) => [t.id, t]));
 
@@ -1301,6 +1283,7 @@ async function addComboLines(
       quantity,
       unit_price: 0,
       line_total: 0,
+      extra_information: combo.equipmentType.default_extra_information,
     })
     .select("id")
     .single();
@@ -1319,6 +1302,7 @@ async function addComboLines(
       ...c,
       order_id: order.id,
       parent_line_id: parent.id,
+      extra_information: componentTypeById.get(c.equipment_type_id)?.default_extra_information ?? null,
       unit_price: round2(shares[i] / c.quantity),
       line_total: shares[i],
     })),
@@ -1511,6 +1495,8 @@ export async function addOrderEquipmentLine(
     quantity: parsed.data.quantity,
     unit_price: computed.unitPrice,
     line_total: computed.lineTotal,
+    // Ghi chú mặc định của sản phẩm (vd "Kèm Remote | Dây nguồn").
+    extra_information: equipmentType.default_extra_information,
   });
 
   if (error) {

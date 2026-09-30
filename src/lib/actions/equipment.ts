@@ -80,6 +80,8 @@ const EquipmentTypeSchema = z
       .max(100, { message: "% trả trực tiếp phải từ 0-100." })
       .optional(),
     category_id: z.string().uuid().optional(),
+    // Ghi chú mặc định của dòng khi thêm SP vào đơn (học Booqable).
+    default_extra_information: z.string().trim().max(1000).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.product_type !== "rental") return;
@@ -131,6 +133,7 @@ function normalizeEquipmentType(
       deposit_amount: data.tracking_type === "combo" ? 0 : (data.deposit_amount ?? 0),
       payout_percentage: null,
       category_id: data.category_id ?? null,
+      default_extra_information: data.default_extra_information || null,
     };
   }
 
@@ -146,6 +149,7 @@ function normalizeEquipmentType(
       deposit_amount: 0,
       payout_percentage: data.payout_percentage ?? null,
       category_id: data.category_id ?? null,
+      default_extra_information: data.default_extra_information || null,
     };
   }
 
@@ -161,6 +165,7 @@ function normalizeEquipmentType(
     deposit_amount: 0,
     payout_percentage: null,
     category_id: data.category_id ?? null,
+    default_extra_information: data.default_extra_information || null,
   };
 }
 
@@ -176,6 +181,7 @@ function parseEquipmentTypeForm(formData: FormData) {
     deposit_amount: formData.get("deposit_amount") || undefined,
     payout_percentage: formData.get("payout_percentage") || undefined,
     category_id: formData.get("category_id") || undefined,
+    default_extra_information: formData.get("default_extra_information") || undefined,
   });
 }
 

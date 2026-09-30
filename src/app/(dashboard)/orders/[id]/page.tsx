@@ -55,10 +55,8 @@ import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { OrderDiscountForm } from "./order-discount-form";
-import { OrderLinePriceForm } from "./order-line-price-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
-import { OrderLineNoteForm } from "./order-line-note-form";
 import { RentalPeriodForm } from "./rental-period-form";
 import { OrderInfoForm } from "./order-info-form";
 import { CancelOrderButton } from "./cancel-order-button";
@@ -71,10 +69,10 @@ import { PrintMenu } from "./print-menu";
 import { OrderConflictAlert } from "./order-conflict-alert";
 import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { OrderComments } from "./order-comments";
-import { OrderLineGroupPriceForm } from "./order-line-group-price-form";
 import { SerialChipList } from "./serial-chip-list";
-import { ComboChildSwapButton, ComboPriceForm } from "./combo-line-controls";
-import { OrderLineChargeDurationForm } from "./order-line-charge-duration-form";
+import { ComboChildSwapButton } from "./combo-line-controls";
+import { LineChargeEditor, type LinePriceTarget } from "./line-charge-editor";
+import { LineNoteEditor } from "./line-note-editor";
 import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 import { countAssemblableSets } from "@/lib/combo";
 import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
@@ -717,182 +715,168 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <div className="overflow-x-auto rounded-lg border">
                 {lines?.length ? (
                   (() => {
-                    // Cột "Số kỳ tính" — số ngày/giờ... tính tiền của dòng, sửa
-                    // tay được (khách cầm 5 ngày, tính 3 ngày).
-                    const durationCell = (
-                      type: (NonNullable<typeof equipmentTypes>)[number] | undefined,
-                      lineIds: string[],
-                      unitPrice: number,
-                      durationOverride: number | null,
-                    ) => {
-                      const c = type ? describeCharge(type, unitPrice, durationOverride) : null;
+                    // Bố cục kiểu Booqable (CEO 2026-09-30, team dùng quen): cột
+                    // Hàng hoá rộng — tên ở trên; serial/biến thể, người thực hiện
+                    // (dòng dịch vụ) và ghi chú xếp ngay dưới tên — rồi tới Còn
+                    // hàng · SL · Tính tiền (số kỳ + giá gộp 1 ô) · Thành tiền.
+                    type Line = (typeof lines)[number];
+                    type EqType = NonNullable<typeof equipmentTypes>[number];
+                    const canNote = !!employee;
+
+                    const productCell = (
+                      type: EqType | undefined,
+                      fallbackName: string | null,
+                      below: React.ReactNode,
+                    ) => (
+                      <TableCell className="whitespace-normal">
+                        <div className="flex items-start gap-2.5">
+                          {type?.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
+                            <img src={type.image_url} alt="" className="size-9 shrink-0 rounded object-cover" />
+                          ) : (
+                            <span className="bg-muted size-9 shrink-0 rounded" />
+                          )}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="leading-5 font-medium">
+                              {type ? (
+                                <Link href={`/equipment/${type.id}`} className="underline-offset-2 hover:underline">
+                                  {type.name}
+                                </Link>
+                              ) : (
+                                (fallbackName ?? "—")
+                              )}
+                            </p>
+                            {below}
+                          </div>
+                        </div>
+                      </TableCell>
+                    );
+
+                    // Ô "Còn hàng" (Booqable "Available"): hàng theo số lượng hiện
+                    // số còn dư/thiếu sau khi trừ mọi đơn đang giữ; dịch vụ là ∞.
+                    const availabilityCell = (unitId: string | null, unlimited: boolean) => {
+                      const shortage = unitId ? shortageByUnit.get(unitId) : undefined;
                       return (
                         <TableCell>
-                          {c ? (
-                            <OrderLineChargeDurationForm
-                              lineIds={lineIds}
-                              duration={c.duration}
-                              autoDuration={c.autoDuration}
-                              isCustom={c.isDurationCustom}
-                              unitLabel={c.unitLabel}
-                              canEdit={canManage}
-                            />
+                          {shortage ? (
+                            <span
+                              className="inline-flex cursor-default rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium whitespace-nowrap text-destructive"
+                              title={`Trong kho còn ${shortage.available}, tổng nhu cầu các đơn chưa giao ${shortage.totalDemand}${
+                                shortage.otherOrders.length > 0
+                                  ? ` — đơn khác đang giữ: ${shortage.otherOrders
+                                      .map(([code, qty]) => `${code} (${qty})`)
+                                      .join(", ")}`
+                                  : ""
+                              }`}
+                            >
+                              thiếu {shortage.shortage}
+                            </span>
+                          ) : unitId && stockLeftByUnit.has(unitId) ? (
+                            <span
+                              className="inline-flex cursor-default rounded-md bg-emerald-500/15 px-2 py-1 text-xs font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-400"
+                              title="Số còn dư trong kho sau khi trừ mọi đơn đang giữ hàng"
+                            >
+                              còn {stockLeftByUnit.get(unitId)}
+                            </span>
+                          ) : unlimited ? (
+                            <span className="text-muted-foreground" title="Dịch vụ — không giới hạn tồn kho">
+                              ∞
+                            </span>
                           ) : (
-                            "—"
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
                       );
                     };
-                    const renderSingleLine = (line: (typeof lines)[number]) => {
-                        const type = line.equipment_type_id
-                          ? equipmentTypeById.get(line.equipment_type_id)
-                          : undefined;
-                        const isTransportLine =
-                          !!line.equipment_type_id &&
-                          line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
-                        // 4 SKU giao/thu hồi (xe máy + ô tô) — ô ghi chú địa
-                        // chỉ + SĐT nhận/trả hàng, độc lập với việc gán nhân
-                        // viên/tính khoán ở trên.
-                        const showDeliveryNote =
-                          !!line.equipment_type_id && DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id);
-                        const lineInstance = line.equipment_instance_id
-                          ? equipmentInstanceById.get(line.equipment_instance_id)
-                          : undefined;
-                        const rawDetail = line.equipment_unit_id
-                          ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
-                          : lineInstance
-                            ? equipmentInstanceLabel(
-                                lineInstance.equipment_unit_id
-                                  ? equipmentUnitById.get(lineInstance.equipment_unit_id)?.brand_model
-                                  : null,
-                                lineInstance.identifier_code,
-                              )
-                            : null;
-                        const detail = equipmentDetailLabel(type?.name, rawDetail, {
-                          soleVariant:
-                            !!line.equipment_unit_id &&
-                            !!type &&
-                            unitCountByType.get(type.id) === 1,
-                        });
-                        const shortage = line.equipment_unit_id
-                          ? shortageByUnit.get(line.equipment_unit_id)
-                          : undefined;
-                        const charge = type ? describeCharge(type, line.unit_price, line.charge_duration) : null;
-                        return {
-                          id: line.id,
-                          content: (
-                            <>
-                              <TableCell
-                                className="font-medium"
-                                title={type?.name ?? line.custom_name ?? undefined}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {type?.image_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
-                                    <img
-                                      src={type.image_url}
-                                      alt=""
-                                      className="size-8 shrink-0 rounded object-cover"
-                                    />
-                                  ) : (
-                                    <span className="bg-muted size-8 shrink-0 rounded" />
-                                  )}
-                                  <span className="truncate">
-                                    {type ? (
-                                      <Link
-                                        href={`/equipment/${type.id}`}
-                                        className="underline-offset-2 hover:underline"
-                                      >
-                                        {type.name}
-                                      </Link>
-                                    ) : (
-                                      (line.custom_name ?? "—")
-                                    )}
-                                  </span>
-                                </div>
-                                {/* Ghi chú địa chỉ + SĐT giao/thu hồi nằm ngay dưới tên
-                                    phí dịch vụ (CEO 2026-09-30: để ở cột Người thực
-                                    hiện ô nhập quá nhỏ). */}
-                                {showDeliveryNote &&
-                                  (canAssignTransport ? (
-                                    <div className="mt-2 font-normal">
-                                      <OrderLineNoteForm lineId={line.id} note={line.note} />
-                                    </div>
-                                  ) : (
-                                    line.note && (
-                                      <p className="mt-2 text-xs font-normal whitespace-pre-wrap text-muted-foreground">
-                                        {line.note}
-                                      </p>
-                                    )
-                                  ))}
-                              </TableCell>
-                              <TableCell className="truncate" title={detail}>
-                                {detail}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  {canManage && !line.equipment_instance_id ? (
-                                    <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
-                                  ) : (
-                                    line.quantity
-                                  )}
-                                  {!shortage &&
-                                    line.equipment_unit_id &&
-                                    stockLeftByUnit.has(line.equipment_unit_id) && (
-                                      <span
-                                        className="shrink-0 cursor-default rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400"
-                                        title="Số còn dư trong kho sau khi trừ mọi đơn đang giữ hàng"
-                                      >
-                                        còn {stockLeftByUnit.get(line.equipment_unit_id)}
-                                      </span>
-                                    )}
-                                  {shortage && (
-                                    <span
-                                      className="shrink-0 cursor-default rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-destructive"
-                                      title={`Trong kho còn ${shortage.available}, tổng nhu cầu các đơn chưa giao ${shortage.totalDemand}${
-                                        shortage.otherOrders.length > 0
-                                          ? ` — đơn khác đang giữ: ${shortage.otherOrders
-                                              .map(([code, qty]) => `${code} (${qty})`)
-                                              .join(", ")}`
-                                          : ""
-                                      }`}
-                                    >
-                                      thiếu {shortage.shortage}
-                                    </span>
-                                  )}
-                                </div>
-                              </TableCell>
-                              {durationCell(type, [line.id], line.unit_price, line.charge_duration)}
-                              <TableCell>
-                                {canManage ? (
-                                  <OrderLinePriceForm lineId={line.id} unitPrice={line.unit_price} />
-                                ) : (
-                                  `${currencyFormatter.format(line.unit_price)}đ`
+
+                    // Ô "Tính tiền": số kỳ tính tiền + đơn giá gộp 1 ô.
+                    const chargeCell = (
+                      type: EqType | undefined,
+                      priceTarget: LinePriceTarget,
+                      durationLineIds: string[],
+                      unitPrice: number,
+                      durationOverride: number | null,
+                      priceSuffix: string,
+                      extraDescription?: string,
+                    ) => {
+                      const c = type ? describeCharge(type, unitPrice, durationOverride) : null;
+                      const formula = c
+                        ? `${currencyFormatter.format(c.basePrice)}đ/${c.unitLabel} × ${c.duration} ${c.unitLabel}${
+                            c.tier
+                              ? ` · gói ≥${c.tier.min_duration} ${c.unitLabel} −${c.tier.discount_percentage}%`
+                              : ""
+                          }`
+                        : null;
+                      return (
+                        <TableCell>
+                          <LineChargeEditor
+                            durationLineIds={durationLineIds}
+                            priceTarget={priceTarget}
+                            duration={c?.duration ?? null}
+                            autoDuration={c?.autoDuration ?? null}
+                            isDurationCustom={c?.isDurationCustom ?? false}
+                            unitLabel={c?.unitLabel ?? null}
+                            unitPrice={unitPrice}
+                            priceSuffix={priceSuffix}
+                            description={[formula, extraDescription].filter(Boolean).join(" · ") || null}
+                            isPriceCustom={c?.isCustom ?? false}
+                            defaultUnitPrice={c?.defaultUnitPrice ?? null}
+                            canEdit={canManage}
+                          />
+                        </TableCell>
+                      );
+                    };
+
+                    const totalCell = (total: number) => (
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {currencyFormatter.format(total)}đ
+                      </TableCell>
+                    );
+
+                    const renderSingleLine = (line: Line) => {
+                      const type = line.equipment_type_id
+                        ? equipmentTypeById.get(line.equipment_type_id)
+                        : undefined;
+                      const isTransportLine =
+                        !!line.equipment_type_id &&
+                        line.equipment_type_id in TRANSPORT_LINE_CATEGORY_BY_TYPE_ID;
+                      // 4 SKU giao/thu hồi (xe máy + ô tô) — ghi chú là địa chỉ +
+                      // SĐT nhận/trả hàng.
+                      const isDeliveryLine =
+                        !!line.equipment_type_id && DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id);
+                      const lineInstance = line.equipment_instance_id
+                        ? equipmentInstanceById.get(line.equipment_instance_id)
+                        : undefined;
+                      const rawDetail = line.equipment_unit_id
+                        ? equipmentUnitById.get(line.equipment_unit_id)?.brand_model
+                        : lineInstance
+                          ? equipmentInstanceLabel(
+                              lineInstance.equipment_unit_id
+                                ? equipmentUnitById.get(lineInstance.equipment_unit_id)?.brand_model
+                                : null,
+                              lineInstance.identifier_code,
+                            )
+                          : null;
+                      const detail = equipmentDetailLabel(type?.name, rawDetail, {
+                        soleVariant:
+                          !!line.equipment_unit_id && !!type && unitCountByType.get(type.id) === 1,
+                      });
+                      const hasAssignee = type?.payout_percentage != null || isTransportLine;
+                      return {
+                        id: line.id,
+                        content: (
+                          <>
+                            {productCell(
+                              type,
+                              line.custom_name,
+                              <>
+                                {detail && detail !== "—" && (
+                                  <p className="text-xs text-muted-foreground">{detail}</p>
                                 )}
-                                {charge && (
-                                  <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {currencyFormatter.format(charge.basePrice)}đ/{charge.unitLabel} ×{" "}
-                                    {charge.duration} {charge.unitLabel}
-                                    {charge.tier &&
-                                      ` · gói ≥${charge.tier.min_duration} ${charge.unitLabel} −${charge.tier.discount_percentage}%`}
-                                  </p>
-                                )}
-                                {charge?.isCustom && (
-                                  <p
-                                    className="mt-0.5 text-xs text-amber-600 dark:text-amber-500"
-                                    title={`Giá theo gói mặc định: ${currencyFormatter.format(charge.defaultUnitPrice)}đ`}
-                                  >
-                                    Giá tuỳ chỉnh
-                                  </p>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-medium tabular-nums">
-                                {currencyFormatter.format(line.line_total)}đ
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col items-start gap-1.5">
-                                  {type?.payout_percentage != null || isTransportLine ? (
-                                    (isTransportLine ? canAssignTransport : canManage) ? (
+                                {hasAssignee && (
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    <span className="text-muted-foreground">Người thực hiện:</span>
+                                    {(isTransportLine ? canAssignTransport : canManage) ? (
                                       <OrderLineEmployeeForm
                                         lineId={line.id}
                                         employeeId={line.employee_id}
@@ -901,32 +885,59 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                         deliveryMethod={line.delivery_method}
                                       />
                                     ) : (
-                                      (employeeNameById.get(line.employee_id ?? "") ?? "—")
-                                    )
-                                  ) : (
-                                    "—"
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <ConfirmDeleteButton
-                                  confirmMessage="Xoá dòng hàng này?"
-                                  successMessage="Đã xoá dòng hàng."
-                                  action={deleteOrderEquipmentLine}
-                                  actionArg={line.id}
+                                      <span>{employeeNameById.get(line.employee_id ?? "") ?? "—"}</span>
+                                    )}
+                                  </div>
+                                )}
+                                <LineNoteEditor
+                                  lineIds={[line.id]}
+                                  note={line.extra_information}
+                                  canEdit={canNote}
+                                  placeholder={
+                                    isDeliveryLine ? "Địa chỉ + SĐT nhận/trả hàng" : undefined
+                                  }
                                 />
-                              </TableCell>
-                            </>
-                          ),
-                        };
+                              </>,
+                            )}
+                            {availabilityCell(
+                              line.equipment_unit_id,
+                              !type || type.product_type === "service",
+                            )}
+                            <TableCell>
+                              {canManage && !line.equipment_instance_id ? (
+                                <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
+                              ) : (
+                                <span className="tabular-nums">{line.quantity}</span>
+                              )}
+                            </TableCell>
+                            {chargeCell(
+                              type,
+                              { kind: "single", lineId: line.id },
+                              [line.id],
+                              line.unit_price,
+                              line.charge_duration,
+                              "",
+                            )}
+                            {totalCell(line.line_total)}
+                            <TableCell>
+                              <ConfirmDeleteButton
+                                confirmMessage="Xoá dòng hàng này?"
+                                successMessage="Đã xoá dòng hàng."
+                                action={deleteOrderEquipmentLine}
+                                actionArg={line.id}
+                              />
+                            </TableCell>
+                          </>
+                        ),
                       };
+                    };
 
                     // Gộp máy serial cùng sản phẩm + cùng đơn giá thành 1 dòng
                     // (kiểu Booqable, CEO 2026-09-25): SL = số máy, serial thành
-                    // chip bên dưới. Chỉ gộp dòng thiết bị serial thuần — dòng
-                    // dịch vụ/vận chuyển có người thực hiện, ghi chú giao nhận vẫn
-                    // tách riêng từng dòng. Nhóm đứng ở vị trí máy đầu tiên.
-                    const isGroupable = (line: (typeof lines)[number]) => {
+                    // chip dưới tên. Chỉ gộp dòng thiết bị serial thuần — dòng
+                    // dịch vụ/vận chuyển có người thực hiện vẫn tách riêng từng
+                    // dòng. Nhóm đứng ở vị trí máy đầu tiên.
+                    const isGroupable = (line: Line) => {
                       if (!line.equipment_instance_id || !line.equipment_type_id) return false;
                       if (line.parent_line_id) return false;
                       const t = equipmentTypeById.get(line.equipment_type_id);
@@ -937,19 +948,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         !DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id)
                       );
                     };
-                    const groupKey = (line: (typeof lines)[number]) =>
-                      `${line.equipment_type_id}|${line.unit_price}`;
-                    const groupMembers = new Map<string, (typeof lines)[number][]>();
+                    const groupKey = (line: Line) => `${line.equipment_type_id}|${line.unit_price}`;
+                    const groupMembers = new Map<string, Line[]>();
                     for (const line of lines) {
                       if (!isGroupable(line)) continue;
                       const key = groupKey(line);
                       groupMembers.set(key, [...(groupMembers.get(key) ?? []), line]);
                     }
-                    const renderGroup = (members: (typeof lines)[number][]) => {
+                    const renderGroup = (members: Line[]) => {
                       const first = members[0];
                       const type = equipmentTypeById.get(first.equipment_type_id!)!;
                       const memberIds = members.map((m) => m.id);
-                      const charge = describeCharge(type, first.unit_price, first.charge_duration);
                       const chips = members.map((m) => {
                         const inst = equipmentInstanceById.get(m.equipment_instance_id!);
                         const variant = inst?.equipment_unit_id
@@ -968,53 +977,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         memberIds,
                         content: (
                           <>
-                            <TableCell className="font-medium" title={type.name}>
-                              <div className="flex items-center gap-2">
-                                {type.image_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
-                                  <img src={type.image_url} alt="" className="size-8 shrink-0 rounded object-cover" />
-                                ) : (
-                                  <span className="bg-muted size-8 shrink-0 rounded" />
-                                )}
-                                <Link
-                                  href={`/equipment/${type.id}`}
-                                  className="truncate underline-offset-2 hover:underline"
-                                >
-                                  {type.name}
-                                </Link>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <SerialChipList items={chips} canRemove={canManage} />
-                            </TableCell>
+                            {productCell(
+                              type,
+                              null,
+                              <>
+                                <SerialChipList items={chips} canRemove={canManage} />
+                                <LineNoteEditor
+                                  lineIds={memberIds}
+                                  note={members.find((m) => m.extra_information)?.extra_information ?? null}
+                                  canEdit={canNote}
+                                />
+                              </>,
+                            )}
+                            {availabilityCell(null, false)}
                             <TableCell className="tabular-nums">{members.length}</TableCell>
-                            {durationCell(type, memberIds, first.unit_price, first.charge_duration)}
-                            <TableCell>
-                              {canManage ? (
-                                <OrderLineGroupPriceForm lineIds={memberIds} unitPrice={first.unit_price} />
-                              ) : (
-                                `${currencyFormatter.format(first.unit_price)}đ`
-                              )}
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                /máy
-                                {charge &&
-                                  ` · ${currencyFormatter.format(charge.basePrice)}đ/${charge.unitLabel} × ${charge.duration} ${charge.unitLabel}`}
-                                {charge?.tier &&
-                                  ` · gói ≥${charge.tier.min_duration} ${charge.unitLabel} −${charge.tier.discount_percentage}%`}
-                              </p>
-                              {charge?.isCustom && (
-                                <p
-                                  className="mt-0.5 text-xs text-amber-600 dark:text-amber-500"
-                                  title={`Giá theo gói mặc định: ${currencyFormatter.format(charge.defaultUnitPrice)}đ`}
-                                >
-                                  Giá tuỳ chỉnh
-                                </p>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right font-medium tabular-nums">
-                              {currencyFormatter.format(members.reduce((sum, m) => sum + m.line_total, 0))}đ
-                            </TableCell>
-                            <TableCell>—</TableCell>
+                            {chargeCell(
+                              type,
+                              { kind: "group", lineIds: memberIds },
+                              memberIds,
+                              first.unit_price,
+                              first.charge_duration,
+                              "/máy",
+                            )}
+                            {totalCell(members.reduce((sum, m) => sum + m.line_total, 0))}
                             <TableCell>
                               <ConfirmDeleteButton
                                 confirmMessage={`Xoá cả ${members.length} máy ${type.name} khỏi đơn?`}
@@ -1030,7 +1015,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     // Combo (CEO 2026-09-26): 1 dòng hiển thị = dòng combo + danh
                     // sách món con kèm nút "Đổi món". Tiền combo = tổng các món
                     // con (đã chia theo giá lẻ); dòng combo tự nó 0đ.
-                    const childrenByParent = new Map<string, (typeof lines)[number][]>();
+                    const childrenByParent = new Map<string, Line[]>();
                     for (const line of lines) {
                       if (!line.parent_line_id) continue;
                       childrenByParent.set(line.parent_line_id, [
@@ -1038,7 +1023,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         line,
                       ]);
                     }
-                    const childLabel = (line: (typeof lines)[number]) => {
+                    const childLabel = (line: Line) => {
                       const t = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
                       const inst = line.equipment_instance_id
                         ? equipmentInstanceById.get(line.equipment_instance_id)
@@ -1050,7 +1035,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           : null;
                       return [t?.name ?? "—", detail].filter(Boolean).join(" — ");
                     };
-                    const renderCombo = (parent: (typeof lines)[number]) => {
+                    const renderCombo = (parent: Line) => {
                       const type = equipmentTypeById.get(parent.equipment_type_id!)!;
                       const children = childrenByParent.get(parent.id) ?? [];
                       const comboTotal = children.reduce((sum, c) => sum + c.line_total, 0);
@@ -1061,67 +1046,57 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         memberIds: [parent.id, ...children.map((c) => c.id)],
                         content: (
                           <>
-                            <TableCell className="font-medium" title={type.name}>
-                              <div className="flex items-center gap-2">
-                                {type.image_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
-                                  <img src={type.image_url} alt="" className="size-8 shrink-0 rounded object-cover" />
-                                ) : (
-                                  <span className="bg-muted size-8 shrink-0 rounded" />
-                                )}
-                                <div className="min-w-0">
-                                  <Link
-                                    href={`/equipment/${type.id}`}
-                                    className="block truncate underline-offset-2 hover:underline"
-                                  >
-                                    {type.name}
-                                  </Link>
-                                  <Badge variant="secondary" className="mt-0.5 h-4 px-1.5 text-[10px]">
-                                    Combo · {children.length} dòng món
-                                  </Badge>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <ul className="space-y-0.5 text-xs">
-                                {children.map((c) => {
-                                  const label = childLabel(c);
-                                  const shortage = c.equipment_unit_id
-                                    ? shortageByUnit.get(c.equipment_unit_id)
-                                    : undefined;
-                                  return (
-                                    <li key={c.id} className="flex items-center gap-1" title={c.note ?? label}>
-                                      <span className="truncate">
-                                        {c.quantity > 1 && `${c.quantity}× `}
-                                        {label}
-                                      </span>
-                                      {shortage && (
-                                        <span className="shrink-0 rounded-full bg-destructive/10 px-1 text-[10px] text-destructive">
-                                          thiếu {shortage.shortage}
+                            {productCell(
+                              type,
+                              null,
+                              <>
+                                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                                  Combo · {children.length} dòng món
+                                </Badge>
+                                <ul className="space-y-0.5 text-xs">
+                                  {children.map((c) => {
+                                    const label = childLabel(c);
+                                    const shortage = c.equipment_unit_id
+                                      ? shortageByUnit.get(c.equipment_unit_id)
+                                      : undefined;
+                                    return (
+                                      <li key={c.id} className="flex items-center gap-1.5" title={c.note ?? label}>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="min-w-0">
+                                          {c.quantity > 1 && `${c.quantity}× `}
+                                          {label}
                                         </span>
-                                      )}
-                                      {editable && (
-                                        <ComboChildSwapButton childLineId={c.id} currentLabel={label} />
-                                      )}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </TableCell>
+                                        {shortage && (
+                                          <span className="shrink-0 rounded-full bg-destructive/10 px-1 text-[10px] text-destructive">
+                                            thiếu {shortage.shortage}
+                                          </span>
+                                        )}
+                                        {editable && (
+                                          <ComboChildSwapButton childLineId={c.id} currentLabel={label} />
+                                        )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                                <LineNoteEditor
+                                  lineIds={[parent.id]}
+                                  note={parent.extra_information}
+                                  canEdit={canNote}
+                                />
+                              </>,
+                            )}
+                            {availabilityCell(null, false)}
                             <TableCell className="tabular-nums">{parent.quantity}</TableCell>
-                            {durationCell(type, [parent.id], perSet, parent.charge_duration)}
-                            <TableCell>
-                              {canManage ? (
-                                <ComboPriceForm parentLineId={parent.id} unitPrice={perSet} />
-                              ) : (
-                                `${currencyFormatter.format(perSet)}đ`
-                              )}
-                              <p className="mt-0.5 text-xs text-muted-foreground">/bộ · chia theo giá lẻ từng món</p>
-                            </TableCell>
-                            <TableCell className="text-right font-medium tabular-nums">
-                              {currencyFormatter.format(comboTotal)}đ
-                            </TableCell>
-                            <TableCell>—</TableCell>
+                            {chargeCell(
+                              type,
+                              { kind: "combo", parentLineId: parent.id },
+                              [parent.id],
+                              perSet,
+                              parent.charge_duration,
+                              "/bộ",
+                              "chia cho từng món theo giá lẻ",
+                            )}
+                            {totalCell(comboTotal)}
                             <TableCell>
                               <ConfirmDeleteButton
                                 confirmMessage={`Xoá combo "${type.name}" cùng ${children.length} dòng món bên trong?`}
@@ -1160,12 +1135,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         <TableHeader>
                           <TableRow>
                             <TableHead>Hàng hoá</TableHead>
-                            <TableHead>Biến thể/Sản phẩm</TableHead>
+                            <TableHead className="w-[92px]">Còn hàng</TableHead>
                             <TableHead className="w-[125px]">SL</TableHead>
-                            <TableHead className="w-[110px]">Số kỳ tính</TableHead>
-                            <TableHead className="w-[210px]">Giá thuê</TableHead>
-                            <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-                            <TableHead className="w-[165px]">Người thực hiện</TableHead>
+                            <TableHead className="w-[290px]">Tính tiền</TableHead>
+                            <TableHead className="w-[125px] text-right">Thành tiền</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
