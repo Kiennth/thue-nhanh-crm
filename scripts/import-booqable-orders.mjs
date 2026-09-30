@@ -173,19 +173,38 @@ async function fetchOrderLines(orderId) {
 }
 
 const customerCache = new Map(); // booqable customer id -> our customer id
+// MST khách: Booqable không có trường riêng, nhân viên ghi vào ô First Name
+// (đôi khi Last Name) của địa chỉ — "MST: 0319409541", "Mã số thuế: ...",
+// số trần, mã chi nhánh "0101799205-001". Bỏ CCCD/CMND và SĐT 10 số không
+// kèm chữ MST. (CEO 2026-10-01, đợt quét đầu điền 950 khách.)
+function extractTaxCode(included) {
+  for (const p of included || []) {
+    if (p.type !== "properties" || p.attributes?.property_type !== "address") continue;
+    for (const text of [p.attributes.first_name, p.attributes.last_name]) {
+      if (!text || /cccd|cmnd|căn cước/i.test(text)) continue;
+      for (const m of text.matchAll(/(?<!\d)(\d{10}(?:\s*-\s*\d{3})?)(?!\d)/g)) {
+        const code = m[1].replace(/\s/g, "");
+        if (/^0[35789]\d{8}$/.test(code) && !/mst|thuế|tax/i.test(text)) continue;
+        return code;
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchBqCustomer(customerId) {
-  const r = await bqFetch(`${BQ_BASE}/customers/${customerId}`);
+  const r = await bqFetch(`${BQ_BASE}/customers/${customerId}?include=properties`);
   if (r.ok) {
     const j = await r.json();
-    return j.data;
+    return { ...j.data, taxCode: extractTaxCode(j.included) };
   }
   // Endpoint chi tiết bị Booqable chặn 402 (gói hết hạn mức, 2026-09-08) —
   // endpoint DANH SÁCH vẫn trả đủ attributes, tra qua filter[id] thay thế.
   // Không được thả trôi về "Khách lẻ" khi Booqable vẫn có dữ liệu khách.
-  const r2 = await bqFetch(`${BQ_BASE}/customers?filter[id]=${customerId}`);
+  const r2 = await bqFetch(`${BQ_BASE}/customers?filter[id]=${customerId}&include=properties`);
   if (r2.ok) {
     const j2 = await r2.json();
-    if (j2.data?.length) return j2.data[0];
+    if (j2.data?.length) return { ...j2.data[0], taxCode: extractTaxCode(j2.included) };
   }
   throw new Error(`Không tra được khách Booqable ${customerId} (HTTP ${r.status}/${r2.status})`);
 }
@@ -207,6 +226,15 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
     customerId = existingByPhone.get(phone);
   } else if (existingByName.has(nameKey)) {
     customerId = existingByName.get(nameKey);
+    // Khách đã có (khớp đúng tên) mà CRM chưa có MST → điền từ Booqable.
+    // Không làm với khớp SĐT: người liên lạc chung, MST có thể của pháp nhân khác.
+    if (bq?.taxCode) {
+      await db
+        .from("customers")
+        .update({ tax_code: bq.taxCode })
+        .eq("id", customerId)
+        .or("tax_code.is.null,tax_code.eq.");
+    }
   } else {
     const customerType = bq?.attributes?.legal_type === "commercial" ? "company" : "individual";
     const { data, error } = await db
@@ -214,7 +242,8 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
       .insert({
         name,
         phone: bq?.attributes?.properties?.phone || null,
-        customer_type: customerType,
+        customer_type: bq?.taxCode ? "company" : customerType,
+        tax_code: bq?.taxCode ?? null,
         deposit_percentage: 100,
       })
       .select("id")
