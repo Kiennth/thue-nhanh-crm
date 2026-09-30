@@ -12,6 +12,8 @@ import {
 import { StatCard } from "@/components/stat-card";
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
+import { SortableTableHead } from "@/components/sortable-table-head";
+import { VN_TIME_ZONE } from "@/lib/date-format";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
@@ -22,16 +24,24 @@ import { WebsiteCategoryDialog } from "./category-dialog";
 // CEO 2026-09-26: danh sách dài hết trang, đỡ bấm chuyển trang (30 → 100).
 const PAGE_SIZE = 100;
 
+const addedDateFormatter = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: VN_TIME_ZONE,
+});
+
 // Quản trị nội dung web công khai new.thuenhanh.vn (CEO yêu cầu 2026-08-16).
 // Nội dung nằm ở bảng website_* cùng Supabase — sửa xong web tự làm mới qua
 // /api/revalidate (action gọi giúp, không cần deploy).
 export default async function WebsitePage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; filter?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; filter?: string; page?: string; sort?: string; dir?: string }>;
 }) {
   await requireRole([...MANAGE_ROLES]);
-  const { search, filter, page } = await searchParams;
+  const { search, filter, page, sort, dir } = await searchParams;
+  const ascending = dir !== "desc";
   const activeSearch = search?.trim() ?? "";
   const activeFilter = filter ?? "all";
   const currentPage = Math.max(1, Number(page) || 1);
@@ -40,10 +50,17 @@ export default async function WebsitePage({
 
   let query = supabase
     .from("website_products")
-    .select("*, equipment_types(name, price, rental_period_unit, image_url)", { count: "exact" })
-    .order("is_published", { ascending: false })
-    .order("sort_order")
-    .order("slug");
+    .select("*, equipment_types(name, price, rental_period_unit, image_url)", { count: "exact" });
+  // Mặc định: mới lên web trước (CEO 2026-10-01) — trước đây xếp đã đăng
+  // trước rồi theo sort_order, SP mới thêm bị chìm giữa danh sách. Bấm tiêu
+  // đề cột để xếp theo tên A→Z / Z→A, ngày tạo, trạng thái (ẩn/hiện) hoặc
+  // độ đầy đủ nội dung.
+  if (sort === "name") query = query.order("equipment_types(name)", { ascending });
+  else if (sort === "status") query = query.order("is_published", { ascending });
+  else if (sort !== "content")
+    query = query.order("created_at", { ascending: sort === "added" ? ascending : false });
+  if (sort === "status" || sort === "content") query = query.order("created_at", { ascending: false });
+  query = query.order("slug");
   if (activeFilter === "published") query = query.eq("is_published", true);
   if (activeFilter === "draft") query = query.eq("is_published", false);
   if (activeFilter === "featured") query = query.eq("is_featured", true);
@@ -64,7 +81,11 @@ export default async function WebsitePage({
 
   const [{ data: products, count }, { data: categories }, statsRes, leadRes, allLiteRes] =
     await Promise.all([
-      query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
+      // "Nội dung" không phải 1 cột DB (ảnh/mô tả/EN) → lấy hết rồi xếp +
+      // cắt trang bên dưới; các kiểu xếp khác để DB phân trang.
+      sort === "content"
+        ? query.range(0, 4999)
+        : query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
       supabase.from("website_categories").select("*").order("sort_order"),
       supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
@@ -76,7 +97,20 @@ export default async function WebsitePage({
         .order("slug"),
     ]);
 
-  const rows = products ?? [];
+  // Số mục thiếu: ảnh, mô tả, bản EN. Tăng dần = thiếu nhiều nhất lên đầu
+  // (việc cần làm trước), giảm dần = đủ nội dung lên đầu.
+  const contentGaps = (p: NonNullable<typeof products>[number]) => {
+    const et = p.equipment_types as unknown as { image_url: string | null } | null;
+    const hasImage = p.gallery_image_urls.length > 0 || Boolean(et?.image_url);
+    // Thiếu mô tả nặng hơn thiếu bản EN (phải viết từ đầu) → tính 2.
+    return (hasImage ? 0 : 1) + (p.description_html ? (p.description_html_en ? 0 : 1) : 2);
+  };
+  const rows =
+    sort === "content"
+      ? [...(products ?? [])]
+          .sort((a, b) => (ascending ? contentGaps(b) - contentGaps(a) : contentGaps(a) - contentGaps(b)))
+          .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+      : (products ?? []);
   const categoryList = categories ?? [];
   const relatedOptions = (allLiteRes.data ?? []).map((p) => ({
     id: p.id,
@@ -167,10 +201,11 @@ export default async function WebsitePage({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Sản phẩm</TableHead>
+            <SortableTableHead sortKey="name" label="Sản phẩm" />
             <TableHead className="w-40">Danh mục web</TableHead>
-            <TableHead className="w-28">Nội dung</TableHead>
-            <TableHead className="w-24">Trạng thái</TableHead>
+            <SortableTableHead sortKey="added" label="Ngày tạo" className="w-28" />
+            <SortableTableHead sortKey="content" label="Nội dung" className="w-28" />
+            <SortableTableHead sortKey="status" label="Trạng thái" className="w-24" />
             <TableHead className="w-40"></TableHead>
           </TableRow>
         </TableHeader>
@@ -193,6 +228,9 @@ export default async function WebsitePage({
                 </TableCell>
                 <TableCell className="text-sm">
                   {category?.name ?? <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="text-sm tabular-nums text-muted-foreground">
+                  {addedDateFormatter.format(new Date(p.created_at))}
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -229,7 +267,7 @@ export default async function WebsitePage({
           })}
           {!rows.length && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 Không có sản phẩm nào khớp bộ lọc.
               </TableCell>
             </TableRow>
