@@ -487,7 +487,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       }
       return {
         unitId,
-        label: `${type?.name ?? "—"} (${unit?.brand_model ?? "—"})`,
+        label:
+          type && unitCountByType.get(type.id) === 1
+            ? type.name
+            : `${type?.name ?? "—"} (${unit?.brand_model ?? "—"})`,
         thisOrderDemand,
         totalDemand,
         available,

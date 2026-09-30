@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImageOff } from "lucide-react";
@@ -83,6 +84,14 @@ const INSTANCE_STATUS_VARIANT = {
   maintenance: "destructive",
   disposed: "outline",
 } as const;
+
+// Thứ tự + màu nhóm kho trong bảng máy serial (cùng màu với BranchBadge).
+const INSTANCE_BRANCH_ORDER = ["TP HCM", "Hà Nội", "Đà Nẵng"];
+const INSTANCE_BRANCH_COLOR: Record<string, string> = {
+  "TP HCM": "--chart-2",
+  "Hà Nội": "--chart-1",
+  "Đà Nẵng": "--chart-3",
+};
 
 const TABS = [
   { value: "stock", label: "Tồn kho" },
@@ -400,6 +409,11 @@ export default async function EquipmentDetailPage({
   // Sắp xếp bảng sản phẩm theo từng cái (Chi nhánh/Trạng thái) — mặc định
   // giữ nguyên thứ tự mã định danh khi chưa chọn cột nào.
   const activeDirMult = activeDir === "asc" ? 1 : -1;
+  const instanceGroupRank = (inst: EquipmentInstanceRow) => {
+    if (inst.status === "disposed") return INSTANCE_BRANCH_ORDER.length + 1;
+    const idx = INSTANCE_BRANCH_ORDER.indexOf(branchNameById.get(inst.branch_id ?? "") ?? "");
+    return idx === -1 ? INSTANCE_BRANCH_ORDER.length : idx;
+  };
   const sortedInstances = [...(instances ?? [])].sort((a, b) => {
     if (activeSort === "branch") {
       const branchA = branchNameById.get(a.branch_id ?? "") ?? "—";
@@ -415,8 +429,44 @@ export default async function EquipmentDetailPage({
         )
       );
     }
-    return a.identifier_code.localeCompare(b.identifier_code, "vi");
+    // Mặc định (CEO 2026-10-01): máy còn tồn gom theo kho HCM → HN → ĐN,
+    // máy đã thanh lý dồn xuống cuối.
+    return (
+      instanceGroupRank(a) - instanceGroupRank(b) ||
+      a.identifier_code.localeCompare(b.identifier_code, "vi")
+    );
   });
+  const groupInstancesByBranch = !activeSort;
+  // Cột "Sản phẩm" ở tab lượt thuê: mã máy (serial) hoặc tên biến thể — SP
+  // số lượng chỉ 1 biến thể thì cột toàn "—", ẩn luôn.
+  const showRentalProductColumn = isRentalIndividual || unitList.length > 1;
+  // Chỉ 1 biến thể thì tên biến thể trùng/thừa — ẩn (CEO 2026-10-01).
+  const showInstanceUnitColumn = unitList.length > 1;
+  const instanceTableColSpan = (canManageStock ? 5 : 4) + (showInstanceUnitColumn ? 1 : 0);
+  // Dòng tiêu đề mỗi nhóm kho: "TP HCM · 12 máy — 9 sẵn sàng · 3 đang thuê".
+  const instanceGroupSummary = new Map<string, string>();
+  {
+    const byGroup = new Map<string, EquipmentInstanceRow[]>();
+    for (const inst of instances ?? []) {
+      const key =
+        inst.status === "disposed" ? "__disposed" : (branchNameById.get(inst.branch_id ?? "") ?? "");
+      byGroup.set(key, [...(byGroup.get(key) ?? []), inst]);
+    }
+    for (const [key, list] of byGroup) {
+      if (key === "__disposed") {
+        instanceGroupSummary.set(key, `Đã thanh lý · ${list.length} máy`);
+        continue;
+      }
+      const counts = (["available", "rented", "maintenance"] as const)
+        .map((s) => [s, list.filter((i) => i.status === s).length] as const)
+        .filter(([, n]) => n > 0)
+        .map(([s, n]) => `${n} ${EQUIPMENT_INSTANCE_STATUS_LABELS[s].toLowerCase()}`);
+      instanceGroupSummary.set(
+        key,
+        `${key || "Chưa gán kho"} · ${list.length} máy${counts.length ? ` — ${counts.join(" · ")}` : ""}`,
+      );
+    }
+  }
 
   // Ghép + sắp xếp bảng lịch sử thuê — bỏ dòng nào không tra được order (dữ
   // liệu mồ côi, không nên xảy ra nhưng phòng hờ).
@@ -426,7 +476,7 @@ export default async function EquipmentDetailPage({
       if (!order) return null;
       const productLabel = line.equipment_instance_id
         ? (instanceById.get(line.equipment_instance_id)?.identifier_code ?? "—")
-        : line.equipment_unit_id
+        : line.equipment_unit_id && unitList.length > 1
           ? (unitById.get(line.equipment_unit_id)?.brand_model ?? "—")
           : "—";
       return {
@@ -673,14 +723,24 @@ export default async function EquipmentDetailPage({
                         />
                       )}
                       <div>
-                        <p className="font-medium">
-                          {unit.brand_model}
-                          {unit.price != null && (
-                            <span className="text-muted-foreground ml-2 text-sm font-normal">
-                              {currencyFormatter.format(unit.price)}đ
-                            </span>
-                          )}
-                        </p>
+                        {/* SP chỉ 1 biến thể: tên biến thể trùng tên SP, bỏ
+                            đi cho gọn (CEO 2026-10-01) — vẫn sửa được qua nút
+                            bút chì nếu sau này tách thêm biến thể. */}
+                        {(unitList.length > 1 || unit.price != null) && (
+                          <p className="font-medium">
+                            {unitList.length > 1 && unit.brand_model}
+                            {unit.price != null && (
+                              <span
+                                className={cn(
+                                  "text-muted-foreground text-sm font-normal",
+                                  unitList.length > 1 && "ml-2",
+                                )}
+                              >
+                                {currencyFormatter.format(unit.price)}đ
+                              </span>
+                            )}
+                          </p>
+                        )}
                         {unit.condition_notes && (
                           <p className="text-sm text-muted-foreground">{unit.condition_notes}</p>
                         )}
@@ -862,7 +922,7 @@ export default async function EquipmentDetailPage({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mã định danh</TableHead>
-                    {unitList.length > 0 && <TableHead>Biến thể</TableHead>}
+                    {showInstanceUnitColumn && <TableHead>Biến thể</TableHead>}
                     <SortableTableHead sortKey="branch" label="Chi nhánh" />
                     <SortableTableHead sortKey="status" label="Trạng thái" />
                     <TableHead>Ghi chú</TableHead>
@@ -870,12 +930,62 @@ export default async function EquipmentDetailPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedInstances.map((inst) => {
+                  {sortedInstances.map((inst, idx) => {
                     const instTags = rfidTagsByInstance.get(inst.id) ?? [];
+                    const branchName = branchNameById.get(inst.branch_id ?? "") ?? "";
+                    const disposed = inst.status === "disposed";
+                    const groupKey = disposed ? "__disposed" : branchName;
+                    const prev = sortedInstances[idx - 1];
+                    const prevGroupKey = prev
+                      ? prev.status === "disposed"
+                        ? "__disposed"
+                        : (branchNameById.get(prev.branch_id ?? "") ?? "")
+                      : null;
+                    const colorVar = disposed ? null : (INSTANCE_BRANCH_COLOR[branchName] ?? null);
+                    const groupHeader =
+                      groupInstancesByBranch && groupKey !== prevGroupKey
+                        ? (instanceGroupSummary.get(groupKey) ?? null)
+                        : null;
                     return (
-                      <TableRow key={inst.id}>
-                        <TableCell className="font-medium">{inst.identifier_code}</TableCell>
-                        {unitList.length > 0 && (
+                      <Fragment key={inst.id}>
+                      {groupHeader && (
+                        <TableRow
+                          className="hover:bg-transparent"
+                          style={
+                            colorVar
+                              ? { backgroundColor: `color-mix(in oklch, var(${colorVar}) 16%, transparent)` }
+                              : undefined
+                          }
+                        >
+                          <TableCell
+                            colSpan={instanceTableColSpan}
+                            className={cn(
+                              "border-l-4 py-1.5 text-xs font-semibold uppercase tracking-wide",
+                              !colorVar && "border-l-border text-muted-foreground",
+                            )}
+                            style={colorVar ? { borderLeftColor: `var(${colorVar})` } : undefined}
+                          >
+                            {groupHeader}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      <TableRow
+                        className={cn(disposed && groupInstancesByBranch && "text-muted-foreground")}
+                        style={
+                          groupInstancesByBranch && colorVar
+                            ? { backgroundColor: `color-mix(in oklch, var(${colorVar}) 6%, transparent)` }
+                            : undefined
+                        }
+                      >
+                        <TableCell
+                          className={cn("font-medium", groupInstancesByBranch && "border-l-4 border-l-transparent")}
+                          style={
+                            groupInstancesByBranch && colorVar ? { borderLeftColor: `var(${colorVar})` } : undefined
+                          }
+                        >
+                          {inst.identifier_code}
+                        </TableCell>
+                        {showInstanceUnitColumn && (
                           <TableCell>
                             {inst.equipment_unit_id
                               ? (unitById.get(inst.equipment_unit_id)?.brand_model ?? "—")
@@ -920,14 +1030,13 @@ export default async function EquipmentDetailPage({
                           </TableCell>
                         )}
                       </TableRow>
+                      </Fragment>
                     );
                   })}
                   {!instances?.length && (
                     <TableRow>
                       <TableCell
-                        colSpan={
-                          (canManageStock ? 5 : 4) + (unitList.length > 0 ? 1 : 0)
-                        }
+                        colSpan={instanceTableColSpan}
                         className="text-center text-muted-foreground"
                       >
                         Chưa có sản phẩm nào.
@@ -974,7 +1083,7 @@ export default async function EquipmentDetailPage({
                 <TableRow>
                   <SortableTableHead sortKey="order_code" label="Mã đơn" />
                   <SortableTableHead sortKey="customer" label="Khách hàng" />
-                  <TableHead>Sản phẩm</TableHead>
+                  {showRentalProductColumn && <TableHead>Sản phẩm</TableHead>}
                   <SortableTableHead sortKey="start" label="Ngày bắt đầu" />
                   <SortableTableHead sortKey="end" label="Ngày kết thúc" />
                   <SortableTableHead sortKey="quantity" label="Số lượng" />
@@ -991,7 +1100,7 @@ export default async function EquipmentDetailPage({
                       </Link>
                     </TableCell>
                     <TableCell>{customerName}</TableCell>
-                    <TableCell>{productLabel}</TableCell>
+                    {showRentalProductColumn && <TableCell>{productLabel}</TableCell>}
                     <TableCell>
                       {order.rental_start_at ? dateFormatter.format(new Date(order.rental_start_at)) : "—"}
                     </TableCell>
@@ -1005,7 +1114,10 @@ export default async function EquipmentDetailPage({
                 ))}
                 {!sortedRentalRows.length && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={showRentalProductColumn ? 8 : 7}
+                      className="text-center text-muted-foreground"
+                    >
                       Chưa có lượt thuê nào.
                     </TableCell>
                   </TableRow>
@@ -1031,7 +1143,7 @@ export default async function EquipmentDetailPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Ngày</TableHead>
-                  <TableHead>Biến thể</TableHead>
+                  {unitList.length > 1 && <TableHead>Biến thể</TableHead>}
                   <TableHead>Từ</TableHead>
                   <TableHead>Đến</TableHead>
                   <TableHead>Số lượng</TableHead>
@@ -1044,7 +1156,7 @@ export default async function EquipmentDetailPage({
                   return (
                     <TableRow key={t.id}>
                       <TableCell>{dateFormatter.format(new Date(t.created_at))}</TableCell>
-                      <TableCell>{unit?.brand_model ?? "—"}</TableCell>
+                      {unitList.length > 1 && <TableCell>{unit?.brand_model ?? "—"}</TableCell>}
                       <TableCell>{branchNameById.get(t.from_branch_id) ?? "—"}</TableCell>
                       <TableCell>{branchNameById.get(t.to_branch_id) ?? "—"}</TableCell>
                       <TableCell>{t.quantity}</TableCell>
@@ -1054,7 +1166,10 @@ export default async function EquipmentDetailPage({
                 })}
                 {!transfers?.length && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={unitList.length > 1 ? 6 : 5}
+                      className="text-center text-muted-foreground"
+                    >
                       Chưa có lượt chuyển kho nào.
                     </TableCell>
                   </TableRow>
