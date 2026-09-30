@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil } from "lucide-react";
+import { Maximize2, Minimize2, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +18,22 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { GalleryEditor } from "./gallery-editor";
 import { RelatedPicker, type RelatedOption } from "./related-picker";
 import { updateWebsiteProduct } from "@/lib/actions/website";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
 type WebsiteProductRow = Database["public"]["Tables"]["website_products"]["Row"];
 type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Row"];
+
+// Nhớ lựa chọn "toàn màn hình" giữa các lần mở (CEO 2026-10-01 muốn khung
+// sửa to, thậm chí full screen).
+const FULLSCREEN_KEY = "website-product-dialog-fullscreen";
+function readFullscreenPref() {
+  try {
+    return localStorage.getItem(FULLSCREEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 // Sửa nội dung 1 sản phẩm web — song ngữ đặt cạnh nhau để đối chiếu nhanh.
 // Mô tả nhập HTML thô (mang từ Haravan sang) — người quen sửa chữ thường chỉ
@@ -39,6 +51,15 @@ export function WebsiteProductDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [fullscreen, setFullscreen] = useState(false);
+
+  function toggleFullscreen() {
+    const next = !fullscreen;
+    setFullscreen(next);
+    try {
+      localStorage.setItem(FULLSCREEN_KEY, next ? "1" : "0");
+    } catch {}
+  }
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -54,7 +75,10 @@ export function WebsiteProductDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setError(null);
+        if (next) {
+          setError(null);
+          setFullscreen(readFullscreenPref());
+        }
       }}
     >
       <DialogTrigger
@@ -65,10 +89,28 @@ export function WebsiteProductDialog({
           </Button>
         }
       />
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "overflow-y-auto",
+          fullscreen
+            ? "h-dvh max-h-dvh w-screen max-w-none rounded-none sm:max-w-none"
+            : "max-h-[92vh] sm:max-w-5xl",
+        )}
+      >
         <form action={handleSubmit} className="space-y-4">
-          <DialogHeader>
+          <DialogHeader className="flex-row items-center gap-2 pr-8">
             <DialogTitle>Sửa nội dung web</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="ml-auto"
+              onClick={toggleFullscreen}
+              title={fullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+            >
+              {fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+              <span className="sr-only">{fullscreen ? "Thu nhỏ" : "Toàn màn hình"}</span>
+            </Button>
           </DialogHeader>
 
           <div className="space-y-2">
@@ -180,26 +222,30 @@ export function WebsiteProductDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Mô tả chi tiết</Label>
-            <RichTextEditor
-              name="description_html"
-              defaultValue={product.description_html ?? ""}
-              placeholder="Tiêu đề lớn để chia ô: Cấu hình, Trong hộp, FAQ..."
-            />
-          </div>
+          {/* Toàn màn hình: 2 bản mô tả VI/EN đặt cạnh nhau để đối chiếu. */}
+          <div className={cn("grid gap-4", fullscreen && "lg:grid-cols-2 [&_.prose-editor]:min-h-[45vh]")}>
+            <div className="min-w-0 space-y-2">
+              <Label>Mô tả chi tiết</Label>
+              <RichTextEditor
+                name="description_html"
+                defaultValue={product.description_html ?? ""}
+                placeholder="Tiêu đề lớn để chia ô: Cấu hình, Trong hộp, FAQ..."
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Mô tả chi tiết tiếng Anh</Label>
-            <RichTextEditor
-              name="description_html_en"
-              defaultValue={product.description_html_en ?? ""}
-            />
+            <div className="min-w-0 space-y-2">
+              <Label>Mô tả chi tiết tiếng Anh</Label>
+              <RichTextEditor
+                name="description_html_en"
+                defaultValue={product.description_html_en ?? ""}
+              />
+            </div>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <DialogFooter>
+          {/* Nút lưu dính đáy khung — mô tả dài không phải cuộn xuống tận cùng. */}
+          <DialogFooter className="sticky -bottom-4 z-10 bg-popover">
             <Button type="submit" disabled={pending}>
               {pending ? "Đang lưu..." : "Lưu và cập nhật web"}
             </Button>
