@@ -906,3 +906,32 @@
 --     import còn map vào nó.
 --   * TỒN CUỐI 27/09: 1.200 dòng treo / 516 tên / 308,8tr (gồm cả nhóm bỏ
 --     qua & không khớp).
+--
+-- ## Đợt map 19 (CEO 2026-09-27 → 2026-09-30):
+--   * ĐỒNG BỘ 27/09: import 1 (BQ13011 — Xe Scooter NINEBOT18W gắn theo
+--     tiền lệ), đóng 4, giao 4 (BQ12897/12931/13002/13006).
+--   * ĐỒNG BỘ 30/09 (dồn 3 ngày): import 49, đóng 51, giao 7 (BQ12771/
+--     12739/12130/12894/12952/12969/12932), huỷ theo BQ 0.
+--   * DÒNG TỰ DO đợt 30/09 — 60 tên: 39 tên tự áp tiền lệ (63 dòng); 9 tên
+--     khớp đúng SP/biến thể có sẵn (iPhone 14, iPad Pro M1 12.9, Tab S9 FE
+--     10.9, Prosper G11, Xbox Series X, DJI Mic 3 2TX+1RX, Odyssey G5, MH
+--     27" LS27D300, Nintendo JoyCon Controllers); 12 tên CEO duyệt:
+--       - SP MỚI: iPad Gen 8 10.2-inch (250k, BQ12965 36 máy 13,3tr); Điều
+--         hòa Sumikura APF/APO-210 (2tr, BQ13023 2 máy 9tr); Màn Hình Quảng
+--         Cáo Chân Quỳ 43-inch (1,5tr); Máy tính bảng Samsung Galaxy Tab A11
+--         (200k); Bàn 0.5m x 1.2m (50k, +6 đơn cũ); Cáp chuyển HDMI to DP
+--         (50k); Dây Cáp XLR - XLR - 3m (50k, +8 đơn cũ); dịch vụ "Chi Phí
+--         Dịch Vụ (di chuyển, ăn ở, đi lại)" (giá nhập tay, BQ6241 1tr).
+--       - BIẾN THỂ MỚI: Smart TV 4K 50 inch bt Casper; Smart TV 4K 55 inch
+--         bt CASPER; DJI Mic 3 bt 1TX (+3 đơn cũ). Ghế công thái học - Đen →
+--         HyperWork Airy bt màu ĐEN.
+--   * NGOÀI MAP: xoá mã "Máy ghi âm Zoom - H4N Pro" tạo 26/09 (máy đã thanh
+--     lý, 12 dòng lịch sử vốn nằm ở Zoom H4N; combo 1–2 mic còn H4N → H6);
+--     nhập kho HCM 1 Nintendo Switch 2 (16,9tr) + 1 cặp JoyCon 2 (0đ, tháo
+--     từ máy); SP mới iPhone 18 Pro 1,5tr / 18 Pro Max 2tr / iPhone Duo
+--     3tr (bật web, chưa có máy); sửa giá MacBook Air 15 M5 24GB 90k→900k,
+--     MacBook Air 13 i7 1,2tr→120k.
+--   * MAPPER lưu vào repo scripts/map-orphan-lines.py (thư mục tạm của phiên
+--     bị dọn mất script).
+--   * TỒN CUỐI 30/09: 1.177 dòng treo / 508 tên / 303,3tr (gồm cả nhóm bỏ
+--     qua & không khớp).
