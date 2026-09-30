@@ -80,6 +80,10 @@ def norm(s):
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", s or "").strip().lower())
 
 
+def alnum(s):
+    return re.sub(r"[\W_]+", "", norm(s))
+
+
 product_names = {}
 
 
@@ -106,6 +110,7 @@ for offset in range(0, 20000, 1000):
 print(f"{len(orders)} đơn BQ cần rà ({'mọi đơn từ 06/2026' if ALL else 'đơn còn mở'})")
 
 filled = 0
+unmatched = []
 orders_touched = 0
 for order in orders:
     number = order["order_code"][2:]
@@ -121,21 +126,42 @@ for order in orders:
         continue
     crm_lines = sb(
         "GET",
-        f"/order_equipment?select=id,custom_name,note,extra_information,equipment_types(name)&order_id=eq.{order['id']}",
+        f"/order_equipment?select=id,custom_name,note,extra_information,quantity,equipment_types(name)&order_id=eq.{order['id']}&order=position",
     )
     touched = False
     for bl in bq_lines:
         names = {norm(n) for n in (product_name(bl.get("item_id")), bl.get("title")) if n}
-        ids = []
-        for cl in crm_lines:
-            if cl["extra_information"]:
-                continue
-            note = cl["note"] or ""
-            quoted = {norm(m) for m in re.findall(r'"([^"]+)"', note)}
+        # Khớp lỏng (dự phòng): bỏ dấu câu/khoảng trắng và phần biến thể sau
+        # " - " (BQ "Smart TV 4K 50-inch - Samsung" ↔ CRM "Smart TV 4K 50 inch";
+        # BQ "Playstation 5" ↔ CRM "Playstation 5 (kèm 2 tay cầm)").
+        loose = set()
+        for n in (product_name(bl.get("item_id")), bl.get("title")):
+            if n:
+                loose.add(alnum(n))
+                loose.add(alnum(n.split(" - ")[0]))
+        loose = {x for x in loose if len(x) >= 8}
+
+        def exact(cl):
+            quoted = {norm(m) for m in re.findall(r'"([^"]+)"', cl["note"] or "")}
             type_name = norm((cl.get("equipment_types") or {}).get("name"))
-            if norm(cl["custom_name"]) in names or (quoted & names) or type_name in names:
-                ids.append(cl["id"])
-                cl["extra_information"] = bl["extra_information"].strip()
+            return norm(cl["custom_name"]) in names or bool(quoted & names) or type_name in names
+
+        def fuzzy(cl):
+            t = alnum((cl.get("equipment_types") or {}).get("name") or cl["custom_name"] or "")
+            return len(t) >= 8 and any(t == x or t in x or x in t for x in loose)
+
+        free = [cl for cl in crm_lines if not cl["extra_information"]]
+        candidates = [cl for cl in free if exact(cl)] or [cl for cl in free if fuzzy(cl)]
+        # 1 dòng BQ chỉ "ăn" đúng phần của nó: máy serial CRM tách mỗi máy 1 dòng
+        # (SL 1) → lấy số dòng bằng SL bên BQ; còn lại lấy 1 dòng. Nhờ vậy 2 dòng
+        # BQ trùng tên nhưng ghi chú khác nhau được gán lần lượt, không đè nhau.
+        serial_split = len(candidates) > 1 and all(cl["quantity"] == 1 for cl in candidates)
+        take = candidates[: max(1, int(bl.get("quantity") or 1))] if serial_split else candidates[:1]
+        ids = [cl["id"] for cl in take]
+        for cl in take:
+            cl["extra_information"] = bl["extra_information"].strip()
+        if not ids:
+            unmatched.append((order["order_code"], bl.get("title"), bl["extra_information"].strip()[:50]))
         if ids:
             filled += len(ids)
             touched = True
@@ -148,3 +174,7 @@ for order in orders:
     if touched:
         orders_touched += 1
 print(f"{'(chạy thử) ' if DRY else ''}đã điền {filled} dòng trên {orders_touched} đơn")
+if unmatched:
+    print(f"{len(unmatched)} dòng Booqable có ghi chú nhưng không khớp được dòng CRM (đã có ghi chú sẵn, hoặc dòng đã bị sửa/xoá):")
+    for code, title, note in unmatched[:15]:
+        print(f"  {code} | {title} | {note}")
