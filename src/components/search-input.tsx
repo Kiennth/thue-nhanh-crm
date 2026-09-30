@@ -14,6 +14,9 @@ interface SearchInputProps {
   // lại trang 1 thay vì đứng nguyên ở trang cũ với kết quả đã lọc khác).
   resetParams?: string[];
   className?: string;
+  // "lg": ô tìm to, viền nhấn — cho trang mà tìm kiếm là thao tác chính (vd
+  // Thiết bị, CEO 2026-10-01).
+  size?: "default" | "lg";
 }
 
 // CEO 2026-09-22: không tìm ngay khi gõ (trước debounce 300ms) — chỉ tìm khi
@@ -24,7 +27,9 @@ export function SearchInput({
   value,
   resetParams = [],
   className = "w-64",
+  size = "default",
 }: SearchInputProps) {
+  const large = size === "lg";
   const router = useRouter();
   const { start } = useTopLoader();
   const pathname = usePathname();
@@ -58,16 +63,22 @@ export function SearchInput({
         type="submit"
         aria-label="Tìm kiếm"
         title="Tìm kiếm (Enter)"
-        className="absolute top-1/2 left-1.5 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        className={`absolute top-1/2 -translate-y-1/2 rounded-sm p-1 hover:bg-accent hover:text-foreground ${
+          large ? "left-2.5 text-primary" : "left-1.5 text-muted-foreground"
+        }`}
       >
-        <Search className="size-4" />
+        <Search className={large ? "size-5" : "size-4"} />
       </button>
       <Input
         type="search"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={placeholder}
-        className="pl-8"
+        className={
+          large
+            ? "h-12 rounded-lg border-2 border-primary/40 bg-background pl-11 text-base shadow-sm focus-visible:border-primary md:text-base"
+            : "pl-8"
+        }
       />
     </form>
   );

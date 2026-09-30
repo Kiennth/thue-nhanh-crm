@@ -355,13 +355,6 @@ export default async function EquipmentPage({
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
         {!isReportTab && (
           <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              key={activeSearch}
-              paramName="search"
-              placeholder="Tìm theo tên hàng hoá..."
-              value={activeSearch}
-              resetParams={["page"]}
-            />
             <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
             {canManageCatalog && (
               <EquipmentTypeDialog templates={templateList} categories={categoryList} />
@@ -369,6 +362,20 @@ export default async function EquipmentPage({
           </div>
         )}
       </div>
+
+      {/* Ô tìm to, riêng 1 hàng — tìm hàng hoá là thao tác chính của trang
+          (CEO 2026-10-01: "ô tìm kiếm to và nổi bật hơn"). */}
+      {!isReportTab && (
+        <SearchInput
+          key={activeSearch}
+          paramName="search"
+          placeholder="Tìm hàng hoá theo tên — gõ rồi Enter..."
+          value={activeSearch}
+          resetParams={["page"]}
+          size="lg"
+          className="w-full max-w-2xl"
+        />
+      )}
 
       {canViewEquipmentReports && (
         <div className="flex items-center gap-1 border-b">
