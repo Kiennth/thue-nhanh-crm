@@ -75,8 +75,25 @@ export default async function WebsitePage({
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/đ/g, "d")
-      .replace(/\s+/g, "-");
-    query = query.or(`slug.ilike.%${slugTerm}%,name.ilike.%${cleaned}%`);
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    // Tên hiển thị của đa số SP web là tên CRM (website_products.name để
+    // trống) → phải tìm cả equipment_types.name, không thì dán đúng tên SP
+    // vẫn không ra (CEO báo 2026-10-01; tên có "|", "+" hay slug bị cắt 60
+    // ký tự đều trượt). Tách từ: đủ mọi từ, không cần đúng thứ tự.
+    let typeQuery = supabase.from("equipment_types").select("id").limit(300);
+    for (const word of activeSearch.split(/\s+/).filter(Boolean)) {
+      typeQuery = typeQuery.ilike("name", `%${word}%`);
+    }
+    const { data: matchedTypes } = await typeQuery;
+    const typeIds = (matchedTypes ?? []).map((t) => t.id);
+    query = query.or(
+      [
+        `slug.ilike.%${slugTerm}%`,
+        `name.ilike.%${cleaned}%`,
+        ...(typeIds.length ? [`equipment_type_id.in.(${typeIds.join(",")})`] : []),
+      ].join(","),
+    );
   }
 
   const [{ data: products, count }, { data: categories }, statsRes, leadRes, allLiteRes] =
