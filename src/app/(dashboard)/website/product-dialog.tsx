@@ -229,7 +229,7 @@ export function WebsiteProductDialog({
               <RichTextEditor
                 name="description_html"
                 defaultValue={product.description_html ?? ""}
-                placeholder="Tiêu đề lớn để chia ô: Cấu hình, Trong hộp, FAQ..."
+                placeholder="Tiêu đề lớn để chia ô: Tính năng nổi bật · Thông số kỹ thuật · Trong hộp · Tại sao nên thuê · Video (dán link YouTube)"
               />
             </div>
 
