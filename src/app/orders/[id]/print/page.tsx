@@ -12,7 +12,22 @@ import {
 } from "@/lib/equipment-labels";
 import type { RentalPeriodUnit } from "@/types/database";
 import { COMPANY_INFO } from "@/lib/company-info";
-import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
+import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, PRINT_DOC_TYPES, type PrintDocType } from "@/lib/print-docs";
+import { DELIVERY_NOTE_TYPE_IDS } from "@/lib/commission";
+import { computeRentalDurationInUnit } from "@/lib/rental-pricing";
+import {
+  buildDocRows,
+  computeDocTotals,
+  computeOrderDeposit,
+  type DocEquipmentType,
+} from "@/lib/order-document-data";
+import {
+  AcceptanceDocument,
+  HandoverDocument,
+  PaymentRequestDocument,
+  QuoteDocument,
+  type DocContext,
+} from "./documents";
 import { PrintButton } from "./print-button";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -21,8 +36,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeStyle: "short",
   timeZone: VN_TIME_ZONE,
 });
-
-const PRINT_DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
 
 function isPrintDocType(value: string | undefined): value is PrintDocType {
   return !!value && (PRINT_DOC_TYPES as string[]).includes(value);
@@ -70,7 +83,9 @@ export default async function OrderPrintPage({
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
     supabase.from("branches").select("id, name"),
-    supabase.from("equipment_types").select("id, name, rental_period_unit"),
+    supabase
+      .from("equipment_types")
+      .select("id, name, rental_period_unit, product_type, tracking_type, deposit_amount"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
   ]);
 
@@ -99,7 +114,7 @@ export default async function OrderPrintPage({
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, name, phone, email, address, tax_code")
+    .select("id, name, phone, email, address, tax_code, deposit_percentage")
     .eq("id", order.customer_id)
     .maybeSingle();
 
@@ -122,6 +137,116 @@ export default async function OrderPrintPage({
   // không hiện tiền (CEO 2026-09-01): người ký là kỹ thuật/khách tại hiện
   // trường, giá cả đã nằm ở hợp đồng/báo giá.
   const showPrices = docType !== "handover" && docType !== "collection";
+
+  // Báo giá / Đề nghị thanh toán / Biên bản bàn giao / Biên bản nghiệm thu in
+  // theo đúng file mẫu CEO gửi 2026-09-30 (documents.tsx). Hợp đồng và biên
+  // bản thu hồi chưa có mẫu → vẫn dùng khuôn chung bên dưới.
+  const TEMPLATE_DOCS: PrintDocType[] = ["quote", "payment_request", "handover", "acceptance"];
+  if (TEMPLATE_DOCS.includes(docType)) {
+    const { data: payments } = await supabase
+      .from("order_payments")
+      .select("amount, payment_type")
+      .eq("order_id", id);
+    const sumPayments = (paymentType: string) =>
+      (payments ?? []).filter((p) => p.payment_type === paymentType).reduce((sum, p) => sum + p.amount, 0);
+
+    const typeById = new Map<string, DocEquipmentType>((equipmentTypes ?? []).map((t) => [t.id, t]));
+    const rows = buildDocRows({
+      lines: lines ?? [],
+      typeById,
+      unitNameById: new Map((equipmentUnits ?? []).map((u) => [u.id, u.brand_model])),
+      unitCountByType,
+      instanceCodeById: new Map((equipmentInstances ?? []).map((i) => [i.id, i.identifier_code])),
+      rentalStartAt: order.rental_start_at,
+      rentalEndAt: order.rental_end_at,
+    });
+    const deposit = computeOrderDeposit({
+      lines: lines ?? [],
+      typeById,
+      customerDepositPercentage: customer?.deposit_percentage ?? 100,
+      depositOverrideAmount: order.deposit_override_amount,
+    });
+
+    const vnParts = (iso: string | null) => {
+      if (!iso) return null;
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: VN_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date(iso));
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      return { day: get("day"), month: get("month"), year: get("year"), time: `${get("hour")}:${get("minute")}` };
+    };
+    const start = vnParts(order.rental_start_at);
+    const end = vnParts(order.rental_end_at);
+    const [orderYear, orderMonth, orderDay] = order.order_date.split("-");
+
+    const branchName = branchNameById.get(order.pickup_branch_id) ?? "";
+    const city = /hcm|hồ chí minh/i.test(branchName)
+      ? "TP. Hồ Chí Minh"
+      : branchName || "TP. Hồ Chí Minh";
+    // Địa điểm nhận & trả: lấy ghi chú địa chỉ trên dòng phí giao/thu hồi; khách
+    // tự đến lấy thì là kho giao.
+    const deliveryNotes = [
+      ...new Set(
+        (lines ?? [])
+          .filter(
+            (l) =>
+              l.equipment_type_id &&
+              DELIVERY_NOTE_TYPE_IDS.has(l.equipment_type_id) &&
+              l.extra_information?.trim(),
+          )
+          .map((l) => l.extra_information!.trim().replace(/\s*\n+\s*/g, " - ")),
+      ),
+    ];
+
+    const ctx: DocContext = {
+      docNumber: `${order.order_code}/TN`,
+      contractDateText: `ngày ${orderDay} tháng ${orderMonth} năm ${orderYear}`,
+      orderDate: `${orderDay}/${orderMonth}/${orderYear}`,
+      city,
+      customer: {
+        name: customer?.name ?? "—",
+        address: customer?.address ?? null,
+        taxCode: customer?.tax_code ?? null,
+        phone: customer?.phone ?? null,
+        email: customer?.email ?? null,
+      },
+      rows,
+      totals: computeDocTotals(rows, deposit),
+      pickupText: start ? `${start.time} ngày ${start.day}/${start.month}/${start.year}` : "",
+      returnText: end ? `${end.time} ngày ${end.day}/${end.month}/${end.year}` : "",
+      pickupDateParts: start ? { day: start.day, month: start.month, year: start.year } : null,
+      returnDateText: end ? `ngày ${end.day} tháng ${end.month} năm ${end.year}` : "ngày … tháng … năm …",
+      rentalDays:
+        order.rental_start_at && order.rental_end_at
+          ? computeRentalDurationInUnit(order.rental_start_at, order.rental_end_at, "day")
+          : null,
+      placeText: deliveryNotes.length ? deliveryNotes.join(" / ") : `Kho Thuê Nhanh ${branchName}`.trim(),
+      paid: sumPayments("invoice"),
+      depositHeld: sumPayments("deposit_collect") - sumPayments("deposit_refund"),
+    };
+
+    return (
+      <div className="min-h-screen bg-neutral-100 py-8 print:bg-white print:py-0">
+        <style>{`@page { size: A4; margin: 1.5cm; }`}</style>
+        <div
+          className="mx-auto max-w-[210mm] bg-white p-10 text-[13px] leading-5 text-black shadow print:max-w-none print:p-0 print:shadow-none"
+          style={{ fontFamily: '"Times New Roman", Times, serif' }}
+        >
+          <PrintButton />
+          {docType === "quote" && <QuoteDocument ctx={ctx} />}
+          {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} />}
+          {docType === "handover" && <HandoverDocument ctx={ctx} />}
+          {docType === "acceptance" && <AcceptanceDocument ctx={ctx} />}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100 py-8 print:bg-white print:py-0">

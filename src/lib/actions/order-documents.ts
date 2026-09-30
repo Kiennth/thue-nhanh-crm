@@ -14,6 +14,7 @@ export type ActionState = { error: string } | { success: true } | undefined;
 const PRINT_DOC_TYPE_OPTIONS = [
   "contract",
   "quote",
+  "payment_request",
   "handover",
   "collection",
   "acceptance",

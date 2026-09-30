@@ -1,8 +1,27 @@
-export type PrintDocType = "contract" | "quote" | "handover" | "collection" | "acceptance";
+export type PrintDocType =
+  | "contract"
+  | "quote"
+  | "payment_request"
+  | "handover"
+  | "collection"
+  | "acceptance";
+
+// Thứ tự hiện trong menu "Tạo chứng từ" / hộp gửi email — theo trình tự làm
+// việc với khách: báo giá → hợp đồng → đề nghị thanh toán → bàn giao → thu hồi
+// → nghiệm thu.
+export const PRINT_DOC_TYPES: PrintDocType[] = [
+  "quote",
+  "contract",
+  "payment_request",
+  "handover",
+  "collection",
+  "acceptance",
+];
 
 export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
   contract: "HỢP ĐỒNG CHO THUÊ",
   quote: "BÁO GIÁ",
+  payment_request: "ĐỀ NGHỊ THANH TOÁN",
   handover: "BIÊN BẢN BÀN GIAO",
   collection: "BIÊN BẢN THU HỒI",
   acceptance: "BIÊN BẢN NGHIỆM THU",
@@ -11,6 +30,7 @@ export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
 export const PRINT_DOC_MENU_LABELS: Record<PrintDocType, string> = {
   contract: "Tạo hợp đồng",
   quote: "Tạo báo giá",
+  payment_request: "Tạo đề nghị thanh toán",
   handover: "Tạo biên bản bàn giao",
   collection: "Tạo biên bản thu hồi",
   acceptance: "Tạo biên bản nghiệm thu",
@@ -101,6 +121,9 @@ export const PRINT_DOC_TERMS: Record<PrintDocType, TermsSection[]> = {
       ],
     },
   ],
+  // Đề nghị thanh toán in theo mẫu riêng (documents.tsx), không dùng khối điều
+  // khoản chung.
+  payment_request: [],
   handover: [
     {
       heading: "Điều khoản",

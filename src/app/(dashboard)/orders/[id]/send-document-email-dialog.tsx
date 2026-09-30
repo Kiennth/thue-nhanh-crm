@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { sendOrderDocumentEmail } from "@/lib/actions/order-documents";
-import { PRINT_DOC_MENU_LABELS, type PrintDocType } from "@/lib/print-docs";
+import { PRINT_DOC_MENU_LABELS, PRINT_DOC_TYPES, type PrintDocType } from "@/lib/print-docs";
 
-const DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
+const DOC_TYPES = PRINT_DOC_TYPES;
 
 export function SendDocumentEmailDialog({
   orderId,

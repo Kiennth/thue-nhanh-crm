@@ -9,9 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PRINT_DOC_MENU_LABELS, type PrintDocType } from "@/lib/print-docs";
-
-const DOC_TYPES: PrintDocType[] = ["contract", "quote", "handover", "collection", "acceptance"];
+import { PRINT_DOC_MENU_LABELS, PRINT_DOC_TYPES } from "@/lib/print-docs";
 
 export function PrintMenu({ orderId }: { orderId: string }) {
   const trigger = (
@@ -26,7 +24,7 @@ export function PrintMenu({ orderId }: { orderId: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger} />
       <DropdownMenuContent>
-        {DOC_TYPES.map((docType) => (
+        {PRINT_DOC_TYPES.map((docType) => (
           <DropdownMenuItem
             key={docType}
             render={
