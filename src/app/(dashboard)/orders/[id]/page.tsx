@@ -810,6 +810,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     )}
                                   </span>
                                 </div>
+                                {/* Ghi chú địa chỉ + SĐT giao/thu hồi nằm ngay dưới tên
+                                    phí dịch vụ (CEO 2026-09-30: để ở cột Người thực
+                                    hiện ô nhập quá nhỏ). */}
+                                {showDeliveryNote &&
+                                  (canAssignTransport ? (
+                                    <div className="mt-2 font-normal">
+                                      <OrderLineNoteForm lineId={line.id} note={line.note} />
+                                    </div>
+                                  ) : (
+                                    line.note && (
+                                      <p className="mt-2 text-xs font-normal whitespace-pre-wrap text-muted-foreground">
+                                        {line.note}
+                                      </p>
+                                    )
+                                  ))}
                               </TableCell>
                               <TableCell className="truncate" title={detail}>
                                 {detail}
@@ -889,18 +904,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                       (employeeNameById.get(line.employee_id ?? "") ?? "—")
                                     )
                                   ) : (
-                                    !showDeliveryNote && "—"
+                                    "—"
                                   )}
-                                  {showDeliveryNote &&
-                                    (canAssignTransport ? (
-                                      <OrderLineNoteForm lineId={line.id} note={line.note} />
-                                    ) : (
-                                      line.note && (
-                                        <p className="max-w-[160px] text-xs whitespace-pre-wrap text-muted-foreground">
-                                          {line.note}
-                                        </p>
-                                      )
-                                    ))}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1156,11 +1161,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           <TableRow>
                             <TableHead>Hàng hoá</TableHead>
                             <TableHead>Biến thể/Sản phẩm</TableHead>
-                            <TableHead className="w-[105px]">SL</TableHead>
+                            <TableHead className="w-[125px]">SL</TableHead>
                             <TableHead className="w-[110px]">Số kỳ tính</TableHead>
-                            <TableHead className="w-[160px]">Giá thuê</TableHead>
+                            <TableHead className="w-[210px]">Giá thuê</TableHead>
                             <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-                            <TableHead className="w-[130px]">Người thực hiện</TableHead>
+                            <TableHead className="w-[165px]">Người thực hiện</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>

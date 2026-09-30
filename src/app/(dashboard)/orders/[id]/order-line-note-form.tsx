@@ -20,7 +20,7 @@ export function OrderLineNoteForm({ lineId, note }: { lineId: string; note: stri
   }
 
   return (
-    <form action={handleSubmit} className="flex w-40 flex-col items-start gap-1">
+    <form action={handleSubmit} className="flex w-full flex-col items-start gap-1">
       <Textarea
         key={note ?? ""}
         name="note"

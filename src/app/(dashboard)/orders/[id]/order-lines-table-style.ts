@@ -4,9 +4,12 @@
 // ô để ô nhập + dòng diễn giải bên dưới thẳng hàng giữa các cột. Dùng chung
 // cho bảng kéo thả (quản lý) và bảng chỉ xem.
 export const ORDER_LINES_TABLE_CLASS = [
-  "min-w-[1080px] table-fixed",
+  "min-w-[1200px] table-fixed",
   "[&_th]:border-r [&_th:last-child]:border-r-0 [&_td]:border-r [&_td:last-child]:border-r-0",
   "[&_thead_tr]:bg-muted/70 [&_th]:text-xs [&_th]:font-semibold [&_th]:tracking-wide [&_th]:text-muted-foreground [&_th]:uppercase",
   "[&_td]:py-2.5 [&_td]:align-top",
+  // Dòng diễn giải nhỏ dưới ô (giá gốc × số kỳ · bậc giảm...) tự xuống dòng
+  // trong ô thay vì tràn sang cột bên cạnh.
+  "[&_td_p]:whitespace-normal",
   "[&_tbody_tr:nth-child(even)]:bg-muted/30",
 ].join(" ");

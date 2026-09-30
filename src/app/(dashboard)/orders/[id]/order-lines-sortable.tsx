@@ -104,11 +104,11 @@ export function OrderLinesSortableTable({ orderId, rows }: { orderId: string; ro
             <TableHead className="w-8"></TableHead>
             <TableHead>Hàng hoá</TableHead>
             <TableHead>Biến thể/Sản phẩm</TableHead>
-            <TableHead className="w-[105px]">SL</TableHead>
+            <TableHead className="w-[125px]">SL</TableHead>
             <TableHead className="w-[110px]">Số kỳ tính</TableHead>
-            <TableHead className="w-[160px]">Giá thuê</TableHead>
+            <TableHead className="w-[210px]">Giá thuê</TableHead>
             <TableHead className="w-[110px] text-right">Thành tiền</TableHead>
-            <TableHead className="w-[130px]">Người thực hiện</TableHead>
+            <TableHead className="w-[165px]">Người thực hiện</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
