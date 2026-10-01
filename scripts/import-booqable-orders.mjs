@@ -235,6 +235,16 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
         .eq("id", customerId)
         .or("tax_code.is.null,tax_code.eq.");
     }
+    // Email: CRM trước 2026-10-01 không lưu email khách Booqable → ô chọn
+    // khách khi tạo đơn không tìm theo email được. Điền khi CRM còn trống.
+    const bqEmail = bq?.attributes?.email?.trim();
+    if (bqEmail) {
+      await db
+        .from("customers")
+        .update({ email: bqEmail })
+        .eq("id", customerId)
+        .or("email.is.null,email.eq.");
+    }
   } else {
     const customerType = bq?.attributes?.legal_type === "commercial" ? "company" : "individual";
     const { data, error } = await db
@@ -244,6 +254,7 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
         phone: bq?.attributes?.properties?.phone || null,
         customer_type: bq?.taxCode ? "company" : customerType,
         tax_code: bq?.taxCode ?? null,
+        email: bq?.attributes?.email?.trim() || null,
         deposit_percentage: 100,
       })
       .select("id")
