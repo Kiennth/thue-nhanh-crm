@@ -944,3 +944,9 @@
 -- dây HDMI 4K - 2m → dây HDMI to HDMI 4K bt 2m (chưa có tiền lệ, khớp
 -- biến thể có sẵn); Linksys FGW3000 → mã Linksys FGW3000 bt cùng tên;
 -- Playstation 5 (kèm 2 tay cầm) → Máy chơi games Playstation 5.
+--
+-- Đợt map 21 (01/10 lần 2: import BQ10431/12923/13069/13070, đóng 1, giao
+-- BQ12864/12985/13033). Gắn 5 dòng tự do theo tiền lệ: Meta Quest 2 ×4;
+-- iPad Pro M1 11 inch - Wi-Fi + 5G ×8 → iPad Pro M1 11 inch; giá đỡ tablet
+-- chống trộm - Trắng ×8 → bt Trắng; Linksys FGW3000 → bt cùng tên; Xe
+-- Scooter Điện - NINEBOT18W → bt NINEBOT18W.
