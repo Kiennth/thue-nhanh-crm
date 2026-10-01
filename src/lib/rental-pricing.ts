@@ -72,7 +72,19 @@ export interface RentalPresetOption {
   key: string;
   label: string;
   hours: number;
+  // Gói cam kết N tháng — giá hiển thị chia đều mỗi tháng.
+  commitMonths?: number;
 }
+
+// Nhóm hàng (equipment_categories.name) được chọn gói cam kết tháng.
+export const LONG_TERM_CATEGORY_NAMES = [
+  "PC & Mac",
+  "PC Laptop",
+  "Điện Thoại",
+  "iPhone",
+  "Máy tính Bảng",
+  "iPad",
+] as const;
 
 export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
   { key: "3h", label: "3 giờ", hours: 3 },
@@ -86,13 +98,15 @@ export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
   { key: "6d", label: "6 ngày", hours: 24 * 6 },
   { key: "7d", label: "7 ngày", hours: 24 * 7 },
   { key: "14d", label: "14 ngày", hours: 24 * 14 },
-  { key: "30d", label: "30 ngày", hours: 24 * 30 },
-  // Gói dài hạn (CEO 2026-10-01). 1 tháng = 30 ngày theo đúng quy ước tính
-  // giá (PERIOD_LENGTH_IN_HOURS.month) — 12 tháng = 360 ngày, không lấy 365
-  // vì SP giá theo tháng sẽ bị tính thành 13 tháng.
-  { key: "3m", label: "3 tháng", hours: 24 * 30 * 3 },
-  { key: "6m", label: "6 tháng", hours: 24 * 30 * 6 },
-  { key: "12m", label: "12 tháng", hours: 24 * 30 * 12 },
+  { key: "30d", label: "1 tháng", hours: 24 * 30 },
+  // Gói cam kết dài hạn (CEO 2026-10-01) — CHỈ cho nhóm máy tính / điện
+  // thoại / máy tính bảng (xem LONG_TERM_*), giá hiển thị là giá MỖI THÁNG
+  // (tổng gói ÷ số tháng). 1 tháng = 30 ngày theo đúng quy ước tính giá
+  // (PERIOD_LENGTH_IN_HOURS.month) — 12 tháng = 360 ngày, không lấy 365 vì
+  // SP giá theo tháng sẽ bị tính thành 13 tháng.
+  { key: "3m", label: "1 tháng (cam kết 3 tháng)", hours: 24 * 30 * 3, commitMonths: 3 },
+  { key: "6m", label: "1 tháng (cam kết 6 tháng)", hours: 24 * 30 * 6, commitMonths: 6 },
+  { key: "12m", label: "1 tháng (cam kết 12 tháng)", hours: 24 * 30 * 12, commitMonths: 12 },
 ];
 
 // Mặc định thời gian bắt đầu thuê khi tạo mới = hiện tại + 1 tiếng, làm tròn
