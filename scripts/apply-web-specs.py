@@ -2,7 +2,7 @@
 """Gắn "Thông số kỹ thuật" chuẩn (form thống nhất CEO chốt 2026-10-01) vào
 mô tả sản phẩm web.
 
-Đầu vào: file JSON mảng {slug, specs_vi: [[nhãn, giá trị]...], specs_en: [...]}
+Đầu vào: file JSON mảng (hoặc .jsonl mỗi dòng 1 SP) {slug, specs_vi: [[nhãn, giá trị]...], specs_en: [...]}
 (do agent tra web hãng/Google tạo). Với mỗi SP: bỏ các mục cũ có heading
 kiểu Cấu hình / Thông số / Specs / Kích thước / Tương thích trong
 description_html (và _en nếu có), chèn 1 mục "<h2>Thông số kỹ thuật</h2>"
@@ -62,7 +62,20 @@ def spec_block(title, rows):
 def main():
     src = sys.argv[1]
     dry = "--dry" in sys.argv
-    items = json.load(open(src))
+    if src.endswith(".jsonl"):
+        # Mỗi dòng 1 SP; slug lặp thì lấy dòng sau cùng.
+        by_slug = {}
+        for line in open(src):
+            line = line.strip()
+            if line:
+                try:
+                    it = json.loads(line)
+                    by_slug[it["slug"]] = it
+                except (json.JSONDecodeError, KeyError):
+                    print("BỎ DÒNG HỎNG:", line[:80])
+        items = list(by_slug.values())
+    else:
+        items = json.load(open(src))
     backup = []
     done = 0
     for it in items:
@@ -85,8 +98,9 @@ def main():
         if not dry:
             req("PATCH", f"website_products?id=eq.{p['id']}", body)
         done += 1
-    json.dump(backup, open(src.replace(".json", ".backup.json"), "w"), ensure_ascii=False)
-    print(f"{'(chạy thử) ' if dry else ''}đã gắn thông số cho {done} SP; backup: {src.replace('.json', '.backup.json')}")
+    bk = src.rsplit(".", 1)[0] + ".backup.json"
+    json.dump(backup, open(bk, "w"), ensure_ascii=False)
+    print(f"{'(chạy thử) ' if dry else ''}đã gắn thông số cho {done} SP; backup: {bk}")
 
 
 main()
