@@ -677,10 +677,31 @@ export async function updateEquipmentInstance(
   const branchError = assertOwnBranch(employee, parsed.data.branch_id);
   if (branchError) return { error: branchError };
 
+  // Máy "CHỜ MUA" (mã tạm AUTO-…, ghi chú "Máy CHỜ MUA … thay serial thật +
+  // nhập giá mua"): khi đã đổi sang serial thật VÀ nhập giá mua thì máy đã
+  // mua xong → tự bỏ ghi chú chờ mua (CEO 2026-10-01 sửa serial xong vẫn
+  // thấy "Máy CHỜ MUA" vì quên xoá ô ghi chú).
+  // Ô để trống phải GHI null (supabase-js bỏ qua field undefined → xoá trắng
+  // ghi chú/giá mua trên form trước đây không lưu được).
+  const data = {
+    ...parsed.data,
+    condition_notes: parsed.data.condition_notes ?? null,
+    purchase_price: parsed.data.purchase_price ?? null,
+    purchase_date: parsed.data.purchase_date ?? null,
+  };
+  if (
+    data.condition_notes &&
+    /CHỜ MUA/i.test(data.condition_notes) &&
+    !/^AUTO-/i.test(data.identifier_code) &&
+    data.purchase_price != null
+  ) {
+    data.condition_notes = null;
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("equipment_instances")
-    .update(parsed.data)
+    .update(data)
     .eq("id", id);
 
   if (error) {
