@@ -27,6 +27,23 @@ export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
   acceptance: "BIÊN BẢN NGHIỆM THU",
 };
 
+// Tên file chứng từ (CEO 2026-10-01): chữ HOA không dấu + "PO" + mã đơn hệ
+// thống, vd "BAO GIA PO DH20261001-871", "HOP DONG PO DH20261001-871". Dùng
+// làm tiêu đề trang in (trình duyệt lấy làm tên file khi "Lưu PDF") và tên
+// file đính kèm khi gửi email.
+export const PRINT_DOC_FILE_PREFIX: Record<PrintDocType, string> = {
+  contract: "HOP DONG",
+  quote: "BAO GIA",
+  payment_request: "DE NGHI THANH TOAN",
+  handover: "BIEN BAN BAN GIAO",
+  collection: "BIEN BAN THU HOI",
+  acceptance: "BIEN BAN NGHIEM THU",
+};
+
+export function printDocFileName(docType: PrintDocType, orderCode: string): string {
+  return `${PRINT_DOC_FILE_PREFIX[docType]} PO ${orderCode}`;
+}
+
 export const PRINT_DOC_MENU_LABELS: Record<PrintDocType, string> = {
   contract: "Tạo hợp đồng",
   quote: "Tạo báo giá",

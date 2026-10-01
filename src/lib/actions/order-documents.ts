@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES } from "@/lib/roles";
 import { COMPANY_INFO } from "@/lib/company-info";
-import { PRINT_DOC_TITLES, type PrintDocType } from "@/lib/print-docs";
+import { PRINT_DOC_TITLES, printDocFileName, type PrintDocType } from "@/lib/print-docs";
 import { renderOrderDocumentPdf } from "@/lib/pdf";
 import { sendEmail } from "@/lib/email";
 
@@ -77,7 +77,7 @@ export async function sendOrderDocumentEmail(
     `,
     attachments: [
       {
-        filename: `${docTitle} - ${order.order_code}.pdf`,
+        filename: `${printDocFileName(doc_type as PrintDocType, order.order_code)}.pdf`,
         content: pdf,
       },
     ],

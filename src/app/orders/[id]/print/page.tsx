@@ -12,7 +12,8 @@ import {
 } from "@/lib/equipment-labels";
 import type { RentalPeriodUnit } from "@/types/database";
 import { COMPANY_INFO } from "@/lib/company-info";
-import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, PRINT_DOC_TYPES, type PrintDocType } from "@/lib/print-docs";
+import { PRINT_DOC_TERMS, PRINT_DOC_TITLES, PRINT_DOC_TYPES, printDocFileName, type PrintDocType } from "@/lib/print-docs";
+import type { Metadata } from "next";
 import { DELIVERY_NOTE_TYPE_IDS } from "@/lib/commission";
 import { computeRentalDurationInUnit } from "@/lib/rental-pricing";
 import {
@@ -57,6 +58,23 @@ function chargeNote(chargeDuration: number | null, unit: RentalPeriodUnit | null
       Tính {chargeDuration} {RENTAL_PERIOD_UNIT_LABELS[unit]}
     </span>
   );
+}
+
+// Tiêu đề tab = tên file khi bấm "In / Lưu PDF" (trình duyệt lấy title làm
+// tên file mặc định) — theo mẫu CEO: "BAO GIA PO DH20261001-871".
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ type?: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { type } = await searchParams;
+  const docType: PrintDocType = isPrintDocType(type) ? type : "contract";
+  const supabase = await createClient();
+  const { data: order } = await supabase.from("orders").select("order_code").eq("id", id).single();
+  return { title: order ? printDocFileName(docType, order.order_code) : PRINT_DOC_TITLES[docType] };
 }
 
 export default async function OrderPrintPage({
