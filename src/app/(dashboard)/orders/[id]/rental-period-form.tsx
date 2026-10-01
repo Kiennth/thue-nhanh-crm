@@ -40,15 +40,12 @@ interface RentalPeriodFormProps {
   orderId: string;
   rentalStartAt: string | null;
   rentalEndAt: string | null;
-  // Cho chọn gói "1 tháng (cam kết N tháng)" — chỉ nhóm máy tính/điện thoại/tablet.
-  allowLongTerm?: boolean;
 }
 
 export function RentalPeriodForm({
   orderId,
   rentalStartAt,
   rentalEndAt,
-  allowLongTerm = false,
 }: RentalPeriodFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -182,7 +179,10 @@ export function RentalPeriodForm({
         <div className="space-y-2">
           <Label>Gói thuê</Label>
           <div className="flex flex-wrap gap-2">
-            {RENTAL_PRESET_OPTIONS.filter((p) => !p.commitMonths || allowLongTerm).map((preset) => (
+            {/* Trong CRM gói dài hạn ghi gọn "3/6/12 tháng" và luôn hiện (CEO
+                2026-10-01) — nhãn "1 tháng (cam kết N tháng)" + giới hạn
+                nhóm hàng chỉ áp dụng trên website. */}
+            {RENTAL_PRESET_OPTIONS.map((preset) => (
               <Button
                 key={preset.key}
                 type="button"
@@ -190,7 +190,7 @@ export function RentalPeriodForm({
                 variant={presetKey === preset.key ? "default" : "outline"}
                 onClick={() => setPresetKey(preset.key)}
               >
-                {preset.label}
+                {preset.commitMonths ? `${preset.commitMonths} tháng` : preset.label}
               </Button>
             ))}
           </div>

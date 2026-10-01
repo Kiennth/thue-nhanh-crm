@@ -58,7 +58,6 @@ import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
 import { RentalPeriodForm } from "./rental-period-form";
-import { LONG_TERM_CATEGORY_NAMES } from "@/lib/rental-pricing";
 import { OrderInfoForm } from "./order-info-form";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
@@ -118,7 +117,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase
       .from("equipment_types")
       .select(
-        "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url, category_id",
+        "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url",
       )
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
@@ -221,20 +220,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     };
   };
   const equipmentTypeById = new Map((equipmentTypes ?? []).map((t) => [t.id, t]));
-  // Gói "1 tháng (cam kết 3/6/12 tháng)" chỉ cho máy tính / điện thoại /
-  // máy tính bảng (CEO 2026-10-01): hiện khi đơn chưa có dòng nào hoặc có ít
-  // nhất 1 dòng thuộc các nhóm này.
-  const { data: longTermCategories } = await supabase
-    .from("equipment_categories")
-    .select("id")
-    .in("name", [...LONG_TERM_CATEGORY_NAMES]);
-  const longTermCategoryIds = new Set((longTermCategories ?? []).map((c) => c.id));
-  const allowLongTermPresets =
-    !(lines ?? []).length ||
-    (lines ?? []).some((l) => {
-      const categoryId = l.equipment_type_id ? equipmentTypeById.get(l.equipment_type_id)?.category_id : null;
-      return !!categoryId && longTermCategoryIds.has(categoryId);
-    });
   const equipmentUnitById = new Map((equipmentUnits ?? []).map((u) => [u.id, u]));
   const equipmentInstanceById = new Map((equipmentInstances ?? []).map((i) => [i.id, i]));
   // Số biến thể của từng loại hàng — loại chỉ có 1 biến thể thì cột "Biến
@@ -700,7 +685,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               orderId={order.id}
               rentalStartAt={order.rental_start_at}
               rentalEndAt={order.rental_end_at}
-              allowLongTerm={allowLongTermPresets}
             />
           </CardContent>
         </Card>

@@ -76,16 +76,6 @@ export interface RentalPresetOption {
   commitMonths?: number;
 }
 
-// Nhóm hàng (equipment_categories.name) được chọn gói cam kết tháng.
-export const LONG_TERM_CATEGORY_NAMES = [
-  "PC & Mac",
-  "PC Laptop",
-  "Điện Thoại",
-  "iPhone",
-  "Máy tính Bảng",
-  "iPad",
-] as const;
-
 export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
   { key: "3h", label: "3 giờ", hours: 3 },
   { key: "6h", label: "6 giờ", hours: 6 },
@@ -99,8 +89,8 @@ export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
   { key: "7d", label: "7 ngày", hours: 24 * 7 },
   { key: "14d", label: "14 ngày", hours: 24 * 14 },
   { key: "30d", label: "1 tháng", hours: 24 * 30 },
-  // Gói cam kết dài hạn (CEO 2026-10-01) — CHỈ cho nhóm máy tính / điện
-  // thoại / máy tính bảng (xem LONG_TERM_*), giá hiển thị là giá MỖI THÁNG
+  // Gói cam kết dài hạn (CEO 2026-10-01). Web: chỉ nhóm máy tính / điện
+  // thoại / máy tính bảng, giá hiển thị là giá MỖI THÁNG; CRM: luôn hiện, nhãn "N tháng"
   // (tổng gói ÷ số tháng). 1 tháng = 30 ngày theo đúng quy ước tính giá
   // (PERIOD_LENGTH_IN_HOURS.month) — 12 tháng = 360 ngày, không lấy 365 vì
   // SP giá theo tháng sẽ bị tính thành 13 tháng.
