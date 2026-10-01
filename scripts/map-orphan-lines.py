@@ -14,7 +14,7 @@ def req(method, path, body=None, params=None, headers=None):
             b = resp.read(); return resp.status, (json.loads(b) if b else None)
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode()[:200]
-def map_orphans(line_pattern, type_name, variant=None, tag='CEO 2026-09-30'):
+def map_orphans(line_pattern, type_name, variant=None, tag='CEO 2026-10-01'):
     st, et = req('GET', '/equipment_types', params={'select': 'id,name,tracking_type,product_type', 'name': f'eq.{type_name}'})
     if not et:
         st, et = req('GET', '/equipment_types', params={'select': 'id,name,tracking_type,product_type', 'name': f'ilike.{type_name}'})

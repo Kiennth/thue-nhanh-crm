@@ -935,3 +935,12 @@
 --     bị dọn mất script).
 --   * TỒN CUỐI 30/09: 1.177 dòng treo / 508 tên / 303,3tr (gồm cả nhóm bỏ
 --     qua & không khớp).
+--
+-- Đợt map 20 (01/10, đồng bộ Booqable: import 4 đơn mới BQ13053/13066/
+-- 13067/13068, đóng 2, đưa 1 đơn sang đã giao — BQ12980). Gắn 6 dòng tự do
+-- theo tiền lệ: JBL Partybox 710 800W → Loa JBL Partybox 710; Màn Gaming
+-- 27" EGM27F240S → Màn Hình Gaming 1080P 240Hz 27 inch bt EGM27F240S;
+-- Cục phát 5G GALAXY-SCR01 (có pin) → Cục phát 5G WiFi 6 có pin (kèm sim);
+-- dây HDMI 4K - 2m → dây HDMI to HDMI 4K bt 2m (chưa có tiền lệ, khớp
+-- biến thể có sẵn); Linksys FGW3000 → mã Linksys FGW3000 bt cùng tên;
+-- Playstation 5 (kèm 2 tay cầm) → Máy chơi games Playstation 5.
