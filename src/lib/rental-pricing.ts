@@ -87,6 +87,12 @@ export const RENTAL_PRESET_OPTIONS: RentalPresetOption[] = [
   { key: "7d", label: "7 ngày", hours: 24 * 7 },
   { key: "14d", label: "14 ngày", hours: 24 * 14 },
   { key: "30d", label: "30 ngày", hours: 24 * 30 },
+  // Gói dài hạn (CEO 2026-10-01). 1 tháng = 30 ngày theo đúng quy ước tính
+  // giá (PERIOD_LENGTH_IN_HOURS.month) — 12 tháng = 360 ngày, không lấy 365
+  // vì SP giá theo tháng sẽ bị tính thành 13 tháng.
+  { key: "3m", label: "3 tháng", hours: 24 * 30 * 3 },
+  { key: "6m", label: "6 tháng", hours: 24 * 30 * 6 },
+  { key: "12m", label: "12 tháng", hours: 24 * 30 * 12 },
 ];
 
 // Mặc định thời gian bắt đầu thuê khi tạo mới = hiện tại + 1 tiếng, làm tròn
