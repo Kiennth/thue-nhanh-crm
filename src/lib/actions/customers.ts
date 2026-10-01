@@ -95,20 +95,25 @@ export async function updateCustomer(
   return { success: true };
 }
 
-// Tìm khách hàng theo tên/SĐT — dùng cho ô chọn khách hàng dạng combobox khi
-// tạo/sửa đơn hàng. Không dùng select("*") toàn bộ khách hàng ở đây vì
-// Supabase giới hạn 1.000 dòng mỗi query (bảng này hiện có hơn 5.800 dòng).
+// Tìm khách hàng theo tên/SĐT/MST/email — dùng cho ô chọn khách hàng dạng
+// combobox khi tạo/sửa đơn hàng (email thêm 2026-10-01, CEO báo gõ email
+// không ra). Không dùng select("*") toàn bộ khách hàng ở đây vì Supabase giới
+// hạn 1.000 dòng mỗi query (bảng này hiện có hơn 5.800 dòng).
 export async function searchCustomers(query: string): Promise<{ id: string; name: string }[]> {
   await requireRole([...ALL_ROLES]);
 
-  const trimmed = query.trim();
+  // Bỏ ký tự cú pháp của or= PostgREST (dấu phẩy, ngoặc) để chuỗi tìm không
+  // phá filter.
+  const trimmed = query.replace(/[,()"\\]/g, " ").trim();
   if (!trimmed) return [];
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("customers")
     .select("id, name")
-    .or(`name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%`)
+    .or(
+      `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,email.ilike.%${trimmed}%`,
+    )
     .order("name")
     .limit(20);
 
