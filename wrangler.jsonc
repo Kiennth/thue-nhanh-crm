@@ -18,5 +18,9 @@
   // của Cloudflare — Puppeteer thường không chạy được trong Workers isolate,
   // binding này expose 1 trình duyệt thật ở phía Cloudflare cho @cloudflare/
   // puppeteer điều khiển từ xa. Xem src/lib/pdf.ts.
-  "browser": { "binding": "BROWSER" }
+  "browser": { "binding": "BROWSER" },
+  // Smart Placement (2026-10-03): Worker chạy gần Supabase thay vì gần người
+  // dùng — mỗi trang gọi DB nhiều lượt nối đuôi, mỗi lượt từ edge HKG tới DB
+  // mất ~450ms; đặt cạnh DB thì còn vài chục ms.
+  "placement": { "mode": "smart" }
 }

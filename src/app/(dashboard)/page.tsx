@@ -136,6 +136,8 @@ export default async function DashboardHomePage({
     payrollByMonth,
     myTrend,
     branchOrdersOverview,
+    periodExpensesRes,
+    recurringDefsRes,
   ] = await Promise.all([
     supabase.from("branches").select("id, name").order("position"),
     canViewBranchComparison
@@ -182,6 +184,20 @@ export default async function DashboardHomePage({
     isBranchManager && branchId
       ? computeOrdersOverview(branchId)
       : Promise.resolve(null),
+    // Chi phí của khối Lợi nhuận gộp — nạp cùng đợt (trước đây chờ xong cả
+    // đợt trên mới gọi, thêm 1 lượt DB nối đuôi).
+    canViewBranchComparison
+      ? supabase
+          .from("expenses")
+          .select("branch_id, amount")
+          .gte("expense_date", `${profitMonths[0]}-01`)
+          .lt("expense_date", `${nextMonthOf(profitMonths[profitMonths.length - 1])}-01`)
+      : Promise.resolve(null),
+    canViewBranchComparison
+      ? supabase
+          .from("recurring_expenses")
+          .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note")
+      : Promise.resolve(null),
   ]);
 
   // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
@@ -192,16 +208,8 @@ export default async function DashboardHomePage({
     payrollByBranch: Map<string, number>;
   } | null = null;
   if (canViewBranchComparison) {
-    const [{ data: periodExpenses }, { data: recurringDefs }] = await Promise.all([
-      supabase
-        .from("expenses")
-        .select("branch_id, amount")
-        .gte("expense_date", `${profitMonths[0]}-01`)
-        .lt("expense_date", `${nextMonthOf(profitMonths[profitMonths.length - 1])}-01`),
-      supabase
-        .from("recurring_expenses")
-        .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note"),
-    ]);
+    const periodExpenses = periodExpensesRes?.data;
+    const recurringDefs = recurringDefsRes?.data;
     const operatingByBranch = new Map<string, number>();
     // Khoản nhập tay + khoản định kỳ trải vào từng tháng của kỳ (thuê nhà,
     // trả góp...) — thiếu vế sau thì chi phí vận hành trên bảng lãi luôn 0.

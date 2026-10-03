@@ -16,16 +16,17 @@ export interface CurrentEmployee {
 export const getCurrentEmployee = cache(
   async (): Promise<CurrentEmployee | null> => {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Xác minh JWT tại chỗ (xem chú thích getClaims ở middleware) — bỏ 1
+    // lượt gọi máy chủ Auth nối đuôi trước mỗi trang.
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const userId = claimsData?.claims?.sub;
 
-    if (!user) return null;
+    if (!userId) return null;
 
     const { data } = await supabase
       .from("employees")
       .select("id, name, role, branch_id, base_salary")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     return data;

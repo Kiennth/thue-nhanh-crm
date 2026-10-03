@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine, deleteOrderEquipmentLines } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
@@ -107,6 +107,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: taskWeights },
     { data: overtimeEntries },
     employee,
+    equipmentInstances,
+    { data: comboComponents },
+    { data: comboAlternatives },
+    { data: commentRows },
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
@@ -129,52 +133,64 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase.from("task_weights").select("*"),
     supabase.from("overtime_entries").select("*").eq("order_id", id).order("entry_date", { ascending: false }),
     getCurrentEmployee(),
+    // equipment_instances đã hơn 4.000 dòng (mỗi máy serialize là 1 dòng) —
+    // PostgREST chặn CỨNG 1.000 dòng/lần gọi nên phải phân trang; dùng bản
+    // song song (fetchAllRowsFast, cần .order ổn định) thay vì 5 lượt nối
+    // đuôi, và nạp cùng đợt với mọi thứ khác (2026-10-03: trang chi tiết đơn
+    // từng có ~11 lượt gọi DB tuần tự, mỗi lượt ~0,1–0,4s).
+    fetchAllRowsFast<{
+      id: string;
+      equipment_type_id: string;
+      equipment_unit_id: string | null;
+      identifier_code: string;
+      status: string;
+      branch_id: string | null;
+    }>(
+      (from, to) =>
+        supabase
+          .from("equipment_instances")
+          .select("id, equipment_type_id, equipment_unit_id, identifier_code, status, branch_id")
+          .order("id")
+          .range(from, to),
+      () => supabase.from("equipment_instances").select("id", { count: "exact", head: true }),
+    ),
+    // Món con của các combo (CEO 2026-09-26) — để ô thêm nhanh báo số bộ ghép
+    // được tại kho giao.
+    supabase.from("equipment_type_components").select("id, combo_type_id, component_type_id, quantity"),
+    supabase.from("equipment_type_component_alternatives").select("component_id, alternative_type_id"),
+    supabase
+      .from("order_comments")
+      .select("id, parent_id, body, created_at, employees(name)")
+      .eq("order_id", id)
+      .order("created_at"),
   ]);
 
   if (!order) {
     notFound();
   }
 
-  // equipment_instances đã hơn 1.700 dòng (mỗi máy serialize là 1 dòng) —
-  // Supabase/PostgREST chặn CỨNG ở 1.000 dòng/lần gọi kể cả khi request
-  // .range() rộng hơn (không lỗi, chỉ âm thầm cắt bớt), nên phải phân trang
-  // bằng fetchAllRows để lấy đủ toàn bộ, tránh 1 phần catalog "biến mất"
-  // khỏi ô tìm nhanh và tên biến thể của dòng hàng cũ hiện "—".
-  const equipmentInstances = await fetchAllRows<{
-    id: string;
-    equipment_type_id: string;
-    equipment_unit_id: string | null;
-    identifier_code: string;
-    status: string;
-    branch_id: string | null;
-  }>((from, to) =>
+  // Đợt 2 (cần order/lines của đợt 1): khách của đơn + các đơn đang giữ
+  // cùng biến thể (cảnh báo thiếu hàng bên dưới) — chạy song song, đơn giữ
+  // hàng nhúng thẳng vào dòng hàng thay vì gọi thêm 1 lượt riêng.
+  // Khách tra thẳng theo customer_id (bảng khách đã quá 1.000 dòng).
+  const relevantUnitIds = [
+    ...new Set((lines ?? []).map((l) => l.equipment_unit_id).filter((u): u is string => !!u)),
+  ];
+  const [{ data: orderCustomer }, { data: reservationRows }] = await Promise.all([
     supabase
-      .from("equipment_instances")
-      .select("id, equipment_type_id, equipment_unit_id, identifier_code, status, branch_id")
-      .range(from, to),
-  );
-
-  // Món con của các combo (CEO 2026-09-26) — để ô thêm nhanh báo số bộ ghép
-  // được tại kho giao.
-  const [{ data: comboComponents }, { data: comboAlternatives }] = await Promise.all([
-    supabase.from("equipment_type_components").select("id, combo_type_id, component_type_id, quantity"),
-    supabase.from("equipment_type_component_alternatives").select("component_id, alternative_type_id"),
+      .from("customers")
+      .select("id, name, email, deposit_percentage")
+      .eq("id", order.customer_id)
+      .maybeSingle(),
+    relevantUnitIds.length > 0
+      ? supabase
+          .from("order_equipment")
+          .select(
+            "order_id, equipment_unit_id, quantity, orders(id, order_code, pickup_branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at, delivery_stock_moved_at)",
+          )
+          .in("equipment_unit_id", relevantUnitIds)
+      : Promise.resolve({ data: [] }),
   ]);
-
-  // Danh sách customers ở trên bị Supabase giới hạn 1.000 dòng (nay có hơn
-  // 5.800 khách hàng) nên không đảm bảo chứa đúng khách của đơn này — luôn
-  // tra thẳng theo customer_id để tên/tỉ lệ cọc hiển thị đúng bất kể thứ tự.
-  const { data: orderCustomer } = await supabase
-    .from("customers")
-    .select("id, name, email, deposit_percentage")
-    .eq("id", order.customer_id)
-    .maybeSingle();
-
-  const { data: commentRows } = await supabase
-    .from("order_comments")
-    .select("id, parent_id, body, created_at, employees(name)")
-    .eq("order_id", id)
-    .order("created_at");
   const orderComments = (commentRows ?? []).map((c) => ({
     id: c.id,
     parentId: c.parent_id,
@@ -342,10 +358,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     );
   }
 
-  const relevantUnitIds = [...demandByUnit.keys()];
-  let reservationLines: { order_id: string; equipment_unit_id: string | null; quantity: number }[] =
-    [];
-  let reservationOrders: {
+  type ReservationOrder = {
     id: string;
     order_code: string;
     pickup_branch_id: string;
@@ -354,24 +367,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     rental_start_at: string | null;
     rental_end_at: string | null;
     delivery_stock_moved_at: string | null;
-  }[] = [];
-  if (relevantUnitIds.length > 0) {
-    const { data: oeRows } = await supabase
-      .from("order_equipment")
-      .select("order_id, equipment_unit_id, quantity")
-      .in("equipment_unit_id", relevantUnitIds);
-    reservationLines = oeRows ?? [];
-
-    const orderIds = [...new Set(reservationLines.map((r) => r.order_id))];
-    const { data: ordersRows } = await supabase
-      .from("orders")
-      .select(
-        "id, order_code, pickup_branch_id, completed_at, cancelled_at, rental_start_at, rental_end_at, delivery_stock_moved_at",
-      )
-      .in("id", orderIds);
-    reservationOrders = ordersRows ?? [];
+  };
+  const reservationLines: { order_id: string; equipment_unit_id: string | null; quantity: number }[] =
+    reservationRows ?? [];
+  const reservationOrderById = new Map<string, ReservationOrder>();
+  // Kiểu sinh tự động chưa có quan hệ order_equipment → orders (khoá ngoại
+  // order_id có thật trong DB) nên phải ép kiểu.
+  for (const r of (reservationRows ?? []) as unknown as { orders: ReservationOrder | null }[]) {
+    if (r.orders) reservationOrderById.set(r.orders.id, r.orders);
   }
-  const reservationOrderById = new Map(reservationOrders.map((o) => [o.id, o]));
 
   // Hai khung thời gian thuê giao nhau (mở, không tính đơn nối đuôi sát giờ).
   function rentalOverlaps(

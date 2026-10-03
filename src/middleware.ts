@@ -32,10 +32,12 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  // getClaims thay getUser (2026-10-03): dự án đã bật khoá ký ES256 nên JWT
+  // được xác minh TẠI CHỖ bằng JWKS (cache trong isolate) — bỏ 1 lượt gọi
+  // máy chủ Auth cho MỌI request. Token hết hạn vẫn được làm mới như cũ
+  // (getClaims gọi getSession bên trong); khoá HS256 cũ thì tự rơi về getUser.
+  const { data: claimsData, error } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   // /auth/confirm tự xác thực token mời/khôi phục mật khẩu bên trong route
