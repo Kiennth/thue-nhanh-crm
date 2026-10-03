@@ -54,6 +54,7 @@ import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
+import { CloseDealButton } from "./close-deal-button";
 import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
@@ -584,9 +585,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       ];
     }
     if (t.product_type === "rental" && t.tracking_type === "individual") {
-      return (equipmentInstances ?? [])
-        .filter((i) => i.equipment_type_id === t.id && i.status === "available")
-        .map((i) => {
+      // Phương án B (CEO 2026-10-03): 1 dòng/loại máy — nhập số lượng, hệ
+      // thống tự lấy máy rảnh. Từng máy vẫn chọn được bằng cách gõ serial.
+      const machines = (equipmentInstances ?? []).filter(
+        (i) => i.equipment_type_id === t.id && i.status === "available",
+      );
+      return [
+        {
+          key: `t-${t.id}`,
+          label: t.name,
+          hint: `${availableAtPickup(t.id)} máy ở kho giao`,
+          imageUrl: t.image_url,
+          equipmentTypeId: t.id,
+        },
+        ...machines.map((i) => {
           // Đa số máy chưa gán biến thể (equipment_unit_id null) — lúc đó
           // nhãn giữ nguyên như trước, chỉ tên loại + serial.
           const unitName = i.equipment_unit_id
@@ -598,8 +610,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             imageUrl: t.image_url,
             equipmentTypeId: t.id,
             equipmentInstanceId: i.id,
+            // Chỉ hiện khi gõ đúng serial/biến thể — không làm ngập danh sách.
+            serialMatch: `${i.identifier_code} ${unitName ?? ""}`,
           };
-        });
+        }),
+      ];
     }
     const units = unitsByType.get(t.id) ?? [];
     if (units.length > 1) {
@@ -988,7 +1003,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               type,
                               null,
                               <>
-                                <SerialChipList items={chips} canRemove={canManage} />
+                                <SerialChipList
+                                  items={chips}
+                                  canRemove={canManage}
+                                  canSwap={!order.delivery_stock_moved_at && !order.completed_at && !order.cancelled_at}
+                                />
                                 <LineNoteEditor
                                   lineIds={memberIds}
                                   note={members.find((m) => m.extra_information)?.extra_information ?? null}
@@ -1228,6 +1247,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       style={{ width: `${(doneCount / TASK_TYPE_SEQUENCE.length) * 100}%` }}
                     />
                   </div>
+                  {!order.cancelled_at && !order.completed_at && !taskByType.get("chot_don")?.completed_date && (
+                    <CloseDealButton
+                      orderId={order.id}
+                      employees={taskEmployeeOptions("chot_don", employee?.id).employees}
+                      defaultEmployeeId={employee?.id ?? null}
+                    />
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div>

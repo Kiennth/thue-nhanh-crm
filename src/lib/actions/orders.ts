@@ -11,6 +11,7 @@ import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } f
 import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 import { splitTotalByWeights } from "@/lib/combo";
+import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import type { TaskType } from "@/types/database";
 
 const DELETE_ROLES = MANAGE_ROLES;
@@ -1373,44 +1374,97 @@ export async function addOrderEquipmentLine(
   }
 
   const supabase = await createClient();
+  const error = await insertEquipmentLine(supabase, parsed.data.order_id, {
+    typeId: parsed.data.equipment_type_id,
+    unitId: parsed.data.equipment_unit_id ?? null,
+    instanceId: parsed.data.equipment_instance_id ?? null,
+    quantity: parsed.data.quantity,
+  });
 
+  revalidatePath(`/orders/${parsed.data.order_id}`);
+  return error ? { error } : { success: true };
+}
+
+// Lõi thêm 1 lựa chọn hàng vào đơn — dùng chung cho ô thêm nhanh trên trang
+// đơn và popup "Tạo đơn nhanh". Trả về thông báo lỗi (null = ổn).
+//
+// Hàng serial KHÔNG chỉ định máy (CEO 2026-10-03, phương án B): nhập số
+// lượng, hệ thống tự lấy đủ máy đang rảnh tại kho giao (serial thật trước,
+// mã AUTO sau, bỏ máy đang nằm trên đơn chưa đóng), mỗi máy 1 dòng như cũ —
+// đổi máy khác được ở trang đơn. Thiếu máy thì vẫn thêm số máy có và báo rõ
+// thiếu bao nhiêu.
+async function insertEquipmentLine(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  item: { typeId: string; unitId: string | null; instanceId: string | null; quantity: number },
+): Promise<string | null> {
   const { data: order } = await supabase
     .from("orders")
     .select("rental_start_at, rental_end_at, pickup_branch_id")
-    .eq("id", parsed.data.order_id)
+    .eq("id", orderId)
     .single();
 
   let equipmentType;
   let tiers;
   try {
-    ({ equipmentType, tiers } = await fetchEquipmentTypeForPricing(
-      supabase,
-      parsed.data.equipment_type_id,
-    ));
+    ({ equipmentType, tiers } = await fetchEquipmentTypeForPricing(supabase, item.typeId));
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
+    return e instanceof Error ? e.message : "Không tính được giá dòng hàng.";
+  }
+
+  if (equipmentType.product_type === "rental" && (!order?.rental_start_at || !order?.rental_end_at)) {
+    return 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.';
   }
 
   if (equipmentType.tracking_type === "combo") {
-    if (!order?.rental_start_at || !order?.rental_end_at) {
-      return {
-        error: 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.',
-      };
-    }
     const result = await addComboLines(
       supabase,
       {
-        id: parsed.data.order_id,
-        pickup_branch_id: order.pickup_branch_id,
-        rentalStartAt: order.rental_start_at,
-        rentalEndAt: order.rental_end_at,
+        id: orderId,
+        pickup_branch_id: order!.pickup_branch_id,
+        rentalStartAt: order!.rental_start_at,
+        rentalEndAt: order!.rental_end_at,
       },
-      { id: parsed.data.equipment_type_id, equipmentType, tiers },
-      parsed.data.quantity,
+      { id: item.typeId, equipmentType, tiers },
+      item.quantity,
     );
-    if (result && "error" in result) return result;
-    revalidatePath(`/orders/${parsed.data.order_id}`);
-    return { success: true };
+    return result && "error" in result ? result.error : null;
+  }
+
+  // Hàng serial chưa chỉ định máy → tự chọn máy rảnh rồi thêm từng máy.
+  if (
+    equipmentType.product_type === "rental" &&
+    equipmentType.tracking_type === "individual" &&
+    !item.instanceId
+  ) {
+    const { data: existing } = await supabase
+      .from("order_equipment")
+      .select("equipment_instance_id")
+      .eq("order_id", orderId)
+      .not("equipment_instance_id", "is", null);
+    const taken = new Set((existing ?? []).map((l) => l.equipment_instance_id!));
+    const picked = await pickAvailableInstances(
+      supabase,
+      item.typeId,
+      order!.pickup_branch_id,
+      item.quantity,
+      taken,
+    );
+    for (const instanceId of picked) {
+      const error = await insertEquipmentLine(supabase, orderId, {
+        typeId: item.typeId,
+        unitId: null,
+        instanceId,
+        quantity: 1,
+      });
+      if (error) return error;
+    }
+    if (picked.length < item.quantity) {
+      return picked.length
+        ? `${equipmentType.name}: kho giao chỉ còn ${picked.length}/${item.quantity} máy trống — đã thêm ${picked.length} máy, thiếu ${item.quantity - picked.length}.`
+        : `${equipmentType.name}: kho giao không còn máy trống — chưa thêm được máy nào.`;
+    }
+    return null;
   }
 
   // Hàng bán/cho thuê theo số lượng bắt buộc gắn biến thể (tồn kho bám theo
@@ -1420,7 +1474,7 @@ export async function addOrderEquipmentLine(
   // trùng tên sản phẩm — qua admin client vì RLS chỉ cho Giám đốc/Admin/Kế
   // toán ghi equipment_units, còn đây là ghi sổ hệ thống, an toàn cho mọi
   // role được phép thêm dòng hàng.
-  let equipmentUnitId = parsed.data.equipment_unit_id ?? null;
+  let equipmentUnitId = item.unitId;
   const needsUnit =
     equipmentType.product_type === "sale" ||
     (equipmentType.product_type === "rental" && equipmentType.tracking_type === "quantity");
@@ -1428,11 +1482,11 @@ export async function addOrderEquipmentLine(
     const { data: units } = await supabase
       .from("equipment_units")
       .select("id")
-      .eq("equipment_type_id", parsed.data.equipment_type_id);
+      .eq("equipment_type_id", item.typeId);
     if (units && units.length === 1) {
       equipmentUnitId = units[0].id;
     } else if (units && units.length > 1) {
-      return { error: "Loại hàng này có nhiều biến thể — vui lòng chọn biến thể cụ thể." };
+      return `${equipmentType.name} có nhiều biến thể — vui lòng chọn biến thể cụ thể.`;
     } else {
       // RPC security definer (không phải admin client) — xem ghi chú trong
       // migration 20260802020000: import @supabase/supabase-js thuần vào
@@ -1440,12 +1494,10 @@ export async function addOrderEquipmentLine(
       // module, trước khi code chạy tới).
       const { data: newUnitId, error: unitError } = await supabase.rpc(
         "ensure_default_equipment_unit",
-        { p_equipment_type_id: parsed.data.equipment_type_id },
+        { p_equipment_type_id: item.typeId },
       );
       if (unitError || !newUnitId) {
-        return {
-          error: "Không tạo được biến thể mặc định cho loại hàng này: " + (unitError?.message ?? ""),
-        };
+        return "Không tạo được biến thể mặc định cho loại hàng này: " + (unitError?.message ?? "");
       }
       equipmentUnitId = newUnitId;
     }
@@ -1455,23 +1507,7 @@ export async function addOrderEquipmentLine(
   // chọn thẳng, biến thể duy nhất tự dùng, hay biến thể mặc định vừa tạo) —
   // null nếu biến thể không có giá riêng, khi đó computeLinePrice tự rơi về
   // giá chung equipmentType.price như trước giờ.
-  const unitPriceOverride = await resolveUnitPriceOverride(
-    supabase,
-    equipmentUnitId,
-    parsed.data.equipment_instance_id ?? null,
-  );
-  // Đơn mới tạo chưa đặt thời gian thuê mà thêm hàng cho thuê thì không tính
-  // được giá — computeOrderLinePrice sẽ throw, Server Action nổ 500 và người
-  // dùng chỉ thấy "click không ăn" (CEO gặp 2026-09-02). Chặn sớm với thông
-  // báo chỉ đúng việc cần làm.
-  if (
-    equipmentType.product_type === "rental" &&
-    (!order?.rental_start_at || !order?.rental_end_at)
-  ) {
-    return {
-      error: 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.',
-    };
-  }
+  const unitPriceOverride = await resolveUnitPriceOverride(supabase, equipmentUnitId, item.instanceId);
 
   let computed;
   try {
@@ -1480,31 +1516,26 @@ export async function addOrderEquipmentLine(
       tiers,
       order?.rental_start_at ?? null,
       order?.rental_end_at ?? null,
-      parsed.data.quantity,
+      item.quantity,
       unitPriceOverride,
     );
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
+    return e instanceof Error ? e.message : "Không tính được giá dòng hàng.";
   }
 
   const { error } = await supabase.from("order_equipment").insert({
-    order_id: parsed.data.order_id,
-    equipment_type_id: parsed.data.equipment_type_id,
+    order_id: orderId,
+    equipment_type_id: item.typeId,
     equipment_unit_id: equipmentUnitId,
-    equipment_instance_id: parsed.data.equipment_instance_id ?? null,
-    quantity: parsed.data.quantity,
+    equipment_instance_id: item.instanceId,
+    quantity: item.quantity,
     unit_price: computed.unitPrice,
     line_total: computed.lineTotal,
     // Ghi chú mặc định của sản phẩm (vd "Kèm Remote | Dây nguồn").
     extra_information: equipmentType.default_extra_information,
   });
 
-  if (error) {
-    return { error: "Không thể thêm dòng hàng: " + error.message };
-  }
-
-  revalidatePath(`/orders/${parsed.data.order_id}`);
-  return { success: true };
+  return error ? "Không thể thêm dòng hàng: " + error.message : null;
 }
 
 const CustomOrderLineSchema = z.object({
@@ -2130,4 +2161,332 @@ export async function uncompleteOrderTask(orderId: string, taskType: TaskType) {
   }
 
   revalidatePath(`/orders/${orderId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Tạo đơn nhanh 1 màn hình (CEO 2026-10-03, phương án A + B + C) — mô phỏng
+// cho thấy tạo 1 đơn ở CRM tốn ~41 click/14 lần chờ tải (Booqable ~23): popup
+// cũ chỉ tạo "vỏ" đơn, sang trang đơn mới nhập thời gian, thêm hàng từng máy
+// serial, rồi tick 3 khâu đầu từng khâu. Giờ: khách + kho + gói thời gian +
+// hàng (số lượng) + phí giao/thu hồi → 1 nút tạo xong, khâu đầu tự hoàn thành.
+// ---------------------------------------------------------------------------
+
+export interface QuickOrderCatalogItem {
+  key: string;
+  typeId: string;
+  unitId: string | null;
+  label: string;
+  imageUrl: string | null;
+  productType: "rental" | "sale" | "service";
+  trackingType: string | null;
+  pricingMethod: string | null;
+  rentalPeriodUnit: string | null;
+  // Giá riêng biến thể nếu có, không thì giá chung của sản phẩm.
+  price: number;
+  templateId: string | null;
+  // Hàng serial: số máy đang rảnh theo từng kho (đã trừ máy nằm trên đơn
+  // chưa đóng). Hàng khác: không theo dõi ở đây.
+  freeByBranch: Record<string, number> | null;
+}
+
+export interface QuickOrderCatalog {
+  items: QuickOrderCatalogItem[];
+  tiersByTemplate: Record<string, PricingTierInput[]>;
+  employees: { id: string; name: string; branch_id: string | null }[];
+  currentEmployeeId: string;
+  defaultBranchId: string | null;
+}
+
+// Nạp lúc MỞ popup (không nạp sẵn ở trang danh sách đơn để trang đó nhẹ).
+export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
+  const employee = await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+
+  const [
+    { data: types },
+    { data: units },
+    { data: tierRows },
+    { data: employees },
+    instances,
+    busyRows,
+  ] = await Promise.all([
+    supabase
+      .from("equipment_types")
+      .select("id, name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id, image_url")
+      .order("name"),
+    supabase.from("equipment_units").select("id, equipment_type_id, brand_model, price"),
+    supabase.from("pricing_template_tiers").select("template_id, min_duration, duration_unit, discount_percentage"),
+    supabase.from("employees_public").select("id, name, branch_id, is_active").eq("is_active", true).order("name"),
+    fetchAllRowsFast<{ id: string; equipment_type_id: string; branch_id: string | null }>(
+      (from, to) =>
+        supabase
+          .from("equipment_instances")
+          .select("id, equipment_type_id, branch_id")
+          .eq("status", "available")
+          .order("id")
+          .range(from, to),
+      () => supabase.from("equipment_instances").select("id", { count: "exact", head: true }).eq("status", "available"),
+    ),
+    fetchAllRows<{ equipment_instance_id: string | null }>((from, to) =>
+      supabase
+        .from("order_equipment")
+        .select("equipment_instance_id, orders!inner(completed_at, cancelled_at)")
+        .not("equipment_instance_id", "is", null)
+        .is("orders.completed_at", null)
+        .is("orders.cancelled_at", null)
+        .range(from, to),
+    ),
+  ]);
+
+  const busy = new Set(busyRows.map((r) => r.equipment_instance_id));
+  const freeByType = new Map<string, Record<string, number>>();
+  for (const i of instances) {
+    if (busy.has(i.id) || !i.branch_id) continue;
+    const m = freeByType.get(i.equipment_type_id) ?? {};
+    m[i.branch_id] = (m[i.branch_id] ?? 0) + 1;
+    freeByType.set(i.equipment_type_id, m);
+  }
+
+  const unitsByType = new Map<string, { id: string; brand_model: string; price: number | null }[]>();
+  for (const u of units ?? []) {
+    const list = unitsByType.get(u.equipment_type_id) ?? [];
+    list.push(u);
+    unitsByType.set(u.equipment_type_id, list);
+  }
+
+  const items: QuickOrderCatalogItem[] = [];
+  for (const t of types ?? []) {
+    const base = {
+      typeId: t.id,
+      imageUrl: t.image_url,
+      productType: t.product_type,
+      trackingType: t.tracking_type,
+      pricingMethod: t.pricing_method,
+      rentalPeriodUnit: t.rental_period_unit,
+      templateId: t.pricing_method === "pricing_structure" ? t.pricing_template_id : null,
+    };
+    if (t.product_type === "rental" && t.tracking_type === "individual") {
+      items.push({ ...base, key: `t-${t.id}`, unitId: null, label: t.name, price: t.price, freeByBranch: freeByType.get(t.id) ?? {} });
+      continue;
+    }
+    const typeUnits = unitsByType.get(t.id) ?? [];
+    if (t.tracking_type !== "combo" && t.product_type !== "service" && typeUnits.length > 1) {
+      for (const u of typeUnits) {
+        items.push({ ...base, key: `u-${u.id}`, unitId: u.id, label: `${t.name} — ${u.brand_model}`, price: u.price ?? t.price, freeByBranch: null });
+      }
+      continue;
+    }
+    items.push({ ...base, key: `t-${t.id}`, unitId: null, label: t.name, price: typeUnits[0]?.price ?? t.price, freeByBranch: null });
+  }
+
+  const tiersByTemplate: Record<string, PricingTierInput[]> = {};
+  for (const r of tierRows ?? []) {
+    (tiersByTemplate[r.template_id] ??= []).push({
+      min_duration: r.min_duration,
+      duration_unit: r.duration_unit,
+      discount_percentage: r.discount_percentage,
+    });
+  }
+
+  return {
+    items,
+    tiersByTemplate,
+    employees: (employees ?? []).map((e) => ({ id: e.id, name: e.name, branch_id: e.branch_id })),
+    currentEmployeeId: employee.id,
+    defaultBranchId: employee.branch_id,
+  };
+}
+
+const QuickOrderSchema = z.object({
+  customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
+  pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn kho giao." }),
+  return_branch_id: z.string().uuid().nullable().optional(),
+  rental_start_at: z.string().min(1, { message: "Vui lòng chọn thời gian bắt đầu thuê." }),
+  rental_end_at: z.string().min(1, { message: "Vui lòng chọn thời gian kết thúc thuê." }),
+  order_code: z.string().trim().min(1, { message: "Mã đơn không được để trống." }),
+  order_date: z.string().min(1),
+  orderer_name: z.string().trim().nullable().optional(),
+  orderer_phone: z.string().trim().nullable().optional(),
+  orderer_email: z
+    .union([z.literal(""), z.string().trim().email({ message: "Email người đặt không hợp lệ." })])
+    .nullable()
+    .optional(),
+  employee_id: z.string().uuid({ message: "Vui lòng chọn người phụ trách." }),
+  // "quote" = Tiếp nhận + Báo giá; "deal" = thêm Chốt đơn.
+  stage: z.enum(["quote", "deal"]),
+  items: z
+    .array(
+      z.object({
+        typeId: z.string().uuid(),
+        unitId: z.string().uuid().nullable(),
+        quantity: z.number().int().min(1),
+      }),
+    )
+    .max(200),
+});
+
+export type QuickOrderInput = z.input<typeof QuickOrderSchema>;
+
+export async function quickCreateOrder(
+  input: QuickOrderInput,
+): Promise<{ error: string } | { orderId: string; warnings: string[] }> {
+  const employee = await requireRole([...ALL_ROLES]);
+  const parsed = QuickOrderSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const d = parsed.data;
+  if (new Date(d.rental_end_at) <= new Date(d.rental_start_at)) {
+    return { error: "Thời gian kết thúc phải sau thời gian bắt đầu." };
+  }
+
+  const supabase = await createClient();
+  const { data: order, error } = await supabase
+    .from("orders")
+    .insert({
+      order_code: d.order_code,
+      pickup_branch_id: d.pickup_branch_id,
+      return_branch_id: d.return_branch_id || d.pickup_branch_id,
+      customer_id: d.customer_id,
+      orderer_name: d.orderer_name || null,
+      orderer_phone: d.orderer_phone || null,
+      orderer_email: d.orderer_email || null,
+      order_date: d.order_date,
+      rental_start_at: d.rental_start_at,
+      rental_end_at: d.rental_end_at,
+      created_by: employee.id,
+    })
+    .select("id")
+    .single();
+  if (error || !order) {
+    return { error: "Không thể tạo đơn hàng: " + (error?.message ?? "") };
+  }
+
+  // Thêm tuần tự (trigger tính lại tổng đơn theo từng dòng).
+  const warnings: string[] = [];
+  for (const item of d.items) {
+    const lineError = await insertEquipmentLine(supabase, order.id, {
+      typeId: item.typeId,
+      unitId: item.unitId,
+      instanceId: null,
+      quantity: item.quantity,
+    });
+    if (lineError) warnings.push(lineError);
+  }
+
+  const taskError = await completeEarlyTasks(supabase, order.id, d.employee_id, d.stage === "deal" ? "chot_don" : "bao_gia");
+  if (taskError) warnings.push(taskError);
+
+  revalidatePath("/orders");
+  return { orderId: order.id, warnings };
+}
+
+// Hoàn thành các khâu đầu (Tiếp nhận yêu cầu → … → upTo) còn dở, ghi cho 1
+// người phụ trách — khâu đã xong giữ nguyên người cũ.
+async function completeEarlyTasks(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  employeeId: string,
+  upTo: "bao_gia" | "chot_don",
+): Promise<string | null> {
+  const stages = TASK_TYPE_SEQUENCE.slice(0, TASK_TYPE_SEQUENCE.indexOf(upTo) + 1);
+  const { data: done } = await supabase
+    .from("order_tasks")
+    .select("task_type")
+    .eq("order_id", orderId)
+    .not("completed_date", "is", null);
+  const doneSet = new Set((done ?? []).map((t) => t.task_type));
+  for (const stage of stages) {
+    if (doneSet.has(stage)) continue;
+    const { error } = await supabase.from("order_tasks").upsert(
+      {
+        order_id: orderId,
+        task_type: stage,
+        employee_id: employeeId,
+        completed_date: vnTodayString(),
+      },
+      { onConflict: "order_id,task_type" },
+    );
+    if (error) return `Không ghi được khâu "${TASK_TYPE_LABELS[stage]}": ${error.message}`;
+  }
+  return null;
+}
+
+// Nút "Chốt đơn" trên trang đơn (phương án C): hoàn thành Tiếp nhận + Báo giá
+// + Chốt đơn còn dở trong 1 click.
+export async function closeOrderDeal(orderId: string, employeeId: string): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+  if (!z.string().uuid().safeParse(employeeId).success) {
+    return { error: "Vui lòng chọn người phụ trách." };
+  }
+  const supabase = await createClient();
+  const error = await completeEarlyTasks(supabase, orderId, employeeId, "chot_don");
+  revalidatePath(`/orders/${orderId}`);
+  return error ? { error } : { success: true };
+}
+
+// Đổi máy serial của 1 dòng (phương án B: hệ thống tự chọn máy, nhân viên
+// đổi được) — chỉ khi đơn CHƯA giao (sau khi giao, máy đã sang "đang cho
+// thuê", đổi lúc đó phải hoàn tác giao trước).
+export async function getSwapInstanceOptions(
+  lineId: string,
+): Promise<{ id: string; label: string }[]> {
+  await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+  const { data: line } = await supabase
+    .from("order_equipment")
+    .select("order_id, equipment_type_id, equipment_instance_id")
+    .eq("id", lineId)
+    .single();
+  if (!line?.equipment_type_id || !line.equipment_instance_id) return [];
+  const { data: order } = await supabase
+    .from("orders")
+    .select("pickup_branch_id")
+    .eq("id", line.order_id)
+    .single();
+  if (!order) return [];
+  const ids = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set());
+  if (!ids.length) return [];
+  const { data: rows } = await supabase
+    .from("equipment_instances")
+    .select("id, identifier_code, equipment_units(brand_model)")
+    .in("id", ids);
+  return (rows ?? [])
+    .map((r) => {
+      const variant = (r.equipment_units as unknown as { brand_model: string } | null)?.brand_model;
+      return { id: r.id, label: variant ? `${r.identifier_code} · ${variant}` : r.identifier_code };
+    })
+    .sort((a, b) => Number(a.label.startsWith("AUTO")) - Number(b.label.startsWith("AUTO")) || a.label.localeCompare(b.label));
+}
+
+export async function swapOrderLineInstance(lineId: string, instanceId: string): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+  const { data: line } = await supabase
+    .from("order_equipment")
+    .select("order_id, equipment_type_id, equipment_instance_id")
+    .eq("id", lineId)
+    .single();
+  if (!line?.equipment_type_id || !line.equipment_instance_id) {
+    return { error: "Dòng này không phải máy serial." };
+  }
+  const { data: order } = await supabase
+    .from("orders")
+    .select("pickup_branch_id, delivery_stock_moved_at, completed_at, cancelled_at")
+    .eq("id", line.order_id)
+    .single();
+  if (!order) return { error: "Không tìm thấy đơn." };
+  if (order.delivery_stock_moved_at || order.completed_at || order.cancelled_at) {
+    return { error: "Đơn đã giao/đã đóng — không đổi máy ở đây được." };
+  }
+  const free = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set());
+  if (!free.includes(instanceId)) {
+    return { error: "Máy này không còn trống — chọn máy khác." };
+  }
+
+  // Giữ nguyên giá dòng (có thể đã sửa tay) — chỉ đổi máy.
+  const update = { equipment_instance_id: instanceId };
+  const { error } = await supabase.from("order_equipment").update(update).eq("id", lineId);
+  revalidatePath(`/orders/${line.order_id}`);
+  return error ? { error: "Không đổi được máy: " + error.message } : { success: true };
 }

@@ -24,9 +24,12 @@ const CREATE_VALUE = "__create__";
 export function CustomerCombobox({
   name,
   defaultCustomer,
+  onChange,
 }: {
   name: string;
   defaultCustomer?: { id: string; name: string };
+  // Báo id khách đang chọn cho form điều khiển bằng state (popup Tạo đơn nhanh).
+  onChange?: (customerId: string | null) => void;
 }) {
   const initial = defaultCustomer ? { value: defaultCustomer.id, label: defaultCustomer.name } : null;
   const [items, setItems] = useState<CustomerOption[]>(initial ? [initial] : []);
@@ -64,6 +67,7 @@ export function CustomerCombobox({
       return;
     }
     setValue(next);
+    onChange?.(next?.value ?? null);
   }
 
   return (
@@ -101,6 +105,7 @@ export function CustomerCombobox({
         onCreated={(customer) => {
           setValue(customer);
           setItems([customer]);
+          onChange?.(customer.value);
         }}
       />
     </>

@@ -15,6 +15,10 @@ export interface QuickAddOption {
   equipmentTypeId: string;
   equipmentUnitId?: string;
   equipmentInstanceId?: string;
+  // Ghi chú nhỏ bên phải (vd "12 máy ở kho giao").
+  hint?: string;
+  // Lựa chọn từng máy serial: chỉ hiện khi từ khoá khớp serial/biến thể.
+  serialMatch?: string;
 }
 
 // Học theo ô "Search to add products" của Booqable: gõ tên ngay trên bảng
@@ -28,6 +32,8 @@ export function QuickAddProductSearch({
   options: QuickAddOption[];
 }) {
   const [query, setQuery] = useState("");
+  // Số lượng thêm 1 lần — hàng serial: hệ thống tự lấy đủ số máy rảnh.
+  const [quantity, setQuantity] = useState(1);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -36,7 +42,11 @@ export function QuickAddProductSearch({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return options.filter((o) => o.label.toLowerCase().includes(q)).slice(0, 12);
+    return options
+      .filter((o) =>
+        o.serialMatch ? o.serialMatch.toLowerCase().includes(q) : o.label.toLowerCase().includes(q),
+      )
+      .slice(0, 12);
   }, [options, query]);
 
   function handlePick(option: QuickAddOption) {
@@ -47,13 +57,14 @@ export function QuickAddProductSearch({
     if (option.equipmentUnitId) formData.set("equipment_unit_id", option.equipmentUnitId);
     if (option.equipmentInstanceId)
       formData.set("equipment_instance_id", option.equipmentInstanceId);
-    formData.set("quantity", "1");
+    formData.set("quantity", option.equipmentInstanceId ? "1" : String(quantity));
     startTransition(async () => {
       const result = await addOrderEquipmentLine(undefined, formData);
       if (result && "error" in result) {
         setError(result.error);
       } else {
         setQuery("");
+        setQuantity(1);
         setOpen(false);
       }
     });
@@ -67,23 +78,41 @@ export function QuickAddProductSearch({
         if (!containerRef.current?.contains(e.relatedTarget as Node)) setOpen(false);
       }}
     >
-      <div className="relative">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+              setError(null);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered[0]) {
+                e.preventDefault();
+                handlePick(filtered[0]);
+              }
+            }}
+            placeholder="Gõ tên hàng (hoặc serial) để thêm vào đơn — Enter chọn dòng đầu..."
+            className="pl-8"
+            disabled={pending}
+          />
+          {pending && (
+            <Loader2 className="text-muted-foreground absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin" />
+          )}
+        </div>
         <Input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-            setError(null);
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder="Gõ tên hàng hoá để thêm nhanh vào đơn..."
-          className="pl-8"
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+          className="w-20"
+          aria-label="Số lượng"
+          title="Số lượng thêm (máy serial: tự lấy đủ số máy rảnh)"
           disabled={pending}
         />
-        {pending && (
-          <Loader2 className="text-muted-foreground absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin" />
-        )}
       </div>
       {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
       {open && filtered.length > 0 && (
@@ -105,7 +134,8 @@ export function QuickAddProductSearch({
                 ) : (
                   <span className="bg-muted size-6 shrink-0 rounded" />
                 )}
-                <span className="truncate">{o.label}</span>
+                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                {o.hint && <span className="text-muted-foreground shrink-0 text-xs">{o.hint}</span>}
               </button>
             </li>
           ))}

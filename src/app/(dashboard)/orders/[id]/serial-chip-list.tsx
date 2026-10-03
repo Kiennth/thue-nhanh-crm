@@ -11,19 +11,53 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteOrderEquipmentLine } from "@/lib/actions/orders";
+import {
+  deleteOrderEquipmentLine,
+  getSwapInstanceOptions,
+  swapOrderLineInstance,
+} from "@/lib/actions/orders";
 
 // Dãy serial của 1 dòng sản phẩm đã gộp (kiểu Booqable) — mỗi chip là 1
 // máy/1 dòng order_equipment; nút × bỏ riêng máy đó khỏi đơn.
 export function SerialChipList({
   items,
   canRemove,
+  canSwap = false,
 }: {
   // variant: tên biến thể (null = không cần hiện) — chip cùng biến thể gom
   // dưới 1 tiêu đề nhỏ thay vì lặp tên trên từng chip.
   items: { lineId: string; label: string; variant: string | null }[];
   canRemove: boolean;
+  // Đơn chưa giao: bấm vào serial để đổi sang máy rảnh khác (phương án B —
+  // hệ thống tự chọn máy khi thêm theo số lượng, nhân viên đổi nếu cần).
+  canSwap?: boolean;
 }) {
+  const [swapping, setSwapping] = useState<{ lineId: string; label: string } | null>(null);
+  const [swapOptions, setSwapOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const [swapFilter, setSwapFilter] = useState("");
+
+  function openSwap(item: { lineId: string; label: string }) {
+    setSwapping(item);
+    setSwapOptions(null);
+    setSwapFilter("");
+    startTransition(async () => {
+      setSwapOptions(await getSwapInstanceOptions(item.lineId));
+    });
+  }
+
+  function handleSwap(instanceId: string, label: string) {
+    if (!swapping) return;
+    const target = swapping;
+    startTransition(async () => {
+      const result = await swapOrderLineInstance(target.lineId, instanceId);
+      if (result && "error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`Đã đổi ${target.label} → ${label}.`);
+      setSwapping(null);
+    });
+  }
   const [removing, setRemoving] = useState<{
     lineId: string;
     label: string;
@@ -63,7 +97,18 @@ export function SerialChipList({
                     className="inline-flex max-w-full items-center gap-0.5 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-1.5 font-mono text-[11px] break-all"
                     title={item.label}
                   >
-                    <span>{item.label}</span>
+                    {canSwap ? (
+                      <button
+                        type="button"
+                        onClick={() => openSwap(item)}
+                        className="rounded hover:text-primary hover:underline"
+                        title="Bấm để đổi sang máy khác"
+                      >
+                        {item.label}
+                      </button>
+                    ) : (
+                      <span>{item.label}</span>
+                    )}
                     {canRemove && (
                       <button
                         type="button"
@@ -80,6 +125,42 @@ export function SerialChipList({
           </div>
         ))}
       </div>
+      <Dialog open={!!swapping} onOpenChange={(open) => !open && setSwapping(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi máy {swapping?.label}</DialogTitle>
+          </DialogHeader>
+          {swapOptions === null ? (
+            <p className="text-sm text-muted-foreground">Đang tải máy trống…</p>
+          ) : swapOptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Kho giao không còn máy trống nào cùng loại.</p>
+          ) : (
+            <div className="space-y-2">
+              <input
+                value={swapFilter}
+                onChange={(e) => setSwapFilter(e.target.value)}
+                placeholder="Lọc theo serial…"
+                className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              />
+              <div className="max-h-72 space-y-1 overflow-y-auto">
+                {swapOptions
+                  .filter((o) => o.label.toLowerCase().includes(swapFilter.trim().toLowerCase()))
+                  .map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => handleSwap(o.id, o.label)}
+                      className="block w-full rounded-md border px-2.5 py-1.5 text-left font-mono text-sm hover:bg-muted"
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!removing}
         onOpenChange={(open) => !open && setRemoving(null)}

@@ -26,7 +26,7 @@ import {
   type DateRangePreset,
 } from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
-import { OrderDialog } from "./order-dialog";
+import { QuickOrderDialog } from "./quick-order-dialog";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
@@ -294,7 +294,7 @@ export async function OrdersListSection({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Đơn hàng</h2>
-        <OrderDialog branches={branchList} />
+        <QuickOrderDialog branches={branchList} />
       </div>
 
       {/* Ô tìm đơn to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
