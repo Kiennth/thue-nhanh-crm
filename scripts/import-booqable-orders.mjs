@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
+import { writeFileSync } from "fs";
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
@@ -360,7 +361,15 @@ async function ensureStockQuantity(equipmentUnitId, branchId, neededQuantity) {
   }
 }
 
+// Chế độ --resync: ưu tiên dùng lại đúng các máy đơn đang gắn (giữ serial
+// nhân viên đã chọn), không tự nâng tồn kho số lượng.
+const resyncState = { preferredInstances: new Map(), skipStockBump: false };
+
 async function getOrCreateInstances(equipmentType, branchId, count) {
+  const pool = resyncState.preferredInstances.get(equipmentType.id) || [];
+  const reused = pool.splice(0, count);
+  if (reused.length >= count) return reused;
+  count -= reused.length;
   const { data: available } = await db
     .from("equipment_instances")
     .select("id")
@@ -369,8 +378,8 @@ async function getOrCreateInstances(equipmentType, branchId, count) {
     .eq("status", "available")
     .limit(count);
 
-  const ids = (available || []).map((r) => r.id);
-  while (ids.length < count) {
+  const ids = [...reused, ...(available || []).map((r) => r.id).filter((id) => !reused.includes(id))];
+  while (ids.length < count + reused.length) {
     const code = `AUTO-${slug(equipmentType.name)}-${randomUUID().slice(0, 8)}`;
     const { data, error } = await db
       .from("equipment_instances")
@@ -433,7 +442,7 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
       });
     } else if (et.product_type === "rental" && et.tracking_type === "quantity") {
       const unitId = await getOrCreateEquipmentUnit(et);
-      await ensureStockQuantity(unitId, pickupBranchId, line.quantity);
+      if (!resyncState.skipStockBump) await ensureStockQuantity(unitId, pickupBranchId, line.quantity);
       rows.push({
         equipment_type_id: et.id,
         equipment_unit_id: unitId,
@@ -491,6 +500,61 @@ async function syncOpenOrderTimes(bqOrder, orderCode, ctx) {
   console.log(
     `  🕒 ${orderCode} cập nhật giờ theo Booqable: ${crm.rental_start_at} → ${starts_at} / ${crm.rental_end_at} → ${stops_at}`,
   );
+}
+
+// --resync BQ1,BQ2,...: làm lại TOÀN BỘ dòng hàng của đơn đã nhập theo
+// Booqable hiện tại (CEO 2026-10-03 — đơn bị sửa món trên Booqable sau khi
+// nhập). Đơn đã giao chưa trả: hoàn tác xuất kho → thay dòng → xuất kho lại.
+// Đơn đã xong/chưa giao: chỉ thay dòng (tồn kho không đổi). Giữ lại máy
+// serial đang gắn nếu cùng sản phẩm. Thanh toán, khâu, khách giữ nguyên.
+const resyncBackup = {};
+async function resyncOrders(codes, ctx) {
+  resyncState.skipStockBump = true;
+  for (const code of codes) {
+    const { data: crm } = await db
+      .from("orders")
+      .select("id,pickup_branch_id,delivery_stock_moved_at,completed_at,cancelled_at,total_value")
+      .eq("order_code", code)
+      .single();
+    if (!crm) { console.log(code, "không thấy trong CRM"); continue; }
+    const found = await bqFetch(`${BQ_BASE}/orders?filter[number]=${code.slice(2)}`).then((r) => r.json());
+    const bqOrder = found.data?.[0];
+    if (!bqOrder) { console.log(code, "không thấy trên Booqable"); continue; }
+    const bqLines = await fetchOrderLines(bqOrder.id);
+    const { data: oldLines } = await db
+      .from("order_equipment")
+      .select("*")
+      .eq("order_id", crm.id);
+    resyncBackup[code] = oldLines;
+    writeFileSync(process.env.RESYNC_BACKUP || "resync-backup.json", JSON.stringify(resyncBackup, null, 1));
+    resyncState.preferredInstances = new Map();
+    for (const l of oldLines || []) {
+      if (!l.equipment_instance_id) continue;
+      const list = resyncState.preferredInstances.get(l.equipment_type_id) || [];
+      list.push(l.equipment_instance_id);
+      resyncState.preferredInstances.set(l.equipment_type_id, list);
+    }
+    const delivered = !!crm.delivery_stock_moved_at && !crm.completed_at && !crm.cancelled_at;
+    if (delivered) {
+      const { error } = await ctx.authedDb.rpc("undo_deliver_order_stock", { p_order_id: crm.id });
+      if (error) { console.log(code, "hoàn tác xuất kho lỗi:", error.message); continue; }
+    }
+    for (const l of (oldLines || []).filter((x) => x.parent_line_id)) await db.from("order_equipment").delete().eq("id", l.id);
+    for (const l of (oldLines || []).filter((x) => !x.parent_line_id)) await db.from("order_equipment").delete().eq("id", l.id);
+    const rows = await resolveOrderLines(bqLines, ctx.equipmentTypeMap, crm.pickup_branch_id);
+    for (const row of rows) {
+      const { error } = await db.from("order_equipment").insert({ ...row, order_id: crm.id });
+      if (error) throw new Error(`${code} thêm dòng lỗi: ${error.message}`);
+    }
+    if (delivered) {
+      const { error } = await ctx.authedDb.rpc("deliver_order_stock", { p_order_id: crm.id });
+      if (error) console.log(code, "xuất kho lại lỗi:", error.message);
+    }
+    const { data: after } = await db.from("orders").select("total_value").eq("id", crm.id).single();
+    console.log(
+      `${code}: ${oldLines?.length ?? 0} dòng cũ → ${rows.length} dòng mới | ${crm.total_value} → ${after?.total_value} (BQ ${bqOrder.attributes.price_in_cents / 100})${delivered ? " | đã xuất kho lại" : ""}`,
+    );
+  }
 }
 
 async function importOrder(bqOrder, ctx) {
@@ -640,6 +704,23 @@ async function main() {
     customersByName,
     authedDb,
   };
+
+  // --stock undo|deliver BQ1,BQ2: hoàn tác / xuất kho lại cho đơn đang giao
+  // (dùng quanh bước sửa dòng hàng thủ công của đơn đã xuất kho).
+  if (process.argv[2] === "--stock") {
+    const fn = process.argv[3] === "undo" ? "undo_deliver_order_stock" : "deliver_order_stock";
+    for (const code of process.argv[4].split(",")) {
+      const { data: o } = await db.from("orders").select("id").eq("order_code", code).single();
+      const { error } = await authedDb.rpc(fn, { p_order_id: o.id });
+      console.log(code, fn, error ? "LỖI " + error.message : "ok");
+    }
+    return;
+  }
+
+  if (process.argv[2] === "--resync") {
+    await resyncOrders(process.argv[3].split(","), ctx);
+    return;
+  }
 
   // Two forms: `node script.mjs 2026 7` (single month) or
   // `node script.mjs 2021-03 2026-07` (inclusive month range, run in one process).

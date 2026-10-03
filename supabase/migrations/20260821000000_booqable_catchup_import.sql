@@ -959,3 +959,15 @@
 -- tiền lệ, gắn theo biến thể sẵn có: iPad Pro M5 13 inch - Wi-Fi + 5G LTE →
 -- iPad Pro M5 13 inch bt Wi-Fi + 5G; Smart TV 65 SAMSUNG_UA65AU7700 (4 dòng,
 -- gồm đơn cũ) → Smart TV 4K 65-inch bt SAMSUNG.
+
+-- Đợt map 23 (03/10, CEO "làm lại theo Booqable hết"): 14 đơn bị sửa món trên
+-- Booqable sau khi nhập (BQ12714 12802 12850 12852 12860 12897 12931 12932
+-- 12943 12944 12952 12965 12966 13009) dựng lại TOÀN BỘ dòng hàng bằng
+-- `node scripts/import-booqable-orders.mjs --resync <mã,...>` (đơn đang giao:
+-- hoàn tác xuất kho → thay dòng → xuất lại; dùng lại máy serial cũ cùng sản
+-- phẩm). Dòng tự do gắn lại theo tiền lệ, ưu tiên máy cũ của chính đơn; mới:
+-- iPad Gen 7 10.2-inch (BQ12965), GoWithMe 27 TRẮNG, Surface Pro 7 i7, TV 65
+-- LG 65UT8050PSB. Để tự do (không có SP): Laptop Gaming Ultra 9 RTX 4070,
+-- dây Type C 0đ, ổ điện 20m 0đ. Tổng 14 đơn = price_in_cents Booqable. Backup
+-- dòng cũ: ~/Documents/Thuê Nhanh backups/bq-time-shift-2026-10-03/
+-- resync-lines-backup-{1,2,3}.json. BQ12771 không đụng (đang thương lượng).
