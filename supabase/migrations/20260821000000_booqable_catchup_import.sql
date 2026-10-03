@@ -971,3 +971,12 @@
 -- dây Type C 0đ, ổ điện 20m 0đ. Tổng 14 đơn = price_in_cents Booqable. Backup
 -- dòng cũ: ~/Documents/Thuê Nhanh backups/bq-time-shift-2026-10-03/
 -- resync-lines-backup-{1,2,3}.json. BQ12771 không đụng (đang thương lượng).
+
+-- Đợt map 24 (03/10 tối: import 6 đơn BQ13098 13102–13106, giao BQ13097
+-- 13101). Gắn theo tiền lệ: Archer BE220 → Cục phát WiFi 7 bt Archer BE220,
+-- On site support, SSD 4TB T7 Shield → Ổ cứng di động SSD 4TB (kèm 1 dòng cũ
+-- BQ12606). Khớp tên: PC i7 14th 64GB RTX 4070 → PC Core i7 14th | 64GB RAM
+-- | RTX 4070 12GB. Chưa có tiền lệ: Smart TV 4K 75-inch COCAA → Smart TV 4K
+-- 75-inch, tạo biến thể COCAA. Để tự do (không có SP): Cable mạng CAT6
+-- 5m/20m, NAS 8TB, Switch mạng 24-port Gigabit (BQ13098). BQ13102–13105 là
+-- đơn 0đ trên Booqable.
