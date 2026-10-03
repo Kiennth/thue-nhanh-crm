@@ -247,7 +247,11 @@ export default async function EquipmentPage({
       case "name":
         return dirMult * a.name.localeCompare(b.name, "vi");
       default:
-        return a.name.localeCompare(b.name, "vi");
+        // Mặc định: hàng hoá MỚI TẠO NHẤT lên đầu (CEO 2026-10-03) — vừa
+        // thêm mã là thấy ngay ở trang 1; trùng thời điểm thì theo tên.
+        return (
+          (b.created_at ?? "").localeCompare(a.created_at ?? "") || a.name.localeCompare(b.name, "vi")
+        );
     }
   });
 
