@@ -429,9 +429,40 @@ async function resolveOrderLines(bqLines, equipmentTypeMap, pickupBranchId) {
   return rows;
 }
 
+// Đơn đã nhập từ trước: trước 2026-10-03 script bỏ qua hẳn → nhân viên sửa
+// giờ nhận/trả bên Booqable sau khi nhập thì CRM giữ giờ cũ (CEO báo "mấy đơn
+// hôm nay 2 bên lệch giờ"). Giờ: đơn CRM còn mở hoặc mới xong ≤7 ngày mà giờ
+// lệch Booqable thì cập nhật theo Booqable. Chỉ đụng giờ thuê, không đụng
+// dòng hàng/tiền.
+async function syncOpenOrderTimes(bqOrder, orderCode, ctx) {
+  const crm = ctx.existingOrders.get(orderCode);
+  // Đơn đã xong lâu thì để nguyên (sổ sách đã chốt); đơn mới xong trong 7
+  // ngày vẫn chỉnh — bước "đóng đơn" chạy sau import nên đơn vừa trả hôm nay
+  // có thể đã bị đóng với giờ cũ.
+  const recentlyDone = crm.completed_at && Date.now() - Date.parse(crm.completed_at) < 7 * 86_400_000;
+  if (!crm || crm.cancelled_at || (crm.completed_at && !recentlyDone)) return;
+  const { starts_at, stops_at } = bqOrder.attributes;
+  if (!starts_at || !stops_at) return;
+  const same = (a, b) => a && b && Math.abs(Date.parse(a) - Date.parse(b)) < 60_000;
+  if (same(crm.rental_start_at, starts_at) && same(crm.rental_end_at, stops_at)) return;
+  const { error } = await db
+    .from("orders")
+    .update({ rental_start_at: starts_at, rental_end_at: stops_at })
+    .eq("id", crm.id);
+  if (error) {
+    console.log(`  ⚠️ ${orderCode} không cập nhật được giờ: ${error.message}`);
+    return;
+  }
+  ctx.timeUpdates.push(orderCode);
+  console.log(
+    `  🕒 ${orderCode} cập nhật giờ theo Booqable: ${crm.rental_start_at} → ${starts_at} / ${crm.rental_end_at} → ${stops_at}`,
+  );
+}
+
 async function importOrder(bqOrder, ctx) {
   const orderCode = "BQ" + bqOrder.attributes.number;
   if (ctx.existingOrderCodes.has(orderCode)) {
+    await syncOpenOrderTimes(bqOrder, orderCode, ctx);
     return { skipped: false, alreadyImported: true, orderCode };
   }
 
@@ -541,11 +572,15 @@ async function main() {
 
   const equipmentTypeMap = await loadEquipmentTypes();
 
-  const existingOrderCodes = new Set(
-    (
-      await fetchAllRows(() => db.from("orders").select("order_code").like("order_code", "BQ%").order("id"))
-    ).map((o) => o.order_code),
+  const existingOrderRows = await fetchAllRows(() =>
+    db
+      .from("orders")
+      .select("id,order_code,rental_start_at,rental_end_at,completed_at,cancelled_at")
+      .like("order_code", "BQ%")
+      .order("id"),
   );
+  const existingOrderCodes = new Set(existingOrderRows.map((o) => o.order_code));
+  const existingOrders = new Map(existingOrderRows.map((o) => [o.order_code, o]));
 
   const allCustomers = await fetchAllRows(() => db.from("customers").select("id,name,phone").order("id"));
   const customersByPhone = new Map();
@@ -562,6 +597,8 @@ async function main() {
     ceoEmployeeId: ceo.id,
     equipmentTypeMap,
     existingOrderCodes,
+    existingOrders,
+    timeUpdates: [],
     customersByPhone,
     customersByName,
     authedDb,
@@ -633,6 +670,7 @@ async function main() {
   console.log("Import thành công:", totalImported);
   console.log("Đã import từ trước (bỏ qua):", totalAlreadyImported);
   console.log("Bỏ qua (chưa đủ điều kiện):", totalSkipped);
+  console.log("Đơn mở cập nhật giờ theo Booqable:", ctx.timeUpdates.length, ctx.timeUpdates.join(", "));
   if (allSkipReasons.length) {
     console.log("\nChi tiết đơn bị bỏ qua:");
     for (const s of allSkipReasons) console.log(`  ${s.orderCode}: ${s.reason}`);
