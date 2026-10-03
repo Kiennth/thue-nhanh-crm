@@ -161,52 +161,61 @@ export default async function WebsitePage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <StatCard label="Đang hiện trên web" value={publishedCount} />
-        <StatCard label="Đang ẩn" value={all.length - publishedCount} />
-        <StatCard label="Thuê nhiều nhất" value={all.filter((p) => p.is_featured).length} />
-        <StatCard label="Sản phẩm mới" value={all.filter((p) => p.is_new).length} />
-        <StatCard label="Chưa có danh mục" value={noCategoryCount} />
-      </div>
+      {/* Ô tìm sản phẩm web to, ngay dưới tiêu đề (CEO 2026-10-03) — đang
+          tìm thì ẩn thống kê + khối danh mục để kết quả hiện ngay. */}
+      <SearchInput
+        key={activeSearch}
+        paramName="search"
+        placeholder="Tìm sản phẩm web theo tên hoặc slug — gõ rồi Enter..."
+        value={activeSearch}
+        resetParams={["page"]}
+        size="lg"
+        className="w-full max-w-2xl"
+      />
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-          <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
-          <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {/* 2 tầng: mỗi dòng = nhóm cha + các con của nó */}
-          {categoryList
-            .filter((c) => !c.parent_id)
-            .map((parent) => (
-              <div key={parent.id} className="flex flex-wrap items-center gap-2">
-                <WebsiteCategoryDialog category={parent} parents={categoryList.filter((c) => !c.parent_id)} />
-                <span className="text-muted-foreground">›</span>
-                {categoryList
-                  .filter((c) => c.parent_id === parent.id)
-                  .map((child) => (
-                    <WebsiteCategoryDialog
-                      key={child.id}
-                      category={child}
-                      parents={categoryList.filter((c) => !c.parent_id)}
-                    />
-                  ))}
-              </div>
-            ))}
-          {!categoryList.length && (
-            <p className="text-sm text-muted-foreground">Chưa có danh mục web nào.</p>
-          )}
-        </CardContent>
-      </Card>
+      {!activeSearch && (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <StatCard label="Đang hiện trên web" value={publishedCount} />
+            <StatCard label="Đang ẩn" value={all.length - publishedCount} />
+            <StatCard label="Thuê nhiều nhất" value={all.filter((p) => p.is_featured).length} />
+            <StatCard label="Sản phẩm mới" value={all.filter((p) => p.is_new).length} />
+            <StatCard label="Chưa có danh mục" value={noCategoryCount} />
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+              <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
+              <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {/* 2 tầng: mỗi dòng = nhóm cha + các con của nó */}
+              {categoryList
+                .filter((c) => !c.parent_id)
+                .map((parent) => (
+                  <div key={parent.id} className="flex flex-wrap items-center gap-2">
+                    <WebsiteCategoryDialog category={parent} parents={categoryList.filter((c) => !c.parent_id)} />
+                    <span className="text-muted-foreground">›</span>
+                    {categoryList
+                      .filter((c) => c.parent_id === parent.id)
+                      .map((child) => (
+                        <WebsiteCategoryDialog
+                          key={child.id}
+                          category={child}
+                          parents={categoryList.filter((c) => !c.parent_id)}
+                        />
+                      ))}
+                  </div>
+                ))}
+              {!categoryList.length && (
+                <p className="text-sm text-muted-foreground">Chưa có danh mục web nào.</p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          key={activeSearch}
-          paramName="search"
-          placeholder="Tìm theo tên hoặc slug..."
-          value={activeSearch}
-          resetParams={["page"]}
-        />
         {filterLink("all", "Tất cả")}
         {filterLink("published", "Đang hiện")}
         {filterLink("draft", "Đang ẩn")}
