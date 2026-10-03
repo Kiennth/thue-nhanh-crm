@@ -950,3 +950,12 @@
 -- iPad Pro M1 11 inch - Wi-Fi + 5G ×8 → iPad Pro M1 11 inch; giá đỡ tablet
 -- chống trộm - Trắng ×8 → bt Trắng; Linksys FGW3000 → bt cùng tên; Xe
 -- Scooter Điện - NINEBOT18W → bt NINEBOT18W.
+--
+-- Đợt map 22 (03/10: import 26 đơn BQ12919…BQ13096, đóng 13, giao 6). Gắn
+-- 20 dòng tự do theo tiền lệ (Linksys FGW3000/FGMM1000, TV 55 Samsung QLED,
+-- màn tương tác 65, Archer BE220, Photobooth AI CƠ BẢN 2H, S21|S21 FE ×2,
+-- phim instax 10/20 tấm, instax mini Evo Cinema, khoá chống trộm USB-C,
+-- Ninebot 18W, TV 43 COCA, Rokid Glasses, MBP M3 Pro 36GB 14"). Chưa có
+-- tiền lệ, gắn theo biến thể sẵn có: iPad Pro M5 13 inch - Wi-Fi + 5G LTE →
+-- iPad Pro M5 13 inch bt Wi-Fi + 5G; Smart TV 65 SAMSUNG_UA65AU7700 (4 dòng,
+-- gồm đơn cũ) → Smart TV 4K 65-inch bt SAMSUNG.
