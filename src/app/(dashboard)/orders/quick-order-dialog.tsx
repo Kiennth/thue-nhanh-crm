@@ -20,7 +20,6 @@ import {
   computeRentalDurationInUnit,
   defaultRentalStart,
 } from "@/lib/rental-pricing";
-import { DELIVERY_NOTE_TYPE_IDS } from "@/lib/commission";
 import { cn } from "@/lib/utils";
 import type { PricingMethod, ProductType, RentalPeriodUnit } from "@/types/database";
 import { CustomerCombobox } from "./customer-combobox";
@@ -34,6 +33,8 @@ import { CustomerCombobox } from "./customer-combobox";
 const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 // Gói hay dùng nhất — "Khác" để chọn ngày giờ kết thúc tay.
 const QUICK_PRESET_KEYS = ["1d", "2d", "3d", "7d", "14d", "30d"];
+// Cùng 4 mã với DELIVERY_NOTE_TYPE_IDS (lib/commission) — không import file
+// đó vì nó kéo theo vn-time (chỉ chạy phía server).
 const TRANSPORT_LABELS: Record<string, string> = {
   "38f5c644-3898-4b1f-a3f5-901e55f77c6a": "Giao xe máy",
   "13c85fe0-8b13-4d76-9df5-a20b19598cc9": "Thu hồi xe máy",
@@ -157,7 +158,7 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
   }, [catalog, query]);
 
   const transportItems = useMemo(
-    () => (catalog?.items ?? []).filter((i) => DELIVERY_NOTE_TYPE_IDS.has(i.typeId)),
+    () => (catalog?.items ?? []).filter((i) => i.typeId in TRANSPORT_LABELS),
     [catalog],
   );
 
