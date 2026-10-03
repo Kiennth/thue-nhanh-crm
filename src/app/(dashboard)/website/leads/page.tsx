@@ -79,7 +79,7 @@ export default async function WebsiteLeadsPage() {
                 {lead.product_slug ? (
                   <a
                     className="text-primary hover:underline"
-                    href={`https://new.thuenhanh.vn/${lead.product_slug}`}
+                    href={`https://thuenhanh.vn/${lead.product_slug}`}
                     target="_blank"
                     rel="noopener"
                   >

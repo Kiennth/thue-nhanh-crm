@@ -114,7 +114,7 @@ export function WebsiteProductDialog({
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="slug">Slug (đường dẫn: new.thuenhanh.vn/…)</Label>
+            <Label htmlFor="slug">Slug (đường dẫn: thuenhanh.vn/…)</Label>
             <Input id="slug" name="slug" defaultValue={product.slug} required />
           </div>
 

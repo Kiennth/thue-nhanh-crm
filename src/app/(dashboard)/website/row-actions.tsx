@@ -11,7 +11,7 @@ import {
   refreshWebsiteNow,
 } from "@/lib/actions/website";
 
-const WEBSITE_BASE = "https://new.thuenhanh.vn";
+const WEBSITE_BASE = "https://thuenhanh.vn";
 
 export function WebsiteProductRowActions({
   id,
