@@ -149,10 +149,23 @@ export default async function CustomersPage({
         <CustomerDialog />
       </div>
 
+      {/* Ô tìm khách to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
+          nhỏ dưới khối báo cáo, phải cuộn mới thấy. */}
+      <SearchInput
+        key={activeSearch}
+        paramName="search"
+        placeholder="Tìm khách theo tên hoặc SĐT — gõ rồi Enter..."
+        value={activeSearch}
+        resetParams={["page"]}
+        size="lg"
+        className="w-full max-w-2xl"
+      />
+
       {/* CEO chốt 2026-08-06: Admin bỏ luôn cả "Báo cáo khách hàng" tổng
           (trước đây vẫn giữ riêng công nợ để đôn đốc thu tiền — nay bỏ hết,
           không chỉ xếp hạng/khách nguội). */}
-      {!isAdmin && (
+      {/* Đang tìm khách thì ẩn báo cáo — kết quả hiện ngay dưới ô tìm. */}
+      {!isAdmin && !activeSearch && (
         <CustomerReportSection
           data={reportData}
           overview={overview}
@@ -163,14 +176,6 @@ export default async function CustomersPage({
       )}
 
       <div className="space-y-3">
-        <SearchInput
-          key={activeSearch}
-          paramName="search"
-          placeholder="Tìm theo tên, SĐT, mã số thuế..."
-          value={activeSearch}
-          resetParams={["page"]}
-        />
-
         <Table>
           <TableHeader>
             <TableRow>
