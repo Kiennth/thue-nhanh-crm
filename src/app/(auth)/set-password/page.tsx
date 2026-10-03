@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SetPasswordForm } from "./set-password-form";
 
@@ -10,6 +11,12 @@ export default function SetPasswordPage() {
         </CardHeader>
         <CardContent>
           <SetPasswordForm />
+          <Link
+            href="/"
+            className="mt-4 block text-center text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            ← Quay lại, không đổi
+          </Link>
         </CardContent>
       </Card>
     </div>
