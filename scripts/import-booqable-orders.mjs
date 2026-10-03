@@ -75,6 +75,19 @@ function normalizePhone(s) {
   return (s || "").replace(/[^\d]/g, "");
 }
 
+// GIỜ BOOQABLE (CEO xác nhận 2026-10-03): giao diện Booqable hiện & nhận giờ
+// theo UTC dù cài đặt ghi Bangkok — nhân viên gõ giờ VN, API trả về chính số
+// đó kèm "+00:00". Tức starts_at/stops_at là GIỜ VN dán nhãn UTC → phải lùi
+// 7 tiếng mới ra thời điểm thật. created_at/updated_at thì là UTC thật.
+function bqWallToInstant(isoString) {
+  if (!isoString) return null;
+  return new Date(Date.parse(isoString) - 7 * 3600 * 1000).toISOString();
+}
+// Ngày (VN) của giờ nhận/trả Booqable = phần ngày của nhãn (đã là giờ VN).
+function bqWallDate(isoString) {
+  return isoString ? isoString.slice(0, 10) : null;
+}
+
 function toVNDate(isoString) {
   if (!isoString) return null;
   const d = new Date(new Date(isoString).getTime() + 7 * 3600 * 1000);
@@ -210,6 +223,9 @@ async function fetchBqCustomer(customerId) {
 }
 
 const NO_CUSTOMER_KEY = "__no_customer__";
+// Nạp ở main(): MST → id khách, id → tên khách (cho luật khớp khách ở dưới).
+const customersByTaxCode = new Map();
+const customerNameById = new Map();
 
 async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName) {
   const cacheKey = bqCustomerId || NO_CUSTOMER_KEY;
@@ -221,9 +237,24 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
   const phone = normalizePhone(bq?.attributes?.properties?.phone);
   const nameKey = normalize(name);
 
+  // Thứ tự khớp (CEO 2026-10-03, BQ13100 Gemini bị gán nhầm NINA NGUYỄN vì
+  // chung SĐT người liên lạc): 1) cùng MST, 2) đúng tên, 3) cùng SĐT — nhưng
+  // nếu khách BQ là công ty (có MST/legal_type commercial) mà tên khác hẳn
+  // khách CRM cùng SĐT thì là pháp nhân khác → tạo khách mới.
+  // (Khớp SĐT vẫn giữ cho khách cá nhân — vd đơn ghi tên người liên lạc của
+  // CMECH, xem memory "tên khách lệch BQ↔CRM".)
   let customerId = null;
-  if (phone && existingByPhone.has(phone)) {
-    customerId = existingByPhone.get(phone);
+  const isCompany = !!bq?.taxCode || bq?.attributes?.legal_type === "commercial";
+  const phoneMatch = phone && existingByPhone.has(phone) ? existingByPhone.get(phone) : null;
+  const phoneMatchName = phoneMatch ? customerNameById.get(phoneMatch) : null;
+  if (bq?.taxCode && customersByTaxCode.has(bq.taxCode)) {
+    customerId = customersByTaxCode.get(bq.taxCode);
+  } else if (
+    phoneMatch &&
+    !existingByName.has(nameKey) &&
+    !(isCompany && phoneMatchName && normalize(phoneMatchName) !== nameKey)
+  ) {
+    customerId = phoneMatch;
   } else if (existingByName.has(nameKey)) {
     customerId = existingByName.get(nameKey);
     // Khách đã có (khớp đúng tên) mà CRM chưa có MST → điền từ Booqable.
@@ -261,8 +292,10 @@ async function getOrCreateCustomer(bqCustomerId, existingByPhone, existingByName
       .single();
     if (error) throw new Error("Tạo khách hàng thất bại: " + error.message);
     customerId = data.id;
-    if (phone) existingByPhone.set(phone, customerId);
+    if (phone && !existingByPhone.has(phone)) existingByPhone.set(phone, customerId);
     existingByName.set(nameKey, customerId);
+    customerNameById.set(customerId, name);
+    if (bq?.taxCode) customersByTaxCode.set(bq.taxCode, customerId);
   }
 
   customerCache.set(cacheKey, customerId);
@@ -441,7 +474,8 @@ async function syncOpenOrderTimes(bqOrder, orderCode, ctx) {
   // có thể đã bị đóng với giờ cũ.
   const recentlyDone = crm.completed_at && Date.now() - Date.parse(crm.completed_at) < 7 * 86_400_000;
   if (!crm || crm.cancelled_at || (crm.completed_at && !recentlyDone)) return;
-  const { starts_at, stops_at } = bqOrder.attributes;
+  const starts_at = bqWallToInstant(bqOrder.attributes.starts_at);
+  const stops_at = bqWallToInstant(bqOrder.attributes.stops_at);
   if (!starts_at || !stops_at) return;
   const same = (a, b) => a && b && Math.abs(Date.parse(a) - Date.parse(b)) < 60_000;
   if (same(crm.rental_start_at, starts_at) && same(crm.rental_end_at, stops_at)) return;
@@ -479,8 +513,8 @@ async function importOrder(bqOrder, ctx) {
   const customerId = await getOrCreateCustomer(bqOrder.attributes.customer_id, ctx.customersByPhone, ctx.customersByName);
 
   const createdAtDate = toVNDate(bqOrder.attributes.created_at);
-  const startsAtDate = toVNDate(bqOrder.attributes.starts_at);
-  const stopsAtDate = toVNDate(bqOrder.attributes.stops_at);
+  const startsAtDate = bqWallDate(bqOrder.attributes.starts_at);
+  const stopsAtDate = bqWallDate(bqOrder.attributes.stops_at);
 
   const { data: order, error: orderErr } = await db
     .from("orders")
@@ -490,8 +524,8 @@ async function importOrder(bqOrder, ctx) {
       return_branch_id: returnBranchId,
       customer_id: customerId,
       order_date: createdAtDate,
-      rental_start_at: bqOrder.attributes.starts_at,
-      rental_end_at: bqOrder.attributes.stops_at,
+      rental_start_at: bqWallToInstant(bqOrder.attributes.starts_at),
+      rental_end_at: bqWallToInstant(bqOrder.attributes.stops_at),
       created_by: ctx.ceoEmployeeId,
     })
     .select("id")
@@ -528,7 +562,7 @@ async function importOrder(bqOrder, ctx) {
     const { error: returnErr } = await ctx.authedDb.rpc("return_order_stock", { p_order_id: order.id });
     if (returnErr) throw new Error("return_order_stock thất bại: " + returnErr.message);
 
-    const { error: completeErr } = await db.from("orders").update({ completed_at: bqOrder.attributes.stops_at }).eq("id", order.id);
+    const { error: completeErr } = await db.from("orders").update({ completed_at: bqWallToInstant(bqOrder.attributes.stops_at) }).eq("id", order.id);
     if (completeErr) throw new Error("Đóng đơn thất bại: " + completeErr.message);
   }
 
@@ -582,10 +616,13 @@ async function main() {
   const existingOrderCodes = new Set(existingOrderRows.map((o) => o.order_code));
   const existingOrders = new Map(existingOrderRows.map((o) => [o.order_code, o]));
 
-  const allCustomers = await fetchAllRows(() => db.from("customers").select("id,name,phone").order("id"));
+  const allCustomers = await fetchAllRows(() => db.from("customers").select("id,name,phone,tax_code").order("id"));
   const customersByPhone = new Map();
   const customersByName = new Map();
   for (const c of allCustomers || []) {
+    customerNameById.set(c.id, c.name);
+    const tc = (c.tax_code || "").replace(/\s/g, "");
+    if (tc && !customersByTaxCode.has(tc)) customersByTaxCode.set(tc, c.id);
     const phone = normalizePhone(c.phone);
     if (phone && !customersByPhone.has(phone)) customersByPhone.set(phone, c.id);
     const nameKey = normalize(c.name);

@@ -1,7 +1,8 @@
 // Đóng các đơn CRM còn treo mà Booqable đã stopped (chốt sổ cắt Booqable).
 // Per đơn: chèn khâu thiếu (đủ 10) → trigger tự hoàn tất; deliver/return
 // stock chỉ gọi khi khâu giao/thu hồi TRƯỚC ĐÓ còn thiếu (tránh chạy đôi);
-// completed_at sửa về stops_at Booqable.
+// completed_at sửa về stops_at Booqable (lùi 7 tiếng: giờ Booqable là giờ VN
+// dán nhãn UTC — xem bqWallToInstant trong import-booqable-orders.mjs).
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 
@@ -93,7 +94,7 @@ for (const o of open) {
       const { error } = await authedDb.rpc("return_order_stock", { p_order_id: o.id });
       if (error) throw new Error("return: " + error.message);
     }
-    const { error: cErr } = await db.from("orders").update({ completed_at: bq.stops_at }).eq("id", o.id);
+    const { error: cErr } = await db.from("orders").update({ completed_at: new Date(Date.parse(bq.stops_at) - 7 * 3600 * 1000).toISOString() }).eq("id", o.id);
     if (cErr) throw new Error("completed_at: " + cErr.message);
     closed++;
     if (closed % 25 === 0) console.log(`... đã đóng ${closed}`);
