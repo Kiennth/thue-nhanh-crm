@@ -297,7 +297,20 @@ export async function OrdersListSection({
         <OrderDialog branches={branchList} />
       </div>
 
-      {showStats && (
+      {/* Ô tìm đơn to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
+          nhỏ dưới khối biểu đồ, phải cuộn mới thấy. */}
+      <SearchInput
+        key={activeSearch}
+        paramName="search"
+        placeholder="Tìm đơn theo mã đơn, tên khách hàng — gõ rồi Enter..."
+        value={activeSearch}
+        resetParams={["page"]}
+        size="lg"
+        className="w-full max-w-2xl"
+      />
+
+      {/* Đang tìm đơn thì ẩn khối thống kê — kết quả hiện ngay dưới ô tìm. */}
+      {showStats && !activeSearch && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">Tổng quan đơn hàng</h3>
@@ -356,13 +369,6 @@ export async function OrdersListSection({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          key={activeSearch}
-          paramName="search"
-          placeholder="Tìm theo mã đơn, tên khách hàng..."
-          value={activeSearch}
-          resetParams={["page"]}
-        />
         <OrderStatusFilter value={activeStatus} />
         <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
         {unpaidOnly && (
