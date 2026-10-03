@@ -691,7 +691,7 @@ export async function updateEquipmentInstance(
   };
   if (
     data.condition_notes &&
-    /CHỜ MUA/i.test(data.condition_notes) &&
+    /CHỜ MUA|serial thật/i.test(data.condition_notes) &&
     !/^AUTO-/i.test(data.identifier_code) &&
     data.purchase_price != null
   ) {
