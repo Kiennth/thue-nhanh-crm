@@ -35,6 +35,23 @@ function readFullscreenPref() {
   }
 }
 
+// Ô chọn danh mục (CEO 2026-10-03): danh mục cha xếp ABC, ngay dưới mỗi cha
+// là các con của nó (cũng ABC) ghi "Cha › Con". Con mồ côi (cha đã xoá) đứng
+// cuối như danh mục thường.
+function categoryOptions(categories: WebsiteCategoryRow[]) {
+  const byName = (a: WebsiteCategoryRow, b: WebsiteCategoryRow) => a.name.localeCompare(b.name, "vi");
+  const ids = new Set(categories.map((c) => c.id));
+  const roots = categories.filter((c) => !c.parent_id || !ids.has(c.parent_id)).sort(byName);
+  const options: { id: string; label: string }[] = [];
+  for (const root of roots) {
+    options.push({ id: root.id, label: root.name });
+    for (const child of categories.filter((c) => c.parent_id === root.id).sort(byName)) {
+      options.push({ id: child.id, label: `${root.name} › ${child.name}` });
+    }
+  }
+  return options;
+}
+
 // Sửa nội dung 1 sản phẩm web — song ngữ đặt cạnh nhau để đối chiếu nhanh.
 // Mô tả nhập HTML thô (mang từ Haravan sang) — người quen sửa chữ thường chỉ
 // đổi text giữa các thẻ; làm editor xịn là việc sau nếu cần.
@@ -143,10 +160,9 @@ export function WebsiteProductDialog({
               className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             >
               <option value="">— Chưa phân loại —</option>
-              {/* Xếp ABC theo tên (CEO 2026-10-03) cho dễ tìm. */}
-              {[...categories].sort((a, b) => a.name.localeCompare(b.name, "vi")).map((c) => (
+              {categoryOptions(categories).map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.label}
                 </option>
               ))}
             </select>
