@@ -143,7 +143,8 @@ export function WebsiteProductDialog({
               className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             >
               <option value="">— Chưa phân loại —</option>
-              {categories.map((c) => (
+              {/* Xếp ABC theo tên (CEO 2026-10-03) cho dễ tìm. */}
+              {[...categories].sort((a, b) => a.name.localeCompare(b.name, "vi")).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
