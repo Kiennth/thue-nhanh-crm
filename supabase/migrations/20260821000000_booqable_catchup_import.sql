@@ -1010,3 +1010,8 @@
 -- 04/10 ĐỔI CÁCH QUẢN LÝ serial→số lượng (CEO): "Switch TP-Link 24-port"
 -- (đơn BQ13098 1 dòng giữ nguyên tiền, xoá máy AUTO-SYNC → tồn Hà Nội 1) và
 -- "Switch TP-Link 16-Port" (chưa có máy/đơn). Mỗi mã 1 unit mặc định trùng tên.
+-- 04/10 tối: BQ13064 (IND) sửa trên Booqable 21h09 → --resync: 2× MacBook Pro
+-- M1 PRO 16GB 512GB 14" @2.520.000 (gắn về "MacBook Pro 14-inch M1 Pro 16GB
+-- RAM", máy AUTO-SYNC-1ad918c8 + AUTO-SYNC-12522bd4) + giao ô tô 250.000 +
+-- thu hồi xe máy 75.000; 7.300.000 → 5.365.000 (khớp BQ). Máy M3 Pro 36GB
+-- AUTO-SYNC-MACBOOKP-6ba6c2 của dòng cũ để trống.
