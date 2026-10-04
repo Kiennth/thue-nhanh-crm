@@ -50,7 +50,9 @@ export function buildWordHtml(root: HTMLElement, title: string): string {
     // đổi thành dòng trống: margin-top lớn, hoặc khối rỗng có chiều cao.
     const empty = !el.textContent?.trim() && !el.querySelector("img");
     const gap = parseFloat(cs.marginTop) + (empty ? (el as HTMLElement).offsetHeight : 0);
-    if (gap >= 14 && el !== root) gaps.push({ el: copies[i], lines: Math.min(6, Math.round(gap / 18) || 1) });
+    // Bỏ qua phần bên trong bảng (ô trống không phải khoảng cách — chèn <p>
+    // vào giữa bảng làm vỡ bảng).
+    if (gap >= 14 && el !== root && !el.closest("table")) gaps.push({ el: copies[i], lines: Math.min(6, Math.round(gap / 18) || 1) });
     inlineStyles(el, copies[i]);
   });
   for (const { el, lines } of gaps) {
