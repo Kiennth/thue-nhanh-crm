@@ -117,7 +117,7 @@ export async function searchCustomers(query: string): Promise<{ id: string; name
     .from("customers")
     .select("id, name")
     .or(
-      `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,email.ilike.%${trimmed}%`,
+      `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,email.ilike.%${trimmed}%,budget_unit_code.ilike.%${trimmed}%`,
     )
     .order("name")
     .limit(20);
