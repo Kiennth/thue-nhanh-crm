@@ -160,8 +160,13 @@ export async function getOrdersToHandle(
     }
   }
 
-  upcomingDeliveries.sort((a, b) => a.actionDate.localeCompare(b.actionDate));
-  pendingCollections.sort((a, b) => a.actionDate.localeCompare(b.actionDate));
+  // Danh sách thường: sắp tới gần nhất lên đầu. Danh sách "Trễ hạn": đơn mới
+  // trễ nhất lên đầu (CEO 2026-10-05) — đơn trễ lâu (thường là đơn cũ quên
+  // đóng) xuống dưới.
+  const byDate = (late: boolean) => (a: { actionDate: string }, b: { actionDate: string }) =>
+    late ? b.actionDate.localeCompare(a.actionDate) : a.actionDate.localeCompare(b.actionDate);
+  upcomingDeliveries.sort(byDate(lateOnlyDelivery));
+  pendingCollections.sort(byDate(lateOnlyCollection));
 
   return {
     upcomingDeliveries: limit ? upcomingDeliveries.slice(0, limit) : upcomingDeliveries,
