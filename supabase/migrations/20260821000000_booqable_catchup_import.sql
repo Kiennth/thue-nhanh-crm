@@ -980,3 +980,8 @@
 -- 75-inch, tạo biến thể COCAA. Để tự do (không có SP): Cable mạng CAT6
 -- 5m/20m, NAS 8TB, Switch mạng 24-port Gigabit (BQ13098). BQ13102–13105 là
 -- đơn 0đ trên Booqable.
+
+-- Đợt map 25 (04/10: import BQ13107, giao BQ12919 13056 13078). Cột chắn
+-- INOX dây căng 3m Dây Xanh → bt dây XANH (tiền lệ); Cột chắn gắn bảng A4
+-- (3m) bảng NGANG, INOX → Cột Chắn INOX gắn bảng thông báo chỉ dẫn A4 màu
+-- INOX bt bảng NGANG (khớp tên).
