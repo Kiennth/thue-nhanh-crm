@@ -56,12 +56,25 @@ export async function requestPasswordReset(
   }
 
   const origin = (await headers()).get("origin") ?? "https://crm.thuenhanh.vn";
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: `${origin}/login`,
-  });
+  // Gọi thẳng API khôi phục của Supabase Auth (không qua thư viện @supabase/ssr):
+  // thư viện mặc định PKCE — link trong email trả "?code=" chỉ đổi được ra
+  // phiên trên ĐÚNG trình duyệt đã bấm gửi (CEO 2026-10-04 bấm link thì kẹt
+  // ở trang đăng nhập). Không gửi code_challenge → Supabase dùng luồng token
+  // qua hash (#access_token=…) như email mời nhân viên — InviteHashHandler ở
+  // /login nhận rồi chuyển sang /set-password, mở link trên máy nào cũng được.
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(`${origin}/login`)}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: parsed.data }),
+    },
+  );
   // Supabase giới hạn số email/giờ — chỉ lỗi này mới báo riêng.
-  if (error && (error.status === 429 || /rate limit/i.test(error.message))) {
+  if (res.status === 429) {
     return { error: "Đã gửi quá nhiều email trong thời gian ngắn — thử lại sau ít phút." };
   }
   return { sent: true };

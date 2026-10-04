@@ -11,6 +11,18 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? "/";
+  const code = searchParams.get("code");
+
+  // Link khôi phục mật khẩu kiểu PKCE ("?code=") — chỉ đổi được ra phiên
+  // trên đúng trình duyệt đã bấm "Gửi link" (cookie code_verifier).
+  if (code) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      redirect(next);
+    }
+    redirect("/login?error=reset-invalid");
+  }
 
   if (token_hash && type) {
     const supabase = await createClient();
