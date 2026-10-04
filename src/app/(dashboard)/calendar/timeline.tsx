@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { BarStatus, CalendarBar, CalendarRow } from "@/lib/calendar-data";
@@ -58,9 +58,23 @@ export function CalendarTimeline({
   nowMs: number;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Cột ngày giãn hết bề ngang khung (CEO 2026-10-05: "chạy hết chiều ngang");
+  // colWidth chỉ còn là bề rộng TỐI THIỂU — hẹp hơn thì cuộn ngang.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const update = () => setBoxWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const effectiveCol = Math.max(colWidth, Math.floor((boxWidth - NAME_COL - 2) / days.length));
   const fromMs = days[0].startMs;
   const toMs = days[days.length - 1].endMs;
-  const gridWidth = days.length * colWidth;
+  const gridWidth = days.length * effectiveCol;
   const xOf = (ms: number) => ((Math.min(Math.max(ms, fromMs), toMs) - fromMs) / (toMs - fromMs)) * gridWidth;
   const nowX = nowMs >= fromMs && nowMs < toMs ? xOf(nowMs) : null;
 
@@ -84,7 +98,10 @@ export function CalendarTimeline({
     // contain:inline-size — lưới rộng không được kéo giãn cả trang (khung
     // nội dung là flex item, min-width tự lấy theo bề rộng lưới), chỉ cuộn
     // ngang bên trong khung này.
-    <div className="max-h-[calc(100vh-230px)] w-full overflow-auto rounded-lg border bg-background [contain:inline-size]">
+    <div
+      ref={boxRef}
+      className="max-h-[calc(100vh-230px)] w-full overflow-auto rounded-lg border bg-background [contain:inline-size]"
+    >
       <div style={{ width: NAME_COL + gridWidth }} className="relative">
         {/* Hàng tiêu đề ngày */}
         <div className="sticky top-0 z-20 flex border-b bg-background">
@@ -97,7 +114,7 @@ export function CalendarTimeline({
           {days.map((d) => (
             <div
               key={d.date}
-              style={{ width: colWidth }}
+              style={{ width: effectiveCol }}
               className={`shrink-0 border-r py-1.5 text-center leading-tight ${
                 d.isToday ? "bg-primary/10 text-primary" : d.isWeekend ? "bg-muted/60" : ""
               }`}
@@ -139,7 +156,7 @@ export function CalendarTimeline({
                 }
                 bars={row.bars}
                 days={days}
-                colWidth={colWidth}
+                colWidth={effectiveCol}
                 xOf={xOf}
                 fromMs={fromMs}
                 toMs={toMs}
@@ -164,7 +181,7 @@ export function CalendarTimeline({
                     }
                     bars={inst.bars}
                     days={days}
-                    colWidth={colWidth}
+                    colWidth={effectiveCol}
                     xOf={xOf}
                     fromMs={fromMs}
                     toMs={toMs}
