@@ -18,7 +18,7 @@ import {
 } from "@/lib/google-drive";
 
 // "Mở bằng Google Docs" trên trang chứng từ (CEO 2026-10-04): lần đầu tạo
-// file Google Docs trong thư mục "Chứng từ CRM" (Drive ceo@thuenhanh.vn),
+// file Google Docs trong thư mục "CRM Báo Giá & Hợp đồng" (Drive ceo@thuenhanh.vn),
 // lần sau mở lại ĐÚNG file đó (giữ chỗ đã sửa tay); regenerate = ghi đè nội
 // dung bằng dữ liệu đơn mới nhất.
 export async function openInGoogleDocs(

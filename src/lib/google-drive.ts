@@ -9,7 +9,7 @@ function untypedAdmin() {
 }
 
 // Google Drive cho chứng từ (CEO 2026-10-04): chứng từ in → Google Docs sửa
-// được, lưu trong thư mục "Chứng từ CRM" ở Drive của ceo@thuenhanh.vn.
+// được, lưu trong thư mục "CRM Báo Giá & Hợp đồng" ở Drive của ceo@thuenhanh.vn.
 // OAuth 1 lần (CEO bấm "Kết nối Google Drive"), quyền drive.file = CRM chỉ
 // thấy/sửa file do chính nó tạo. Gọi REST thẳng (fetch) — không kéo thư viện
 // googleapis vào Worker.
@@ -18,7 +18,9 @@ function untypedAdmin() {
 // application" trong Google Cloud, redirect URI .../api/google/callback).
 
 export const GOOGLE_SCOPES = "openid email https://www.googleapis.com/auth/drive.file";
-const FOLDER_NAME = "Chứng từ CRM";
+// Tên thư mục + người được chia sẻ quyền sửa (CEO 2026-10-04).
+const FOLDER_NAME = "CRM Báo Giá & Hợp đồng";
+const SHARE_WITH = ["ketoan@thuenhanh.vn", "admin@thuenhanh.vn", "hoapham@thuenhanh.vn"];
 
 export function googleClientConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -107,7 +109,23 @@ export async function createFolder(accessToken: string): Promise<string> {
   });
   const j = (await res.json()) as { id?: string; error?: { message?: string } };
   if (!res.ok || !j.id) throw new Error("Không tạo được thư mục trên Drive: " + (j.error?.message ?? res.status));
+  await shareFolder(accessToken, j.id);
   return j.id;
+}
+
+// Chia sẻ quyền sửa thư mục cho kế toán/admin/nhân viên (file bên trong tự
+// thừa hưởng). Lỗi 1 người không chặn cả việc tạo thư mục.
+async function shareFolder(accessToken: string, folderId: string) {
+  for (const emailAddress of SHARE_WITH) {
+    await fetch(
+      `https://www.googleapis.com/drive/v3/files/${folderId}/permissions?sendNotificationEmail=true`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "user", role: "writer", emailAddress }),
+      },
+    ).catch(() => {});
+  }
 }
 
 // Tải HTML lên, Google tự chuyển thành Google Docs sửa được.
