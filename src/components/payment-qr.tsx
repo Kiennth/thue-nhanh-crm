@@ -38,7 +38,7 @@ export function PaymentQr({
           Nội dung: <b className="font-mono">{ref}</b>
         </p>
         <p>
-          {COMPANY_INFO.documentBank.accountNumber} · Techcombank
+          {COMPANY_INFO.documentBank.accountNumber} · {COMPANY_INFO.documentBank.shortName}
         </p>
         <p className="text-muted-foreground">{COMPANY_INFO.documentBank.accountName}</p>
       </div>

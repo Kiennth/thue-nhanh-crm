@@ -15,14 +15,18 @@ export const COMPANY_INFO = {
   representative: "Ông NGUYỄN TRUNG KIÊN",
   representativeName: "NGUYỄN TRUNG KIÊN",
   representativeTitle: "Giám đốc",
+  // Tài khoản in trên chứng từ + nhận QR (CEO 2026-10-04 đổi Techcombank →
+  // VPBank vì SePay chỉ nối được VPBank để tự ghi nhận tiền vào).
   documentBank: {
     accountName: "CONG TY CO PHAN THUONG MAI DICH VU THUE NHANH",
-    accountNumber: "19037155411017",
-    bankName: "TECHCOMBANK - Ngân hàng TMCP Kỹ Thương Việt Nam. CN: Hồ Chí Minh",
+    accountNumber: "147714078888",
+    bankName: "VPBANK - Ngân hàng TMCP Việt Nam Thịnh Vượng",
+    shortName: "VPBank",
+    // Mã BIN Napas dùng cho VietQR.
+    bin: "970432",
   },
   bankAccountName: "CTCP TM DICH VU THUE NHANH",
-  bankAccounts: [
-    { bankName: "Techcombank", accountNumber: "19037 15541 1017" },
-    { bankName: "VPBank", accountNumber: "1477 1407 8888" },
-  ],
+  // Chỉ in VPBank (CEO 2026-10-04) — tiền vào VPBank mới tự ghi nhận qua
+  // SePay. Techcombank 19037 15541 1017 vẫn của công ty nhưng không in nữa.
+  bankAccounts: [{ bankName: "VPBank", accountNumber: "1477 1407 8888" }],
 };

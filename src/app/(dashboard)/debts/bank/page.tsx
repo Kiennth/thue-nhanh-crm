@@ -95,7 +95,7 @@ export default async function BankTransactionsPage({
             <CardTitle className="text-base">Chưa nhận giao dịch nào</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
-            <p>Cần nối tài khoản Techcombank với SePay (sepay.vn) rồi tạo webhook trỏ về:</p>
+            <p>Cần nối tài khoản VPBank với SePay (sepay.vn) rồi tạo webhook trỏ về:</p>
             <p className="font-mono text-foreground">https://crm.thuenhanh.vn/api/bank/sepay</p>
             <p>Kiểu xác thực “API Key” — khoá lấy từ quản trị CRM (biến SEPAY_WEBHOOK_KEY).</p>
           </CardContent>

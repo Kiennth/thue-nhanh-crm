@@ -266,8 +266,7 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
         <p>
           <b>Tên tài khoản:</b> {COMPANY_INFO.documentBank.accountName}
           <br />
-          <b>Số tài khoản:</b> {COMPANY_INFO.documentBank.accountNumber} tại (TECHCOMBANK) - Ngân hàng
-          TMCP Kỹ Thương Việt Nam. CN: Hồ Chí Minh.
+          <b>Số tài khoản:</b> {COMPANY_INFO.documentBank.accountNumber} tại {COMPANY_INFO.documentBank.bankName}.
         </p>
         {/* QR chuyển khoản (CEO 2026-10-04) — đúng nội dung thì CRM tự ghi nhận. */}
         <div className="grid grid-cols-2 gap-4 py-1">

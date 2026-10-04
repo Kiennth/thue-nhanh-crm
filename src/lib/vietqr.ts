@@ -6,9 +6,6 @@ import { COMPANY_INFO } from "@/lib/company-info";
 // hay tự xoá ký tự đặc biệt), thêm " COC" khi là tiền ký quỹ — webhook
 // SePay (/api/bank/sepay) đọc lại để tự ghi vào đúng đơn.
 
-// Techcombank — tài khoản in trên chứng từ (COMPANY_INFO.documentBank).
-const BANK_BIN = "970407";
-
 export function transferRef(orderCode: string, deposit = false): string {
   const ref = orderCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return deposit ? `${ref} COC` : ref;
@@ -21,7 +18,7 @@ export function vietQrImageUrl(amount: number, ref: string): string {
     addInfo: ref,
     accountName: COMPANY_INFO.documentBank.accountName,
   });
-  return `https://img.vietqr.io/image/${BANK_BIN}-${account}-compact2.png?${params.toString()}`;
+  return `https://img.vietqr.io/image/${COMPANY_INFO.documentBank.bin}-${account}-compact2.png?${params.toString()}`;
 }
 
 // Đọc mã đơn từ nội dung chuyển khoản. Ngân hàng hay chèn thêm chữ (tên
