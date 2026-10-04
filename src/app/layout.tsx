@@ -43,7 +43,7 @@ export default function RootLayout({
           showSpinner={false}
         />
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster richColors closeButton position="bottom-right" />
       </body>
     </html>
   );
