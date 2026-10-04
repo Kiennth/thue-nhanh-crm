@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileEdit, Loader2, Printer, RefreshCw } from "lucide-react";
+import { FileDown, FileEdit, Loader2, Printer, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { openInGoogleDocs } from "@/lib/actions/google-docs";
+import { downloadWord } from "./word-export";
 
 export interface GoogleDocsState {
   // Nút Google Docs chỉ hiện cho Giám đốc/Admin/Kế toán.
@@ -90,6 +91,18 @@ export function PrintButton({
             Kết nối Google Drive
           </Button>
         )}
+        {/* Tải Word để sửa tay (CEO 2026-10-04) — kéo file vào Google Drive
+            là mở thành Google Docs. */}
+        <Button
+          variant="outline"
+          onClick={() => {
+            const root = document.querySelector<HTMLElement>("[data-doc-root]");
+            if (root) downloadWord(root, document.title || "chung-tu");
+          }}
+        >
+          <FileDown className="size-4" />
+          Tải file Word
+        </Button>
         <Button onClick={() => window.print()}>
           <Printer className="size-4" />
           In / Lưu PDF
@@ -97,11 +110,6 @@ export function PrintButton({
       </div>
       {google?.notice && NOTICES[google.notice] && (
         <p className="text-right text-sm text-muted-foreground">{NOTICES[google.notice]}</p>
-      )}
-      {google?.canConnect && !google.configured && (
-        <p className="text-right text-xs text-muted-foreground">
-          Google Docs: chưa cấu hình GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET trên CRM.
-        </p>
       )}
       {error && <p className="text-right text-sm text-destructive">{error}</p>}
     </div>
