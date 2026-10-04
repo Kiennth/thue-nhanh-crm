@@ -303,6 +303,8 @@ export function PaymentRequestDocument({ ctx }: { ctx: DocContext }) {
   // đồng nào thì là toàn bộ tiền thuê.
   const due = ctx.totals.rentalWithVat - ctx.paid;
   const amount = due > 0 ? due : ctx.totals.rentalWithVat;
+  // Ký quỹ còn phải thu = cọc của đơn trừ số đang giữ.
+  const depositDue = Math.max(0, ctx.totals.deposit - ctx.depositHeld);
   const contractRef = `${ctx.docNumber} ${ctx.contractDateText}`;
   return (
     <div className="space-y-3 leading-7">
@@ -330,12 +332,19 @@ export function PaymentRequestDocument({ ctx }: { ctx: DocContext }) {
         <p>Ngân hàng: {COMPANY_INFO.documentBank.bankName}.</p>
         <p>Số tài khoản: {COMPANY_INFO.documentBank.accountNumber}</p>
         <p>Tên tài khoản: {COMPANY_INFO.documentBank.accountName}</p>
-        <p>Nội dung chuyển khoản: {transferRef(ctx.orderCode)}</p>
-        {amount > 0 && (
-          <div className="pt-2">
-            <PaymentQr orderCode={ctx.orderCode} amount={amount} label="Quét mã để chuyển khoản" size={120} />
-          </div>
-        )}
+        <p>
+          Nội dung chuyển khoản: {transferRef(ctx.orderCode)}
+          {depositDue > 0 && <> (tiền thuê) · {transferRef(ctx.orderCode, true)} (ký quỹ)</>}
+        </p>
+        {/* 2 QR như báo giá (CEO 2026-10-05): tiền thuê + ký quỹ còn phải thu. */}
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          {amount > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={amount} label="Đợt 1 — tiền thuê" size={120} />
+          )}
+          {depositDue > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={depositDue} deposit label="Đợt 2 — ký quỹ" size={120} />
+          )}
+        </div>
       </div>
       <p>Rất mong nhận được sự hợp tác từ quý khách hàng. Chúng tôi xin trân trọng cảm ơn!</p>
       <div className="flex justify-end pt-2">
