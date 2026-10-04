@@ -23,6 +23,7 @@ import {
 import { createOrderPayment } from "@/lib/actions/order-payments";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_OPTIONS } from "@/lib/order-labels";
 import type { OrderPaymentType } from "@/types/database";
+import { DateInput } from "@/components/date-input";
 
 const DIALOG_TITLES: Record<OrderPaymentType, string> = {
   invoice: "Thêm thanh toán",
@@ -131,10 +132,9 @@ export function OrderPaymentDialog({
 
           <div className="space-y-2">
             <Label htmlFor="paid_at">Ngày thanh toán</Label>
-            <Input
+            <DateInput
               id="paid_at"
               name="paid_at"
-              type="date"
               defaultValue={new Date().toISOString().slice(0, 10)}
               required
             />

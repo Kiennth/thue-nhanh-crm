@@ -23,6 +23,7 @@ import {
 import { createEmployee, updateEmployee } from "@/lib/actions/employees";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { UserRole } from "@/types/database";
+import { DateInput } from "@/components/date-input";
 
 interface Branch {
   id: string;
@@ -142,10 +143,9 @@ export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="birthday">Ngày sinh (không bắt buộc)</Label>
-            <Input
+            <DateInput
               id="birthday"
               name="birthday"
-              type="date"
               defaultValue={employee?.birthday ?? undefined}
             />
             <p className="text-xs text-muted-foreground">

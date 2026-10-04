@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { addOvertimeEntry } from "@/lib/actions/overtime";
+import { DateInput } from "@/components/date-input";
 
 interface EmployeeOption {
   id: string;
@@ -118,7 +119,7 @@ export function OvertimeDialog({
 
           <div className="space-y-2">
             <Label htmlFor="ot_entry_date">Ngày</Label>
-            <Input id="ot_entry_date" name="entry_date" type="date" defaultValue={todayStr()} required />
+            <DateInput id="ot_entry_date" name="entry_date" defaultValue={todayStr()} required />
           </div>
 
           <div className="space-y-2">

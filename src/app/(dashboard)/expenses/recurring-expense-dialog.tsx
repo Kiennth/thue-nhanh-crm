@@ -25,6 +25,7 @@ import {
 } from "@/lib/actions/expenses";
 import { FREQUENCY_LABELS, type RecurringExpenseDef } from "@/lib/recurring-expenses";
 import type { RecurringFrequency } from "@/types/database";
+import { DateInput } from "@/components/date-input";
 
 // Khai một lần cho các khoản lặp lại — thuê nhà, trả góp xe, lãi ngân hàng.
 // Ngày bắt đầu ấn định ngày ghi mỗi kỳ; bỏ trống ngày kết thúc = chạy đến
@@ -171,10 +172,9 @@ export function RecurringExpenseDialog({
               <label className="text-sm font-medium" htmlFor="recurring-start">
                 Ngày bắt đầu
               </label>
-              <Input
+              <DateInput
                 id="recurring-start"
                 name="start_date"
-                type="date"
                 required
                 defaultValue={recurring?.start_date ?? ""}
               />
@@ -184,10 +184,9 @@ export function RecurringExpenseDialog({
               <label className="text-sm font-medium" htmlFor="recurring-end">
                 Ngày kết thúc
               </label>
-              <Input
+              <DateInput
                 id="recurring-end"
                 name="end_date"
-                type="date"
                 defaultValue={recurring?.end_date ?? ""}
               />
               <p className="text-xs text-muted-foreground">Bỏ trống nếu chưa hẹn ngày dừng.</p>

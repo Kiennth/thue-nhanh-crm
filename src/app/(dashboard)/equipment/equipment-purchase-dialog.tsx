@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createEquipmentPurchase } from "@/lib/actions/equipment";
+import { DateInput } from "@/components/date-input";
 
 interface Branch {
   id: string;
@@ -107,10 +108,9 @@ export function EquipmentPurchaseDialog({
 
           <div className="space-y-2">
             <Label htmlFor="purchase_date">Ngày mua</Label>
-            <Input
+            <DateInput
               id="purchase_date"
               name="purchase_date"
-              type="date"
               defaultValue={new Date().toISOString().slice(0, 10)}
               required
             />

@@ -18,6 +18,7 @@ import {
   markInvoiceNotNeeded,
   resetInvoiceStatus,
 } from "@/lib/actions/invoices";
+import { DateInput } from "@/components/date-input";
 
 // Nút thao tác từng dòng sổ hoá đơn: "Đã xuất" mở dialog lưu số HĐ + ngày;
 // "Không cần" cho khách lẻ; "Mở lại" đưa về danh sách chờ khi bấm nhầm.
@@ -81,10 +82,9 @@ export function InvoiceRowActions({
             </div>
             <div className="space-y-2">
               <Label htmlFor="issued_date">Ngày xuất</Label>
-              <Input
+              <DateInput
                 id="issued_date"
                 name="issued_date"
-                type="date"
                 defaultValue={new Date().toISOString().slice(0, 10)}
                 required
               />

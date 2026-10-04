@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { createOrder, updateOrder } from "@/lib/actions/orders";
 import { CustomerCombobox } from "./customer-combobox";
+import { DateInput } from "@/components/date-input";
 
 interface BranchOption {
   id: string;
@@ -183,10 +184,9 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="order_date">Ngày</Label>
-            <Input
+            <DateInput
               id="order_date"
               name="order_date"
-              type="date"
               defaultValue={order?.order_date ?? new Date().toISOString().slice(0, 10)}
               required
             />

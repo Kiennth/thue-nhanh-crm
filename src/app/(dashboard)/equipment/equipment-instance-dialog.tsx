@@ -23,6 +23,7 @@ import {
 import { createEquipmentInstance, updateEquipmentInstance } from "@/lib/actions/equipment";
 import { EQUIPMENT_INSTANCE_STATUS_LABELS } from "@/lib/equipment-labels";
 import type { EquipmentInstanceStatus } from "@/types/database";
+import { DateInput } from "@/components/date-input";
 
 interface Branch {
   id: string;
@@ -208,10 +209,9 @@ export function EquipmentInstanceDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchase_date">Ngày mua</Label>
-              <Input
+              <DateInput
                 id="purchase_date"
                 name="purchase_date"
-                type="date"
                 defaultValue={instance?.purchase_date ?? ""}
               />
             </div>

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { disposeEquipmentInstance } from "@/lib/actions/equipment";
+import { DateInput } from "@/components/date-input";
 
 interface EquipmentInstanceDisposeDialogProps {
   instanceId: string;
@@ -77,10 +78,9 @@ export function EquipmentInstanceDisposeDialog({
 
           <div className="space-y-2">
             <Label htmlFor="disposal_date">Ngày bán</Label>
-            <Input
+            <DateInput
               id="disposal_date"
               name="disposal_date"
-              type="date"
               defaultValue={new Date().toISOString().slice(0, 10)}
               required
             />

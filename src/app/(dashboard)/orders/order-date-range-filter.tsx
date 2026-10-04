@@ -9,8 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { DATE_RANGE_PRESET_OPTIONS, type DateRangePreset } from "@/lib/date-range-presets";
+import { DateInput } from "@/components/date-input";
 
 export function OrderDateRangeFilter({
   preset,
@@ -87,18 +87,16 @@ export function OrderDateRangeFilter({
 
       {preset === "custom" && (
         <>
-          <Input
+          <DateInput
             key={`from-${from}`}
-            type="date"
             aria-label="Từ ngày"
             className="w-40"
             defaultValue={from}
             onChange={(e) => updateParams({ from: e.target.value })}
           />
           <span className="text-sm text-muted-foreground">đến</span>
-          <Input
+          <DateInput
             key={`to-${to}`}
-            type="date"
             aria-label="Đến ngày"
             className="w-40"
             defaultValue={to}

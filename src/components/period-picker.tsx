@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTopLoader } from "nextjs-toploader";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/date-input";
 
 export function PeriodPicker({
   paramName,
@@ -26,6 +27,18 @@ export function PeriodPicker({
     params.set(paramName, newValue);
     start();
     router.push(`${pathname}?${params.toString()}`);
+  }
+
+  if (type === "date") {
+    return (
+      <DateInput
+        key={value}
+        defaultValue={value}
+        aria-label={label}
+        className="w-36"
+        onChange={(e) => handleChange(e.target.value)}
+      />
+    );
   }
 
   return (

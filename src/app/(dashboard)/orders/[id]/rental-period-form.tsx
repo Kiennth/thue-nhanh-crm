@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -18,6 +17,7 @@ import {
   defaultRentalStart,
   hoursBetween,
 } from "@/lib/rental-pricing";
+import { DateInput } from "@/components/date-input";
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 
@@ -128,9 +128,8 @@ export function RentalPeriodForm({
       <div className="space-y-2">
         <Label htmlFor="rental_start_date">Bắt đầu thuê</Label>
         <div className="flex gap-2">
-          <Input
+          <DateInput
             id="rental_start_date"
-            type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
@@ -154,9 +153,8 @@ export function RentalPeriodForm({
         <div className="space-y-2">
           <Label htmlFor="rental_end_date">Kết thúc thuê</Label>
           <div className="flex gap-2">
-            <Input
+            <DateInput
               id="rental_end_date"
-              type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required

@@ -23,6 +23,7 @@ import {
 import { addReward } from "@/lib/actions/rewards";
 import { REWARD_CATEGORY_LABELS, REWARD_CATEGORY_OPTIONS } from "@/lib/reward-labels";
 import type { RewardCategory } from "@/types/database";
+import { DateInput } from "@/components/date-input";
 
 interface EmployeeOption {
   id: string;
@@ -142,10 +143,9 @@ export function RewardDialog({ employees }: { employees: EmployeeOption[] }) {
 
           <div className="space-y-2">
             <Label htmlFor="reward_entry_date">Ngày</Label>
-            <Input
+            <DateInput
               id="reward_entry_date"
               name="entry_date"
-              type="date"
               defaultValue={todayStr()}
               required
             />

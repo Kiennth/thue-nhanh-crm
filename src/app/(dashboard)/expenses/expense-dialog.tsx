@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Pencil, Plus } from "lucide-react";
 import { createExpense, updateExpense, type ActionState } from "@/lib/actions/expenses";
+import { DateInput } from "@/components/date-input";
 
 // KHÔNG dùng toISOString(): nó trả ngày UTC — 1h sáng ở Việt Nam sẽ điền
 // nhầm thành ngày hôm trước. Ghép tay theo giờ máy người dùng.
@@ -153,10 +154,9 @@ export function ExpenseDialog({
               <label className="text-sm font-medium" htmlFor="expense-date">
                 Ngày chi
               </label>
-              <Input
+              <DateInput
                 id="expense-date"
                 name="expense_date"
-                type="date"
                 required
                 defaultValue={expense?.expense_date ?? todayLocal()}
               />

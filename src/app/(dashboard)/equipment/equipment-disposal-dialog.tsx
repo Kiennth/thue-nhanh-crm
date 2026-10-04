@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createEquipmentDisposal } from "@/lib/actions/equipment";
+import { DateInput } from "@/components/date-input";
 
 interface Branch {
   id: string;
@@ -107,10 +108,9 @@ export function EquipmentDisposalDialog({
 
           <div className="space-y-2">
             <Label htmlFor="disposal_date">Ngày bán</Label>
-            <Input
+            <DateInput
               id="disposal_date"
               name="disposal_date"
-              type="date"
               defaultValue={new Date().toISOString().slice(0, 10)}
               required
             />

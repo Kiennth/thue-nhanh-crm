@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import type { PricingMethod, ProductType, RentalPeriodUnit } from "@/types/database";
 import { createCustomerFromWebOrder } from "@/lib/actions/website-orders";
 import { CustomerCombobox } from "./customer-combobox";
+import { DateInput } from "@/components/date-input";
 
 // Popup "Tạo đơn nhanh" (CEO 2026-10-03, phương án A + B + C): mọi thứ cần
 // cho 1 đơn thường trên 1 màn hình — khách, kho, gói thời gian, hàng (nhập số
@@ -386,9 +387,8 @@ export function QuickOrderDialog({
             <Label htmlFor="quick_start_date">Thời gian thuê</Label>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">Bắt đầu</span>
-              <Input
+              <DateInput
                 id="quick_start_date"
-                type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="w-40"
@@ -426,7 +426,7 @@ export function QuickOrderDialog({
             {presetKey === "custom" && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Kết thúc</span>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
+                <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
                 <HourSelect value={endHour} onChange={setEndHour} />
               </div>
             )}
@@ -624,7 +624,7 @@ export function QuickOrderDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_date">Ngày đơn</Label>
-                <Input id="quick_order_date" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+                <DateInput id="quick_order_date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
               </div>
             </div>
           </details>
