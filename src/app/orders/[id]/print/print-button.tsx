@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileDown, FileEdit, Loader2, Printer, RefreshCw } from "lucide-react";
+import { FileDown, FileEdit, FileText, Loader2, Printer, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { openInGoogleDocs } from "@/lib/actions/google-docs";
 import { downloadWord } from "./word-export";
@@ -103,9 +103,17 @@ export function PrintButton({
           <FileDown className="size-4" />
           Tải file Word
         </Button>
+        {/* Tải PDF và In tách 2 nút (CEO 2026-10-04): PDF dựng ở server, tải
+            thẳng về máy đúng tên file; In chỉ mở hộp thoại in. */}
+        {orderId && docType && (
+          <Button variant="outline" render={<a href={`/api/orders/${orderId}/pdf?type=${docType}`} />}>
+            <FileText className="size-4" />
+            Tải PDF
+          </Button>
+        )}
         <Button onClick={() => window.print()}>
           <Printer className="size-4" />
-          In / Lưu PDF
+          In
         </Button>
       </div>
       {google?.notice && NOTICES[google.notice] && (
