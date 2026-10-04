@@ -1000,15 +1000,18 @@ async function pickAvailableInstances(
   branchId: string,
   count: number,
   exclude: Set<string>,
+  // Chỉ lấy máy đúng biến thể (vd iPad Wi-Fi + 4G) — null = biến thể nào cũng được.
+  unitId: string | null = null,
 ): Promise<string[]> {
   if (count <= 0) return [];
-  const { data: candidates } = await supabase
+  let candidateQuery = supabase
     .from("equipment_instances")
     .select("id, identifier_code")
     .eq("equipment_type_id", typeId)
     .eq("branch_id", branchId)
-    .eq("status", "available")
-    .order("identifier_code");
+    .eq("status", "available");
+  if (unitId) candidateQuery = candidateQuery.eq("equipment_unit_id", unitId);
+  const { data: candidates } = await candidateQuery.order("identifier_code");
   const candidateIds = (candidates ?? []).map((c) => c.id).filter((cid) => !exclude.has(cid));
   if (!candidateIds.length) return [];
 
@@ -1450,6 +1453,7 @@ async function insertEquipmentLine(
       order!.pickup_branch_id,
       item.quantity,
       taken,
+      item.unitId,
     );
     for (const instanceId of picked) {
       const error = await insertEquipmentLine(supabase, orderId, {
@@ -1461,9 +1465,14 @@ async function insertEquipmentLine(
       if (error) return error;
     }
     if (picked.length < item.quantity) {
+      let label = equipmentType.name;
+      if (item.unitId) {
+        const { data: unit } = await supabase.from("equipment_units").select("brand_model").eq("id", item.unitId).maybeSingle();
+        if (unit?.brand_model) label += ` (${unit.brand_model})`;
+      }
       return picked.length
-        ? `${equipmentType.name}: kho giao chỉ còn ${picked.length}/${item.quantity} máy trống — đã thêm ${picked.length} máy, thiếu ${item.quantity - picked.length}.`
-        : `${equipmentType.name}: kho giao không còn máy trống — chưa thêm được máy nào.`;
+        ? `${label}: kho giao chỉ còn ${picked.length}/${item.quantity} máy trống — đã thêm ${picked.length} máy, thiếu ${item.quantity - picked.length}.`
+        : `${label}: kho giao không còn máy trống — chưa thêm được máy nào.`;
     }
     return null;
   }
@@ -2188,6 +2197,9 @@ export interface QuickOrderCatalogItem {
   // Hàng serial: số máy đang rảnh theo từng kho (đã trừ máy nằm trên đơn
   // chưa đóng). Hàng khác: không theo dõi ở đây.
   freeByBranch: Record<string, number> | null;
+  // Số lượng tối đa chở bằng xe máy (website_products.ship_bike_max_qty):
+  // null = mặc định 5; 0 = đồ cồng kềnh luôn ô tô; 999 = xe máy chở thoải mái.
+  bikeMaxQty: number | null;
 }
 
 export interface QuickOrderCatalog {
@@ -2210,6 +2222,7 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     { data: employees },
     instances,
     busyRows,
+    { data: webRows },
   ] = await Promise.all([
     supabase
       .from("equipment_types")
@@ -2218,11 +2231,11 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model, price"),
     supabase.from("pricing_template_tiers").select("template_id, min_duration, duration_unit, discount_percentage"),
     supabase.from("employees_public").select("id, name, branch_id, is_active").eq("is_active", true).order("name"),
-    fetchAllRowsFast<{ id: string; equipment_type_id: string; branch_id: string | null }>(
+    fetchAllRowsFast<{ id: string; equipment_type_id: string; equipment_unit_id: string | null; branch_id: string | null }>(
       (from, to) =>
         supabase
           .from("equipment_instances")
-          .select("id, equipment_type_id, branch_id")
+          .select("id, equipment_type_id, equipment_unit_id, branch_id")
           .eq("status", "available")
           .order("id")
           .range(from, to),
@@ -2237,15 +2250,23 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
         .is("orders.cancelled_at", null)
         .range(from, to),
     ),
+    supabase.from("website_products").select("equipment_type_id, ship_bike_max_qty"),
   ]);
 
+  const bikeMaxByType = new Map((webRows ?? []).map((w) => [w.equipment_type_id, w.ship_bike_max_qty]));
   const busy = new Set(busyRows.map((r) => r.equipment_instance_id));
   const freeByType = new Map<string, Record<string, number>>();
+  const freeByUnit = new Map<string, Record<string, number>>();
   for (const i of instances) {
     if (busy.has(i.id) || !i.branch_id) continue;
     const m = freeByType.get(i.equipment_type_id) ?? {};
     m[i.branch_id] = (m[i.branch_id] ?? 0) + 1;
     freeByType.set(i.equipment_type_id, m);
+    if (i.equipment_unit_id) {
+      const u = freeByUnit.get(i.equipment_unit_id) ?? {};
+      u[i.branch_id] = (u[i.branch_id] ?? 0) + 1;
+      freeByUnit.set(i.equipment_unit_id, u);
+    }
   }
 
   const unitsByType = new Map<string, { id: string; brand_model: string; price: number | null }[]>();
@@ -2265,12 +2286,20 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
       pricingMethod: t.pricing_method,
       rentalPeriodUnit: t.rental_period_unit,
       templateId: t.pricing_method === "pricing_structure" ? t.pricing_template_id : null,
+      bikeMaxQty: bikeMaxByType.get(t.id) ?? null,
     };
+    const typeUnits = unitsByType.get(t.id) ?? [];
     if (t.product_type === "rental" && t.tracking_type === "individual") {
       items.push({ ...base, key: `t-${t.id}`, unitId: null, label: t.name, price: t.price, freeByBranch: freeByType.get(t.id) ?? {} });
+      // Máy serial nhiều biến thể (iPad Wi-Fi / 4G…): thêm lựa chọn theo từng
+      // biến thể — hệ thống chỉ lấy máy đúng biến thể đó.
+      if (typeUnits.length > 1) {
+        for (const u of typeUnits) {
+          items.push({ ...base, key: `u-${u.id}`, unitId: u.id, label: `${t.name} — ${u.brand_model}`, price: u.price ?? t.price, freeByBranch: freeByUnit.get(u.id) ?? {} });
+        }
+      }
       continue;
     }
-    const typeUnits = unitsByType.get(t.id) ?? [];
     if (t.tracking_type !== "combo" && t.product_type !== "service" && typeUnits.length > 1) {
       for (const u of typeUnits) {
         items.push({ ...base, key: `u-${u.id}`, unitId: u.id, label: `${t.name} — ${u.brand_model}`, price: u.price ?? t.price, freeByBranch: null });

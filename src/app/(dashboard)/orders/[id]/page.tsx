@@ -598,6 +598,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           imageUrl: t.image_url,
           equipmentTypeId: t.id,
         },
+        // Nhiều biến thể (Wi-Fi / 4G…): chọn đúng biến thể → chỉ lấy máy biến thể đó.
+        ...((unitsByType.get(t.id) ?? []).length > 1
+          ? (unitsByType.get(t.id) ?? []).map((u) => ({
+              key: `u-${u.id}`,
+              label: `${t.name} — ${u.brand_model}`,
+              hint: `${
+                machines.filter((i) => i.equipment_unit_id === u.id && i.branch_id === order.pickup_branch_id).length
+              } máy ở kho giao`,
+              imageUrl: t.image_url,
+              equipmentTypeId: t.id,
+              equipmentUnitId: u.id,
+            }))
+          : []),
         ...machines.map((i) => {
           // Đa số máy chưa gán biến thể (equipment_unit_id null) — lúc đó
           // nhãn giữ nguyên như trước, chỉ tên loại + serial.

@@ -82,6 +82,10 @@ export interface QuickOrderPrefill {
 }
 const BIKE_DELIVERY_ID = "38f5c644-3898-4b1f-a3f5-901e55f77c6a";
 const BIKE_COLLECTION_ID = "13c85fe0-8b13-4d76-9df5-a20b19598cc9";
+const CAR_DELIVERY_ID = "ce4a5f88-8daa-47c2-92fc-196d1fc321db";
+const CAR_COLLECTION_ID = "1a53924a-a070-44b0-9441-3f09042af7e7";
+// Mặc định xe máy chở tối đa 5 cái/món (giống web — SHIP_RATES.defaultBikeMaxQty).
+const DEFAULT_BIKE_MAX_QTY = 5;
 
 function HourSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
   return (
@@ -131,7 +135,14 @@ export function QuickOrderDialog({
   const [endDate, setEndDate] = useState(() => datePart(prefillEnd ?? new Date(start.getTime() + 86_400_000)));
   const [endHour, setEndHour] = useState(() => hourPart(prefillEnd ?? start));
   const [endMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
+  // Hàng (không gồm phí vận chuyển). Phí giao/thu hồi tính riêng ở dưới.
   const [cart, setCart] = useState<CartLine[]>([]);
+  // Phí giao + thu hồi (CEO 2026-10-04): null = TỰ ĐỘNG theo hàng — món nào
+  // vượt ngưỡng xe máy (ship_bike_max_qty, 0 = cồng kềnh) thì ô tô, còn lại xe
+  // máy. Bấm chọn tay thì thôi tự động. Lên đơn web khách nhận tại kho → không phí.
+  const [manualTransport, setManualTransport] = useState<string[] | null>(
+    prefill && !prefill.ship ? [] : null,
+  );
   const [query, setQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -159,12 +170,6 @@ export function QuickOrderDialog({
         for (const it of prefill.items) {
           const item = (it.unitId && byKey.get(`u-${it.unitId}`)) || byKey.get(`t-${it.typeId}`);
           if (item) lines.push({ item, quantity: it.quantity });
-        }
-        if (prefill.ship) {
-          for (const id of [BIKE_DELIVERY_ID, BIKE_COLLECTION_ID]) {
-            const item = byKey.get(`t-${id}`);
-            if (item) lines.push({ item, quantity: 1 });
-          }
         }
         setCart(lines);
       }
@@ -199,7 +204,22 @@ export function QuickOrderDialog({
       return null;
     }
   }
-  const prices = cart.map(linePrice);
+  const needsCar = cart.some(
+    (l) => l.item.productType === "rental" && l.quantity > (l.item.bikeMaxQty ?? DEFAULT_BIKE_MAX_QTY),
+  );
+  const hasRental = cart.some((l) => l.item.productType === "rental");
+  const autoTransport = hasRental
+    ? needsCar
+      ? [CAR_DELIVERY_ID, CAR_COLLECTION_ID]
+      : [BIKE_DELIVERY_ID, BIKE_COLLECTION_ID]
+    : [];
+  const transportIds = manualTransport ?? autoTransport;
+  const transportLines: CartLine[] = transportIds.flatMap((id) => {
+    const item = catalog?.items.find((i) => i.key === `t-${id}`);
+    return item ? [{ item, quantity: 1 }] : [];
+  });
+  const allLines = [...cart, ...transportLines];
+  const prices = allLines.map(linePrice);
   const total = prices.reduce<number>((s, p) => s + (p ?? 0), 0);
 
   const results = useMemo(() => {
@@ -219,6 +239,12 @@ export function QuickOrderDialog({
   }
 
   function addItem(item: QuickOrderCatalogItem) {
+    if (item.typeId in TRANSPORT_LABELS) {
+      if (!transportIds.includes(item.typeId)) toggleTransport(item);
+      setQuery("");
+      setShowResults(false);
+      return;
+    }
     setCart((c) => {
       const idx = c.findIndex((l) => l.item.key === item.key);
       if (idx >= 0) return c.map((l, i) => (i === idx ? { ...l, quantity: l.quantity + 1 } : l));
@@ -233,7 +259,11 @@ export function QuickOrderDialog({
     );
   }
   function toggleTransport(item: QuickOrderCatalogItem) {
-    setCart((c) => (c.some((l) => l.item.key === item.key) ? c.filter((l) => l.item.key !== item.key) : [...c, { item, quantity: 1 }]));
+    setManualTransport(
+      transportIds.includes(item.typeId)
+        ? transportIds.filter((id) => id !== item.typeId)
+        : [...transportIds, item.typeId],
+    );
   }
 
   function submit(stage: "quote" | "deal") {
@@ -256,7 +286,7 @@ export function QuickOrderDialog({
         employee_id: employeeId,
         stage,
         web_order_id: prefill?.webOrderId ?? null,
-        items: cart.map((l) => ({ typeId: l.item.typeId, unitId: l.item.unitId, quantity: l.quantity })),
+        items: allLines.map((l) => ({ typeId: l.item.typeId, unitId: l.item.unitId, quantity: l.quantity })),
       });
       if ("error" in result) {
         setError(result.error);
@@ -468,8 +498,13 @@ export function QuickOrderDialog({
                 {transportItems.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Truck className="size-4 text-muted-foreground" />
+                    {manualTransport === null && hasRental && (
+                      <span className="text-xs text-muted-foreground">
+                        Tự động: {needsCar ? "ô tô (có món cồng kềnh / số lượng lớn)" : "xe máy (hàng nhỏ gọn)"} ·
+                      </span>
+                    )}
                     {transportItems.map((item) => {
-                      const on = cart.some((l) => l.item.key === item.key);
+                      const on = transportIds.includes(item.typeId);
                       return (
                         <Button
                           key={item.key}
@@ -485,9 +520,10 @@ export function QuickOrderDialog({
                   </div>
                 )}
 
-                {cart.length > 0 && (
+                {allLines.length > 0 && (
                   <div className="divide-y rounded-md border">
-                    {cart.map((line, i) => {
+                    {allLines.map((line, i) => {
+                      const isTransport = line.item.typeId in TRANSPORT_LABELS;
                       const free = freeAt(line.item);
                       const short = free !== null && line.quantity > free;
                       return (
@@ -500,7 +536,7 @@ export function QuickOrderDialog({
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className={cn("flex items-center gap-1", isTransport && "invisible")}>
                             <Button type="button" size="icon-sm" variant="ghost" onClick={() => setQty(line.item.key, line.quantity - 1)}>
                               <Minus className="size-3.5" />
                             </Button>
@@ -518,7 +554,12 @@ export function QuickOrderDialog({
                           <span className="w-28 text-right tabular-nums">
                             {prices[i] === null ? "—" : vnd(prices[i]!)}
                           </span>
-                          <Button type="button" size="icon-sm" variant="ghost" onClick={() => setQty(line.item.key, 0)}>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => (isTransport ? toggleTransport(line.item) : setQty(line.item.key, 0))}
+                          >
                             <X className="size-3.5" />
                             <span className="sr-only">Bỏ</span>
                           </Button>
