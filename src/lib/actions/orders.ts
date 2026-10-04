@@ -102,6 +102,18 @@ export async function updateOrder(
   }
 
   const supabase = await createClient();
+  // Đã xuất kho thì hàng đã trừ ở kho giao cũ — đổi kho giao lúc này làm
+  // lệch tồn (hoàn kho sẽ cộng nhầm sang kho mới). Kho thu hồi vẫn đổi được.
+  const { data: current } = await supabase
+    .from("orders")
+    .select("pickup_branch_id, delivery_stock_moved_at")
+    .eq("id", id)
+    .single();
+  if (current?.delivery_stock_moved_at && current.pickup_branch_id !== parsed.data.pickup_branch_id) {
+    return {
+      error: "Đơn đã xuất kho nên không đổi được chi nhánh giao (sẽ lệch tồn). Chi nhánh thu hồi thì vẫn đổi được.",
+    };
+  }
   const { error } = await supabase.from("orders").update(parsed.data).eq("id", id);
 
   if (error) {
