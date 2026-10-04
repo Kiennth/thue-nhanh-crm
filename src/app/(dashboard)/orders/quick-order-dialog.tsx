@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronDown, Loader2, Minus, Plus, Search, Truck, X } from "lucide-react";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/rental-pricing";
 import { cn } from "@/lib/utils";
 import type { PricingMethod, ProductType, RentalPeriodUnit } from "@/types/database";
+import { createCustomerFromWebOrder } from "@/lib/actions/website-orders";
 import { CustomerCombobox } from "./customer-combobox";
 
 // Popup "Tạo đơn nhanh" (CEO 2026-10-03, phương án A + B + C): mọi thứ cần
@@ -52,8 +53,11 @@ function datePart(d: Date) {
 function hourPart(d: Date) {
   return String(d.getHours()).padStart(2, "0");
 }
-function combine(date: string, hour: string) {
-  return new Date(`${date}T${hour}:00:00`);
+function minutePart(d: Date) {
+  return String(d.getMinutes()).padStart(2, "0");
+}
+function combine(date: string, hour: string, minute = "00") {
+  return new Date(`${date}T${hour}:${minute}:00`);
 }
 function randomOrderCode() {
   const now = new Date();
@@ -61,6 +65,23 @@ function randomOrderCode() {
 }
 
 type CartLine = { item: QuickOrderCatalogItem; quantity: number };
+
+// Dữ liệu điền sẵn khi "Lên đơn" từ 1 đơn web (CEO 2026-10-04).
+export interface QuickOrderPrefill {
+  webOrderId: string;
+  branchId: string | null;
+  startAt: string;
+  endAt: string;
+  items: { typeId: string; unitId: string | null; quantity: number }[];
+  // Giao tận nơi → tự thêm phí giao + thu hồi xe máy.
+  ship: boolean;
+  customer: { id: string; name: string } | null;
+  ordererName: string;
+  ordererPhone: string;
+  ordererEmail: string;
+}
+const BIKE_DELIVERY_ID = "38f5c644-3898-4b1f-a3f5-901e55f77c6a";
+const BIKE_COLLECTION_ID = "13c85fe0-8b13-4d76-9df5-a20b19598cc9";
 
 function HourSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
   return (
@@ -79,7 +100,15 @@ function HourSelect({ value, onChange, id }: { value: string; onChange: (v: stri
   );
 }
 
-export function QuickOrderDialog({ branches }: { branches: { id: string; name: string }[] }) {
+export function QuickOrderDialog({
+  branches,
+  prefill,
+  trigger,
+}: {
+  branches: { id: string; name: string }[];
+  prefill?: QuickOrderPrefill;
+  trigger?: ReactElement;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<QuickOrderCatalog | null>(null);
@@ -87,14 +116,21 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
   const [saving, startSaving] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [branchId, setBranchId] = useState<string>("");
-  const [start] = useState(() => defaultRentalStart(new Date()));
+  const [customer, setCustomer] = useState<{ id: string; name: string } | null>(prefill?.customer ?? null);
+  const customerId = customer?.id ?? null;
+  const [customerKey, setCustomerKey] = useState(0);
+  const [creatingCustomer, startCreatingCustomer] = useTransition();
+  const [branchId, setBranchId] = useState<string>(prefill?.branchId ?? "");
+  const [start] = useState(() => (prefill ? new Date(prefill.startAt) : defaultRentalStart(new Date())));
+  const [prefillEnd] = useState(() => (prefill ? new Date(prefill.endAt) : null));
   const [startDate, setStartDate] = useState(() => datePart(start));
   const [startHour, setStartHour] = useState(() => hourPart(start));
-  const [presetKey, setPresetKey] = useState<string>("1d");
-  const [endDate, setEndDate] = useState(() => datePart(new Date(start.getTime() + 86_400_000)));
-  const [endHour, setEndHour] = useState(() => hourPart(start));
+  // Giữ phút lẻ từ đơn web (khách chọn 08:30…) — popup chỉ chọn giờ chẵn.
+  const [startMinute] = useState(() => minutePart(start));
+  const [presetKey, setPresetKey] = useState<string>(prefill ? "custom" : "1d");
+  const [endDate, setEndDate] = useState(() => datePart(prefillEnd ?? new Date(start.getTime() + 86_400_000)));
+  const [endHour, setEndHour] = useState(() => hourPart(prefillEnd ?? start));
+  const [endMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
   const [cart, setCart] = useState<CartLine[]>([]);
   const [query, setQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
@@ -103,9 +139,9 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
   // "Thêm chi tiết"
   const [orderCode, setOrderCode] = useState(randomOrderCode);
   const [returnBranchId, setReturnBranchId] = useState("");
-  const [ordererName, setOrdererName] = useState("");
-  const [ordererPhone, setOrdererPhone] = useState("");
-  const [ordererEmail, setOrdererEmail] = useState("");
+  const [ordererName, setOrdererName] = useState(prefill?.ordererName ?? "");
+  const [ordererPhone, setOrdererPhone] = useState(prefill?.ordererPhone ?? "");
+  const [ordererEmail, setOrdererEmail] = useState(prefill?.ordererEmail ?? "");
   const [orderDate, setOrderDate] = useState(() => datePart(new Date()));
 
   function handleOpenChange(next: boolean) {
@@ -116,14 +152,30 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
       setCatalog(c);
       setEmployeeId((v) => v || c.currentEmployeeId);
       setBranchId((v) => v || c.defaultBranchId || branches[0]?.id || "");
+      if (prefill) {
+        // Dòng web → mục danh mục: biến thể riêng (u-) nếu có, không thì loại hàng (t-).
+        const byKey = new Map(c.items.map((i) => [i.key, i]));
+        const lines: CartLine[] = [];
+        for (const it of prefill.items) {
+          const item = (it.unitId && byKey.get(`u-${it.unitId}`)) || byKey.get(`t-${it.typeId}`);
+          if (item) lines.push({ item, quantity: it.quantity });
+        }
+        if (prefill.ship) {
+          for (const id of [BIKE_DELIVERY_ID, BIKE_COLLECTION_ID]) {
+            const item = byKey.get(`t-${id}`);
+            if (item) lines.push({ item, quantity: 1 });
+          }
+        }
+        setCart(lines);
+      }
     });
   }
 
-  const startAt = useMemo(() => combine(startDate, startHour), [startDate, startHour]);
+  const startAt = useMemo(() => combine(startDate, startHour, startMinute), [startDate, startHour, startMinute]);
   const endAt = useMemo(() => {
     const preset = RENTAL_PRESET_OPTIONS.find((p) => p.key === presetKey);
-    return preset ? new Date(startAt.getTime() + preset.hours * 3_600_000) : combine(endDate, endHour);
-  }, [presetKey, startAt, endDate, endHour]);
+    return preset ? new Date(startAt.getTime() + preset.hours * 3_600_000) : combine(endDate, endHour, endMinute);
+  }, [presetKey, startAt, endDate, endHour, endMinute]);
   const periodValid = endAt > startAt;
   const dayCount = periodValid
     ? computeRentalDurationInUnit(startAt.toISOString(), endAt.toISOString(), "day")
@@ -203,6 +255,7 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
         orderer_email: ordererEmail || null,
         employee_id: employeeId,
         stage,
+        web_order_id: prefill?.webOrderId ?? null,
         items: cart.map((l) => ({ typeId: l.item.typeId, unitId: l.item.unitId, quantity: l.quantity })),
       });
       if ("error" in result) {
@@ -226,15 +279,17 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          <Button>
-            <Plus className="size-4" />
-            Tạo đơn nhanh
-          </Button>
+          trigger ?? (
+            <Button>
+              <Plus className="size-4" />
+              Tạo đơn nhanh
+            </Button>
+          )
         }
       />
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Tạo đơn nhanh</DialogTitle>
+          <DialogTitle>{prefill ? "Lên đơn từ đơn web" : "Tạo đơn nhanh"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -242,7 +297,35 @@ export function QuickOrderDialog({ branches }: { branches: { id: string; name: s
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
               <Label>Khách hàng</Label>
-              <CustomerCombobox name="quick_customer_id" onChange={setCustomerId} />
+              <CustomerCombobox
+                key={customerKey}
+                name="quick_customer_id"
+                defaultCustomer={customer ?? undefined}
+                onChange={(id) => setCustomer(id ? { id, name: "" } : null)}
+              />
+              {prefill && !customer && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={creatingCustomer}
+                  onClick={() =>
+                    startCreatingCustomer(async () => {
+                      const r = await createCustomerFromWebOrder(prefill.webOrderId);
+                      if ("error" in r) return setError(r.error);
+                      setCustomer(r);
+                      setCustomerKey((k) => k + 1);
+                      toast.success(`Đã tạo khách ${r.name}`);
+                    })
+                  }
+                >
+                  {creatingCustomer ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                  Tạo khách mới từ thông tin khách điền trên web
+                </Button>
+              )}
+              {prefill?.customer && customer?.id === prefill.customer.id && (
+                <p className="text-xs text-muted-foreground">Khớp khách cũ theo MST/SĐT — đổi nếu sai.</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Kho giao</Label>

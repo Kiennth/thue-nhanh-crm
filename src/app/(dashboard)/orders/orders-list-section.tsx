@@ -27,6 +27,8 @@ import {
 } from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
 import { QuickOrderDialog } from "./quick-order-dialog";
+import { WebOrdersAlert } from "@/components/web-orders-alert";
+import { Globe } from "lucide-react";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
@@ -294,8 +296,19 @@ export async function OrdersListSection({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Đơn hàng</h2>
-        <QuickOrderDialog branches={branchList} />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/orders/web"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium hover:bg-muted"
+          >
+            <Globe className="size-4" />
+            Đơn web
+          </Link>
+          <QuickOrderDialog branches={branchList} />
+        </div>
       </div>
+
+      <WebOrdersAlert />
 
       {/* Ô tìm đơn to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
           nhỏ dưới khối biểu đồ, phải cuộn mới thấy. */}

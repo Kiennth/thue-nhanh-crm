@@ -13,6 +13,7 @@ import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 import { splitTotalByWeights } from "@/lib/combo";
 import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import type { TaskType } from "@/types/database";
+import type { SupabaseClient as UntypedSupabaseClient } from "@supabase/supabase-js";
 
 const DELETE_ROLES = MANAGE_ROLES;
 
@@ -2314,6 +2315,8 @@ const QuickOrderSchema = z.object({
   employee_id: z.string().uuid({ message: "Vui lòng chọn người phụ trách." }),
   // "quote" = Tiếp nhận + Báo giá; "deal" = thêm Chốt đơn.
   stage: z.enum(["quote", "deal"]),
+  // Lên đơn từ 1 đơn web (giỏ hàng thuenhanh.vn) — gắn link + đánh dấu đã lên đơn.
+  web_order_id: z.string().uuid().nullable().optional(),
   items: z
     .array(
       z.object({
@@ -2376,6 +2379,16 @@ export async function quickCreateOrder(
 
   const taskError = await completeEarlyTasks(supabase, order.id, d.employee_id, d.stage === "deal" ? "chot_don" : "bao_gia");
   if (taskError) warnings.push(taskError);
+
+  if (d.web_order_id) {
+    // website_orders chưa có trong types/database.ts — client không ràng kiểu.
+    const { error: linkError } = await (supabase as unknown as UntypedSupabaseClient)
+      .from("website_orders")
+      .update({ status: "converted", order_id: order.id, handled_by: employee.id })
+      .eq("id", d.web_order_id);
+    if (linkError) warnings.push("Không gắn được đơn web: " + linkError.message);
+    revalidatePath("/orders/web");
+  }
 
   revalidatePath("/orders");
   return { orderId: order.id, warnings };

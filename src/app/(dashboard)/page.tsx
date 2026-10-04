@@ -28,6 +28,7 @@ import { MyPerformanceTrendCard } from "./my-performance-trend-card";
 import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
+import { WebOrdersAlert } from "@/components/web-orders-alert";
 
 // Trang chủ hiện tối đa 10 đơn mỗi khối "Đơn hàng sắp tới"/"Đơn hàng sắp về"
 // (CEO chốt 2026-08-02, áp dụng cho mọi phân quyền).
@@ -313,6 +314,8 @@ export default async function DashboardHomePage({
       {/* CEO chốt 2026-08-08: "Thu nhập của bạn" xuống DƯỚI CÙNG trang chủ
           cho MỌI vai trò (trước đó chỉ Giám đốc/Kế toán còn giữ nó ở đầu) —
           đơn hàng và so sánh chi nhánh mới là thứ cần thấy ngay khi mở app. */}
+      <WebOrdersAlert />
+
       {ordersSection}
 
       {canViewBranchComparison && (
