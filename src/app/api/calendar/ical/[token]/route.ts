@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     admin as unknown as SupabaseClient,
   );
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://crm.thuenhanh.vn";
+  const siteUrl = new URL(request.url).origin;
   const stamp = icsDate(new Date(now).toISOString());
   const lines = [
     "BEGIN:VCALENDAR",

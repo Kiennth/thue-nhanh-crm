@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -77,7 +78,9 @@ export default async function CalendarPage({
   ]);
   const branches = branchesRes.data ?? [];
   const branchNames = new Map(branches.map((b) => [b.id, b.name]));
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://crm.thuenhanh.vn";
+  // Lấy tên miền từ request (NEXT_PUBLIC_SITE_URL lúc build có thể là localhost).
+  const host = (await headers()).get("host") ?? "crm.thuenhanh.vn";
+  const siteUrl = `${host.startsWith("localhost") ? "http" : "https"}://${host}`;
   const feedUrl = `${siteUrl}/api/calendar/ical/${token}.ics${branchId ? `?branch=${branchId}` : ""}`;
 
   const href = (over: Record<string, string | null>) => {
