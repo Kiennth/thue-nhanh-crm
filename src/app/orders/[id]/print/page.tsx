@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
-import { ALL_ROLES } from "@/lib/roles";
+import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import {
@@ -29,7 +29,8 @@ import {
   QuoteDocument,
   type DocContext,
 } from "./documents";
-import { PrintButton } from "./print-button";
+import { PrintButton, type GoogleDocsState } from "./print-button";
+import { getDriveIntegration, getOrderGoogleDoc, googleClientConfig } from "@/lib/google-drive";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -67,7 +68,7 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; google?: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
   const { type } = await searchParams;
@@ -82,13 +83,29 @@ export default async function OrderPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; google?: string }>;
 }) {
-  await requireRole([...ALL_ROLES]);
+  const viewer = await requireRole([...ALL_ROLES]);
 
   const { id } = await params;
-  const { type } = await searchParams;
+  const { type, google: googleNotice } = await searchParams;
   const docType: PrintDocType = isPrintDocType(type) ? type : "contract";
+
+  // Nút Google Docs (CEO 2026-10-04) — trạng thái kết nối Drive + file đã tạo.
+  const canUseGoogle = MANAGE_ROLES.includes(viewer.role);
+  const [driveIntegration, existingGoogleDoc] = canUseGoogle
+    ? await Promise.all([getDriveIntegration(), getOrderGoogleDoc(id, docType)])
+    : [null, null];
+  const google: GoogleDocsState = {
+    canUse: canUseGoogle,
+    canConnect: viewer.role === "giam_doc",
+    configured: !!googleClientConfig(),
+    connected: !!driveIntegration,
+    existingUrl: existingGoogleDoc?.url ?? null,
+    notice: googleNotice ?? null,
+    connectHref: `/api/google/connect?return=${encodeURIComponent(`/orders/${id}/print?type=${docType}`)}`,
+  };
+  const printButton = <PrintButton orderId={id} docType={docType} google={google} />;
 
   const supabase = await createClient();
   const [
@@ -254,10 +271,11 @@ export default async function OrderPrintPage({
       <div className="min-h-screen bg-neutral-100 py-8 print:bg-white print:py-0">
         <style>{`@page { size: A4; margin: 1.5cm; }`}</style>
         <div
+          data-doc-root
           className="mx-auto max-w-[210mm] bg-white p-10 text-[13px] leading-5 text-black shadow print:max-w-none print:p-0 print:shadow-none"
           style={{ fontFamily: '"Times New Roman", Times, serif' }}
         >
-          <PrintButton />
+          {printButton}
           {docType === "quote" && <QuoteDocument ctx={ctx} />}
           {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} />}
           {docType === "handover" && <HandoverDocument ctx={ctx} />}
@@ -270,8 +288,11 @@ export default async function OrderPrintPage({
   return (
     <div className="min-h-screen bg-neutral-100 py-8 print:bg-white print:py-0">
       <style>{`@page { size: A4; margin: 1.5cm; }`}</style>
-      <div className="mx-auto max-w-3xl bg-white p-10 text-sm text-neutral-900 shadow print:max-w-none print:p-0 print:shadow-none">
-        <PrintButton />
+      <div
+        data-doc-root
+        className="mx-auto max-w-3xl bg-white p-10 text-sm text-neutral-900 shadow print:max-w-none print:p-0 print:shadow-none"
+      >
+        {printButton}
 
         <div className="flex justify-between gap-6">
           <div>

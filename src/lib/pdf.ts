@@ -43,7 +43,7 @@ interface PuppeteerModule {
 // Chromium đầy đủ của puppeteer — dùng @sparticuz/chromium (bản nén cho
 // serverless) + puppeteer-core. Local/dev/VPS vẫn dùng puppeteer đầy đủ.
 // Nhớ set env PUPPETEER_SKIP_DOWNLOAD=1 trên Vercel để build khỏi tải Chrome.
-async function launchBrowser(): Promise<Browser> {
+export async function launchBrowser(): Promise<Browser> {
   if (isCloudflareWorkers) {
     const { env } = await getCloudflareContext({ async: true });
     // @cloudflare/puppeteer trả về Browser tương thích API với puppeteer-core
