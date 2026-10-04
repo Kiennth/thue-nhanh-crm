@@ -224,6 +224,7 @@ export default async function OrderPrintPage({
 
     const ctx: DocContext = {
       docNumber: `${order.order_code}/TN`,
+      orderCode: order.order_code,
       contractDateText: `ngày ${orderDay} tháng ${orderMonth} năm ${orderYear}`,
       orderDate: `${orderDay}/${orderMonth}/${orderYear}`,
       city,

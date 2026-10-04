@@ -12,6 +12,8 @@ import type { DocRow, DocTotals } from "@/lib/order-document-data";
 
 export interface DocContext {
   docNumber: string;
+  // Mã đơn (PO) — điền ô "PO" trên chứng từ (CEO 2026-10-04).
+  orderCode: string;
   // "ngày 30 tháng 09 năm 2026" của ngày lập đơn — dùng làm ngày ký hợp đồng.
   contractDateText: string;
   orderDate: string; // dd/mm/yyyy
@@ -151,7 +153,7 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
             </tr>
             <tr>
               <Td className="font-bold">PO</Td>
-              <Td />
+              <Td className="text-center">{ctx.orderCode}</Td>
             </tr>
           </tbody>
         </table>
