@@ -50,6 +50,7 @@ import {
   type PoolExcludedLineInput,
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
+import { BranchQuickSwitch } from "./branch-quick-switch";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
@@ -684,12 +685,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Chi nhánh</p>
-              <p className="font-medium">{branchNameById.get(order.pickup_branch_id) ?? "—"}</p>
-              {order.return_branch_id !== order.pickup_branch_id && (
-                <p className="text-xs text-muted-foreground">
-                  Thu hồi tại: {branchNameById.get(order.return_branch_id) ?? "—"}
-                </p>
-              )}
+              <BranchQuickSwitch
+                orderId={order.id}
+                branches={branchList}
+                pickupBranchId={order.pickup_branch_id}
+                returnBranchId={order.return_branch_id}
+                pickupLocked={!!order.delivery_stock_moved_at}
+              />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Ngày</p>

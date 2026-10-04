@@ -125,6 +125,40 @@ export async function updateOrder(
   return { success: true };
 }
 
+// Đổi chi nhánh 1 chạm ngay trên trang đơn (CEO 2026-10-04) — cùng luật
+// với updateOrder: đã xuất kho thì không đổi kho giao.
+export async function updateOrderBranches(
+  orderId: string,
+  pickupBranchId: string,
+  returnBranchId: string,
+): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+  const uuid = z.string().uuid();
+  if (!uuid.safeParse(orderId).success || !uuid.safeParse(pickupBranchId).success || !uuid.safeParse(returnBranchId).success) {
+    return { error: "Chi nhánh không hợp lệ." };
+  }
+  const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("orders")
+    .select("pickup_branch_id, delivery_stock_moved_at")
+    .eq("id", orderId)
+    .single();
+  if (!current) return { error: "Không tìm thấy đơn." };
+  if (current.delivery_stock_moved_at && current.pickup_branch_id !== pickupBranchId) {
+    return {
+      error: "Đơn đã xuất kho nên không đổi được chi nhánh giao (sẽ lệch tồn). Chi nhánh thu hồi thì vẫn đổi được.",
+    };
+  }
+  const { error } = await supabase
+    .from("orders")
+    .update({ pickup_branch_id: pickupBranchId, return_branch_id: returnBranchId })
+    .eq("id", orderId);
+  if (error) return { error: "Không đổi được chi nhánh: " + error.message };
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
 const OrderTotalOverrideSchema = z.object({
   total_value: z.coerce.number().min(0, { message: "Doanh số không được âm." }),
 });
