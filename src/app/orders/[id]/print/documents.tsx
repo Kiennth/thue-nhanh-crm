@@ -542,8 +542,11 @@ export function AcceptanceDocument({ ctx }: { ctx: DocContext }) {
         {ctx.customer.budgetUnitCode && (
           <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
         )}
+        {/* Người ký nghiệm thu thường KHÔNG phải người đại diện trên hồ sơ khách
+            (CEO 2026-10-04) — để chấm cho ghi tay; người đại diện chỉ điền ở
+            báo giá/hợp đồng. */}
         <PartyLine label="Đại diện">
-          {ctx.customer.representativeName ?? DOTS} Chức vụ: {ctx.customer.representativeTitle ?? SHORT_DOTS}
+          {DOTS} Chức vụ: {SHORT_DOTS}
         </PartyLine>
         {ctx.customer.bankAccountNumber && (
           <PartyLine label="Số tài khoản">
