@@ -39,13 +39,28 @@ export function buildWordHtml(root: HTMLElement, title: string): string {
   const clone = root.cloneNode(true) as HTMLElement;
   const live = [root, ...Array.from(root.querySelectorAll("*"))];
   const copies = [clone, ...Array.from(clone.querySelectorAll("*"))] as HTMLElement[];
-  // Ghi nhận hàng flex TRƯỚC khi xoá class (cần computed style của bản gốc).
+  // Ghi nhận hàng flex + khoảng trống lớn TRƯỚC khi xoá class (cần computed
+  // style của bản gốc).
   const flexRows: HTMLElement[] = [];
+  const gaps: { el: HTMLElement; lines: number }[] = [];
   live.forEach((el, i) => {
     const cs = getComputedStyle(el);
     if (cs.display === "flex" && cs.flexDirection === "row" && el.children.length >= 2) flexRows.push(copies[i]);
+    // Khoảng trống (chỗ ký tên, cách khối) — Word bỏ qua margin của div nên
+    // đổi thành dòng trống: margin-top lớn, hoặc khối rỗng có chiều cao.
+    const empty = !el.textContent?.trim() && !el.querySelector("img");
+    const gap = parseFloat(cs.marginTop) + (empty ? (el as HTMLElement).offsetHeight : 0);
+    if (gap >= 14 && el !== root) gaps.push({ el: copies[i], lines: Math.min(6, Math.round(gap / 18) || 1) });
     inlineStyles(el, copies[i]);
   });
+  for (const { el, lines } of gaps) {
+    for (let k = 0; k < lines; k++) {
+      const spacer = document.createElement("p");
+      spacer.setAttribute("style", "margin:0");
+      spacer.innerHTML = "&nbsp;";
+      el.before(spacer);
+    }
+  }
   // Hàng flex → bảng 1 dòng không viền, mỗi con 1 ô.
   for (const row of flexRows) {
     const table = document.createElement("table");
