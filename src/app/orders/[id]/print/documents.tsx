@@ -270,7 +270,7 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
           TMCP Kỹ Thương Việt Nam. CN: Hồ Chí Minh.
         </p>
         {/* QR chuyển khoản (CEO 2026-10-04) — đúng nội dung thì CRM tự ghi nhận. */}
-        <div className="flex flex-wrap gap-8 py-1">
+        <div className="grid grid-cols-2 gap-4 py-1">
           {totals.rentalWithVat > 0 && (
             <PaymentQr orderCode={ctx.orderCode} amount={totals.rentalWithVat} label="Đợt 1 — tiền thuê" size={120} />
           )}
