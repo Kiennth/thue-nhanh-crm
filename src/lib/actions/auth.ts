@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -36,6 +37,34 @@ export async function login(
   }
 
   redirect("/");
+}
+
+// "Quên / đổi mật khẩu" ở màn hình đăng nhập (CEO 2026-10-04): gửi email
+// khôi phục của Supabase. Link trong email trả token về /login (hash
+// fragment) → InviteHashHandler tạo phiên rồi chuyển sang /set-password —
+// cùng đường với email mời nhân viên. Luôn báo cùng 1 câu dù email có tồn
+// tại hay không, để không lộ ai là nhân viên.
+export type PasswordResetState = { error: string } | { sent: true } | undefined;
+
+export async function requestPasswordReset(
+  _prevState: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  const parsed = z.string().trim().email({ message: "Email không hợp lệ." }).safeParse(formData.get("email"));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Email không hợp lệ." };
+  }
+
+  const origin = (await headers()).get("origin") ?? "https://crm.thuenhanh.vn";
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+    redirectTo: `${origin}/login`,
+  });
+  // Supabase giới hạn số email/giờ — chỉ lỗi này mới báo riêng.
+  if (error && (error.status === 429 || /rate limit/i.test(error.message))) {
+    return { error: "Đã gửi quá nhiều email trong thời gian ngắn — thử lại sau ít phút." };
+  }
+  return { sent: true };
 }
 
 export async function logout() {
