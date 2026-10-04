@@ -159,7 +159,13 @@ export function QuickOrderDialog({
     setOpen(next);
     if (!next || catalog) return;
     startLoading(async () => {
-      const c = await getQuickOrderCatalog();
+      let c: QuickOrderCatalog;
+      try {
+        c = await getQuickOrderCatalog();
+      } catch {
+        setError("Không tải được danh mục hàng — đóng popup rồi mở lại.");
+        return;
+      }
       setCatalog(c);
       setEmployeeId((v) => v || c.currentEmployeeId);
       setBranchId((v) => v || c.defaultBranchId || branches[0]?.id || "");
@@ -434,7 +440,7 @@ export function QuickOrderDialog({
           {/* Hàng */}
           <div className="space-y-2">
             <Label>Hàng thuê</Label>
-            {loading && !catalog ? (
+            {!catalog ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" /> Đang tải danh mục hàng…
               </p>
