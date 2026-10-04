@@ -44,6 +44,10 @@ interface CustomerDialogProps {
     customer_type: CustomerType;
     tax_code: string | null;
     budget_unit_code?: string | null;
+    representative_name?: string | null;
+    representative_title?: string | null;
+    bank_account_number?: string | null;
+    bank_name?: string | null;
     address: string | null;
     deposit_percentage: number;
   };
@@ -100,7 +104,7 @@ export function CustomerDialog({ customer, editTriggerVariant = "icon" }: Custom
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form action={handleSubmit} className="space-y-4">
           <DialogHeader>
             <DialogTitle>{customer ? "Sửa khách hàng" : "Thêm khách hàng"}</DialogTitle>
@@ -164,6 +168,46 @@ export function CustomerDialog({ customer, editTriggerVariant = "icon" }: Custom
               placeholder="Địa chỉ xuất hoá đơn"
               defaultValue={customer?.address ?? ""}
             />
+          </div>
+
+          {/* Thông tin hợp đồng (CEO 2026-10-04) — in vào phần BÊN B của chứng từ. */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="representative_name">Người đại diện</Label>
+              <Input
+                id="representative_name"
+                name="representative_name"
+                placeholder="Ông/Bà ..."
+                defaultValue={customer?.representative_name ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="representative_title">Chức vụ</Label>
+              <Input
+                id="representative_title"
+                name="representative_title"
+                placeholder="Giám đốc, Trưởng phòng..."
+                defaultValue={customer?.representative_title ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bank_account_number">Số tài khoản</Label>
+              <Input
+                id="bank_account_number"
+                name="bank_account_number"
+                inputMode="numeric"
+                defaultValue={customer?.bank_account_number ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bank_name">Tại ngân hàng</Label>
+              <Input
+                id="bank_name"
+                name="bank_name"
+                placeholder="Vietcombank - CN Hà Nội..."
+                defaultValue={customer?.bank_name ?? ""}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

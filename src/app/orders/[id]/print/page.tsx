@@ -239,6 +239,13 @@ export default async function OrderPrintPage({
       ),
     ];
 
+    // Cột mới chưa có trong types/database.ts (WIP phiên khác).
+    const extra = customer as {
+      representative_name?: string | null;
+      representative_title?: string | null;
+      bank_account_number?: string | null;
+      bank_name?: string | null;
+    } | null;
     const ctx: DocContext = {
       docNumber: `${order.order_code}/TN`,
       orderCode: order.order_code,
@@ -250,6 +257,10 @@ export default async function OrderPrintPage({
         address: customer?.address ?? null,
         taxCode: customer?.tax_code ?? null,
         budgetUnitCode: (customer as { budget_unit_code?: string | null } | null)?.budget_unit_code ?? null,
+        representativeName: extra?.representative_name || null,
+        representativeTitle: extra?.representative_title || null,
+        bankAccountNumber: extra?.bank_account_number || null,
+        bankName: extra?.bank_name || null,
         phone: customer?.phone ?? null,
         email: customer?.email ?? null,
       },

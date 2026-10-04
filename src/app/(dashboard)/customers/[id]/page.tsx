@@ -133,6 +133,21 @@ export default async function CustomerDetailPage({
               {(customer as typeof customer & { budget_unit_code?: string | null }).budget_unit_code ?? "—"}
             </p>
           </div>
+          {(
+            [
+              ["Người đại diện", "representative_name"],
+              ["Chức vụ", "representative_title"],
+              ["Số tài khoản", "bank_account_number"],
+              ["Tại ngân hàng", "bank_name"],
+            ] as const
+          ).map(([label, key]) => (
+            <div key={key}>
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="font-medium">
+                {(customer as typeof customer & Record<typeof key, string | null | undefined>)[key] ?? "—"}
+              </p>
+            </div>
+          ))}
           <div>
             <p className="text-xs text-muted-foreground">Tiền cọc</p>
             <p className="font-medium">{DEPOSIT_PERCENTAGE_LABELS[customer.deposit_percentage]}</p>

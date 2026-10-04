@@ -24,6 +24,11 @@ export interface DocContext {
     taxCode: string | null;
     // Mã số ĐVQHNS (CEO 2026-10-04) — chỉ in khi khách có.
     budgetUnitCode: string | null;
+    // Thông tin hợp đồng (CEO 2026-10-04) — trống thì in dòng chấm như cũ.
+    representativeName: string | null;
+    representativeTitle: string | null;
+    bankAccountNumber: string | null;
+    bankName: string | null;
     phone: string | null;
     email: string | null;
   };
@@ -166,7 +171,16 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
         <p>Địa chỉ: {ctx.customer.address ?? ""}</p>
         <p>MST: {ctx.customer.taxCode ?? ""}</p>
         {ctx.customer.budgetUnitCode && <p>Mã số ĐVQHNS: {ctx.customer.budgetUnitCode}</p>}
-        <p>Người đại diện: Ông/ Bà {SHORT_DOTS} Chức vụ: {SHORT_DOTS}</p>
+        <p>
+          Người đại diện: {ctx.customer.representativeName ?? `Ông/ Bà ${SHORT_DOTS}`} Chức vụ:{" "}
+          {ctx.customer.representativeTitle ?? SHORT_DOTS}
+        </p>
+        {ctx.customer.bankAccountNumber && (
+          <p>
+            Số tài khoản: {ctx.customer.bankAccountNumber}
+            {ctx.customer.bankName ? ` tại ${ctx.customer.bankName}` : ""}
+          </p>
+        )}
         <p>SĐT: {ctx.customer.phone ?? ""}</p>
         <p>Email: {ctx.customer.email ?? ""}</p>
       </div>
@@ -529,8 +543,14 @@ export function AcceptanceDocument({ ctx }: { ctx: DocContext }) {
           <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
         )}
         <PartyLine label="Đại diện">
-          {DOTS} Chức vụ: {SHORT_DOTS}
+          {ctx.customer.representativeName ?? DOTS} Chức vụ: {ctx.customer.representativeTitle ?? SHORT_DOTS}
         </PartyLine>
+        {ctx.customer.bankAccountNumber && (
+          <PartyLine label="Số tài khoản">
+            {ctx.customer.bankAccountNumber}
+            {ctx.customer.bankName ? ` tại ${ctx.customer.bankName}` : ""}
+          </PartyLine>
+        )}
         <p className="italic">(Sau đây gọi là Bên B)</p>
       </div>
 

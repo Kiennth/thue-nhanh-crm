@@ -15,11 +15,31 @@ const CustomerSchema = z.object({
   tax_code: z.string().trim().optional(),
   // Mã số ĐVQHNS — khách là đơn vị có quan hệ ngân sách (CEO 2026-10-04).
   budget_unit_code: z.string().trim().optional(),
+  // Thông tin hợp đồng (CEO 2026-10-04) — điền vào phần BÊN B của chứng từ.
+  representative_name: z.string().trim().optional(),
+  representative_title: z.string().trim().optional(),
+  bank_account_number: z.string().trim().optional(),
+  bank_name: z.string().trim().optional(),
   address: z.string().trim().optional(),
   deposit_percentage: z.coerce.number().refine((v) => [0, 50, 100].includes(v), {
     message: "Tỉ lệ tiền cọc chỉ được 0%, 50% hoặc 100%.",
   }),
 });
+
+// Ô bỏ trống → null (sửa khách xoá được giá trị cũ).
+function emptyToNull<T extends Record<string, unknown>>(data: T): T {
+  const out: Record<string, unknown> = { ...data };
+  for (const key of [
+    "budget_unit_code",
+    "representative_name",
+    "representative_title",
+    "bank_account_number",
+    "bank_name",
+  ]) {
+    out[key] = out[key] || null;
+  }
+  return out as T;
+}
 
 export type ActionState = { error: string } | { success: true; id?: string } | undefined;
 
@@ -37,6 +57,10 @@ export async function createCustomer(
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
     budget_unit_code: formData.get("budget_unit_code") || undefined,
+    representative_name: formData.get("representative_name") || undefined,
+    representative_title: formData.get("representative_title") || undefined,
+    bank_account_number: formData.get("bank_account_number") || undefined,
+    bank_name: formData.get("bank_name") || undefined,
     address: formData.get("address") || undefined,
     deposit_percentage: formData.get("deposit_percentage") || 100,
   });
@@ -49,8 +73,8 @@ export async function createCustomer(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("customers")
-    // budget_unit_code chưa có trong types/database.ts (WIP phiên khác) — ép kiểu.
-    .insert({ ...rest, email: email || null, budget_unit_code: rest.budget_unit_code || null } as never)
+    // Cột mới chưa có trong types/database.ts (WIP phiên khác) — ép kiểu.
+    .insert({ ...emptyToNull(rest), email: email || null } as never)
     .select("id")
     .single();
 
@@ -77,6 +101,10 @@ export async function updateCustomer(
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
     budget_unit_code: formData.get("budget_unit_code") || undefined,
+    representative_name: formData.get("representative_name") || undefined,
+    representative_title: formData.get("representative_title") || undefined,
+    bank_account_number: formData.get("bank_account_number") || undefined,
+    bank_name: formData.get("bank_name") || undefined,
     address: formData.get("address") || undefined,
     deposit_percentage: formData.get("deposit_percentage") || 100,
   });
@@ -89,7 +117,7 @@ export async function updateCustomer(
   const supabase = await createClient();
   const { error } = await supabase
     .from("customers")
-    .update({ ...rest, email: email || null, budget_unit_code: rest.budget_unit_code || null } as never)
+    .update({ ...emptyToNull(rest), email: email || null } as never)
     .eq("id", id);
 
   if (error) {
