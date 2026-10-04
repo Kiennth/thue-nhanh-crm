@@ -997,3 +997,5 @@
 -- Gắn 7 dòng tự do: BQ12714 laptop; BQ13098 NAS ×2, Switch, CAT6 5m ×20,
 -- CAT6 20m; BQ12852 Type C; BQ12897 ổ điện 20m. Máy serial là AUTO-SYNC
 -- (chờ serial thật). id mã mới: backups/new-skus-2026-10-04.json.
+-- 04/10 thêm mã Switch TP-Link 16-Port (serial, Thiết Bị Sự Kiện) 100.000/ngày
+-- (CEO), cọc 1.500.000 đề xuất chờ duyệt.
