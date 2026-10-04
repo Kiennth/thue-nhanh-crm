@@ -999,3 +999,11 @@
 -- (chờ serial thật). id mã mới: backups/new-skus-2026-10-04.json.
 -- 04/10 thêm mã Switch TP-Link 16-Port (serial, Thiết Bị Sự Kiện) 100.000/ngày
 -- (CEO), cọc 1.500.000 đề xuất chờ duyệt.
+-- 04/10 thêm 3 mã Giá đỡ TV Aero / Core / Era Stand (số lượng, Thiết Bị Sự
+-- Kiện) 200.000/ngày, cọc 0 (CEO chưa báo), web: TV & Máy Chiếu, ẩn, giao ô tô
+-- (ship_bike_max_qty=0).
+-- 04/10 ĐỔI CÁCH QUẢN LÝ serial→số lượng (CEO): "Giá đỡ TV AVA1800 75-100
+-- inch" (18 dòng instance gộp thành 11 dòng theo đơn, tổng 900.000 giữ nguyên)
+-- và "Giá Đỡ TV E1290 32-65 inch (Ngang - Dọc)" (32 → 24 dòng, 1.570.000 giữ
+-- nguyên). Mỗi mã 1 unit mặc định trùng tên; xoá hết instance AUTO (48 đã
+-- thanh lý + 2 còn kho) → tồn E1290: TP HCM 1, Hà Nội 1; AVA1800 tồn 0.
