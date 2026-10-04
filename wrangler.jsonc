@@ -23,6 +23,8 @@
   // dùng — mỗi trang gọi DB nhiều lượt nối đuôi, mỗi lượt từ edge HKG tới DB
   // mất ~450ms; đặt cạnh DB thì còn vài chục ms.
   "placement": { "mode": "smart" },
-  // Email nhắc việc 17h giờ VN = 10:00 UTC (custom-worker.js → scheduled).
-  "triggers": { "crons": ["0 10 * * *"] }
+  // Email nhắc việc 17h (custom-worker.js → scheduled) — CEO 2026-10-04 chưa
+  // muốn dùng ("rác, tao ở trên CRM suốt"): tắt lịch chạy. Bật lại thì đặt
+  // "0 10 * * *" (10:00 UTC = 17h VN) + DAILY_REMINDERS_ENABLED=1.
+  "triggers": { "crons": [] }
 }
