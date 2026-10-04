@@ -62,9 +62,13 @@ export function DateInput({
   }
 
   function handleType(raw: string) {
-    let next = raw.replace(/[^\d/.-]/g, "").slice(0, 10);
-    // Gõ liền số thì tự chèn "/" sau ngày và tháng.
-    if (next.length > text.length && /^\d{2}$|^\d{1,2}\/\d{2}$/.test(next)) next += "/";
+    let next = raw.replace(/[^\d/.-]/g, "");
+    // Gõ/dán liền số ("15092026") thì tự chèn "/" sau ngày và tháng.
+    if (/^\d+$/.test(next) && next.length > 2) {
+      const d = next.slice(0, 8);
+      next = `${d.slice(0, 2)}/${d.slice(2, 4)}${d.length > 4 ? `/${d.slice(4)}` : ""}`;
+    } else if (next.length > text.length && /^\d{2}$|^\d{1,2}\/\d{2}$/.test(next)) next += "/";
+    next = next.slice(0, 10);
     setText(next);
     if (!next) commit("");
     else {
