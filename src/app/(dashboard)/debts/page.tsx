@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,7 +25,7 @@ export default async function DebtsPage() {
   await requireRole([...MANAGE_ROLES]);
 
   const supabase = await createClient();
-  const [{ data: report, error }, { data: notes }, { data: employees }] = await Promise.all([
+  const [{ data: report, error }, { data: notes }, { data: employees }, bankRes] = await Promise.all([
     supabase.rpc("debt_aging_report"),
     supabase
       .from("debt_notes")
@@ -32,7 +33,13 @@ export default async function DebtsPage() {
       .order("created_at", { ascending: false })
       .limit(500),
     supabase.from("employees").select("id, name"),
+    // Bảng mới chưa có trong types/database.ts (WIP phiên khác).
+    (supabase as unknown as SupabaseClient)
+      .from("bank_transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "unmatched"),
   ]);
+  const unmatchedBank = bankRes.count ?? 0;
   if (error || !report || "error" in report) {
     throw new Error("Không tải được báo cáo công nợ: " + (error?.message ?? "forbidden"));
   }
@@ -71,12 +78,23 @@ export default async function DebtsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Công nợ</h1>
-        <p className="text-sm text-muted-foreground">
-          Nợ càng già càng khó đòi — khách nợ lâu nhất nằm trên cùng, ghi chú lại mỗi lần gọi để
-          không ai phải hỏi lại từ đầu.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Công nợ</h1>
+          <p className="text-sm text-muted-foreground">
+            Nợ càng già càng khó đòi — khách nợ lâu nhất nằm trên cùng, ghi chú lại mỗi lần gọi để
+            không ai phải hỏi lại từ đầu.
+          </p>
+        </div>
+        <Link
+          href="/debts/bank"
+          className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
+        >
+          Tiền vào ngân hàng
+          {unmatchedBank > 0 && (
+            <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white">{unmatchedBank}</span>
+          )}
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

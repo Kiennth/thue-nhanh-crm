@@ -51,6 +51,7 @@ import {
 } from "@/lib/commission";
 import { OrderDialog } from "../order-dialog";
 import { BranchQuickSwitch } from "./branch-quick-switch";
+import { PaymentQr } from "@/components/payment-qr";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
@@ -340,6 +341,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // cũ) thì cộng thêm vào cọc hoàn — gộp về 1 lần hoàn cuối thay vì phải xử
   // lý hoá đơn và cọc thành 2 giao dịch riêng.
   const depositRefundSuggestion = Math.max(0, depositHeld - (grandTotal - totalPaid));
+  // QR chuyển khoản (CEO 2026-10-04): tiền thuê còn thiếu + cọc chưa thu, 1
+  // lần quét — webhook SePay tự chia lại tiền thuê trước, dư là cọc.
+  const depositDue =
+    rawDeposit > 0 && customerDepositPercentage > 0 && depositRefunded === 0
+      ? Math.max(0, totalDeposit - depositCollected)
+      : 0;
+  const qrAmount = order.cancelled_at ? 0 : Math.round(remaining + depositDue);
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -1483,6 +1491,25 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     </Badge>
                   </div>
                 </div>
+
+                {qrAmount > 0 && (
+                  <div className="rounded-lg border border-dashed p-3">
+                    <PaymentQr
+                      orderCode={order.order_code}
+                      amount={qrAmount}
+                      label="Khách quét để chuyển khoản"
+                      size={132}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {depositDue > 0 && remaining > 0
+                        ? `Gồm tiền thuê còn lại ${currencyFormatter.format(remaining)}đ + cọc ${currencyFormatter.format(depositDue)}đ. `
+                        : depositDue > 0
+                          ? "Tiền cọc chưa thu. "
+                          : ""}
+                      Chuyển đúng nội dung là CRM tự ghi nhận thanh toán.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {invoicePaymentList.map((payment) => (

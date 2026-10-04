@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { PaymentQr } from "@/components/payment-qr";
+import { transferRef } from "@/lib/vietqr";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { VAT_RATE } from "@/lib/order-labels";
 import { vndToWords } from "@/lib/vnd-words";
@@ -267,6 +269,15 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
           <b>Số tài khoản:</b> {COMPANY_INFO.documentBank.accountNumber} tại (TECHCOMBANK) - Ngân hàng
           TMCP Kỹ Thương Việt Nam. CN: Hồ Chí Minh.
         </p>
+        {/* QR chuyển khoản (CEO 2026-10-04) — đúng nội dung thì CRM tự ghi nhận. */}
+        <div className="flex flex-wrap gap-8 py-1">
+          {totals.rentalWithVat > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={totals.rentalWithVat} label="Đợt 1 — tiền thuê" size={120} />
+          )}
+          {totals.deposit > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={totals.deposit} deposit label="Đợt 2 — ký quỹ" size={120} />
+          )}
+        </div>
         <p>
           <b>Hoàn cọc:</b> Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có)
           sau khi bên B trả lại thiết bị cho bên A, tối đa 24h làm việc.
@@ -320,6 +331,12 @@ export function PaymentRequestDocument({ ctx }: { ctx: DocContext }) {
         <p>Ngân hàng: {COMPANY_INFO.documentBank.bankName}.</p>
         <p>Số tài khoản: {COMPANY_INFO.documentBank.accountNumber}</p>
         <p>Tên tài khoản: {COMPANY_INFO.documentBank.accountName}</p>
+        <p>Nội dung chuyển khoản: {transferRef(ctx.orderCode)}</p>
+        {amount > 0 && (
+          <div className="pt-2">
+            <PaymentQr orderCode={ctx.orderCode} amount={amount} label="Quét mã để chuyển khoản" size={120} />
+          </div>
+        )}
       </div>
       <p>Rất mong nhận được sự hợp tác từ quý khách hàng. Chúng tôi xin trân trọng cảm ơn!</p>
       <div className="flex justify-end pt-2">
