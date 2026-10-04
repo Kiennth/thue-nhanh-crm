@@ -159,6 +159,23 @@ export async function updateOrderBranches(
   return { success: true };
 }
 
+// Sửa tay tiền cọc của đơn (CEO 2026-10-04) — null = về cọc tính theo hàng.
+export async function setOrderDepositOverride(orderId: string, amount: number | null): Promise<ActionState> {
+  await requireRole([...EQUIPMENT_WRITE_ROLES]);
+  if (!z.string().uuid().safeParse(orderId).success) return { error: "Đơn không hợp lệ." };
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > 10_000_000_000)) {
+    return { error: "Số tiền cọc không hợp lệ." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ deposit_override_amount: amount === null ? null : Math.round(amount) })
+    .eq("id", orderId);
+  if (error) return { error: "Không sửa được tiền cọc: " + error.message };
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
 const OrderTotalOverrideSchema = z.object({
   total_value: z.coerce.number().min(0, { message: "Doanh số không được âm." }),
 });

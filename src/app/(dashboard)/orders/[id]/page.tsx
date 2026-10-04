@@ -52,6 +52,7 @@ import {
 import { OrderDialog } from "../order-dialog";
 import { BranchQuickSwitch } from "./branch-quick-switch";
 import { PaymentQr } from "@/components/payment-qr";
+import { DepositOverrideDialog } from "./deposit-override-dialog";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
@@ -78,7 +79,7 @@ import { LineChargeEditor, type LinePriceTarget } from "./line-charge-editor";
 import { LineNoteEditor } from "./line-note-editor";
 import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 import { countAssemblableSets } from "@/lib/combo";
-import { BRANCH_SCOPED_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -316,6 +317,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     return sum + (type.deposit_amount ?? 0) * line.quantity;
   }, 0);
   const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
+  // Cọc tính theo hàng (chưa sửa tay) — hiện cạnh số đã sửa cho dễ so.
+  const defaultDeposit = Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+  const depositOverridden = order.deposit_override_amount != null;
+  const canEditDeposit = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
   const totalDeposit =
     // So sánh lỏng (!= thay vì !==): cột này migration mới thêm, có thể
     // chưa lên production nếu đợt deploy chạy trước lúc db push xong — lúc
@@ -1546,12 +1551,25 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     <p className="text-sm font-medium">Tiền cọc</p>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-muted-foreground">Cọc dự kiến</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground">Cọc dự kiến</p>
+                          {canEditDeposit && !order.cancelled_at && (
+                            <DepositOverrideDialog
+                              orderId={order.id}
+                              current={totalDeposit}
+                              defaultAmount={defaultDeposit}
+                              overridden={depositOverridden}
+                            />
+                          )}
+                        </div>
                         <p className="font-medium">
-                          {customerDepositPercentage <= 0
-                            ? "Miễn cọc"
-                            : `${currencyFormatter.format(totalDeposit)}đ`}
+                          {totalDeposit <= 0 ? "Miễn cọc" : `${currencyFormatter.format(totalDeposit)}đ`}
                         </p>
+                        {depositOverridden && (
+                          <p className="text-xs text-amber-600">
+                            Đã sửa tay · theo hàng {currencyFormatter.format(defaultDeposit)}đ
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Đang giữ</p>
