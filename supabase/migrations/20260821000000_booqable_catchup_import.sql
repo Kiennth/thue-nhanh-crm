@@ -985,3 +985,15 @@
 -- INOX dây căng 3m Dây Xanh → bt dây XANH (tiền lệ); Cột chắn gắn bảng A4
 -- (3m) bảng NGANG, INOX → Cột Chắn INOX gắn bảng thông báo chỉ dẫn A4 màu
 -- INOX bt bảng NGANG (khớp tên).
+
+-- Đợt map 26 (04/10, CEO "tạo mã cho mấy món này"): 6 mã mới (bảng giá
+-- 80% Tháng, giá/ngày ĐỀ XUẤT chờ CEO duyệt, trừ laptop lấy theo Booqable):
+--   Laptop Gaming Ultra 9 RTX 4070 (serial, PC & Mac) 1.500.000 / cọc 25tr
+--   NAS 8TB (serial, PC & Mac) 500.000 / cọc 10tr
+--   Switch mạng 24-port Gigabit (serial, Thiết Bị Sự Kiện) 250.000 / cọc 3tr
+--   Cáp mạng CAT6 (số lượng, bt 5m 20.000 · 20m 50.000) cọc 0
+--   Dây Type C to Type C (số lượng) 20.000 cọc 0
+--   Ổ cắm điện kéo dài 20m (số lượng) 75.000 cọc 100.000
+-- Gắn 7 dòng tự do: BQ12714 laptop; BQ13098 NAS ×2, Switch, CAT6 5m ×20,
+-- CAT6 20m; BQ12852 Type C; BQ12897 ổ điện 20m. Máy serial là AUTO-SYNC
+-- (chờ serial thật). id mã mới: backups/new-skus-2026-10-04.json.
