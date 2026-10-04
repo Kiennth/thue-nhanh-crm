@@ -1007,3 +1007,6 @@
 -- và "Giá Đỡ TV E1290 32-65 inch (Ngang - Dọc)" (32 → 24 dòng, 1.570.000 giữ
 -- nguyên). Mỗi mã 1 unit mặc định trùng tên; xoá hết instance AUTO (48 đã
 -- thanh lý + 2 còn kho) → tồn E1290: TP HCM 1, Hà Nội 1; AVA1800 tồn 0.
+-- 04/10 ĐỔI CÁCH QUẢN LÝ serial→số lượng (CEO): "Switch TP-Link 24-port"
+-- (đơn BQ13098 1 dòng giữ nguyên tiền, xoá máy AUTO-SYNC → tồn Hà Nội 1) và
+-- "Switch TP-Link 16-Port" (chưa có máy/đơn). Mỗi mã 1 unit mặc định trùng tên.
