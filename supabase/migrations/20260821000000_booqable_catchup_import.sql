@@ -990,7 +990,7 @@
 -- 80% Tháng, giá/ngày ĐỀ XUẤT chờ CEO duyệt, trừ laptop lấy theo Booqable):
 --   Laptop Gaming Ultra 9 RTX 4070 (serial, PC & Mac) 1.500.000 / cọc 25tr
 --   Ổ cứng NAS 8TB (serial, PC & Mac) 400.000 / cọc 2tr (CEO duyệt, đổi tên)
---   Switch mạng 24-port Gigabit (serial, Thiết Bị Sự Kiện) 250.000 / cọc 3tr
+--   Switch mạng 24-port Gigabit (serial, Thiết Bị Sự Kiện) 200.000 (CEO duyệt) / cọc 3tr
 --   Cáp mạng CAT6 (số lượng, bt 5m 20.000 · 20m 50.000) cọc 0
 --   Dây Type C to Type C (số lượng) 20.000 cọc 0
 --   Ổ cắm điện kéo dài 20m (số lượng) 75.000 cọc 100.000
