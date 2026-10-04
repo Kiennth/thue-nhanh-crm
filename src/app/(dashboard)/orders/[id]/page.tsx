@@ -358,13 +358,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // cũ) thì cộng thêm vào cọc hoàn — gộp về 1 lần hoàn cuối thay vì phải xử
   // lý hoá đơn và cọc thành 2 giao dịch riêng.
   const depositRefundSuggestion = Math.max(0, depositHeld - (grandTotal - totalPaid));
-  // QR chuyển khoản (CEO 2026-10-04): tiền thuê còn thiếu + cọc chưa thu, 1
-  // lần quét — webhook SePay tự chia lại tiền thuê trước, dư là cọc.
-  const depositDue =
-    rawDeposit > 0 && customerDepositPercentage > 0 && depositRefunded === 0
-      ? Math.max(0, totalDeposit - depositCollected)
-      : 0;
-  const qrAmount = order.cancelled_at ? 0 : Math.round(remaining + depositDue);
+  // QR chuyển khoản tách 2 mục như báo giá (CEO 2026-10-05): tiền thuê còn
+  // thiếu ("THANH TOAN …") + cọc chưa thu ("DAT COC …").
+  const depositDue = totalDeposit > 0 && depositRefunded === 0 ? Math.max(0, totalDeposit - depositCollected) : 0;
+  const qrRental = order.cancelled_at ? 0 : Math.round(remaining);
+  const qrDeposit = order.cancelled_at ? 0 : Math.round(depositDue);
 
   // Cảnh báo thiếu hàng: so số lượng sẵn có tại chi nhánh của đơn với tổng
   // nhu cầu của TẤT CẢ đơn CHƯA hoàn tất đang giữ cùng biến thể đó tại chi
@@ -1534,22 +1532,25 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   </div>
                 </div>
 
-                {qrAmount > 0 && (
-                  <div className="rounded-lg border border-dashed p-3">
-                    <PaymentQr
-                      orderCode={order.order_code}
-                      amount={qrAmount}
-                      label="Khách quét để chuyển khoản"
-                      size={132}
-                    />
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {depositDue > 0 && remaining > 0
-                        ? `Gồm tiền thuê còn lại ${currencyFormatter.format(remaining)}đ + cọc ${currencyFormatter.format(depositDue)}đ. `
-                        : depositDue > 0
-                          ? "Tiền cọc chưa thu. "
-                          : ""}
-                      Chuyển đúng nội dung là CRM tự ghi nhận thanh toán.
-                    </p>
+                {(qrRental > 0 || qrDeposit > 0) && (
+                  <div className="grid gap-3 rounded-lg border border-dashed p-3 sm:grid-cols-2">
+                    {qrRental > 0 && (
+                      <PaymentQr
+                        orderCode={order.order_code}
+                        amount={qrRental}
+                        label="Tiền thuê còn lại"
+                        size={120}
+                      />
+                    )}
+                    {qrDeposit > 0 && (
+                      <PaymentQr
+                        orderCode={order.order_code}
+                        amount={qrDeposit}
+                        deposit
+                        label="Tiền cọc chưa thu"
+                        size={120}
+                      />
+                    )}
                   </div>
                 )}
 
