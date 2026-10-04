@@ -81,7 +81,10 @@ export function CalendarTimeline({
   }
 
   return (
-    <div className="max-h-[calc(100vh-230px)] overflow-auto rounded-lg border bg-background">
+    // contain:inline-size — lưới rộng không được kéo giãn cả trang (khung
+    // nội dung là flex item, min-width tự lấy theo bề rộng lưới), chỉ cuộn
+    // ngang bên trong khung này.
+    <div className="max-h-[calc(100vh-230px)] w-full overflow-auto rounded-lg border bg-background [contain:inline-size]">
       <div style={{ width: NAME_COL + gridWidth }} className="relative">
         {/* Hàng tiêu đề ngày */}
         <div className="sticky top-0 z-20 flex border-b bg-background">
