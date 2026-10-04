@@ -310,8 +310,20 @@ async function loadEquipmentTypes() {
   );
   const map = new Map();
   for (const e of data) map.set(normalize(e.name), e);
+  // Tên cũ (trùng tên sản phẩm bên Booqable) của mã đã đổi tên trong CRM —
+  // vẫn tự gắn đúng mã khi đồng bộ.
+  for (const [oldName, newName] of Object.entries(RENAMED_TYPES)) {
+    const e = map.get(normalize(newName));
+    if (e && !map.has(normalize(oldName))) map.set(normalize(oldName), e);
+  }
   return map;
 }
+
+// CEO 2026-10-04: thêm chữ "PlayStation" để tìm "playstation" ra tay cầm.
+const RENAMED_TYPES = {
+  "Tay cầm PS4 Sony DUALSHOCK": "Tay cầm PlayStation 4 PS4 Sony DUALSHOCK",
+  "Tay cầm Sony DualSense": "Tay cầm PlayStation 5 PS5 Sony DualSense",
+};
 
 const equipmentUnitCache = new Map(); // equipment_type_id -> equipment_unit_id
 async function getOrCreateEquipmentUnit(equipmentType) {
