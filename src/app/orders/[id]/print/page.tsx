@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Tinos } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/dal";
@@ -63,6 +64,16 @@ function chargeNote(chargeDuration: number | null, unit: RentalPeriodUnit | null
 
 // Tiêu đề tab = tên file khi bấm "In / Lưu PDF" (trình duyệt lấy title làm
 // tên file mặc định) — theo mẫu CEO: "BAO GIA PO DH20261001-871".
+// Font chứng từ (CEO 2026-10-04 báo lỗi dấu tiếng Việt): trước dùng
+// "Times New Roman" của máy người xem — PDF dựng trên máy chủ Cloudflare
+// (Linux, không có font này) rơi về font thay thế thiếu dấu. Tinos cùng kích
+// thước chữ với Times New Roman, đủ tiếng Việt, nhúng sẵn vào trang.
+const docFont = Tinos({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+});
+
 export async function generateMetadata({
   params,
   searchParams,
@@ -285,7 +296,7 @@ export default async function OrderPrintPage({
         <div
           data-doc-root
           className="mx-auto max-w-[210mm] bg-white p-10 text-[13px] leading-5 text-black shadow print:max-w-none print:p-0 print:shadow-none"
-          style={{ fontFamily: '"Times New Roman", Times, serif' }}
+          style={{ fontFamily: `${docFont.style.fontFamily}, "Times New Roman", Times, serif` }}
         >
           {printButton}
           {docType === "quote" && <QuoteDocument ctx={ctx} />}
