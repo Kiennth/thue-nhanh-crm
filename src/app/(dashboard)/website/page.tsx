@@ -20,6 +20,7 @@ import { MANAGE_ROLES } from "@/lib/roles";
 import { WebsiteProductRowActions, RefreshWebsiteButton } from "./row-actions";
 import { WebsiteProductDialog } from "./product-dialog";
 import { WebsiteCategoryDialog } from "./category-dialog";
+import { WebsiteCategoryTree } from "./category-tree";
 
 // CEO 2026-09-26: danh sách dài hết trang, đỡ bấm chuyển trang (30 → 100).
 const PAGE_SIZE = 100;
@@ -37,16 +38,31 @@ const addedDateFormatter = new Intl.DateTimeFormat("vi-VN", {
 export default async function WebsitePage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; filter?: string; page?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    filter?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+    cat?: string;
+  }>;
 }) {
   await requireRole([...MANAGE_ROLES]);
-  const { search, filter, page, sort, dir } = await searchParams;
+  const { search, filter, page, sort, dir, cat } = await searchParams;
   const ascending = dir !== "desc";
   const activeSearch = search?.trim() ?? "";
   const activeFilter = filter ?? "all";
   const currentPage = Math.max(1, Number(page) || 1);
 
   const supabase = await createClient();
+  // Lọc theo 1 danh mục trong cây (bấm số SP) — danh mục cha gồm luôn các con.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const activeCat = cat && UUID_RE.test(cat) ? cat : null;
+  const catChildIds = activeCat
+    ? ((await supabase.from("website_categories").select("id").eq("parent_id", activeCat)).data ?? []).map(
+        (c) => c.id,
+      )
+    : [];
 
   let query = supabase
     .from("website_products")
@@ -66,6 +82,7 @@ export default async function WebsitePage({
   if (activeFilter === "featured") query = query.eq("is_featured", true);
   if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
+  if (activeCat) query = query.in("website_category_id", [activeCat, ...catChildIds]);
   if (activeSearch) {
     // Slug toàn chữ không dấu nên phải bỏ dấu tiếng Việt trước khi so
     // ("kính" → "kinh"), kèm tìm cả tên marketing (có dấu). Bỏ ký tự đặc
@@ -188,28 +205,12 @@ export default async function WebsitePage({
               <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
               <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
             </CardHeader>
-            <CardContent className="space-y-2">
-              {/* 2 tầng: mỗi dòng = nhóm cha + các con của nó */}
-              {categoryList
-                .filter((c) => !c.parent_id)
-                .map((parent) => (
-                  <div key={parent.id} className="flex flex-wrap items-center gap-2">
-                    <WebsiteCategoryDialog category={parent} parents={categoryList.filter((c) => !c.parent_id)} />
-                    <span className="text-muted-foreground">›</span>
-                    {categoryList
-                      .filter((c) => c.parent_id === parent.id)
-                      .map((child) => (
-                        <WebsiteCategoryDialog
-                          key={child.id}
-                          category={child}
-                          parents={categoryList.filter((c) => !c.parent_id)}
-                        />
-                      ))}
-                  </div>
-                ))}
-              {!categoryList.length && (
-                <p className="text-sm text-muted-foreground">Chưa có danh mục web nào.</p>
-              )}
+            <CardContent>
+              <WebsiteCategoryTree
+                categories={categoryList}
+                productCategoryIds={all.map((p) => p.website_category_id)}
+                activeId={activeCat}
+              />
             </CardContent>
           </Card>
         </>
@@ -222,6 +223,14 @@ export default async function WebsitePage({
         {filterLink("featured", "Thuê nhiều nhất")}
         {filterLink("new", "Sản phẩm mới")}
         {filterLink("no-category", "Chưa có danh mục")}
+        {activeCat && (
+          <Link
+            href="/website"
+            className="rounded-full border border-primary bg-primary px-3 py-1 text-xs font-medium text-primary-foreground"
+          >
+            Danh mục: {categoryList.find((c) => c.id === activeCat)?.name ?? "?"} ✕
+          </Link>
+        )}
       </div>
 
       <Table>

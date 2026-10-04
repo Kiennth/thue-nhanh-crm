@@ -25,9 +25,12 @@ type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Ro
 export function WebsiteCategoryDialog({
   category,
   parents = [],
+  trigger: customTrigger,
 }: {
   category?: WebsiteCategoryRow;
   parents?: WebsiteCategoryRow[];
+  // Nút mở dialog tuỳ chỉnh (vd tên danh mục trong cây ở trang Website).
+  trigger?: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +45,7 @@ export function WebsiteCategoryDialog({
     });
   }
 
-  const trigger = category ? (
+  const trigger = customTrigger ?? (category ? (
     <button type="button" className="cursor-pointer">
       <Badge variant={category.is_published ? "default" : "secondary"}>
         {category.name} · {category.sort_order}
@@ -53,7 +56,7 @@ export function WebsiteCategoryDialog({
       <Plus className="size-4" />
       Thêm danh mục
     </Button>
-  );
+  ));
 
   return (
     <Dialog
