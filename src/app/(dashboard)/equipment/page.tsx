@@ -359,6 +359,12 @@ export default async function EquipmentPage({
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
         {!isReportTab && (
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/shortages"
+              className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
+            >
+              Thiếu hàng &amp; cần mua
+            </Link>
             <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
             {canManageCatalog && (
               <EquipmentTypeDialog templates={templateList} categories={categoryList} />

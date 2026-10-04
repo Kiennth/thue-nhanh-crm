@@ -29,6 +29,7 @@ import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-hand
 import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
 import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
 import { WebOrdersAlert } from "@/components/web-orders-alert";
+import { ShortageAlert } from "@/components/shortage-alert";
 
 // Trang chủ hiện tối đa 10 đơn mỗi khối "Đơn hàng sắp tới"/"Đơn hàng sắp về"
 // (CEO chốt 2026-08-02, áp dụng cho mọi phân quyền).
@@ -315,6 +316,7 @@ export default async function DashboardHomePage({
           cho MỌI vai trò (trước đó chỉ Giám đốc/Kế toán còn giữ nó ở đầu) —
           đơn hàng và so sánh chi nhánh mới là thứ cần thấy ngay khi mở app. */}
       <WebOrdersAlert />
+      <ShortageAlert />
 
       {ordersSection}
 
