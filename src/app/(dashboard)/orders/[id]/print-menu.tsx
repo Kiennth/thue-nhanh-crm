@@ -10,6 +10,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PRINT_DOC_MENU_LABELS, PRINT_DOC_TYPES } from "@/lib/print-docs";
 
+function openInNewTab(href: string) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 export function PrintMenu({ orderId }: { orderId: string }) {
   const trigger = (
     <Button variant="outline" size="sm">
@@ -26,12 +36,12 @@ export function PrintMenu({ orderId }: { orderId: string }) {
         {PRINT_DOC_TYPES.map((docType) => (
           <DropdownMenuItem
             key={docType}
-            // Mở chứng từ ở TAB MỚI, giữ nguyên trang đơn (CEO 2026-10-04) —
-            // render <Link target="_blank"> bị menu chặn mặc định, vẫn chuyển
-            // trang cũ, nên mở tab bằng tay.
-            onClick={() =>
-              window.open(`/orders/${orderId}/print?type=${docType}`, "_blank", "noopener,noreferrer")
-            }
+            // Mở chứng từ ở TAB MỚI, giữ nguyên trang đơn (CEO 2026-10-04).
+            // <Link target="_blank"> trong menu bị chặn → vẫn chuyển trang cũ;
+            // window.open(…, features) bị nhiều trình duyệt coi là popup (Safari/
+            // app cài từ web chuyển luôn trang hiện tại). Bấm 1 thẻ <a> thật
+            // target=_blank — trình duyệt nào cũng mở tab mới như bấm link.
+            onClick={() => openInNewTab(`/orders/${orderId}/print?type=${docType}`)}
           >
             {PRINT_DOC_MENU_LABELS[docType]}
           </DropdownMenuItem>
