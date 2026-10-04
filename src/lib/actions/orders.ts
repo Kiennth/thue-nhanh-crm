@@ -991,9 +991,12 @@ async function allocateComboTotal(
   return null;
 }
 
-// Máy sẵn có của 1 loại hàng tại kho, bỏ máy đang nằm trên đơn CHƯA ĐÓNG
-// (status vẫn "available" tới lúc giao nên phải lọc tay — bài học mapper
-// 2026-09-24 lấy trùng máy).
+// Máy rảnh của 1 loại hàng tại kho cho 1 khung thuê.
+// - Có `period` (CEO 2026-10-04): xét THEO LỊCH như Booqable — máy đang cho
+//   thuê / đã giữ cho đơn khác vẫn lấy được nếu lịch không chồng với khung
+//   thuê mới (đơn quá hạn chưa trả thì coi như còn bận tới hiện tại).
+// - Không có `period`: chỉ máy đang trong kho và không nằm trên đơn chưa đóng
+//   nào (bài học mapper 2026-09-24 lấy trùng máy).
 async function pickAvailableInstances(
   supabase: SupabaseServerClient,
   typeId: string,
@@ -1002,14 +1005,16 @@ async function pickAvailableInstances(
   exclude: Set<string>,
   // Chỉ lấy máy đúng biến thể (vd iPad Wi-Fi + 4G) — null = biến thể nào cũng được.
   unitId: string | null = null,
+  period: { start: string | null; end: string | null } | null = null,
 ): Promise<string[]> {
   if (count <= 0) return [];
+  const byPeriod = !!(period?.start && period?.end);
   let candidateQuery = supabase
     .from("equipment_instances")
     .select("id, identifier_code")
     .eq("equipment_type_id", typeId)
     .eq("branch_id", branchId)
-    .eq("status", "available");
+    .in("status", byPeriod ? ["available", "rented"] : ["available"]);
   if (unitId) candidateQuery = candidateQuery.eq("equipment_unit_id", unitId);
   const { data: candidates } = await candidateQuery.order("identifier_code");
   const candidateIds = (candidates ?? []).map((c) => c.id).filter((cid) => !exclude.has(cid));
@@ -1017,14 +1022,28 @@ async function pickAvailableInstances(
 
   const { data: busyRows } = await supabase
     .from("order_equipment")
-    .select("equipment_instance_id, orders!inner(completed_at, cancelled_at)")
+    .select("equipment_instance_id, orders!inner(completed_at, cancelled_at, rental_start_at, rental_end_at)")
     .in("equipment_instance_id", candidateIds)
     .is("orders.completed_at", null)
     .is("orders.cancelled_at", null);
+  const now = Date.now();
+  const newStart = byPeriod ? Date.parse(period!.start!) : 0;
+  const newEnd = byPeriod ? Date.parse(period!.end!) : 0;
   const busy = new Set(
-    ((busyRows ?? []) as unknown as { equipment_instance_id: string | null }[]).map(
-      (r) => r.equipment_instance_id,
-    ),
+    (
+      (busyRows ?? []) as unknown as {
+        equipment_instance_id: string | null;
+        orders: { rental_start_at: string | null; rental_end_at: string | null };
+      }[]
+    )
+      .filter((r) => {
+        if (!byPeriod) return true;
+        const s = r.orders.rental_start_at ? Date.parse(r.orders.rental_start_at) : -Infinity;
+        // Đơn chưa đóng mà đã quá giờ trả → máy chưa về, bận tới hiện tại.
+        const e = r.orders.rental_end_at ? Math.max(Date.parse(r.orders.rental_end_at), now) : Infinity;
+        return s < newEnd && e > newStart;
+      })
+      .map((r) => r.equipment_instance_id),
   );
   // Máy serial thật trước, mã tạm AUTO-* sau — cùng thứ tự ưu tiên mapper.
   const free = (candidates ?? []).filter((c) => candidateIds.includes(c.id) && !busy.has(c.id));
@@ -1205,7 +1224,10 @@ async function addComboLines(
       const type = componentTypeById.get(typeId);
       if (!type) continue;
       if (type.tracking_type === "individual") {
-        const ids = await pickAvailableInstances(supabase, type.id, order.pickup_branch_id, remaining, taken);
+        const ids = await pickAvailableInstances(supabase, type.id, order.pickup_branch_id, remaining, taken, null, {
+          start: order.rentalStartAt,
+          end: order.rentalEndAt,
+        });
         for (const iid of ids) {
           taken.add(iid);
           childSpecs.push({
@@ -1454,7 +1476,27 @@ async function insertEquipmentLine(
       item.quantity,
       taken,
       item.unitId,
+      { start: order!.rental_start_at, end: order!.rental_end_at },
     );
+    // Thiếu máy: vẫn cho lên đơn bằng MÁY TẠM "CHỜ MUA" (CEO 2026-10-04 —
+    // trước đây hết máy là không thêm được, nhìn như bấm không ăn).
+    const missing = item.quantity - picked.length;
+    let placeholderCount = 0;
+    if (missing > 0) {
+      const { data: orderInfo } = await supabase.from("orders").select("order_code").eq("id", orderId).single();
+      // RPC mới chưa có trong types/database.ts — gọi qua client không ràng kiểu.
+      const { data: newIds, error: phError } = await (supabase as unknown as UntypedSupabaseClient).rpc("create_placeholder_instances", {
+        p_equipment_type_id: item.typeId,
+        p_branch_id: order!.pickup_branch_id,
+        p_unit_id: item.unitId,
+        p_count: missing,
+        p_note: `Máy CHỜ MUA — thiếu hàng khi lên đơn ${orderInfo?.order_code ?? ""}; thay serial thật + nhập giá mua khi có máy`,
+      });
+      if (!phError && Array.isArray(newIds)) {
+        placeholderCount = newIds.length;
+        picked.push(...(newIds as string[]));
+      }
+    }
     for (const instanceId of picked) {
       const error = await insertEquipmentLine(supabase, orderId, {
         typeId: item.typeId,
@@ -1464,11 +1506,14 @@ async function insertEquipmentLine(
       });
       if (error) return error;
     }
-    if (picked.length < item.quantity) {
+    if (placeholderCount > 0 || picked.length < item.quantity) {
       let label = equipmentType.name;
       if (item.unitId) {
         const { data: unit } = await supabase.from("equipment_units").select("brand_model").eq("id", item.unitId).maybeSingle();
         if (unit?.brand_model) label += ` (${unit.brand_model})`;
+      }
+      if (placeholderCount > 0) {
+        return `${label}: kho giao thiếu ${placeholderCount}/${item.quantity} máy trong khung thuê — đã thêm bằng máy tạm "CHỜ MUA" (AUTO-CHOMUA…). Cần mua/điều chuyển máy rồi đổi sang serial thật.`;
       }
       return picked.length
         ? `${label}: kho giao chỉ còn ${picked.length}/${item.quantity} máy trống — đã thêm ${picked.length} máy, thiếu ${item.quantity - picked.length}.`
@@ -2483,11 +2528,14 @@ export async function getSwapInstanceOptions(
   if (!line?.equipment_type_id || !line.equipment_instance_id) return [];
   const { data: order } = await supabase
     .from("orders")
-    .select("pickup_branch_id")
+    .select("pickup_branch_id, rental_start_at, rental_end_at")
     .eq("id", line.order_id)
     .single();
   if (!order) return [];
-  const ids = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set());
+  const ids = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set(), null, {
+    start: order.rental_start_at,
+    end: order.rental_end_at,
+  });
   if (!ids.length) return [];
   const { data: rows } = await supabase
     .from("equipment_instances")
@@ -2514,14 +2562,17 @@ export async function swapOrderLineInstance(lineId: string, instanceId: string):
   }
   const { data: order } = await supabase
     .from("orders")
-    .select("pickup_branch_id, delivery_stock_moved_at, completed_at, cancelled_at")
+    .select("pickup_branch_id, rental_start_at, rental_end_at, delivery_stock_moved_at, completed_at, cancelled_at")
     .eq("id", line.order_id)
     .single();
   if (!order) return { error: "Không tìm thấy đơn." };
   if (order.delivery_stock_moved_at || order.completed_at || order.cancelled_at) {
     return { error: "Đơn đã giao/đã đóng — không đổi máy ở đây được." };
   }
-  const free = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set());
+  const free = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set(), null, {
+    start: order.rental_start_at,
+    end: order.rental_end_at,
+  });
   if (!free.includes(instanceId)) {
     return { error: "Máy này không còn trống — chọn máy khác." };
   }

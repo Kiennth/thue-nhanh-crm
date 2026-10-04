@@ -538,7 +538,8 @@ export function QuickOrderDialog({
                             <p className="truncate">{line.item.label}</p>
                             {short && (
                               <p className="text-xs text-destructive">
-                                Kho này chỉ còn {free} máy trống — sẽ thêm {free}, thiếu {line.quantity - free!}.
+                                Kho đang có {free} máy trống — máy về kịp trước ngày thuê sẽ được tính; còn thiếu thì
+                                hệ thống thêm máy tạm &quot;CHỜ MUA&quot; để vẫn lên được đơn.
                               </p>
                             )}
                           </div>
