@@ -116,7 +116,7 @@ export function QuickOrderDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<QuickOrderCatalog | null>(null);
-  const [loading, startLoading] = useTransition();
+  const [, startLoading] = useTransition();
   const [saving, startSaving] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
