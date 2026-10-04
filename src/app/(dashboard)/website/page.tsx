@@ -191,29 +191,13 @@ export default async function WebsitePage({
       />
 
       {!activeSearch && (
-        <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-            <StatCard label="Đang hiện trên web" value={publishedCount} />
-            <StatCard label="Đang ẩn" value={all.length - publishedCount} />
-            <StatCard label="Thuê nhiều nhất" value={all.filter((p) => p.is_featured).length} />
-            <StatCard label="Sản phẩm mới" value={all.filter((p) => p.is_new).length} />
-            <StatCard label="Chưa có danh mục" value={noCategoryCount} />
-          </div>
-
-          <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-              <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
-              <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
-            </CardHeader>
-            <CardContent>
-              <WebsiteCategoryTree
-                categories={categoryList}
-                productCategoryIds={all.map((p) => p.website_category_id)}
-                activeId={activeCat}
-              />
-            </CardContent>
-          </Card>
-        </>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <StatCard label="Đang hiện trên web" value={publishedCount} />
+          <StatCard label="Đang ẩn" value={all.length - publishedCount} />
+          <StatCard label="Thuê nhiều nhất" value={all.filter((p) => p.is_featured).length} />
+          <StatCard label="Sản phẩm mới" value={all.filter((p) => p.is_new).length} />
+          <StatCard label="Chưa có danh mục" value={noCategoryCount} />
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -316,6 +300,23 @@ export default async function WebsitePage({
         totalCount={count ?? 0}
         itemLabel="sản phẩm"
       />
+
+      {/* Cây danh mục để dưới bảng sản phẩm (CEO 2026-10-04: SP lên trên). */}
+      {!activeSearch && (
+        <Card>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+            <CardTitle className="text-base">Danh mục web ({categoryList.length})</CardTitle>
+            <WebsiteCategoryDialog parents={categoryList.filter((c) => !c.parent_id)} />
+          </CardHeader>
+          <CardContent>
+            <WebsiteCategoryTree
+              categories={categoryList}
+              productCategoryIds={all.map((p) => p.website_category_id)}
+              activeId={activeCat}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
