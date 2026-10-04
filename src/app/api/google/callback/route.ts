@@ -9,7 +9,7 @@ import {
 } from "@/lib/google-drive";
 
 // Google trả mã về đây sau khi CEO đồng ý → đổi lấy refresh token, tạo thư
-// mục "Chứng từ CRM" (nếu chưa có), lưu lại rồi quay về trang đang dùng.
+// mục "CRM Báo Giá & Hợp đồng" (nếu chưa có), lưu lại rồi quay về trang đang dùng.
 export async function GET(request: NextRequest) {
   const employee = await requireRole([...DIRECTOR_ONLY]);
   const params = request.nextUrl.searchParams;
