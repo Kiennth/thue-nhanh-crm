@@ -53,6 +53,7 @@ import { OrderDialog } from "../order-dialog";
 import { BranchQuickSwitch } from "./branch-quick-switch";
 import { PaymentQr } from "@/components/payment-qr";
 import { DepositOverrideDialog } from "./deposit-override-dialog";
+import { QuoteShareButton } from "./quote-share-button";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
@@ -320,6 +321,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // Cọc tính theo hàng (chưa sửa tay) — hiện cạnh số đã sửa cho dễ so.
   const defaultDeposit = Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
   const depositOverridden = order.deposit_override_amount != null;
+  // Khách đồng ý báo giá online (cột mới, chưa có trong types/database.ts).
+  const quoteAccepted = order as typeof order & {
+    quote_accepted_at?: string | null;
+    quote_accepted_name?: string | null;
+    quote_accepted_total?: number | null;
+  };
+  const quoteAcceptedInfo = {
+    at: quoteAccepted.quote_accepted_at ?? null,
+    name: quoteAccepted.quote_accepted_name ?? null,
+    total: quoteAccepted.quote_accepted_total ?? null,
+  };
   const canEditDeposit = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
   const totalDeposit =
     // So sánh lỏng (!= thay vì !==): cột này migration mới thêm, có thể
@@ -668,11 +680,27 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           ) : (
             <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
           )}
+          {quoteAcceptedInfo.at && (
+            <span
+              className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+              title={`Lúc ${new Date(quoteAcceptedInfo.at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}`}
+            >
+              ✓ Khách đồng ý báo giá{quoteAcceptedInfo.name ? ` · ${quoteAcceptedInfo.name}` : ""}
+            </span>
+          )}
+          {quoteAcceptedInfo.at &&
+            quoteAcceptedInfo.total != null &&
+            Math.abs(Number(quoteAcceptedInfo.total) - grandTotal) >= 1 && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700">
+              Đơn đã đổi giá sau khi khách đồng ý (lúc đó {currencyFormatter.format(Number(quoteAcceptedInfo.total))}đ)
+            </span>
+          )}
         </div>
         {/* flex-wrap: mobile 375px không đủ chỗ 5 nút hành động 1 hàng —
             không wrap là cả trang bị scroll ngang. */}
         <div className="flex flex-wrap items-center gap-2">
           <PrintMenu orderId={order.id} />
+          {!order.cancelled_at && <QuoteShareButton orderId={order.id} />}
           <SendDocumentEmailDialog orderId={order.id} customerEmail={orderCustomer?.email ?? null} />
           <OrderDialog
             branches={branchList}

@@ -31,6 +31,9 @@ import {
   type DocContext,
 } from "./documents";
 import { PrintButton, type GoogleDocsState } from "./print-button";
+import { QuoteAcceptBar } from "./quote-accept-bar";
+import { verifyQuoteShareToken } from "@/lib/quote-share";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getDriveIntegration, getOrderGoogleDoc, googleClientConfig } from "@/lib/google-drive";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -79,12 +82,13 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string; google?: string }>;
+  searchParams: Promise<{ type?: string; google?: string; share?: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const { type } = await searchParams;
-  const docType: PrintDocType = isPrintDocType(type) ? type : "contract";
-  const supabase = await createClient();
+  const { type, share } = await searchParams;
+  const shareMode = (await verifyQuoteShareToken(share)) === id;
+  const docType: PrintDocType = shareMode ? "quote" : isPrintDocType(type) ? type : "contract";
+  const supabase = shareMode ? createAdminClient() : await createClient();
   const { data: order } = await supabase.from("orders").select("order_code").eq("id", id).single();
   return { title: order ? printDocFileName(docType, order.order_code) : PRINT_DOC_TITLES[docType] };
 }
@@ -94,31 +98,34 @@ export default async function OrderPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string; google?: string }>;
+  searchParams: Promise<{ type?: string; google?: string; share?: string }>;
 }) {
-  const viewer = await requireRole([...ALL_ROLES]);
-
   const { id } = await params;
-  const { type, google: googleNotice } = await searchParams;
-  const docType: PrintDocType = isPrintDocType(type) ? type : "contract";
+  const { type, google: googleNotice, share } = await searchParams;
+  // Chế độ khách (CEO 2026-10-04): link báo giá có mã ký đúng đơn → không
+  // cần đăng nhập, chỉ xem báo giá + nút Đồng ý (đọc dữ liệu bằng admin
+  // client vì khách không có quyền RLS).
+  const shareMode = (await verifyQuoteShareToken(share)) === id;
+  const viewer = shareMode ? null : await requireRole([...ALL_ROLES]);
+  const docType: PrintDocType = shareMode ? "quote" : isPrintDocType(type) ? type : "contract";
 
   // Nút Google Docs (CEO 2026-10-04) — trạng thái kết nối Drive + file đã tạo.
-  const canUseGoogle = MANAGE_ROLES.includes(viewer.role);
+  const canUseGoogle = !!viewer && MANAGE_ROLES.includes(viewer.role);
   const [driveIntegration, existingGoogleDoc] = canUseGoogle
     ? await Promise.all([getDriveIntegration(), getOrderGoogleDoc(id, docType)])
     : [null, null];
   const google: GoogleDocsState = {
     canUse: canUseGoogle,
-    canConnect: viewer.role === "giam_doc",
+    canConnect: viewer?.role === "giam_doc",
     configured: !!googleClientConfig(),
     connected: !!driveIntegration,
     existingUrl: existingGoogleDoc?.url ?? null,
     notice: googleNotice ?? null,
     connectHref: `/api/google/connect?return=${encodeURIComponent(`/orders/${id}/print?type=${docType}`)}`,
   };
-  const printButton = <PrintButton orderId={id} docType={docType} google={google} />;
-
-  const supabase = await createClient();
+  const supabase = shareMode
+    ? (createAdminClient() as unknown as Awaited<ReturnType<typeof createClient>>)
+    : await createClient();
   const [
     { data: order },
     { data: lines },
@@ -136,6 +143,21 @@ export default async function OrderPrintPage({
   ]);
 
   if (!order) notFound();
+
+  const accepted = order as typeof order & {
+    quote_accepted_at?: string | null;
+    quote_accepted_name?: string | null;
+  };
+  const printButton = shareMode ? (
+    <QuoteAcceptBar
+      token={share!}
+      acceptedAt={accepted.quote_accepted_at ?? null}
+      acceptedName={accepted.quote_accepted_name ?? null}
+      cancelled={!!order.cancelled_at}
+    />
+  ) : (
+    <PrintButton orderId={id} docType={docType} google={google} />
+  );
 
   // equipment_instances đã hơn 1.700 dòng — Supabase/PostgREST chặn CỨNG ở
   // 1.000 dòng/lần gọi kể cả khi request .range() rộng hơn (không lỗi, chỉ

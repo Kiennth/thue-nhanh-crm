@@ -50,8 +50,13 @@ export async function middleware(request: NextRequest) {
   const isBankWebhook = request.nextUrl.pathname.startsWith("/api/bank/");
   // Cron nhắc việc (custom-worker.js) — route tự xác thực bằng CRON_SECRET.
   const isCron = request.nextUrl.pathname.startsWith("/api/cron/");
+  // Link báo giá gửi khách (/q/<mã> → trang in ?share=<mã>) — trang tự kiểm
+  // mã ký, sai mã thì không hiện gì.
+  const isQuoteShare =
+    request.nextUrl.pathname.startsWith("/q/") ||
+    (/^\/orders\/[^/]+\/print$/.test(request.nextUrl.pathname) && request.nextUrl.searchParams.has("share"));
 
-  if (!user && !isLoginRoute && !isAuthConfirmRoute && !isCalendarFeed && !isBankWebhook && !isCron) {
+  if (!user && !isLoginRoute && !isAuthConfirmRoute && !isCalendarFeed && !isBankWebhook && !isCron && !isQuoteShare) {
     // Nhiều request song song cùng đem một refresh token đi gia hạn: thằng
     // thắng nhận token mới, các thằng thua dính "already used". Cho thua
     // redirect lại chính URL đang xem một lần — lúc quay lại trình duyệt đã
