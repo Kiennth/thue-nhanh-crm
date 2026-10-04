@@ -4,6 +4,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { getCurrentEmployee } from "@/lib/dal";
+import { createClient } from "@/lib/supabase/server";
+import { QuickOrderFab } from "@/components/quick-order-fab";
 import { HeaderClock } from "./header-clock";
 
 // Vị trí theo IP người dùng — Cloudflare edge đã tự phân giải geo-IP cho mọi
@@ -26,7 +28,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [employee, location] = await Promise.all([getCurrentEmployee(), getRequestLocation()]);
+  const supabase = await createClient();
+  const [employee, location, { data: branches }] = await Promise.all([
+    getCurrentEmployee(),
+    getRequestLocation(),
+    supabase.from("branches").select("id, name").order("position"),
+  ]);
 
   if (!employee) {
     redirect("/login?error=no-employee");
@@ -44,7 +51,9 @@ export default async function DashboardLayout({
           </span>
           <HeaderClock location={location} />
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        {/* pb-24: chừa chỗ cho nút nổi Tạo đơn nhanh không che nội dung cuối trang. */}
+        <main className="flex-1 p-6 pb-24">{children}</main>
+        <QuickOrderFab branches={branches ?? []} />
       </SidebarInset>
     </SidebarProvider>
   );

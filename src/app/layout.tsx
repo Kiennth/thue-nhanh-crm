@@ -44,7 +44,8 @@ export default function RootLayout({
           showSpinner={false}
         />
         {children}
-        <Toaster richColors closeButton position="bottom-right" />
+        {/* offset: thông báo nổi phía trên nút Tạo đơn nhanh góc phải dưới. */}
+        <Toaster richColors closeButton position="bottom-right" offset={{ bottom: 96, right: 24 }} />
         <ChunkReload />
       </body>
     </html>
