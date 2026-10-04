@@ -22,6 +22,8 @@ export interface DocContext {
     name: string;
     address: string | null;
     taxCode: string | null;
+    // Mã số ĐVQHNS (CEO 2026-10-04) — chỉ in khi khách có.
+    budgetUnitCode: string | null;
     phone: string | null;
     email: string | null;
   };
@@ -163,6 +165,7 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
         <p className="font-bold">BÊN B: {ctx.customer.name}</p>
         <p>Địa chỉ: {ctx.customer.address ?? ""}</p>
         <p>MST: {ctx.customer.taxCode ?? ""}</p>
+        {ctx.customer.budgetUnitCode && <p>Mã số ĐVQHNS: {ctx.customer.budgetUnitCode}</p>}
         <p>Người đại diện: Ông/ Bà {SHORT_DOTS} Chức vụ: {SHORT_DOTS}</p>
         <p>SĐT: {ctx.customer.phone ?? ""}</p>
         <p>Email: {ctx.customer.email ?? ""}</p>
@@ -360,6 +363,9 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
         <p className="font-bold">BÊN NHẬN : {ctx.customer.name}</p>
         <PartyLine label="Địa chỉ">{ctx.customer.address ?? ""}</PartyLine>
         <PartyLine label="MST">{ctx.customer.taxCode ?? ""}</PartyLine>
+        {ctx.customer.budgetUnitCode && (
+          <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
+        )}
         <PartyLine label="Người nhận">{DOTS}</PartyLine>
         <PartyLine label="Số điện thoại">{DOTS}</PartyLine>
         <PartyLine label="Số CCCD">
@@ -519,6 +525,9 @@ export function AcceptanceDocument({ ctx }: { ctx: DocContext }) {
         <p className="font-bold">BÊN THUÊ : {ctx.customer.name}</p>
         <PartyLine label="Địa chỉ">{ctx.customer.address ?? ""}</PartyLine>
         <PartyLine label="Mã số thuế">{ctx.customer.taxCode ?? ""}</PartyLine>
+        {ctx.customer.budgetUnitCode && (
+          <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
+        )}
         <PartyLine label="Đại diện">
           {DOTS} Chức vụ: {SHORT_DOTS}
         </PartyLine>

@@ -13,6 +13,8 @@ const CustomerSchema = z.object({
   notes: z.string().trim().optional(),
   customer_type: z.enum(["individual", "company"]),
   tax_code: z.string().trim().optional(),
+  // Mã số ĐVQHNS — khách là đơn vị có quan hệ ngân sách (CEO 2026-10-04).
+  budget_unit_code: z.string().trim().optional(),
   address: z.string().trim().optional(),
   deposit_percentage: z.coerce.number().refine((v) => [0, 50, 100].includes(v), {
     message: "Tỉ lệ tiền cọc chỉ được 0%, 50% hoặc 100%.",
@@ -34,6 +36,7 @@ export async function createCustomer(
     notes: formData.get("notes") || undefined,
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
+    budget_unit_code: formData.get("budget_unit_code") || undefined,
     address: formData.get("address") || undefined,
     deposit_percentage: formData.get("deposit_percentage") || 100,
   });
@@ -46,7 +49,8 @@ export async function createCustomer(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("customers")
-    .insert({ ...rest, email: email || null })
+    // budget_unit_code chưa có trong types/database.ts (WIP phiên khác) — ép kiểu.
+    .insert({ ...rest, email: email || null, budget_unit_code: rest.budget_unit_code || null } as never)
     .select("id")
     .single();
 
@@ -72,6 +76,7 @@ export async function updateCustomer(
     notes: formData.get("notes") || undefined,
     customer_type: formData.get("customer_type"),
     tax_code: formData.get("tax_code") || undefined,
+    budget_unit_code: formData.get("budget_unit_code") || undefined,
     address: formData.get("address") || undefined,
     deposit_percentage: formData.get("deposit_percentage") || 100,
   });
@@ -84,7 +89,7 @@ export async function updateCustomer(
   const supabase = await createClient();
   const { error } = await supabase
     .from("customers")
-    .update({ ...rest, email: email || null })
+    .update({ ...rest, email: email || null, budget_unit_code: rest.budget_unit_code || null } as never)
     .eq("id", id);
 
   if (error) {

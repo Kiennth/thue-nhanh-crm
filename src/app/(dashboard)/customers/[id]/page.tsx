@@ -128,6 +128,12 @@ export default async function CustomerDetailPage({
             <p className="font-medium">{customer.tax_code ?? "—"}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">Mã số ĐVQHNS</p>
+            <p className="font-medium">
+              {(customer as typeof customer & { budget_unit_code?: string | null }).budget_unit_code ?? "—"}
+            </p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">Tiền cọc</p>
             <p className="font-medium">{DEPOSIT_PERCENTAGE_LABELS[customer.deposit_percentage]}</p>
           </div>

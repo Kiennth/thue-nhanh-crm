@@ -149,7 +149,7 @@ export default async function OrderPrintPage({
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, name, phone, email, address, tax_code, deposit_percentage")
+    .select("*")
     .eq("id", order.customer_id)
     .maybeSingle();
 
@@ -249,6 +249,7 @@ export default async function OrderPrintPage({
         name: customer?.name ?? "—",
         address: customer?.address ?? null,
         taxCode: customer?.tax_code ?? null,
+        budgetUnitCode: (customer as { budget_unit_code?: string | null } | null)?.budget_unit_code ?? null,
         phone: customer?.phone ?? null,
         email: customer?.email ?? null,
       },
@@ -308,6 +309,9 @@ export default async function OrderPrintPage({
             {customer?.email && <p>{customer.email}</p>}
             {customer?.address && <p>{customer.address}</p>}
             {customer?.tax_code && <p>MST: {customer.tax_code}</p>}
+            {(customer as { budget_unit_code?: string | null } | null)?.budget_unit_code && (
+              <p>Mã số ĐVQHNS: {(customer as { budget_unit_code?: string | null }).budget_unit_code}</p>
+            )}
           </div>
         </div>
 

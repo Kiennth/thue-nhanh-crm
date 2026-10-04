@@ -43,6 +43,7 @@ interface CustomerDialogProps {
     notes: string | null;
     customer_type: CustomerType;
     tax_code: string | null;
+    budget_unit_code?: string | null;
     address: string | null;
     deposit_percentage: number;
   };
@@ -142,6 +143,16 @@ export function CustomerDialog({ customer, editTriggerVariant = "icon" }: Custom
               name="tax_code"
               placeholder="Công ty: mã số thuế · Cá nhân: số CCCD"
               defaultValue={customer?.tax_code ?? ""}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="budget_unit_code">Mã số ĐVQHNS</Label>
+            <Input
+              id="budget_unit_code"
+              name="budget_unit_code"
+              placeholder="Đơn vị có quan hệ với ngân sách — không bắt buộc"
+              defaultValue={customer?.budget_unit_code ?? ""}
             />
           </div>
 
