@@ -254,8 +254,8 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
           TMCP Kỹ Thương Việt Nam. CN: Hồ Chí Minh.
         </p>
         <p>
-          <b>Hoàn tiền:</b> Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có)
-          sau khi bên B trả lại thiết bị cho bên A.
+          <b>Hoàn cọc:</b> Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có)
+          sau khi bên B trả lại thiết bị cho bên A, tối đa 24h làm việc.
         </p>
       </div>
 
