@@ -4,15 +4,13 @@ import { loadAgenda, type AgendaItem } from "@/lib/calendar-data";
 import { loadShortages, type ShortageItem } from "@/lib/shortage";
 import { vnStartOfDay, vnTodayString } from "@/lib/vn-time";
 
-// Email nhắc việc 17h mỗi ngày (CEO 2026-10-04): mỗi kho nhận lịch giao +
-// thu hồi NGÀY MAI, đơn quá hạn chưa thu hồi, mã sắp thiếu 2 ngày tới.
-// Cửa hàng trưởng + Kỹ thuật/Sales của kho nhận bản của kho mình; Giám đốc +
-// Admin nhận 1 bản gộp mọi kho. Không gửi cho khách.
+// Email nhắc việc 17h mỗi ngày (CEO 2026-10-04): lịch giao + thu hồi NGÀY
+// MAI, đơn quá hạn chưa thu hồi, mã sắp thiếu 2 ngày tới — 1 bản gộp mọi kho
+// gửi Giám đốc (CEO không muốn gửi cho nhân viên). Không gửi cho khách.
 
 const SITE = "https://crm.thuenhanh.vn";
 const DAY_MS = 86_400_000;
-const BRANCH_ROLES = ["cua_hang_truong", "ky_thuat_sales"];
-const SUMMARY_ROLES = ["giam_doc", "admin"];
+const SUMMARY_ROLES = ["giam_doc"];
 
 export interface OverdueOrder {
   id: string;
@@ -116,22 +114,15 @@ export async function buildDailyReminders(db: SupabaseClient): Promise<BranchDig
     } satisfies BranchDigest;
   };
 
-  const digests: BranchDigest[] = branchList.map((b) =>
-    make(
-      b.id,
-      `Kho ${b.name}`,
-      staff
-        .filter((e) => e.branch_id === b.id && BRANCH_ROLES.includes(e.role))
-        .map((e) => ({ name: e.name, email: e.email! })),
-    ),
-  );
-  digests.push(
+  // CEO 2026-10-04: KHÔNG gửi cho nhân viên — chỉ 1 bản gộp mọi kho cho
+  // Giám đốc.
+  const digests: BranchDigest[] = [
     make(
       null,
       "Tất cả kho",
       staff.filter((e) => SUMMARY_ROLES.includes(e.role)).map((e) => ({ name: e.name, email: e.email! })),
     ),
-  );
+  ];
   return digests;
 }
 
