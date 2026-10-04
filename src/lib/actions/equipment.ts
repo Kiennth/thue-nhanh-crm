@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { DIRECTOR_ONLY, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import type { Database } from "@/types/database";
+import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
 
 type EquipmentTypeInsert = Database["public"]["Tables"]["equipment_types"]["Insert"];
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -256,6 +257,8 @@ export async function updateEquipmentType(
   }
 
   revalidatePath("/equipment");
+  // Giá/cọc hiện trên web — làm mới ngay thay vì chờ cache 1 tiếng.
+  await pingWebsiteRevalidate();
   return { success: true };
 }
 
@@ -386,6 +389,8 @@ export async function updateEquipmentUnit(
   }
 
   revalidatePath("/equipment");
+  // Giá/cọc hiện trên web — làm mới ngay thay vì chờ cache 1 tiếng.
+  await pingWebsiteRevalidate();
   return { success: true };
 }
 
@@ -997,6 +1002,7 @@ export async function createPricingTier(
 
   revalidatePath("/equipment");
   revalidatePath("/pricing-templates");
+  await pingWebsiteRevalidate();
   return { success: true };
 }
 
@@ -1012,6 +1018,7 @@ export async function deletePricingTier(id: string) {
 
   revalidatePath("/equipment");
   revalidatePath("/pricing-templates");
+  await pingWebsiteRevalidate();
 }
 
 // ---------------------------------------------------------------------------

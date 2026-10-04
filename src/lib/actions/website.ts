@@ -6,25 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
+import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
 
 // Quản trị nội dung web công khai (new.thuenhanh.vn) — bảng website_*.
 // RLS đã gate ghi đúng bộ giam_doc/admin/ke_toan từ migration
 // 20260816000000_website_catalog; requireRole ở đây chỉ là lớp chặn sớm.
 
 export type ActionState = { error: string } | { success: true } | undefined;
-
-// Sau khi sửa nội dung: gọi web tự làm mới trang tĩnh — không cần deploy.
-// Best effort: web không revalidate được thì tự hết hạn ISR sau 1 tiếng.
-async function pingWebsiteRevalidate(paths?: string[]) {
-  const base = process.env.WEBSITE_PUBLIC_URL;
-  const secret = process.env.WEBSITE_REVALIDATE_SECRET;
-  if (!base || !secret) return;
-  await fetch(`${base}/api/revalidate?secret=${secret}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(paths?.length ? { paths } : {}),
-  }).catch(() => {});
-}
 
 export async function toggleProductPublished(id: string): Promise<ActionState> {
   await requireRole([...MANAGE_ROLES]);
