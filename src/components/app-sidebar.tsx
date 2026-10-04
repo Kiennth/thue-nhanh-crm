@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Camera,
   ClipboardList,
+  Contact,
   FileText,
   Gift,
   GraduationCap,
@@ -67,6 +68,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: Users,
     tile: "bg-violet-500/12 text-violet-600 dark:text-violet-400",
     active: "data-active:bg-violet-500/12 data-active:text-violet-700 dark:data-active:text-violet-300",
+  },
+  "/orderers": {
+    icon: Contact,
+    tile: "bg-fuchsia-500/12 text-fuchsia-600 dark:text-fuchsia-400",
+    active: "data-active:bg-fuchsia-500/12 data-active:text-fuchsia-700 dark:data-active:text-fuchsia-300",
   },
   "/equipment": {
     icon: Camera,

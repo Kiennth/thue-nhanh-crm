@@ -14,12 +14,21 @@ interface OrderInfoFormProps {
   ordererName: string | null;
   ordererPhone: string | null;
   ordererEmail: string | null;
+  // Hồ sơ người đặt (tự gắn theo SĐT) — chỉ hiện link với vai trò được xem.
+  ordererProfileId?: string | null;
 }
 
 // Sửa nhanh khách hàng + người đặt hàng ngay tại trang xem đơn — khách agency
 // thường có nhiều nhân sự khác nhau đặt cho từng đơn, cần đổi lại được mà
 // không phải mở dialog "Sửa đơn hàng" đầy đủ.
-export function OrderInfoForm({ orderId, customer, ordererName, ordererPhone, ordererEmail }: OrderInfoFormProps) {
+export function OrderInfoForm({
+  orderId,
+  customer,
+  ordererName,
+  ordererPhone,
+  ordererEmail,
+  ordererProfileId,
+}: OrderInfoFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -57,7 +66,14 @@ export function OrderInfoForm({ orderId, customer, ordererName, ordererPhone, or
           <CustomerCombobox name="customer_id" defaultCustomer={customer ?? undefined} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="orderer_name">Người đặt hàng</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="orderer_name">Người đặt hàng</Label>
+            {ordererProfileId && (
+              <Link href={`/orderers/${ordererProfileId}`} className="text-xs text-primary hover:underline">
+                Hồ sơ người đặt →
+              </Link>
+            )}
+          </div>
           <Input
             id="orderer_name"
             name="orderer_name"

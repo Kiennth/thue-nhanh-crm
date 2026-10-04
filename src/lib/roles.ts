@@ -38,6 +38,9 @@ export const EXPENSE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_h
 // và xem bảng tiến độ chỉ Giám đốc/Admin — khớp RLS training_* (câu hỏi có
 // cờ đáp án đúng nên người học không được đọc thẳng bảng).
 export const TRAINING_MANAGE_ROLES: UserRole[] = ["giam_doc", "admin"];
+// Người đặt hàng (CEO 2026-10-05): danh bạ người liên hệ đặt đơn để chăm
+// sóc mối quan hệ — Giám đốc/Admin/Kế toán/Cửa hàng trưởng xem.
+export const ORDERER_VIEW_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
 
 export interface NavItem {
   href: string;
@@ -102,6 +105,11 @@ export const NAV_ITEMS: NavItem[] = [
     // (không có requireRole) — Kỹ thuật/Sales vốn đã vào được nếu gõ thẳng
     // URL, chỉ thiếu mục nav. Thêm vào cho khớp thực tế trang đã cho phép.
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
+  },
+  {
+    href: "/orderers",
+    label: "Người đặt hàng",
+    roles: [...ORDERER_VIEW_ROLES],
   },
   {
     href: "/equipment",

@@ -80,7 +80,7 @@ import { LineChargeEditor, type LinePriceTarget } from "./line-charge-editor";
 import { LineNoteEditor } from "./line-note-editor";
 import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 import { countAssemblableSets } from "@/lib/combo";
-import { BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES, ORDERER_VIEW_ROLES } from "@/lib/roles";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -743,6 +743,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               customer={orderCustomer ? { id: orderCustomer.id, name: orderCustomer.name } : null}
               ordererName={order.orderer_name}
               ordererPhone={order.orderer_phone}
+              ordererProfileId={
+                employee && ORDERER_VIEW_ROLES.includes(employee.role)
+                  ? ((order as typeof order & { orderer_id?: string | null }).orderer_id ?? null)
+                  : null
+              }
               ordererEmail={order.orderer_email}
             />
           </CardContent>
