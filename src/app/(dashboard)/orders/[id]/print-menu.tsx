@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ChevronDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +26,11 @@ export function PrintMenu({ orderId }: { orderId: string }) {
         {PRINT_DOC_TYPES.map((docType) => (
           <DropdownMenuItem
             key={docType}
-            render={
-              <Link
-                href={`/orders/${orderId}/print?type=${docType}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              />
+            // Mở chứng từ ở TAB MỚI, giữ nguyên trang đơn (CEO 2026-10-04) —
+            // render <Link target="_blank"> bị menu chặn mặc định, vẫn chuyển
+            // trang cũ, nên mở tab bằng tay.
+            onClick={() =>
+              window.open(`/orders/${orderId}/print?type=${docType}`, "_blank", "noopener,noreferrer")
             }
           >
             {PRINT_DOC_MENU_LABELS[docType]}
