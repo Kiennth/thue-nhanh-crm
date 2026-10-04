@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import { createOrder, updateOrder } from "@/lib/actions/orders";
 import { CustomerCombobox } from "./customer-combobox";
 import { DateInput } from "@/components/date-input";
 import { cn } from "@/lib/utils";
+import { OrdererSuggestInput, fillOrdererFields } from "@/components/orderer-suggest-input";
 
 interface BranchOption {
   id: string;
@@ -92,6 +93,7 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [orderCode] = useState(() => order?.order_code ?? generateOrderCode());
+  const formRef = useRef<HTMLFormElement>(null);
   const [pickupId, setPickupId] = useState(order?.pickup_branch_id ?? "");
   const [returnId, setReturnId] = useState(order?.return_branch_id ?? "");
   const [separateReturn, setSeparateReturn] = useState(
@@ -133,7 +135,7 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
     >
       <DialogTrigger render={trigger} />
       <DialogContent>
-        <form action={handleSubmit} className="space-y-4">
+        <form ref={formRef} action={handleSubmit} className="space-y-4">
           <DialogHeader>
             <DialogTitle>{isEdit ? "Sửa đơn hàng" : "Thêm đơn hàng"}</DialogTitle>
           </DialogHeader>
@@ -179,22 +181,24 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="orderer_name">Người đặt hàng</Label>
-            <Input
+            <OrdererSuggestInput
               id="orderer_name"
               name="orderer_name"
-              placeholder="Không bắt buộc — tên người trực tiếp đặt đơn"
+              placeholder="Không bắt buộc — gõ tên/SĐT người đặt để tìm"
               defaultValue={order?.orderer_name ?? ""}
+              onPick={(o) => fillOrdererFields(formRef.current, o)}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="orderer_phone">Số điện thoại</Label>
-              <Input
+              <OrdererSuggestInput
                 id="orderer_phone"
                 name="orderer_phone"
                 placeholder="Không bắt buộc"
                 defaultValue={order?.orderer_phone ?? ""}
+                onPick={(o) => fillOrdererFields(formRef.current, o)}
               />
             </div>
             <div className="space-y-2">

@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { ORDERER_VIEW_ROLES } from "@/lib/roles";
+import { ALL_ROLES, ORDERER_VIEW_ROLES } from "@/lib/roles";
 
 const OrdererSchema = z.object({
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
@@ -57,4 +57,29 @@ export async function updateOrderer(
   revalidatePath("/orderers");
   revalidatePath(`/orderers/${id}`);
   return { success: true };
+}
+
+export interface OrdererSuggestion {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  title: string | null;
+}
+
+// Gợi ý tự điền khi gõ tên / SĐT người đặt trên đơn (CEO 2026-10-05) — mọi
+// nhân viên lên đơn đều dùng được (RLS orderers cho đọc).
+export async function searchOrderers(q: string): Promise<OrdererSuggestion[]> {
+  await requireRole([...ALL_ROLES]);
+  const text = q.trim();
+  if (text.length < 2) return [];
+  const db = (await createClient()) as unknown as SupabaseClient;
+  const digits = text.replace(/\D/g, "").replace(/^(84|0)/, "");
+  let query = db.from("orderers").select("id, name, phone, email, title").limit(6);
+  query =
+    digits.length >= 3 && digits.length === text.replace(/[\s.+-]/g, "").replace(/^(84|0)/, "").length
+      ? query.ilike("phone_key", `%${digits}%`)
+      : query.or(`name.ilike.%${text.replace(/[,()%]/g, " ")}%,email.ilike.%${text.replace(/[,()%]/g, " ")}%`);
+  const { data } = await query;
+  return (data ?? []) as OrdererSuggestion[];
 }

@@ -25,6 +25,7 @@ import type { PricingMethod, ProductType, RentalPeriodUnit } from "@/types/datab
 import { createCustomerFromWebOrder } from "@/lib/actions/website-orders";
 import { CustomerCombobox } from "./customer-combobox";
 import { DateInput } from "@/components/date-input";
+import { OrdererSuggestInput } from "@/components/orderer-suggest-input";
 
 // Popup "Tạo đơn nhanh" (CEO 2026-10-03, phương án A + B + C): mọi thứ cần
 // cho 1 đơn thường trên 1 màn hình — khách, kho, gói thời gian, hàng (nhập số
@@ -612,11 +613,31 @@ export function QuickOrderDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_orderer_name">Người đặt hàng</Label>
-                <Input id="quick_orderer_name" value={ordererName} onChange={(e) => setOrdererName(e.target.value)} placeholder="Không bắt buộc" />
+                <OrdererSuggestInput
+                  id="quick_orderer_name"
+                  value={ordererName}
+                  onChange={(e) => setOrdererName(e.target.value)}
+                  placeholder="Gõ tên/SĐT để tìm"
+                  onPick={(o) => {
+                    setOrdererName(o.name);
+                    setOrdererPhone(o.phone ?? "");
+                    setOrdererEmail(o.email ?? "");
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_orderer_phone">SĐT người đặt</Label>
-                <Input id="quick_orderer_phone" value={ordererPhone} onChange={(e) => setOrdererPhone(e.target.value)} placeholder="Không bắt buộc" />
+                <OrdererSuggestInput
+                  id="quick_orderer_phone"
+                  value={ordererPhone}
+                  onChange={(e) => setOrdererPhone(e.target.value)}
+                  placeholder="Không bắt buộc"
+                  onPick={(o) => {
+                    setOrdererName(o.name);
+                    setOrdererPhone(o.phone ?? "");
+                    setOrdererEmail(o.email ?? "");
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_orderer_email">Email người đặt</Label>

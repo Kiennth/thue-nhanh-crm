@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateOrderContactInfo } from "@/lib/actions/orders";
 import { CustomerCombobox } from "../customer-combobox";
+import { OrdererSuggestInput, fillOrdererFields } from "@/components/orderer-suggest-input";
 
 interface OrderInfoFormProps {
   orderId: string;
@@ -32,6 +33,7 @@ export function OrderInfoForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -47,7 +49,7 @@ export function OrderInfoForm({
   }
 
   return (
-    <form action={handleSubmit} className="col-span-2 space-y-3">
+    <form ref={formRef} action={handleSubmit} className="col-span-2 space-y-3">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <div className="flex items-center justify-between">
@@ -74,20 +76,22 @@ export function OrderInfoForm({
               </Link>
             )}
           </div>
-          <Input
+          <OrdererSuggestInput
             id="orderer_name"
             name="orderer_name"
-            placeholder="Không bắt buộc"
+            placeholder="Không bắt buộc — gõ tên để tìm"
             defaultValue={ordererName ?? ""}
+            onPick={(o) => fillOrdererFields(formRef.current, o)}
           />
         </div>
         <div className="space-y-1">
           <Label htmlFor="orderer_phone">SĐT người đặt</Label>
-          <Input
+          <OrdererSuggestInput
             id="orderer_phone"
             name="orderer_phone"
-            placeholder="Không bắt buộc"
+            placeholder="Không bắt buộc — gõ SĐT để tìm"
             defaultValue={ordererPhone ?? ""}
+            onPick={(o) => fillOrdererFields(formRef.current, o)}
           />
         </div>
         <div className="space-y-1">
