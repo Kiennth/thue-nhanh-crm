@@ -17,8 +17,10 @@ import { Input } from "@/components/ui/input";
 // Nút "Đăng ký lịch" (học nút Subscribe của Booqable): link iCal riêng của
 // từng nhân viên, dán vào Google Calendar / iPhone để thấy lịch giao + thu
 // hồi ngay trên điện thoại. Lịch điện thoại tự tải lại vài giờ/lần.
-export function SubscribeButton({ url, branchName }: { url: string; branchName: string | null }) {
+export function SubscribeButton({ path, branchName }: { path: string; branchName: string | null }) {
   const [open, setOpen] = useState(false);
+  // Nội dung dialog chỉ render khi mở (phía trình duyệt) nên đọc được origin.
+  const url = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
 
   async function copy() {
     try {

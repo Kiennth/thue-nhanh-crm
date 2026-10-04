@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -78,10 +77,9 @@ export default async function CalendarPage({
   ]);
   const branches = branchesRes.data ?? [];
   const branchNames = new Map(branches.map((b) => [b.id, b.name]));
-  // Lấy tên miền từ request (NEXT_PUBLIC_SITE_URL lúc build có thể là localhost).
-  const host = (await headers()).get("host") ?? "crm.thuenhanh.vn";
-  const siteUrl = `${host.startsWith("localhost") ? "http" : "https"}://${host}`;
-  const feedUrl = `${siteUrl}/api/calendar/ical/${token}.ics${branchId ? `?branch=${branchId}` : ""}`;
+  // Chỉ đường dẫn — tên miền ghép ở trình duyệt (trên Workers, host của
+  // request trong trang và NEXT_PUBLIC_SITE_URL lúc build đều ra localhost).
+  const feedPath = `/api/calendar/ical/${token}.ics${branchId ? `?branch=${branchId}` : ""}`;
 
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
@@ -108,7 +106,7 @@ export default async function CalendarPage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Lịch</h1>
-        <SubscribeButton url={feedUrl} branchName={branchId ? (branchNames.get(branchId) ?? null) : null} />
+        <SubscribeButton path={feedPath} branchName={branchId ? (branchNames.get(branchId) ?? null) : null} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
