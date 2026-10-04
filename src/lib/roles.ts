@@ -89,6 +89,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Đơn hàng",
     roles: [...ALL_ROLES],
   },
+  // Lịch thuê kiểu Booqable (CEO 2026-10-04) — chỉ xem, ai cũng dùng.
+  {
+    href: "/calendar",
+    label: "Lịch",
+    roles: [...ALL_ROLES],
+  },
   {
     href: "/customers",
     label: "Khách hàng",

@@ -43,8 +43,11 @@ export async function middleware(request: NextRequest) {
   // /auth/confirm tự xác thực token mời/khôi phục mật khẩu bên trong route
   // handler — chưa có session lúc proxy chạy nên phải cho qua trước.
   const isAuthConfirmRoute = request.nextUrl.pathname.startsWith("/auth/confirm");
+  // Link iCal "Đăng ký lịch": Google/Apple tải không kèm cookie — route tự
+  // xác thực bằng mã ký trong link (src/lib/calendar-feed.ts).
+  const isCalendarFeed = request.nextUrl.pathname.startsWith("/api/calendar/ical/");
 
-  if (!user && !isLoginRoute && !isAuthConfirmRoute) {
+  if (!user && !isLoginRoute && !isAuthConfirmRoute && !isCalendarFeed) {
     // Nhiều request song song cùng đem một refresh token đi gia hạn: thằng
     // thắng nhận token mới, các thằng thua dính "already used". Cho thua
     // redirect lại chính URL đang xem một lần — lúc quay lại trình duyệt đã
