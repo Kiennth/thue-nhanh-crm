@@ -58,7 +58,7 @@ export function buildWordHtml(root: HTMLElement, title: string): string {
       const spacer = document.createElement("p");
       spacer.setAttribute("style", "margin:0");
       spacer.innerHTML = "&nbsp;";
-      el.before(spacer);
+      el.parentNode?.insertBefore(spacer, el);
     }
   }
   // Hàng flex → bảng 1 dòng không viền, mỗi con 1 ô.
