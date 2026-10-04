@@ -29,6 +29,10 @@ export interface ShortageItem {
   peak: number;
   missing: number;
   firstAt: string; // ISO — lần đầu thiếu
+  // Thiếu ngay lúc này = máy đang ở chỗ khách nhiều hơn kho ghi nhận → số
+  // liệu lệch (đơn quá hạn chưa đóng, hàng số lượng chưa nhập tồn) chứ
+  // không phải "sắp thiếu" cần mua.
+  shortNow: boolean;
   orders: ShortageOrder[]; // đơn đang cần máy lúc thiếu nhiều nhất
 }
 
@@ -199,6 +203,7 @@ export async function loadShortages(days: number, branchId: string | null = null
       peak,
       missing: peak - cap,
       firstAt: new Date(firstAt).toISOString(),
+      shortNow: firstAt === now,
       orders: list
         .filter((d) => d.start <= peakAt && d.end > peakAt)
         .sort((a, b) => a.start - b.start)

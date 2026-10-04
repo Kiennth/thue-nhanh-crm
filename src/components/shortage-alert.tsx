@@ -4,7 +4,8 @@ import { loadShortages } from "@/lib/shortage";
 
 // Thanh báo trang chủ (CEO 2026-10-04): 7 ngày tới có mã nào thiếu máy.
 export async function ShortageAlert() {
-  const items = await loadShortages(7);
+  // Chỉ báo "sắp thiếu" — lệch số liệu hiện tại xem ở trang /shortages.
+  const items = (await loadShortages(7)).filter((x) => !x.shortNow);
   if (!items.length) return null;
   const missing = items.reduce((s, x) => s + x.missing, 0);
   const names = items
