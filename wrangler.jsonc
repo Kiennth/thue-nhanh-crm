@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  "main": "custom-worker.js",
   "name": "thue-nhanh-crm",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
@@ -22,5 +22,7 @@
   // Smart Placement (2026-10-03): Worker chạy gần Supabase thay vì gần người
   // dùng — mỗi trang gọi DB nhiều lượt nối đuôi, mỗi lượt từ edge HKG tới DB
   // mất ~450ms; đặt cạnh DB thì còn vài chục ms.
-  "placement": { "mode": "smart" }
+  "placement": { "mode": "smart" },
+  // Email nhắc việc 17h giờ VN = 10:00 UTC (custom-worker.js → scheduled).
+  "triggers": { "crons": ["0 10 * * *"] }
 }

@@ -58,8 +58,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-export async function loadShortages(days: number, branchId: string | null = null): Promise<ShortageItem[]> {
-  const db = (await createClient()) as unknown as SupabaseClient;
+export async function loadShortages(
+  days: number,
+  branchId: string | null = null,
+  client?: SupabaseClient,
+): Promise<ShortageItem[]> {
+  // client: truyền admin client khi chạy ngoài request (cron nhắc việc).
+  const db = client ?? ((await createClient()) as unknown as SupabaseClient);
   const now = Date.now();
   const horizon = now + days * 24 * HOUR;
   // Bỏ phần mili-giây: giá trị nằm trong or() của PostgREST, tránh dấu "." thừa.
