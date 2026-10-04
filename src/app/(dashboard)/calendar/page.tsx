@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES } from "@/lib/roles";
 import { vnStartOfDay, vnTodayString } from "@/lib/vn-time";
-import { loadAgenda, loadTimeline } from "@/lib/calendar-data";
+import { loadAgenda, loadTimeline, type AgendaItem } from "@/lib/calendar-data";
 import { calendarFeedToken } from "@/lib/calendar-feed";
 import { SearchInput } from "@/components/search-input";
 import { CalendarTimeline, type CalendarDay } from "./timeline";
@@ -17,6 +17,21 @@ const COL_WIDTH: Record<number, number> = { 7: 150, 14: 84, 30: 46 };
 const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY_MS = 86_400_000;
+
+// Bỏ dấu + chữ thường để tìm "nguyen" ra "Nguyễn".
+function fold(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "d").toLowerCase();
+}
+
+// Tab Giao / Thu hồi: lọc theo mã đơn, tên khách, SĐT, tên hàng, địa chỉ.
+function filterAgenda(items: AgendaItem[], query: string): AgendaItem[] {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return items;
+  return items.filter((it) => {
+    const hay = fold([it.orderCode, it.customer, it.phone ?? "", it.address ?? "", ...it.items].join(" "));
+    return words.every((w) => hay.includes(w));
+  });
+}
 
 // Server Component chạy 1 lần mỗi request — vạch "bây giờ" lấy theo lúc đó.
 function nowMs(): number {
@@ -109,6 +124,20 @@ export default async function CalendarPage({
         <SubscribeButton path={feedPath} branchName={branchId ? (branchNames.get(branchId) ?? null) : null} />
       </div>
 
+      {/* Ô tìm to ngay dưới tiêu đề như các trang khác (CEO 2026-10-05). */}
+      <SearchInput
+        key={query}
+        paramName="q"
+        placeholder={
+          view === "agenda"
+            ? "Tìm theo mã đơn, tên khách, SĐT, tên hàng — gõ rồi Enter..."
+            : "Tìm theo tên sản phẩm — gõ rồi Enter..."
+        }
+        value={query}
+        size="lg"
+        className="w-full max-w-2xl"
+      />
+
       <div className="flex flex-wrap items-center gap-3">
         <nav className="inline-flex rounded-lg border p-1">
           <Link href={href({ view: null, span: null })} className={pill(view === "products")}>
@@ -154,13 +183,6 @@ export default async function CalendarPage({
       {view === "products" && (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <SearchInput
-              key={query}
-              paramName="q"
-              placeholder="Lọc theo tên sản phẩm — gõ rồi Enter..."
-              value={query}
-              className="w-full max-w-md"
-            />
             <Link
               href={href({ all: showAll ? null : "1" })}
               className="text-sm font-medium text-primary hover:underline"
@@ -204,7 +226,7 @@ export default async function CalendarPage({
         </>
       )}
 
-      {view === "agenda" && <CalendarAgenda days={days} items={agenda!} branchNames={branchNames} />}
+      {view === "agenda" && <CalendarAgenda days={days} items={filterAgenda(agenda!, query)} branchNames={branchNames} />}
     </div>
   );
 }
