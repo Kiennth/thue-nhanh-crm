@@ -772,7 +772,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
       {/* Cảnh báo trùng lịch — đặt ngay trên danh sách thiết bị, tự tính lại
           sau mỗi lần thêm dòng/đổi khoảng thuê (trang revalidate). */}
-      <OrderConflictAlert orderId={order.id} />
+      {/* Chỉ đơn SẮP TỚI (chưa giao/hoàn tất/huỷ) — CEO 2026-10-05: đơn đã
+          giao thì máy đã ở chỗ khách, cảnh báo trùng lịch vô nghĩa. */}
+      {!order.cancelled_at && !order.completed_at && !order.delivery_stock_moved_at && !order.delivered_at && (
+        <OrderConflictAlert orderId={order.id} />
+      )}
 
       <Card className={accentCard("blue")}>
         <CardHeader className={accentHeader("blue", "flex-row items-center justify-between")}>
