@@ -13,16 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createOrder, updateOrder } from "@/lib/actions/orders";
 import { CustomerCombobox } from "./customer-combobox";
 import { DateInput } from "@/components/date-input";
+import { cn } from "@/lib/utils";
 
 interface BranchOption {
   id: string;
@@ -43,6 +37,34 @@ interface OrderDialogProps {
     orderer_email: string | null;
     order_date: string;
   };
+}
+
+function BranchPills({
+  branches,
+  value,
+  onChange,
+}: {
+  branches: BranchOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {branches.map((b) => (
+        <button
+          key={b.id}
+          type="button"
+          onClick={() => onChange(b.id)}
+          className={cn(
+            "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+            value === b.id ? "border-primary bg-primary text-primary-foreground" : "hover:border-primary",
+          )}
+        >
+          {b.name}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function generateOrderCode() {
@@ -70,9 +92,18 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [orderCode] = useState(() => order?.order_code ?? generateOrderCode());
+  const [pickupId, setPickupId] = useState(order?.pickup_branch_id ?? "");
+  const [returnId, setReturnId] = useState(order?.return_branch_id ?? "");
+  const [separateReturn, setSeparateReturn] = useState(
+    !!order && order.return_branch_id !== order.pickup_branch_id,
+  );
 
   function handleSubmit(formData: FormData) {
     setError(null);
+    if (!pickupId) {
+      setError("Chọn chi nhánh giao.");
+      return;
+    }
     startTransition(async () => {
       const result = order
         ? await updateOrder(order.id, undefined, formData)
@@ -91,7 +122,13 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setError(null);
+        if (next) {
+          setError(null);
+          // Mở lại thì lấy đúng chi nhánh đang lưu (đơn có thể vừa đổi).
+          setPickupId(order?.pickup_branch_id ?? "");
+          setReturnId(order?.return_branch_id ?? "");
+          setSeparateReturn(!!order && order.return_branch_id !== order.pickup_branch_id);
+        }
       }}
     >
       <DialogTrigger render={trigger} />
@@ -106,40 +143,30 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
             <Input id="order_code" name="order_code" defaultValue={orderCode} required />
           </div>
 
+          {/* Chi nhánh bấm 1 chạm (CEO 2026-10-04): kho nào giao thì mặc định
+              kho đó thu hồi; chỉ khi trả về kho khác mới mở chọn riêng. */}
           <div className="space-y-2">
-            <Label htmlFor="pickup_branch_id">Chi nhánh giao</Label>
-            <Select name="pickup_branch_id" defaultValue={order?.pickup_branch_id}>
-              <SelectTrigger id="pickup_branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh">
-                  {(value: string) => branches.find((b) => b.id === value)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="return_branch_id">Chi nhánh thu hồi</Label>
-            <Select name="return_branch_id" defaultValue={order?.return_branch_id}>
-              <SelectTrigger id="return_branch_id" className="w-full">
-                <SelectValue placeholder="Giống chi nhánh giao">
-                  {(value: string) => branches.find((b) => b.id === value)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Chi nhánh</Label>
+            <BranchPills branches={branches} value={pickupId} onChange={setPickupId} />
+            <input type="hidden" name="pickup_branch_id" value={pickupId} />
+            <input type="hidden" name="return_branch_id" value={separateReturn ? returnId : pickupId} />
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={separateReturn}
+                onChange={(e) => {
+                  setSeparateReturn(e.target.checked);
+                  if (e.target.checked && !returnId) setReturnId(pickupId);
+                }}
+              />
+              Thu hồi về chi nhánh khác
+            </label>
+            {separateReturn && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Chi nhánh thu hồi</p>
+                <BranchPills branches={branches} value={returnId} onChange={setReturnId} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
