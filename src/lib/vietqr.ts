@@ -2,13 +2,16 @@ import { COMPANY_INFO } from "@/lib/company-info";
 
 // Thanh toán QR có số tiền + nội dung sẵn (CEO 2026-10-04). Ảnh QR chuẩn
 // VietQR (Napas) sinh từ img.vietqr.io — app ngân hàng nào quét cũng điền
-// sẵn tài khoản, số tiền, nội dung. Nội dung = mã đơn bỏ dấu "-" (ngân hàng
-// hay tự xoá ký tự đặc biệt), thêm " COC" khi là tiền ký quỹ — webhook
+// sẵn tài khoản, số tiền, nội dung. Nội dung có mã đơn bỏ dấu "-" (ngân hàng
+// hay tự xoá ký tự đặc biệt), xem transferRef — webhook
 // SePay (/api/bank/sepay) đọc lại để tự ghi vào đúng đơn.
 
+// CEO 2026-10-04: tiền thuê ghi "THANH TOAN <mã đơn>", tiền ký quỹ ghi
+// "DAT COC <mã đơn>". Webhook nhận ra cọc nhờ chữ "COC" (vẫn đọc được nội
+// dung kiểu cũ "<mã đơn> COC").
 export function transferRef(orderCode: string, deposit = false): string {
   const ref = orderCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  return deposit ? `${ref} COC` : ref;
+  return deposit ? `DAT COC ${ref}` : `THANH TOAN ${ref}`;
 }
 
 export function vietQrImageUrl(amount: number, ref: string): string {
