@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto, JetBrains_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "@/components/ui/sonner";
+import { ChunkReload } from "@/components/chunk-reload";
 import "./globals.css";
 
 // CEO chốt 2026-08-06: đổi sang Roboto — đúng font fallback Booqable đang
@@ -44,6 +45,7 @@ export default function RootLayout({
         />
         {children}
         <Toaster richColors closeButton position="bottom-right" />
+        <ChunkReload />
       </body>
     </html>
   );
