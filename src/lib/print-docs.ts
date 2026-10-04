@@ -70,7 +70,7 @@ export const PRINT_DOC_TERMS: Record<PrintDocType, TermsSection[]> = {
       items: [
         "Thanh toán đợt 1: Bên thuê chuyển khoản 100% tiền thuê thiết bị sau khi nhận báo giá để Bên cho thuê có căn cứ thực hiện.",
         "Thanh toán đợt 2: Bên thuê chuyển khoản 100% tiền ký quỹ trong vòng 24 giờ trước khi nhận để Bên cho thuê làm thủ tục xuất kho, đóng gói thiết bị, vận chuyển tới địa điểm do Bên thuê yêu cầu.",
-        "Hoàn tiền: Bên cho thuê chuyển khoản hoàn tiền ký quỹ (đã trừ chi phí phát sinh nếu có) trong vòng 24 giờ sau khi nhận lại thiết bị thuê và hai bên đồng ý Biên bản nghiệm thu.",
+        "Hoàn cọc: Bên cho thuê chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có) sau khi Bên thuê trả lại thiết bị cho Bên cho thuê, tối đa 24h làm việc.",
         "Hoá đơn GTGT phát hành trong vòng 24 giờ sau khi kết thúc dịch vụ.",
       ],
     },
