@@ -18,7 +18,7 @@ export default async function RemindersPage() {
       <div>
         <h1 className="text-2xl font-semibold">Email nhắc việc 17h</h1>
         <p className="text-sm text-muted-foreground">
-          Mỗi ngày 17h CRM gửi lịch giao / thu hồi ngày mai, đơn quá hạn và mã sắp thiếu cho từng kho.{" "}
+          Mỗi ngày 17h CRM gửi Giám đốc 1 email gộp mọi kho: lịch giao / thu hồi ngày mai, đơn quá hạn và mã sắp thiếu.{" "}
           {enabled ? (
             <b className="text-emerald-600">Đang bật gửi.</b>
           ) : (

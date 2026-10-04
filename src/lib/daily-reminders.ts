@@ -52,7 +52,7 @@ export async function buildDailyReminders(db: SupabaseClient): Promise<BranchDig
   const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 
   const [{ data: branches }, { data: employees }, agenda, overdueRes, shortages] = await Promise.all([
-    db.from("branches").select("id, name").eq("is_active", true).order("sort_order"),
+    db.from("branches").select("id, name").eq("is_active", true).order("position"),
     db.from("employees").select("name, email, role, branch_id").eq("is_active", true),
     loadAgenda(from, to, null, db),
     db

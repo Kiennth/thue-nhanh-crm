@@ -70,7 +70,7 @@ export default async function CalendarPage({
 
   const supabase = await createClient();
   const [branchesRes, timeline, agenda, token] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("sort_order"),
+    supabase.from("branches").select("id, name").eq("is_active", true).order("position"),
     view === "products" ? loadTimeline({ from: fromIso, to: toIso, branchId, query, showAll }) : null,
     view === "agenda" ? loadAgenda(fromIso, toIso, branchId) : null,
     calendarFeedToken(employee.id),
