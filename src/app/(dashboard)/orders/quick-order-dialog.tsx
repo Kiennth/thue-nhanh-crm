@@ -126,10 +126,10 @@ export function QuickOrderDialog({
   const [startDate, setStartDate] = useState(() => datePart(start));
   const [startHour, setStartHour] = useState(() => hourPart(start));
   // Giữ phút lẻ từ đơn web (khách chọn 08:30…) — popup chỉ chọn giờ chẵn.
-  const [startMinute] = useState(() => minutePart(start));
+  const [startMinute, setStartMinute] = useState(() => minutePart(start));
   const [endDate, setEndDate] = useState(() => datePart(prefillEnd ?? new Date(start.getTime() + 86_400_000)));
   const [endHour, setEndHour] = useState(() => hourPart(prefillEnd ?? start));
-  const [endMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
+  const [endMinute, setEndMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
   // Đổi giờ nhận → giờ trả dời theo, giữ nguyên thời lượng (CEO 2026-10-05).
   function changeStart(nextDate: string, nextHour: string) {
     const oldStart = combine(startDate, startHour, startMinute).getTime();
@@ -172,9 +172,47 @@ export function QuickOrderDialog({
   const [returnName, setReturnName] = useState("");
   const [returnPhone, setReturnPhone] = useState("");
   const [orderDate, setOrderDate] = useState(() => datePart(new Date()));
+  // Mở lại popup còn dữ liệu đơn chưa tạo → báo "đang tiếp tục đơn dở".
+  const [resumedDraft, setResumedDraft] = useState(false);
+
+  // Làm mới toàn bộ form (CEO 2026-10-05: tạo đơn nhanh xong, đơn sau bị dính
+  // khách/hàng/người đặt của đơn trước — nút nổi luôn mounted, state không
+  // tự mất). Giữ kho + người phụ trách (thường không đổi giữa các đơn).
+  function resetForm() {
+    const s0 = defaultRentalStart(new Date());
+    const e0 = new Date(s0.getTime() + 86_400_000);
+    setError(null);
+    setCustomer(null);
+    setCustomerKey((k) => k + 1);
+    setStartDate(datePart(s0));
+    setStartHour(hourPart(s0));
+    setStartMinute(minutePart(s0));
+    setEndDate(datePart(e0));
+    setEndHour(hourPart(e0));
+    setEndMinute(minutePart(e0));
+    setCart([]);
+    setManualTransport(null);
+    setQuery("");
+    setShowResults(false);
+    setOrderCode("");
+    setReturnBranchId("");
+    setOrdererName("");
+    setOrdererPhone("");
+    setOrdererEmail("");
+    setDeliveryAddress("");
+    setReceiverName("");
+    setReceiverPhone("");
+    setReturnDiffers(false);
+    setReturnAddress("");
+    setReturnName("");
+    setReturnPhone("");
+    setOrderDate(datePart(new Date()));
+    setResumedDraft(false);
+  }
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
+    if (next && !prefill) setResumedDraft(cart.length > 0 || !!customer || !!ordererName.trim());
     if (!next || catalog) return;
     startLoading(async () => {
       let c: QuickOrderCatalog;
@@ -323,6 +361,11 @@ export function QuickOrderDialog({
       for (const w of result.warnings) toast.warning(w, { duration: 10_000 });
       toast.success(stage === "deal" ? "Đã tạo và chốt đơn" : "Đã tạo đơn");
       setOpen(false);
+      // Đơn sau bắt đầu trắng + nạp lại danh mục (số máy trống đã đổi).
+      if (!prefill) {
+        resetForm();
+        setCatalog(null);
+      }
       router.push(`/orders/${result.orderId}`);
     });
   }
@@ -351,6 +394,14 @@ export function QuickOrderDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {resumedDraft && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <span>Đang tiếp tục đơn làm dở lần trước (chưa tạo).</span>
+              <Button type="button" size="sm" variant="outline" onClick={resetForm}>
+                Bắt đầu đơn mới
+              </Button>
+            </div>
+          )}
           {/* Khách + kho */}
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
