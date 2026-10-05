@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeMyPerformance, type MyPerformance } from "@/lib/my-performance";
+import { vnTodayString } from "@/lib/vn-time";
 import type { UserRole, TaskType } from "@/types/database";
 
 // Dữ liệu trang hồ sơ nhân viên (CEO 2026-10-05: "mỗi người 1 trang profile
@@ -72,6 +73,8 @@ export async function loadProfileData(employeeId: string): Promise<ProfileData |
       .select("task_type, completed_date, order_id, orders(order_code)")
       .eq("employee_id", employeeId)
       .not("completed_date", "is", null)
+      // Bỏ ngày ở tương lai (dữ liệu nhập cũ có khâu ghi năm 2027).
+      .lte("completed_date", vnTodayString())
       .order("completed_date", { ascending: false })
       .limit(8),
     admin
