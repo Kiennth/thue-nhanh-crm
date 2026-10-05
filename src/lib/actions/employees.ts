@@ -127,3 +127,53 @@ export async function setEmployeeActive(id: string, isActive: boolean) {
 
   revalidatePath("/employees");
 }
+
+// Hồ sơ nhân viên (CEO 2026-10-05) — bảng employee_profiles (có CCCD) chỉ
+// Giám đốc sửa; ngày sinh vẫn nằm ở employees.birthday.
+const ProfileSchema = z.object({
+  birthday: z.string().optional().or(z.literal("")),
+  company_phone: z.string().trim().optional(),
+  personal_phone: z.string().trim().optional(),
+  emergency_name: z.string().trim().optional(),
+  emergency_relation: z.string().trim().optional(),
+  emergency_phone: z.string().trim().optional(),
+  facebook_url: z.string().trim().optional(),
+  citizen_id: z.string().trim().optional(),
+  citizen_id_issued_on: z.string().optional().or(z.literal("")),
+  citizen_id_issued_place: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+export async function saveEmployeeProfile(
+  employeeId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole([...DIRECTOR_ONLY]);
+  if (!z.string().uuid().safeParse(employeeId).success) return { error: "Nhân viên không hợp lệ." };
+  const raw: Record<string, string> = {};
+  for (const key of Object.keys(ProfileSchema.shape)) raw[key] = String(formData.get(key) ?? "");
+  const parsed = ProfileSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  const { birthday, ...profile } = parsed.data;
+  const clean = Object.fromEntries(Object.entries(profile).map(([k, v]) => [k, v ? v : null]));
+  // Link Facebook gõ thiếu https:// thì tự thêm.
+  if (clean.facebook_url && !/^https?:\/\//i.test(clean.facebook_url)) {
+    clean.facebook_url = `https://${clean.facebook_url}`;
+  }
+
+  const supabase = await createClient();
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    supabase.from("employees").update({ birthday: birthday || null }).eq("id", employeeId),
+    // employee_profiles chưa có trong types/database.ts — ép kiểu.
+    supabase
+      .from("employee_profiles" as never)
+      .upsert({ employee_id: employeeId, ...clean, updated_at: new Date().toISOString() } as never),
+  ]);
+  if (e1 || e2) return { error: "Không lưu được hồ sơ: " + (e1 ?? e2)!.message };
+
+  revalidatePath("/employees");
+  revalidatePath(`/employees/${employeeId}`);
+  return { success: true };
+}

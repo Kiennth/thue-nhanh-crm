@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -69,7 +70,12 @@ export default async function EmployeesPage() {
         <TableBody>
           {sortedEmployees.map((emp) => (
             <TableRow key={emp.id}>
-              <TableCell className="font-medium">{emp.name}</TableCell>
+              <TableCell className="font-medium">
+                {/* Tên mở trang hồ sơ (CEO 2026-10-05). */}
+                <Link href={`/employees/${emp.id}`} className="hover:underline">
+                  {emp.name}
+                </Link>
+              </TableCell>
               <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
               <TableCell>
                 {emp.branch_id ? <BranchBadge name={branchNameById.get(emp.branch_id) ?? "—"} /> : "—"}
