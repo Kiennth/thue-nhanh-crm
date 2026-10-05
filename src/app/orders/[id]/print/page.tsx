@@ -280,7 +280,15 @@ export default async function OrderPrintPage({
         .filter((l) => l.equipment_type_id && DELIVERY_TYPE_IDS.has(l.equipment_type_id))
         .map(addressOf)
         .find(Boolean) ?? null;
-    const phoneInText = deliveryAddress?.match(/(?:\+?84|0)\d[\d .]{7,12}\d/)?.[0]?.replace(/[ .]/g, "") ?? null;
+    // SĐT trong ghi chú địa chỉ: ưu tiên số sau chữ "SĐT/ĐT", không thì số di
+    // động VN 10 chữ số đứng riêng (không ăn nhầm số CCCD 12 chữ số).
+    const compact = (deliveryAddress ?? "").replace(/(\d)[ .](?=\d)/g, "$1");
+    const phoneInText =
+      compact.match(/(?:SĐT|ĐT|Sđt|sdt|Tel|Phone)\s*:?\s*((?:\+?84|0)\d{9})(?!\d)/i)?.[1] ??
+      compact.match(/(?<!\d)(?:\+?84|0)[35789]\d{8}(?!\d)/)?.[0] ??
+      null;
+    const nameInText =
+      deliveryAddress?.match(/(?:Người (?:thuê|nhận)|Liên hệ)\s*:\s*([^\-\n,;]+?)\s*(?:-|,|;|$)/i)?.[1]?.trim() ?? null;
 
     // Cột mới chưa có trong types/database.ts (WIP phiên khác).
     const extra = customer as {
@@ -319,7 +327,7 @@ export default async function OrderPrintPage({
           : null,
       placeText: deliveryNotes.length ? deliveryNotes.join(" / ") : `Kho Thuê Nhanh ${branchName}`.trim(),
       deliveryAddress: deliveryAddress ?? `Nhận tại kho Thuê Nhanh ${branchName}`.trim(),
-      receiverName: order.orderer_name?.trim() || null,
+      receiverName: order.orderer_name?.trim() || nameInText,
       receiverPhone: order.orderer_phone?.trim() || phoneInText || customer?.phone || null,
       paid: sumPayments("invoice"),
       depositHeld: sumPayments("deposit_collect") - sumPayments("deposit_refund"),
