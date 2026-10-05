@@ -23,7 +23,7 @@ export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
   quote: "BÁO GIÁ",
   payment_request: "ĐỀ NGHỊ THANH TOÁN",
   handover: "BIÊN BẢN BÀN GIAO",
-  collection: "BIÊN BẢN THU HỒI",
+  collection: "BIÊN BẢN TRẢ HÀNG",
   acceptance: "BIÊN BẢN NGHIỆM THU",
 };
 
@@ -36,7 +36,7 @@ export const PRINT_DOC_FILE_PREFIX: Record<PrintDocType, string> = {
   quote: "BAO GIA",
   payment_request: "DE NGHI THANH TOAN",
   handover: "BIEN BAN BAN GIAO",
-  collection: "BIEN BAN THU HOI",
+  collection: "BIEN BAN TRA HANG",
   acceptance: "BIEN BAN NGHIEM THU",
 };
 
@@ -51,7 +51,7 @@ export const PRINT_DOC_MENU_LABELS: Record<PrintDocType, string> = {
   quote: "Tạo báo giá",
   payment_request: "Tạo đề nghị thanh toán",
   handover: "Tạo biên bản bàn giao",
-  collection: "Tạo biên bản thu hồi",
+  collection: "Tạo biên bản trả hàng",
   acceptance: "Tạo biên bản nghiệm thu",
 };
 
@@ -157,7 +157,7 @@ export const PRINT_DOC_TERMS: Record<PrintDocType, TermsSection[]> = {
     {
       heading: "Điều khoản",
       items: [
-        "Hai bên xác nhận đã kiểm tra số lượng, tình trạng thiết bị tại thời điểm thu hồi như liệt kê trên.",
+        "Hai bên xác nhận đã kiểm tra số lượng, tình trạng thiết bị tại thời điểm trả hàng như liệt kê trên.",
         "Mọi hư hỏng, thiếu phụ kiện, mất mát (nếu có) đã được ghi nhận cụ thể tại mục ghi chú kèm theo để làm căn cứ xử lý bồi thường (nếu có).",
         "Biên bản này là căn cứ để lập Biên bản nghiệm thu và xử lý tiền ký quỹ.",
       ],

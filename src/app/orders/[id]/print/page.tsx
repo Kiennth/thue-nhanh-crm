@@ -403,7 +403,7 @@ export default async function OrderPrintPage({
           {docType === "collection" && returnContact && (
             <>
               <p className="col-span-2">
-                <span className="text-neutral-500">Địa chỉ thu hồi:</span>{" "}
+                <span className="text-neutral-500">Địa chỉ trả hàng:</span>{" "}
                 {returnContact.address ?? `Khách trả tại kho Thuê Nhanh ${branchNameById.get(order.return_branch_id) ?? ""}`.trim()}
               </p>
               <p>
