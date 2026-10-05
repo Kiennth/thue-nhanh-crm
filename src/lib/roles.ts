@@ -62,7 +62,8 @@ export const SETTINGS_ITEMS: NavItem[] = [
   {
     href: "/employees",
     label: "Nhân viên",
-    roles: [...DIRECTOR_ONLY],
+    // Admin + Kế toán vào để mở hồ sơ (CEO 2026-10-05); lương/vai trò vẫn chỉ Giám đốc.
+    roles: [...MANAGE_ROLES],
   },
   {
     href: "/commission",

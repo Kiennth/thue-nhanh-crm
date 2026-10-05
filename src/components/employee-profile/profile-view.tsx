@@ -79,15 +79,18 @@ function Section({ title, icon: Icon, children }: { title: string; icon: typeof 
 }
 
 // Trang hồ sơ "xịn" dùng chung cho "Hồ sơ của tôi" và Giám đốc xem nhân viên
-// (CEO 2026-10-05). mode="director" hiện thêm ghi chú nội bộ.
+// (CEO 2026-10-05). mode="director" (Giám đốc/Admin/Kế toán) hiện thêm ghi chú nội bộ.
 export function ProfileView({
   data,
   mode,
   actions,
+  showMoney = true,
 }: {
   data: ProfileData;
   mode: "self" | "director";
   actions?: ReactNode;
+  // Ẩn thu nhập + bậc thưởng (Admin xem hồ sơ người khác).
+  showMoney?: boolean;
 }) {
   const { employee: e, profile: p, perf } = data;
   const today = vnTodayString();
@@ -99,13 +102,14 @@ export function ProfileView({
   const joined = p?.joined_on ?? e.created_at.slice(0, 10);
   const tel = (v: string | null) => (v ? <a href={`tel:${v.replace(/\s/g, "")}`} className="hover:underline">{v}</a> : null);
 
-  const stats = [
+  const allStats = [
     { icon: Wallet, label: `Thu nhập tạm tính T${perf.month.slice(5)}`, value: `${vnd.format(perf.totalIncome)}đ`, accent: true },
     { icon: ClipboardCheck, label: "Khâu đã làm tháng này", value: String(perf.completedTaskCount) },
     { icon: Award, label: "Thưởng tháng này", value: `${vnd.format(perf.rewardPay)}đ` },
     { icon: BadgeCheck, label: "Tổng khâu đã làm", value: vnd.format(data.lifetimeTasks) },
     { icon: Sparkles, label: "Số đơn đã tham gia", value: vnd.format(data.lifetimeOrders) },
   ];
+  const stats = showMoney ? allStats : allStats.filter((s) => s.icon !== Wallet && s.icon !== Award);
 
   return (
     <div className="space-y-5">
@@ -167,7 +171,7 @@ export function ProfileView({
         ))}
       </div>
 
-      {perf.nextTier && (
+      {showMoney && perf.nextTier && (
         <div className="rounded-2xl border bg-card p-4">
           <div className="flex items-center justify-between text-sm">
             <span className="font-semibold">Tiến tới bậc thưởng {perf.nextTier.tierNumber}</span>
@@ -238,26 +242,28 @@ export function ProfileView({
             <p className="text-sm text-muted-foreground">Chưa có khâu nào.</p>
           )}
         </Section>
-        <Section title="Thưởng gần đây" icon={Award}>
-          {data.rewards.length ? (
-            <ul className="divide-y">
-              {data.rewards.map((r, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
-                  <span className="min-w-0 truncate">{r.reason}</span>
-                  <span className="shrink-0 font-semibold text-emerald-600 tabular-nums">
-                    +{vnd.format(r.amount)}đ <span className="font-normal text-muted-foreground">{dmy(r.date)}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">Chưa có.</p>
-          )}
-        </Section>
+        {showMoney && (
+          <Section title="Thưởng gần đây" icon={Award}>
+            {data.rewards.length ? (
+              <ul className="divide-y">
+                {data.rewards.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="min-w-0 truncate">{r.reason}</span>
+                    <span className="shrink-0 font-semibold text-emerald-600 tabular-nums">
+                      +{vnd.format(r.amount)}đ <span className="font-normal text-muted-foreground">{dmy(r.date)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">Chưa có.</p>
+            )}
+          </Section>
+        )}
       </div>
 
       {mode === "director" && p?.notes && (
-        <Section title="Ghi chú nội bộ (chỉ Giám đốc)" icon={NotebookPen}>
+        <Section title="Ghi chú nội bộ (chỉ quản lý thấy)" icon={NotebookPen}>
           <p className="text-sm whitespace-pre-wrap">{p.notes}</p>
         </Section>
       )}

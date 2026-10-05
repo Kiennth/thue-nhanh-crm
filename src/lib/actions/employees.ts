@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
-import { DIRECTOR_ONLY } from "@/lib/roles";
+import { DIRECTOR_ONLY, MANAGE_ROLES } from "@/lib/roles";
 import { getSiteUrl } from "@/lib/site-url";
 
 const employeeShape = {
@@ -151,7 +151,8 @@ export async function saveEmployeeProfile(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireRole([...DIRECTOR_ONLY]);
+  // Admin + Kế toán cũng sửa được hồ sơ (CEO 2026-10-05).
+  await requireRole([...MANAGE_ROLES]);
   if (!z.string().uuid().safeParse(employeeId).success) return { error: "Nhân viên không hợp lệ." };
   const raw: Record<string, string> = {};
   for (const key of Object.keys(ProfileSchema.shape)) raw[key] = String(formData.get(key) ?? "");
@@ -201,7 +202,7 @@ export async function updateMyProfile(_prev: ActionState, formData: FormData): P
   return { success: true };
 }
 
-// Ảnh đại diện — chính chủ hoặc Giám đốc. Lưu ở bucket công khai
+// Ảnh đại diện — chính chủ hoặc Giám đốc/Admin/Kế toán. Lưu ở bucket công khai
 // equipment-images/avatars/ (ADMIN client như ảnh web).
 export async function uploadEmployeeAvatar(
   employeeId: string,
@@ -209,7 +210,7 @@ export async function uploadEmployeeAvatar(
 ): Promise<{ url: string } | { error: string }> {
   const { getCurrentEmployee } = await import("@/lib/dal");
   const me = await getCurrentEmployee();
-  if (!me || (me.id !== employeeId && me.role !== "giam_doc")) return { error: "Không có quyền đổi ảnh." };
+  if (!me || (me.id !== employeeId && !MANAGE_ROLES.includes(me.role))) return { error: "Không có quyền đổi ảnh." };
   const file = formData.get("avatar");
   if (!(file instanceof File) || file.size === 0) return { error: "Chưa chọn ảnh." };
   if (file.size > 5 * 1024 * 1024) return { error: "Ảnh không được vượt quá 5MB." };

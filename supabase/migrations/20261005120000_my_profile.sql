@@ -51,3 +51,11 @@ grant execute on function public.update_my_profile(text, text, text, text, text,
 -- Ngày vào công ty (CEO 2026-10-05) — Giám đốc nhập; hồ sơ tính thâm niên
 -- theo ngày này (thiếu thì lấy ngày tạo tài khoản CRM).
 alter table public.employee_profiles add column if not exists joined_on date;
+
+-- CEO 2026-10-05: Admin + Kế toán cũng xem/sửa hồ sơ nhân viên (lương, vai
+-- trò, vô hiệu vẫn chỉ Giám đốc — nằm ở bảng employees).
+drop policy if exists employee_profiles_director on public.employee_profiles;
+create policy employee_profiles_director on public.employee_profiles
+  for all to authenticated
+  using (exists (select 1 from public.employees e where e.user_id = auth.uid() and e.is_active and e.role in ('giam_doc', 'admin', 'ke_toan')))
+  with check (exists (select 1 from public.employees e where e.user_id = auth.uid() and e.is_active and e.role in ('giam_doc', 'admin', 'ke_toan')));
