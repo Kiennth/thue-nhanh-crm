@@ -48,6 +48,20 @@ export interface NavItem {
   roles: UserRole[];
 }
 
+// Khu vực chuyên môn của sidebar (CEO 2026-10-05): nav chính chia thành các
+// nhóm theo nghiệp vụ thay vì 1 danh sách phẳng. Thứ tự hiển thị = thứ tự
+// trong NAV_SECTIONS; mục trong nhóm lấy từ NAV_ITEMS theo thứ tự `hrefs`.
+export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "nhan_su" | "khac";
+export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] }[] = [
+  // Hàng hoá: đơn thuê, thiết bị và lịch máy — việc hằng ngày của kho/vận hành.
+  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/calendar"] },
+  // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
+  { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
+  { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses"] },
+  { key: "nhan_su", label: "Nhân sự", hrefs: ["/schedule", "/payroll", "/rewards", "/training"] },
+  { key: "khac", label: "Khác", hrefs: ["/website"] },
+];
+
 // Các mục quản trị tần suất thấp — gom vào menu "Cài đặt" nhỏ ở footer
 // sidebar (xem app-sidebar.tsx) thay vì nav chính, để nav chính chỉ còn
 // những mục dùng liên tục.

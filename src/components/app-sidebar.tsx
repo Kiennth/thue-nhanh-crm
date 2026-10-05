@@ -43,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { NAV_ITEMS, ROLE_LABELS, SETTINGS_ITEMS } from "@/lib/roles";
+import { NAV_ITEMS, NAV_SECTIONS, ROLE_LABELS, SETTINGS_ITEMS } from "@/lib/roles";
 import { logout } from "@/lib/actions/auth";
 import type { CurrentEmployee } from "@/lib/dal";
 
@@ -136,10 +136,10 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
       <SidebarMenuButton
         render={<Link href={href} />}
         isActive={active}
-        className={`h-10 gap-3 px-2 text-[15px] font-semibold text-sidebar-foreground/85 data-active:font-bold ${style.active}`}
+        className={`h-11 gap-3 px-2 text-[16px] font-semibold text-sidebar-foreground/90 data-active:font-bold ${style.active}`}
       >
         <span
-          className={`flex size-7 shrink-0 items-center justify-center rounded-md [&_svg]:size-[18px]! ${style.tile}`}
+          className={`flex size-8 shrink-0 items-center justify-center rounded-md [&_svg]:size-5! ${style.tile}`}
         >
           <Icon strokeWidth={2.25} />
         </span>
@@ -153,6 +153,17 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
   const items = NAV_ITEMS.filter((item) => item.roles.includes(employee.role));
   const settingsItems = SETTINGS_ITEMS.filter((item) => item.roles.includes(employee.role));
+  // Chia nav theo khu vực chuyên môn (CEO 2026-10-05); mục chưa xếp vào khu
+  // nào rơi xuống nhóm "Khác" để không bị mất khi thêm mục mới quên khai báo.
+  const itemByHref = new Map(items.map((item) => [item.href, item]));
+  const placed = new Set(NAV_SECTIONS.flatMap((s) => s.hrefs));
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: [
+      ...section.hrefs.map((href) => itemByHref.get(href)).filter((i) => i !== undefined),
+      ...(section.key === "khac" ? items.filter((i) => !placed.has(i.href)) : []),
+    ],
+  })).filter((section) => section.items.length > 0);
 
   return (
     <Sidebar>
@@ -170,25 +181,33 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
           </span>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[11px] font-semibold tracking-[0.08em] uppercase">
-            Quản lý
-          </SidebarGroupLabel>
+      <SidebarContent className="gap-0">
+        <SidebarGroup className="pb-1">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <NavLink href="/" label="Trang chủ" active={pathname === "/"} />
-              {items.map((item) => (
-                <NavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  active={pathname.startsWith(item.href)}
-                />
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {sections.map((section) => (
+          <SidebarGroup key={section.key} className="py-1">
+            <SidebarGroupLabel className="h-7 text-[12px] font-bold tracking-[0.1em] text-sidebar-foreground/60 uppercase">
+              {section.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    active={pathname.startsWith(item.href)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter className="gap-2 px-4 py-3">
         {/* Bấm tên mở "Hồ sơ của tôi" (CEO 2026-10-05). */}
