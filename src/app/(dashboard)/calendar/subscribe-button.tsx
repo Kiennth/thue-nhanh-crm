@@ -17,7 +17,22 @@ import { Input } from "@/components/ui/input";
 // Nút "Đăng ký lịch" (học nút Subscribe của Booqable): link iCal riêng của
 // từng nhân viên, dán vào Google Calendar / iPhone để thấy lịch giao + thu
 // hồi ngay trên điện thoại. Lịch điện thoại tự tải lại vài giờ/lần.
-export function SubscribeButton({ path, branchName }: { path: string; branchName: string | null }) {
+export function SubscribeButton({
+  path,
+  branchName,
+  buttonLabel = "Đăng ký lịch",
+  title = "Xem lịch giao / thu hồi trên điện thoại",
+  description,
+  footnote = "Lịch gồm đơn từ 2 tuần trước đến 3 tháng tới; Google cập nhật vài giờ một lần nên đơn mới có thể hiện trễ.",
+}: {
+  path: string;
+  branchName?: string | null;
+  // Dùng lại cho "Lịch làm việc của tôi" (CEO 2026-10-05).
+  buttonLabel?: string;
+  title?: string;
+  description?: string;
+  footnote?: string;
+}) {
   const [open, setOpen] = useState(false);
   // Nội dung dialog chỉ render khi mở (phía trình duyệt) nên đọc được origin.
   const url = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
@@ -37,16 +52,16 @@ export function SubscribeButton({ path, branchName }: { path: string; branchName
         render={
           <Button variant="outline" size="sm">
             <CalendarPlus className="size-4" />
-            Đăng ký lịch
+            {buttonLabel}
           </Button>
         }
       />
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Xem lịch giao / thu hồi trên điện thoại</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Link riêng của bạn{branchName ? ` (kho ${branchName})` : " (tất cả kho)"} — đừng gửi cho người ngoài
-            vì có tên và SĐT khách.
+            {description ??
+              `Link riêng của bạn${branchName ? ` (kho ${branchName})` : " (tất cả kho)"} — đừng gửi cho người ngoài vì có tên và SĐT khách.`}
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2">
@@ -65,10 +80,7 @@ export function SubscribeButton({ path, branchName }: { path: string; branchName
             <b>iPhone:</b> Cài đặt → Lịch → Tài khoản → Thêm tài khoản → Khác → <b>Thêm lịch đã đăng ký</b> → dán
             link.
           </p>
-          <p className="text-muted-foreground">
-            Lịch gồm đơn từ 2 tuần trước đến 3 tháng tới; Google cập nhật vài giờ một lần nên đơn mới có thể hiện
-            trễ.
-          </p>
+          <p className="text-muted-foreground">{footnote}</p>
         </div>
       </DialogContent>
     </Dialog>

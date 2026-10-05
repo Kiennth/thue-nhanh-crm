@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeDollarSign,
+  CalendarClock,
   CalendarDays,
   Camera,
   ClipboardList,
@@ -64,6 +65,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: CalendarDays,
     tile: "bg-indigo-500/12 text-indigo-600 dark:text-indigo-400",
     active: "data-active:bg-indigo-500/12 data-active:text-indigo-700 dark:data-active:text-indigo-300",
+  },
+  "/schedule": {
+    icon: CalendarClock,
+    tile: "bg-teal-500/12 text-teal-600 dark:text-teal-400",
+    active: "data-active:bg-teal-500/12 data-active:text-teal-700 dark:data-active:text-teal-300",
   },
   "/customers": {
     icon: Users,

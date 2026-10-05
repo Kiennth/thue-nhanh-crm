@@ -17,7 +17,7 @@ function b64url(bytes: ArrayBuffer): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function sign(employeeId: string): Promise<string> {
+async function sign(employeeId: string, purpose = "calendar"): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret()),
@@ -25,19 +25,21 @@ async function sign(employeeId: string): Promise<string> {
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`calendar:${employeeId}`));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${purpose}:${employeeId}`));
   return b64url(sig).slice(0, 32);
 }
 
-export async function calendarFeedToken(employeeId: string): Promise<string> {
-  return `${employeeId}.${await sign(employeeId)}`;
+// purpose tách mã của từng loại link (calendar = lịch giao/thu hồi; schedule
+// = lịch làm việc cá nhân) — lộ link loại này không mở được loại kia.
+export async function calendarFeedToken(employeeId: string, purpose = "calendar"): Promise<string> {
+  return `${employeeId}.${await sign(employeeId, purpose)}`;
 }
 
 // Trả employeeId nếu mã hợp lệ, null nếu sai.
-export async function verifyCalendarFeedToken(token: string): Promise<string | null> {
+export async function verifyCalendarFeedToken(token: string, purpose = "calendar"): Promise<string | null> {
   const [employeeId, sig] = token.replace(/\.ics$/, "").split(".");
   if (!employeeId || !sig || !/^[0-9a-f-]{36}$/.test(employeeId)) return null;
-  const expected = await sign(employeeId);
+  const expected = await sign(employeeId, purpose);
   if (expected.length !== sig.length) return null;
   let diff = 0;
   for (let i = 0; i < sig.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);

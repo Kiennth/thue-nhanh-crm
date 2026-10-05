@@ -99,6 +99,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Lịch",
     roles: [...ALL_ROLES],
   },
+  // Lịch làm việc nhân viên: ca trực + việc được giao (CEO 2026-10-05).
+  {
+    href: "/schedule",
+    label: "Lịch làm việc",
+    roles: [...ALL_ROLES],
+  },
   {
     href: "/customers",
     label: "Khách hàng",

@@ -45,7 +45,9 @@ export async function middleware(request: NextRequest) {
   const isAuthConfirmRoute = request.nextUrl.pathname.startsWith("/auth/confirm");
   // Link iCal "Đăng ký lịch": Google/Apple tải không kèm cookie — route tự
   // xác thực bằng mã ký trong link (src/lib/calendar-feed.ts).
-  const isCalendarFeed = request.nextUrl.pathname.startsWith("/api/calendar/ical/");
+  const isCalendarFeed =
+    request.nextUrl.pathname.startsWith("/api/calendar/ical/") ||
+    request.nextUrl.pathname.startsWith("/api/schedule/ical/");
   // Webhook SePay (tiền vào ngân hàng) — route tự xác thực bằng API key.
   const isBankWebhook = request.nextUrl.pathname.startsWith("/api/bank/");
   // Cron nhắc việc (custom-worker.js) — route tự xác thực bằng CRON_SECRET.
