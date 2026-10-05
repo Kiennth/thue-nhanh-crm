@@ -55,6 +55,7 @@ type JobLine = {
     rental_end_at: string | null;
     cancelled_at: string | null;
     delivery_address: string | null;
+    return_address: string | null;
     customers: { name: string } | null;
   } | null;
 };
@@ -67,7 +68,9 @@ function jobAddress(l: JobLine, kind: JobKind): string | null {
     l.extra_information?.trim() || (l.note?.trim().startsWith("Gắn lại") ? null : l.note?.trim() || null);
   const orderAddr = l.orders?.delivery_address?.trim() || null;
   if (kind === "delivery") return orderAddr || lineAddr;
-  if (kind === "collection") return lineAddr || orderAddr;
+  const returnAddr = l.orders?.return_address?.trim() || null;
+  if (kind === "collection") return returnAddr || lineAddr || orderAddr;
+  if (kind === "removal") return returnAddr || orderAddr;
   return orderAddr;
 }
 
@@ -82,7 +85,7 @@ export async function loadJobs(
     let q = db
       .from("order_equipment")
       .select(
-        "employee_id, equipment_type_id, note, extra_information, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, delivery_address, customers(name))",
+        "employee_id, equipment_type_id, note, extra_information, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, delivery_address, return_address, customers(name))",
       )
       .not("employee_id", "is", null)
       .in("equipment_type_id", typeIds)

@@ -156,6 +156,11 @@ export function QuickOrderDialog({
   const [deliveryAddress, setDeliveryAddress] = useState(prefill?.deliveryAddress ?? "");
   const [receiverName, setReceiverName] = useState("");
   const [receiverPhone, setReceiverPhone] = useState("");
+  // Trả hàng: mặc định giống lúc giao; tick "khác chỗ giao" mới hiện 3 ô.
+  const [returnDiffers, setReturnDiffers] = useState(false);
+  const [returnAddress, setReturnAddress] = useState("");
+  const [returnName, setReturnName] = useState("");
+  const [returnPhone, setReturnPhone] = useState("");
   const [orderDate, setOrderDate] = useState(() => datePart(new Date()));
 
   function handleOpenChange(next: boolean) {
@@ -293,6 +298,9 @@ export function QuickOrderDialog({
         delivery_address: deliveryAddress || null,
         receiver_name: receiverName || ordererName || null,
         receiver_phone: receiverPhone || ordererPhone || null,
+        return_address: returnDiffers ? returnAddress || null : null,
+        return_contact_name: returnDiffers ? returnName || null : null,
+        return_contact_phone: returnDiffers ? returnPhone || null : null,
         employee_id: employeeId,
         stage,
         web_order_id: prefill?.webOrderId ?? null,
@@ -642,6 +650,42 @@ export function QuickOrderDialog({
                   placeholder={ordererPhone || "Trống = SĐT người đặt"}
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" checked={returnDiffers} onChange={(e) => setReturnDiffers(e.target.checked)} />
+                Trả hàng khác chỗ/người giao
+              </label>
+              {returnDiffers && (
+                <>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="quick_return_address">Địa chỉ trả hàng</Label>
+                    <Input
+                      id="quick_return_address"
+                      value={returnAddress}
+                      onChange={(e) => setReturnAddress(e.target.value)}
+                      placeholder={deliveryAddress || "Trống = như địa chỉ nhận hàng"}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick_return_name">Tên người trả hàng</Label>
+                    <Input
+                      id="quick_return_name"
+                      value={returnName}
+                      onChange={(e) => setReturnName(e.target.value)}
+                      placeholder={receiverName || ordererName || "Trống = người nhận"}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick_return_phone">SĐT người trả hàng</Label>
+                    <Input
+                      id="quick_return_phone"
+                      inputMode="tel"
+                      value={returnPhone}
+                      onChange={(e) => setReturnPhone(e.target.value)}
+                      placeholder={receiverPhone || ordererPhone || "Trống = SĐT người nhận"}
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_date">Ngày đơn</Label>
                 <DateInput id="quick_order_date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />

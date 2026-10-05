@@ -818,12 +818,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               rentalEndAt={order.rental_end_at}
             />
             <DeliveryInfoForm
-              key={`${order.delivery_address ?? ""}|${order.receiver_name ?? ""}|${order.receiver_phone ?? ""}`}
+              key={[
+                order.delivery_address,
+                order.receiver_name,
+                order.receiver_phone,
+                order.return_address,
+                order.return_contact_name,
+                order.return_contact_phone,
+              ].join("|")}
               orderId={order.id}
               address={order.delivery_address}
               name={order.receiver_name}
               phone={order.receiver_phone}
               suggested={suggestDeliveryContact(lines ?? [], order, orderCustomer?.phone ?? null)}
+              returnContact={{
+                address: order.return_address,
+                name: order.return_contact_name,
+                phone: order.return_contact_phone,
+              }}
             />
           </CardContent>
         </Card>

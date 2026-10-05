@@ -9,6 +9,12 @@ export const DELIVERY_FEE_TYPE_IDS = new Set([
   "ce4a5f88-8daa-47c2-92fc-196d1fc321db",
 ]);
 
+// 2 SKU phí THU HỒI (xe máy, ô tô).
+export const COLLECTION_FEE_TYPE_IDS = new Set([
+  "13c85fe0-8b13-4d76-9df5-a20b19598cc9",
+  "1a53924a-a070-44b0-9441-3f09042af7e7",
+]);
+
 type NoteLine = { equipment_type_id: string | null; extra_information: string | null; note: string | null };
 
 // Địa chỉ trên dòng vận chuyển: thường ở "Chi tiết" (extra_information), nhập
@@ -68,5 +74,30 @@ export function resolveDeliveryContact(
     name: order.receiver_name?.trim() || suggested.name,
     phone: order.receiver_phone?.trim() || suggested.phone,
     suggested,
+  };
+}
+
+// Trả hàng (CEO 2026-10-05): ô trên đơn → ghi chú dòng phí thu hồi → giống
+// lúc giao. sameAsDelivery = đơn chưa điền ô trả hàng nào.
+export function resolveReturnContact(
+  order: Parameters<typeof resolveDeliveryContact>[0] & {
+    return_address: string | null;
+    return_contact_name: string | null;
+    return_contact_phone: string | null;
+  },
+  lines: NoteLine[],
+  customerPhone: string | null = null,
+): DeliveryContact & { sameAsDelivery: boolean } {
+  const delivery = resolveDeliveryContact(order, lines, customerPhone);
+  const lineAddr =
+    lines
+      .filter((l) => l.equipment_type_id && COLLECTION_FEE_TYPE_IDS.has(l.equipment_type_id))
+      .map(lineAddress)
+      .find(Boolean) ?? null;
+  return {
+    address: order.return_address?.trim() || lineAddr || delivery.address,
+    name: order.return_contact_name?.trim() || delivery.name,
+    phone: order.return_contact_phone?.trim() || delivery.phone,
+    sameAsDelivery: !(order.return_address || order.return_contact_name || order.return_contact_phone),
   };
 }

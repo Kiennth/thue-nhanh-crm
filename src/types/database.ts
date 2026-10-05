@@ -435,6 +435,10 @@ export interface Database {
           delivery_address: string | null;
           receiver_name: string | null;
           receiver_phone: string | null;
+          // Trả hàng — cả 3 null = giống lúc giao.
+          return_address: string | null;
+          return_contact_name: string | null;
+          return_contact_phone: string | null;
           order_date: string;
           total_value: number;
           status: TaskType;
@@ -473,6 +477,9 @@ export interface Database {
           delivery_address?: string | null;
           receiver_name?: string | null;
           receiver_phone?: string | null;
+          return_address?: string | null;
+          return_contact_name?: string | null;
+          return_contact_phone?: string | null;
           order_date?: string;
           total_value?: number;
           status?: TaskType;

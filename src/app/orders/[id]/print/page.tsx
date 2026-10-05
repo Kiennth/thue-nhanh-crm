@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveDeliveryContact } from "@/lib/delivery-contact";
+import { resolveDeliveryContact, resolveReturnContact } from "@/lib/delivery-contact";
 import { Tinos } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
@@ -206,6 +206,10 @@ export default async function OrderPrintPage({
   // không hiện tiền (CEO 2026-09-01): người ký là kỹ thuật/khách tại hiện
   // trường, giá cả đã nằm ở hợp đồng/báo giá.
   const showPrices = docType !== "handover" && docType !== "collection";
+  // Biên bản thu hồi: địa chỉ + người trả hàng (ô trả hàng → dòng phí thu
+  // hồi → giống lúc giao).
+  const returnContact =
+    docType === "collection" ? resolveReturnContact(order, lines ?? [], customer?.phone ?? null) : null;
 
   // Báo giá / Đề nghị thanh toán / Biên bản bàn giao / Biên bản nghiệm thu in
   // theo đúng file mẫu CEO gửi 2026-09-30 (documents.tsx). Hợp đồng và biên
@@ -394,6 +398,20 @@ export default async function OrderPrintPage({
             <span className="text-neutral-500">Trả hàng:</span>{" "}
             {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
           </p>
+          {docType === "collection" && returnContact && (
+            <>
+              <p className="col-span-2">
+                <span className="text-neutral-500">Địa chỉ thu hồi:</span>{" "}
+                {returnContact.address ?? `Khách trả tại kho Thuê Nhanh ${branchNameById.get(order.return_branch_id) ?? ""}`.trim()}
+              </p>
+              <p>
+                <span className="text-neutral-500">Người trả hàng:</span> {returnContact.name ?? "………………"}
+              </p>
+              <p>
+                <span className="text-neutral-500">SĐT:</span> {returnContact.phone ?? "………………"}
+              </p>
+            </>
+          )}
         </div>
 
         <table className="mt-8 w-full border-collapse">
