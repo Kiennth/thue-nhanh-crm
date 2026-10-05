@@ -1315,7 +1315,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         continue;
                       }
                       const members = isGroupable(line) ? groupMembers.get(groupKey(line)) : undefined;
-                      if (members && members.length > 1) {
+                      // Máy serial luôn hiện kiểu nhóm, kể cả chỉ 1 máy (CEO
+                      // 2026-10-05: đơn 1 SP không gắn được serial) — có chip
+                      // gán/đổi serial, −/+ số lượng, Đổi SP.
+                      if (members && members.length >= 1) {
                         if (members[0].id === line.id) lineRows.push(renderGroup(members));
                         continue;
                       }
