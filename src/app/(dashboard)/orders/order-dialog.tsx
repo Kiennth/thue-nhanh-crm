@@ -84,7 +84,7 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // Đơn mới để trống = server tự đánh số nối tiếp Booqable (13111…).
+  // Đơn mới để trống = server tự đánh số nối tiếp Booqable (PO13111…).
   const [orderCode] = useState(() => order?.order_code ?? "");
   const formRef = useRef<HTMLFormElement>(null);
   const [pickupId, setPickupId] = useState(order?.pickup_branch_id ?? "");

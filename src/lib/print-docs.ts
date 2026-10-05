@@ -41,7 +41,9 @@ export const PRINT_DOC_FILE_PREFIX: Record<PrintDocType, string> = {
 };
 
 export function printDocFileName(docType: PrintDocType, orderCode: string): string {
-  return `${PRINT_DOC_FILE_PREFIX[docType]} PO ${orderCode}`;
+  // Mã mới đã có sẵn "PO" (PO13111 — CEO 2026-10-05) thì không chèn thêm.
+  const code = /^PO\d/.test(orderCode) ? orderCode : `PO ${orderCode}`;
+  return `${PRINT_DOC_FILE_PREFIX[docType]} ${code}`;
 }
 
 export const PRINT_DOC_MENU_LABELS: Record<PrintDocType, string> = {

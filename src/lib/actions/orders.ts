@@ -833,7 +833,7 @@ export async function cancelOrder(id: string) {
   revalidatePath(`/orders/${id}`);
 }
 
-// Số đơn nối tiếp Booqable (CEO 2026-10-05): 13111, 13112… — sequence
+// Số đơn nối tiếp Booqable (CEO 2026-10-05): PO13111, PO13112… — sequence
 // order_number_seq qua RPC next_order_code (bỏ qua số đã bị gõ tay).
 async function nextOrderCode(supabase: SupabaseServerClient): Promise<string> {
   const { data, error } = await (supabase as unknown as UntypedSupabaseClient).rpc("next_order_code");

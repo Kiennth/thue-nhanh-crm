@@ -143,7 +143,7 @@ export function QuickOrderDialog({
   const searchRef = useRef<HTMLDivElement>(null);
   const [employeeId, setEmployeeId] = useState("");
   // "Thêm chi tiết"
-  // Trống = server tự đánh số nối tiếp Booqable (13111…); gõ tay vẫn được.
+  // Trống = server tự đánh số nối tiếp Booqable (PO13111…); gõ tay vẫn được.
   const [orderCode, setOrderCode] = useState("");
   const [returnBranchId, setReturnBranchId] = useState("");
   const [ordererName, setOrdererName] = useState(prefill?.ordererName ?? "");
