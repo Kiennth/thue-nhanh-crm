@@ -215,7 +215,8 @@ export function computeOrderDeposit({
     if (type?.product_type !== "rental" || type.tracking_type === "combo") return sum;
     return sum + (type.deposit_amount ?? 0) * line.quantity;
   }, 0);
-  return Math.round((raw * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+  // Làm tròn đến 100.000đ (CEO 2026-10-05) — cùng công thức trang đơn.
+  return Math.round((raw * customerDepositPercentage) / 100 / 100_000) * 100_000;
 }
 
 export function computeDocTotals(rows: DocRow[], deposit: number): DocTotals {

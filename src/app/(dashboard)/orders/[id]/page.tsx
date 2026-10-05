@@ -316,8 +316,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   // Tiền cọc = tổng (số lượng x cọc/đơn vị) của các dòng hàng CHO THUÊ trong
   // đơn, nhân với tỉ lệ cọc riêng của khách hàng (mặc định 100%, khách thân
-  // thiết có thể được giảm còn 50% hoặc miễn cọc), làm tròn đến triệu cho
-  // gọn — không tính VAT, thu cùng lúc với đơn, hoàn lại sau khi nghiệm thu.
+  // thiết có thể được giảm còn 50% hoặc miễn cọc), làm tròn đến 100.000đ
+  // (CEO 2026-10-05: trước làm tròn đến triệu, cọc 500k bị nhảy thành 1tr) —
+  // không tính VAT, thu cùng lúc với đơn, hoàn lại sau khi nghiệm thu.
   const rawDeposit = (lines ?? []).reduce((sum, line) => {
     const type = line.equipment_type_id ? equipmentTypeById.get(line.equipment_type_id) : undefined;
     // Combo không cọc riêng — cọc nằm ở các món con.
@@ -326,7 +327,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }, 0);
   const customerDepositPercentage = orderCustomer?.deposit_percentage ?? 100;
   // Cọc tính theo hàng (chưa sửa tay) — hiện cạnh số đã sửa cho dễ so.
-  const defaultDeposit = Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+  const defaultDeposit = Math.round((rawDeposit * customerDepositPercentage) / 100 / 100_000) * 100_000;
   const depositOverridden = order.deposit_override_amount != null;
   // Khách đồng ý báo giá online (cột mới, chưa có trong types/database.ts).
   const quoteAccepted = order as typeof order & {
@@ -347,7 +348,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     // như nhau (đều nghĩa là "chưa override, tính như cũ").
     order.deposit_override_amount != null
       ? order.deposit_override_amount
-      : Math.round((rawDeposit * customerDepositPercentage) / 100 / 1_000_000) * 1_000_000;
+      : Math.round((rawDeposit * customerDepositPercentage) / 100 / 100_000) * 100_000;
 
   const depositPaymentList = (payments ?? [])
     .filter((p) => p.payment_type === "deposit_collect" || p.payment_type === "deposit_refund")
