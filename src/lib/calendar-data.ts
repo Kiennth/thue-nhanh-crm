@@ -60,8 +60,10 @@ export function barStatus(o: {
   delivery_stock_moved_at: string | null;
   completed_at: string | null;
   rental_end_at: string | null;
+  return_stock_transferred_at?: string | null;
 }): BarStatus {
-  if (o.completed_at) return "done";
+  // Đã nhập kho hoặc đã chuyển máy sang đơn gia hạn → coi như xong.
+  if (o.completed_at || o.return_stock_transferred_at) return "done";
   if (o.delivery_stock_moved_at) {
     return o.rental_end_at && Date.parse(o.rental_end_at) < Date.now() ? "overdue" : "out";
   }
@@ -77,11 +79,12 @@ type OrderRow = {
   return_branch_id: string;
   delivery_stock_moved_at: string | null;
   completed_at: string | null;
+  return_stock_transferred_at: string | null;
   customers: { name: string; phone: string | null } | null;
 };
 
 const ORDER_COLUMNS =
-  "id, order_code, rental_start_at, rental_end_at, pickup_branch_id, return_branch_id, delivery_stock_moved_at, completed_at, customers(name, phone)";
+  "id, order_code, rental_start_at, rental_end_at, pickup_branch_id, return_branch_id, delivery_stock_moved_at, completed_at, return_stock_transferred_at, customers(name, phone)";
 
 type AnyClient = SupabaseClient;
 
@@ -361,7 +364,7 @@ export async function loadAgenda(
       done:
         kind === "delivery"
           ? Boolean(o.delivery_stock_moved_at || o.completed_at)
-          : Boolean(o.completed_at || returnTasks.has(o.id)),
+          : Boolean(o.completed_at || o.return_stock_transferred_at || returnTasks.has(o.id)),
       transport,
       address,
       branchId: kind === "delivery" ? o.pickup_branch_id : o.return_branch_id,

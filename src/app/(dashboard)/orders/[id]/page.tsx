@@ -54,6 +54,7 @@ import { BranchQuickSwitch } from "./branch-quick-switch";
 import { PaymentQr } from "@/components/payment-qr";
 import { DepositOverrideDialog } from "./deposit-override-dialog";
 import { QuoteShareButton } from "./quote-share-button";
+import { ExtendOrderButton } from "./extend-order-button";
 import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
@@ -666,6 +667,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     return [{ key: `t-${t.id}`, label: t.name, imageUrl: t.image_url, equipmentTypeId: t.id }];
   });
 
+  // Gia hạn (CEO 2026-10-05): đơn này gia hạn từ đơn nào / đã gia hạn sang đơn nào.
+  const extendedFromId = (order as typeof order & { extended_from_order_id?: string | null }).extended_from_order_id ?? null;
+  const [{ data: parentOrder }, { data: childOrder }] = await Promise.all([
+    extendedFromId
+      ? supabase.from("orders").select("id, order_code").eq("id", extendedFromId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("orders")
+      .select("id, order_code")
+      .eq("extended_from_order_id" as never, order.id)
+      .is("cancelled_at", null)
+      .maybeSingle(),
+  ]);
+  const childExt = childOrder as { id: string; order_code: string } | null;
+  const parentExt = parentOrder as { id: string; order_code: string } | null;
+  const canExtend =
+    !order.cancelled_at &&
+    !!order.delivery_stock_moved_at &&
+    !order.return_stock_transferred_at &&
+    !childExt &&
+    !!order.rental_start_at &&
+    !!order.rental_end_at;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -677,6 +701,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             <Badge>Hoàn tất</Badge>
           ) : (
             <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+          )}
+          {parentExt && (
+            <Link
+              href={`/orders/${parentExt.id}`}
+              className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+            >
+              Gia hạn từ {parentExt.order_code}
+            </Link>
+          )}
+          {childExt && (
+            <Link
+              href={`/orders/${childExt.id}`}
+              className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+            >
+              Đã gia hạn → {childExt.order_code}
+            </Link>
           )}
           {quoteAcceptedInfo.at && (
             <span
@@ -704,6 +744,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             branches={branchList}
             order={{ ...order, customer_name: orderCustomer?.name ?? "" }}
           />
+          {canExtend && (
+            <ExtendOrderButton
+              orderId={order.id}
+              rentalStartAt={order.rental_start_at!}
+              rentalEndAt={order.rental_end_at!}
+            />
+          )}
           <DuplicateOrderButton orderId={order.id} />
           {/* Không còn nút "Hoàn tất đơn" — đơn tự hoàn tất khi đủ 10 khâu
               (trigger auto_complete_order). */}

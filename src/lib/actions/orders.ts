@@ -12,7 +12,7 @@ import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 import { splitTotalByWeights } from "@/lib/combo";
 import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
-import type { TaskType } from "@/types/database";
+import type { RentalPeriodUnit, TaskType } from "@/types/database";
 import type { SupabaseClient as UntypedSupabaseClient } from "@supabase/supabase-js";
 
 const DELETE_ROLES = MANAGE_ROLES;
@@ -2689,4 +2689,141 @@ export async function swapOrderLineInstance(lineId: string, instanceId: string):
   const { error } = await supabase.from("order_equipment").update(update).eq("id", lineId);
   revalidatePath(`/orders/${line.order_id}`);
   return error ? { error: "Không đổi được máy: " + error.message } : { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Gia hạn đơn (CEO 2026-10-05): tạo đơn nối tiếp cho khách đang giữ máy.
+//  - Ngày nhận = ngày trả đơn gốc, ngày trả = newEndAt.
+//  - Chỉ chép dòng CHO THUÊ (giữ đúng máy/serial), giữ đơn giá/ngày đang áp
+//    (kể cả giá đã giảm tay) nhân số ngày mới. Không phí giao/thu hồi (phí thu
+//    hồi đã nằm ở đơn gốc), không dịch vụ.
+//  - Cọc = 0 (CEO: cọc vẫn ở đơn gốc; đơn gia hạn chỉ có QR tiền thuê).
+//  - Kho: máy vẫn ở chỗ khách → đơn gốc đánh dấu đã thu về (không cộng kho),
+//    đơn mới đánh dấu đã xuất (không trừ kho). Kho chỉ cộng lại khi đơn gia
+//    hạn nhập kho thật.
+// ---------------------------------------------------------------------------
+export async function extendOrder(
+  orderId: string,
+  newEndAt: string,
+): Promise<{ error: string } | { success: true; id: string; code: string }> {
+  const employee = await requireRole([...ALL_ROLES]);
+  if (!z.string().uuid().safeParse(orderId).success) return { error: "Đơn không hợp lệ." };
+  const end = new Date(newEndAt);
+  if (Number.isNaN(end.getTime())) return { error: "Ngày trả mới không hợp lệ." };
+
+  const supabase = await createClient();
+  const { data: src } = await supabase
+    .from("orders")
+    .select(
+      "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, cancelled_at, delivery_stock_moved_at, return_stock_transferred_at, orderer_name, orderer_phone, orderer_email",
+    )
+    .eq("id", orderId)
+    .single();
+  if (!src) return { error: "Không tìm thấy đơn gốc." };
+  if (src.cancelled_at) return { error: "Đơn đã huỷ, không gia hạn được." };
+  if (!src.delivery_stock_moved_at) {
+    return { error: "Đơn chưa giao máy — muốn thuê lâu hơn thì sửa ngày trả ngay trên đơn này." };
+  }
+  if (src.return_stock_transferred_at) return { error: "Đơn đã nhập kho (máy đã về), không gia hạn được." };
+  if (!src.rental_start_at || !src.rental_end_at) return { error: "Đơn gốc thiếu thời gian thuê." };
+  const startAt = src.rental_end_at;
+  if (end.getTime() <= Date.parse(startAt)) return { error: "Ngày trả mới phải sau ngày trả hiện tại." };
+
+  const { data: existing } = await supabase
+    .from("orders")
+    .select("order_code")
+    .eq("extended_from_order_id" as never, orderId)
+    .is("cancelled_at", null)
+    .maybeSingle();
+  if (existing) return { error: `Đơn này đã được gia hạn sang ${(existing as { order_code: string }).order_code}.` };
+
+  const { data: srcLines, error: linesError } = await supabase
+    .from("order_equipment")
+    .select(
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information, equipment_types(product_type, rental_period_unit)",
+    )
+    .eq("order_id", orderId)
+    .order("position");
+  if (linesError) return { error: "Không đọc được dòng hàng: " + linesError.message };
+  type L = NonNullable<typeof srcLines>[number] & {
+    equipment_types: { product_type: string; rental_period_unit: RentalPeriodUnit | null } | null;
+  };
+  const rentalLines = ((srcLines ?? []) as L[]).filter((l) => l.equipment_types?.product_type === "rental");
+  if (!rentalLines.length) return { error: "Đơn không có hàng cho thuê để gia hạn." };
+
+  const newEndIso = end.toISOString();
+  // Giữ đơn giá/ngày: giá cũ ÷ số kỳ cũ × số kỳ mới (theo đơn vị thuê của SP).
+  const scaled = (l: L) => {
+    const unit = l.equipment_types?.rental_period_unit;
+    if (!unit) return { unit_price: l.unit_price, line_total: l.line_total };
+    const oldDur = l.charge_duration ?? computeRentalDurationInUnit(src.rental_start_at!, src.rental_end_at!, unit);
+    const newDur = computeRentalDurationInUnit(startAt, newEndIso, unit);
+    if (!oldDur) return { unit_price: l.unit_price, line_total: l.line_total };
+    const unitPrice = Math.round((Number(l.unit_price) / oldDur) * newDur * 100) / 100;
+    return { unit_price: unitPrice, line_total: Math.round(unitPrice * l.quantity * 100) / 100 };
+  };
+
+  const today = vnNow();
+  const nowIso = new Date().toISOString();
+  const { data: newOrder, error: insertError } = await supabase
+    .from("orders")
+    .insert({
+      order_code: generateOrderCode(today),
+      pickup_branch_id: src.pickup_branch_id,
+      return_branch_id: src.return_branch_id,
+      customer_id: src.customer_id,
+      order_date: formatVNDate(today),
+      rental_start_at: startAt,
+      rental_end_at: newEndIso,
+      deposit_override_amount: 0,
+      orderer_name: src.orderer_name,
+      orderer_phone: src.orderer_phone,
+      orderer_email: src.orderer_email,
+      delivery_stock_moved_at: nowIso,
+      extended_from_order_id: orderId,
+      created_by: employee.id,
+    } as never)
+    .select("id, order_code")
+    .single();
+  if (insertError || !newOrder) return { error: "Không tạo được đơn gia hạn: " + (insertError?.message ?? "") };
+  const created = newOrder as { id: string; order_code: string };
+
+  const copy = (l: L) => ({
+    order_id: created.id,
+    equipment_type_id: l.equipment_type_id,
+    custom_name: l.custom_name,
+    equipment_unit_id: l.equipment_unit_id,
+    equipment_instance_id: l.equipment_instance_id,
+    quantity: l.quantity,
+    ...scaled(l),
+    charge_duration: null,
+    extra_information: l.extra_information,
+  });
+  const top = rentalLines.filter((l) => !l.parent_line_id);
+  const { data: insertedTop, error: topErr } = await supabase.from("order_equipment").insert(top.map(copy)).select("id");
+  const children = rentalLines.filter((l) => l.parent_line_id);
+  let childErr: { message: string } | null = null;
+  if (!topErr && insertedTop && children.length) {
+    const idMap = new Map(top.map((l, i) => [l.id, insertedTop[i]?.id]));
+    ({ error: childErr } = await supabase
+      .from("order_equipment")
+      .insert(children.map((l) => ({ ...copy(l), parent_line_id: idMap.get(l.parent_line_id!) ?? null }))));
+  }
+  if (topErr || childErr) {
+    // Dọn đơn vừa tạo để khỏi để lại đơn nửa vời.
+    await supabase.from("order_equipment").delete().eq("order_id", created.id);
+    await supabase.from("orders").delete().eq("id", created.id);
+    return { error: "Không chép được dòng hàng: " + (topErr ?? childErr)!.message };
+  }
+
+  // Máy chuyển sang đơn gia hạn: đơn gốc coi như đã thu về (không cộng kho).
+  await supabase
+    .from("orders")
+    .update({ return_stock_transferred_at: nowIso })
+    .eq("id", orderId)
+    .is("return_stock_transferred_at", null);
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true, id: created.id, code: created.order_code };
 }

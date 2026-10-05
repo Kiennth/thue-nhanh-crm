@@ -76,7 +76,9 @@ export async function getOrdersToHandle(
       "id, order_code, customer_id, pickup_branch_id, return_branch_id, status, rental_start_at, rental_end_at",
     )
     .is("completed_at", null)
-    .is("cancelled_at", null);
+    .is("cancelled_at", null)
+    // Máy đã về kho / đã chuyển sang đơn gia hạn → không còn việc giao/thu hồi.
+    .is("return_stock_transferred_at", null);
   if (branchId) {
     query = query.or(`pickup_branch_id.eq.${branchId},return_branch_id.eq.${branchId}`);
   }

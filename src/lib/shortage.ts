@@ -76,6 +76,8 @@ export async function loadShortages(
       .select("id, order_code, rental_start_at, rental_end_at, pickup_branch_id, delivery_stock_moved_at")
       .is("cancelled_at", null)
       .is("completed_at", null)
+      // Máy đã về kho hoặc đã chuyển sang đơn gia hạn → đơn này không giữ máy.
+      .is("return_stock_transferred_at", null)
       .not("rental_start_at", "is", null)
       .not("rental_end_at", "is", null)
       .lt("rental_start_at", new Date(horizon).toISOString())
