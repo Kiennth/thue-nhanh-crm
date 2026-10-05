@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, Loader2, Minus, Plus, Search, Truck, X } from "lucide-react";
+import { Loader2, Minus, Plus, Search, Truck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ import {
   type QuickOrderCatalogItem,
 } from "@/lib/actions/orders";
 import {
-  RENTAL_PRESET_OPTIONS,
   computeOrderLinePrice,
   computeRentalDurationInUnit,
   defaultRentalStart,
@@ -34,8 +33,6 @@ import { OrdererSuggestInput } from "@/components/orderer-suggest-input";
 // Ô ít dùng (mã đơn, kho thu hồi, người đặt...) gập trong "Thêm chi tiết".
 
 const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
-// Gói hay dùng nhất — "Khác" để chọn ngày giờ kết thúc tay.
-const QUICK_PRESET_KEYS = ["1d", "2d", "3d", "7d", "14d", "30d"];
 // Cùng 4 mã với DELIVERY_NOTE_TYPE_IDS (lib/commission) — không import file
 // đó vì nó kéo theo vn-time (chỉ chạy phía server).
 const TRANSPORT_LABELS: Record<string, string> = {
@@ -133,7 +130,6 @@ export function QuickOrderDialog({
   const [startHour, setStartHour] = useState(() => hourPart(start));
   // Giữ phút lẻ từ đơn web (khách chọn 08:30…) — popup chỉ chọn giờ chẵn.
   const [startMinute] = useState(() => minutePart(start));
-  const [presetKey, setPresetKey] = useState<string>(prefill ? "custom" : "1d");
   const [endDate, setEndDate] = useState(() => datePart(prefillEnd ?? new Date(start.getTime() + 86_400_000)));
   const [endHour, setEndHour] = useState(() => hourPart(prefillEnd ?? start));
   const [endMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
@@ -185,10 +181,8 @@ export function QuickOrderDialog({
   }
 
   const startAt = useMemo(() => combine(startDate, startHour, startMinute), [startDate, startHour, startMinute]);
-  const endAt = useMemo(() => {
-    const preset = RENTAL_PRESET_OPTIONS.find((p) => p.key === presetKey);
-    return preset ? new Date(startAt.getTime() + preset.hours * 3_600_000) : combine(endDate, endHour, endMinute);
-  }, [presetKey, startAt, endDate, endHour, endMinute]);
+  // Ngày giờ nhận + trả luôn hiện sẵn (CEO 2026-10-05: bỏ ô chọn nhanh 1 ngày/2 ngày...).
+  const endAt = useMemo(() => combine(endDate, endHour, endMinute), [endDate, endHour, endMinute]);
   const periodValid = endAt > startAt;
   const dayCount = periodValid
     ? computeRentalDurationInUnit(startAt.toISOString(), endAt.toISOString(), "day")
@@ -386,51 +380,23 @@ export function QuickOrderDialog({
           {/* Thời gian */}
           <div className="space-y-2">
             <Label htmlFor="quick_start_date">Thời gian thuê</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Bắt đầu</span>
-              <DateInput
-                id="quick_start_date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-40"
-              />
-              <HourSelect value={startHour} onChange={setStartHour} />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_PRESET_KEYS.map((key) => {
-                const preset = RENTAL_PRESET_OPTIONS.find((p) => p.key === key)!;
-                return (
-                  <Button
-                    key={key}
-                    type="button"
-                    size="sm"
-                    variant={presetKey === key ? "default" : "outline"}
-                    onClick={() => setPresetKey(key)}
-                  >
-                    {key === "7d" ? "1 tuần" : key === "14d" ? "2 tuần" : preset.label}
-                  </Button>
-                );
-              })}
-              <Button
-                type="button"
-                size="sm"
-                variant={presetKey === "custom" ? "default" : "outline"}
-                onClick={() => {
-                  setEndDate(datePart(endAt));
-                  setEndHour(hourPart(endAt));
-                  setPresetKey("custom");
-                }}
-              >
-                Khác…
-              </Button>
-            </div>
-            {presetKey === "custom" && (
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">Kết thúc</span>
+                <span className="w-16 text-sm font-medium">Nhận</span>
+                <DateInput
+                  id="quick_start_date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-40"
+                />
+                <HourSelect value={startHour} onChange={setStartHour} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-16 text-sm font-medium">Trả</span>
                 <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
                 <HourSelect value={endHour} onChange={setEndHour} />
               </div>
-            )}
+            </div>
             <p className={cn("text-xs", periodValid ? "text-muted-foreground" : "text-destructive")}>
               {periodValid
                 ? `Trả: ${endAt.toLocaleString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} · tính ${dayCount} ngày`
@@ -584,12 +550,9 @@ export function QuickOrderDialog({
             )}
           </div>
 
-          {/* Ít dùng — gập lại */}
-          <details className="group rounded-md border px-3 py-2">
-            <summary className="flex cursor-pointer list-none items-center gap-1 text-sm text-muted-foreground">
-              <ChevronDown className="size-4 transition group-open:rotate-180" />
-              Thêm chi tiết (mã đơn, kho thu hồi, người đặt hàng, ngày đơn)
-            </summary>
+          {/* Chi tiết luôn mở sẵn (CEO 2026-10-05: không ẩn mã đơn, người đặt). */}
+          <div className="rounded-md border px-3 py-3">
+            <p className="text-sm font-medium text-muted-foreground">Chi tiết đơn</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_code">Mã đơn</Label>
@@ -648,7 +611,7 @@ export function QuickOrderDialog({
                 <DateInput id="quick_order_date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
               </div>
             </div>
-          </details>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
