@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { vnDayStartIso } from "@/lib/vn-day";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -87,9 +88,9 @@ export default async function RewardsPage({
         .from("orders")
         .select("total_value")
         .is("cancelled_at", null)
-        .not("delivered_at", "is", null)
-        .gte("order_date", rangeStart)
-        .lt("order_date", rangeEnd)
+        // Ghi vào NGÀY GIAO giờ VN (CEO 2026-10-05).
+        .gte("delivered_at", vnDayStartIso(rangeStart))
+        .lt("delivered_at", vnDayStartIso(rangeEnd))
         .range(from, to),
     ).then((rows) =>
       rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),

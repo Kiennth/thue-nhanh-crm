@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { vnDayKey, vnDayStartIso } from "@/lib/vn-day";
 import { BranchComparisonSection, previousMonthOf } from "@/components/branch-comparison";
 import { isProfitPeriod, type ProfitPeriod } from "@/lib/profit-period";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -143,11 +144,11 @@ export default async function DashboardHomePage({
   ] = await Promise.all([
     supabase.from("branches").select("id, name").order("position"),
     canViewBranchComparison
-      ? fetchAllRows<{ pickup_branch_id: string; order_date: string; total_value: number }>(
+      ? fetchAllRows<{ pickup_branch_id: string; delivered_at: string; total_value: number }>(
           (from, to) =>
             supabase
               .from("orders")
-              .select("pickup_branch_id, order_date, total_value")
+              .select("pickup_branch_id, delivered_at, total_value")
               // Đơn huỷ không phải doanh thu; doanh số ghi nhận khi ĐÃ GIAO
               // HÀNG và GỒM VAT (CEO 2026-09-02, thay quy tắc đơn-hoàn-tất
               // 2026-08-08) — lưu ý lãi/lỗ gộp vì thế cũng gồm phần VAT 8%.
@@ -156,11 +157,17 @@ export default async function DashboardHomePage({
               // BranchComparisonSection chỉ đọc lại đúng 3 mốc Ngày/Tháng/
               // Năm đang chọn — trước đây fetch NGUYÊN bảng orders all-time
               // (10.020 dòng) chỉ để dùng khoảng này.
-              .gte("order_date", comparisonRangeStart)
-              .lt("order_date", comparisonRangeEndExclusive)
+              // Ghi vào NGÀY GIAO (CEO 2026-10-05) — order_date bên dưới là
+              // ngày giao giờ VN, giữ tên trường cho các hàm revenueFor*.
+              .gte("delivered_at", vnDayStartIso(comparisonRangeStart))
+              .lt("delivered_at", vnDayStartIso(comparisonRangeEndExclusive))
               .range(from, to),
         ).then((rows) =>
-          rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),
+          rows.map((o) => ({
+            pickup_branch_id: o.pickup_branch_id,
+            order_date: vnDayKey(o.delivered_at),
+            total_value: Math.round(o.total_value * 1.08 * 100) / 100,
+          })),
         )
       : Promise.resolve([]),
     getOrdersToHandle(handleBranchId, HANDLE_LIMIT, {

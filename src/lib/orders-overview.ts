@@ -1,4 +1,5 @@
 import "server-only";
+import { vnDayKey } from "@/lib/vn-day";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import { vnNow } from "@/lib/vn-time";
@@ -29,11 +30,11 @@ export interface OrdersOverview {
 // trang Đơn hàng (migration 20260902100000).
 async function fetchDeliveredOrders(branchId: string | null): Promise<DatedValue[]> {
   const supabase = await createClient();
-  const orders = await fetchAllRowsFast<{ order_date: string; total_value: number }>(
+  const orders = await fetchAllRowsFast<{ delivered_at: string; total_value: number }>(
     (from, to) => {
       let q = supabase
         .from("orders")
-        .select("order_date, total_value")
+        .select("delivered_at, total_value")
         .is("cancelled_at", null)
         .not("delivered_at", "is", null)
         .order("id")
@@ -55,7 +56,8 @@ async function fetchDeliveredOrders(branchId: string | null): Promise<DatedValue
       return q;
     },
   );
-  return orders.map((o) => ({ date: o.order_date, value: Math.round(o.total_value * 1.08 * 100) / 100 }));
+  // CEO 2026-10-05: doanh số ghi vào NGÀY GIAO (giờ VN), không phải ngày tạo đơn.
+  return orders.map((o) => ({ date: vnDayKey(o.delivered_at), value: Math.round(o.total_value * 1.08 * 100) / 100 }));
 }
 
 // Thống kê + xu hướng đơn hàng theo tuần/tháng/năm — chỉ đơn ĐÃ GIAO HÀNG,

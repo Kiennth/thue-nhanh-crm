@@ -1,4 +1,5 @@
 import "server-only";
+import { vnDayKey } from "@/lib/vn-day";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows, fetchRowsByIds } from "@/lib/supabase/fetch-all";
 import { vnNow } from "@/lib/vn-time";
@@ -42,16 +43,17 @@ async function fetchOrderLinesForType(equipmentTypeId: string): Promise<DatedVal
   if (!lines.length) return [];
 
   const orderIds = [...new Set(lines.map((l) => l.order_id))];
-  const orders = await fetchRowsByIds<{ id: string; order_date: string }>(orderIds, (idChunk, from, to) =>
+  const orders = await fetchRowsByIds<{ id: string; delivered_at: string }>(orderIds, (idChunk, from, to) =>
     supabase
       .from("orders")
-      .select("id, order_date")
+      .select("id, delivered_at")
       .in("id", idChunk)
       .is("cancelled_at", null)
       .not("delivered_at", "is", null)
       .range(from, to),
   );
-  const orderDateById = new Map(orders.map((o) => [o.id, o.order_date]));
+  // CEO 2026-10-05: ghi vào NGÀY GIAO (giờ VN), không phải ngày tạo đơn.
+  const orderDateById = new Map(orders.map((o) => [o.id, vnDayKey(o.delivered_at)]));
 
   const items: DatedValue[] = [];
   for (const line of lines) {

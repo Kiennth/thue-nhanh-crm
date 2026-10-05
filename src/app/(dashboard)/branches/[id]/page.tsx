@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { nextDayKey, vnDayKey, vnDayStartIso } from "@/lib/vn-day";
 import { Badge } from "@/components/ui/badge";
 import { PeriodRevenueCards, ProductHighlightCards } from "@/components/dashboard-cards";
 import { createClient } from "@/lib/supabase/server";
@@ -59,18 +60,21 @@ export default async function BranchDashboardPage({
     supabase.from("branches").select("*").eq("id", id).single(),
     // CEO chốt 2026-09-02: doanh thu tính đơn ĐÃ GIAO HÀNG, GỒM VAT (khớp
     // "Tổng doanh số" trang Đơn hàng).
-    fetchAllRows<{ order_date: string; total_value: number }>((from, to) =>
+    // Ghi vào NGÀY GIAO giờ VN (CEO 2026-10-05).
+    fetchAllRows<{ delivered_at: string | null; total_value: number }>((from, to) =>
       supabase
         .from("orders")
-        .select("order_date, total_value")
+        .select("delivered_at, total_value")
         .eq("pickup_branch_id", id)
         .is("cancelled_at", null)
-        .not("delivered_at", "is", null)
-        .gte("order_date", rangeStart)
-        .lte("order_date", rangeEnd)
+        .gte("delivered_at", vnDayStartIso(rangeStart))
+        .lt("delivered_at", vnDayStartIso(nextDayKey(rangeEnd)))
         .range(from, to),
     ).then((rows) =>
-      rows.map((o) => ({ ...o, total_value: Math.round(o.total_value * 1.08 * 100) / 100 })),
+      rows.map((o) => ({
+        order_date: vnDayKey(o.delivered_at!),
+        total_value: Math.round(o.total_value * 1.08 * 100) / 100,
+      })),
     ),
     supabase.from("equipment_types").select("id, name, product_type"),
     supabase.rpc("equipment_page_report", { p_branch_id: id, p_start: null, p_end: null }),

@@ -23,3 +23,16 @@ export function lateness(at: string | number | Date, now: number = Date.now()): 
   if (t >= now) return null;
   return vnDayKey(t) < vnDayKey(now) ? "overdue" : "late-today";
 }
+
+// Mốc 0h giờ VN của ngày "YYYY-MM-DD" — để lọc cột timestamptz (delivered_at…)
+// theo ngày Việt Nam.
+export function vnDayStartIso(day: string): string {
+  return `${day}T00:00:00+07:00`;
+}
+
+// Ngày kế tiếp của "YYYY-MM-DD" (cho mốc kết thúc bao gồm → mốc loại trừ).
+export function nextDayKey(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
