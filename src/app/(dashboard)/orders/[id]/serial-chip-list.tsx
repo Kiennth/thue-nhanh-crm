@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeftRight, X } from "lucide-react";
+import { ArrowLeftRight, CircleDashed, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
   type SwapInstanceOption,
   type SwapMode,
 } from "@/lib/actions/orders";
+import { AutoAssignButton } from "./serial-group-controls";
 
 const SWAP_MODE_HINT: Record<SwapMode, string> = {
   plan: "Chỉ thay máy — dòng hàng, số lượng, đơn giá giữ nguyên.",
@@ -31,8 +32,10 @@ const serialOf = (label: string) => label.split(" · ")[0].trim().toLowerCase();
 // máy/1 dòng order_equipment; nút × bỏ riêng máy đó khỏi đơn.
 export function SerialChipList({
   items,
+  unassignedLineIds = [],
   canRemove,
   canSwap = false,
+  canAutoAssign = false,
 }: {
   // variant: tên biến thể (null = không cần hiện) — chip cùng biến thể gom
   // dưới 1 tiêu đề nhỏ thay vì lặp tên trên từng chip.
@@ -41,10 +44,14 @@ export function SerialChipList({
   // Bấm vào serial để đổi sang máy khác kiểu Booqable — kể cả khi máy đang ở
   // chỗ khách (xem loadSwapContext trong actions/orders.ts).
   canSwap?: boolean;
+  // Dòng "chưa gán serial" (lên đơn theo số lượng kiểu Booqable) — hiện 1 chip
+  // gạch đứt "Gán serial", bấm gán lần lượt từng máy.
+  unassignedLineIds?: string[];
+  canAutoAssign?: boolean;
 }) {
   const [swapping, setSwapping] = useState<{ lineId: string; label: string } | null>(null);
   const [swapData, setSwapData] = useState<
-    { mode: SwapMode; options: SwapInstanceOption[] } | { error: string } | null
+    { mode: SwapMode; assigned: boolean; options: SwapInstanceOption[] } | { error: string } | null
   >(null);
   const [swapFilter, setSwapFilter] = useState("");
 
@@ -57,16 +64,23 @@ export function SerialChipList({
     });
   }
 
-  function handleSwap(instanceId: string, label: string) {
+  function handleSwap(instanceId: string | null, label: string) {
     if (!swapping) return;
     const target = swapping;
+    const wasAssigned = !!swapData && "assigned" in swapData && swapData.assigned;
     startTransition(async () => {
       const result = await swapOrderLineInstance(target.lineId, instanceId);
       if (result && "error" in result) {
         toast.error(result.error);
         return;
       }
-      toast.success(`Đã đổi ${target.label} → ${label}.`);
+      toast.success(
+        !instanceId
+          ? `Đã bỏ gán ${target.label}.`
+          : wasAssigned
+            ? `Đã đổi ${target.label} → ${label}.`
+            : `Đã gán ${label}.`,
+      );
       setSwapping(null);
     });
   }
@@ -116,6 +130,27 @@ export function SerialChipList({
   return (
     <>
       <div className="space-y-1">
+        {unassignedLineIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            {canSwap ? (
+              <button
+                type="button"
+                onClick={() => openSwap({ lineId: unassignedLineIds[0], label: "máy chưa gán" })}
+                className="inline-flex items-center gap-1 rounded-md border border-dashed border-amber-500/70 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200"
+                title="Bấm để gán serial cho từng máy"
+              >
+                <CircleDashed className="size-3" />
+                {unassignedLineIds.length} máy chưa gán serial
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                <CircleDashed className="size-3" />
+                {unassignedLineIds.length} máy chưa gán serial
+              </span>
+            )}
+            {canAutoAssign && <AutoAssignButton lineIds={unassignedLineIds} />}
+          </div>
+        )}
         {[...new Set(items.map((i) => i.variant))].map((variant) => (
           <div key={variant ?? "_"} className="space-y-0.5">
             {variant && (
@@ -165,7 +200,13 @@ export function SerialChipList({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Đổi serial <span className="font-mono">{swapping?.label}</span>
+              {swapData && "assigned" in swapData && !swapData.assigned ? (
+                "Gán serial"
+              ) : (
+                <>
+                  Đổi serial <span className="font-mono">{swapping?.label}</span>
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
           {swapData === null ? (
@@ -183,6 +224,16 @@ export function SerialChipList({
               >
                 {SWAP_MODE_HINT[swapData.mode]}
               </p>
+              {swapData.assigned && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => handleSwap(null, "")}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Để trống serial (gán sau)
+                </button>
+              )}
               <input
                 autoFocus
                 value={swapFilter}

@@ -76,6 +76,7 @@ import { OrderConflictAlert } from "./order-conflict-alert";
 import { SendDocumentEmailDialog } from "./send-document-email-dialog";
 import { OrderComments } from "./order-comments";
 import { SerialChipList } from "./serial-chip-list";
+import { ChangeProductButton, SerialQuantityStepper } from "./serial-group-controls";
 import { ComboChildSwapButton } from "./combo-line-controls";
 import { LineChargeEditor, type LinePriceTarget } from "./line-charge-editor";
 import { LineNoteEditor } from "./line-note-editor";
@@ -206,6 +207,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }));
 
   const canManage = !!employee && MANAGE_ROLES.includes(employee.role);
+  // Sửa nhanh dòng hàng (−/+ số lượng, đổi sản phẩm, tự gán serial) — mọi
+  // nhân viên, như ô thêm nhanh sản phẩm.
+  const linesEditable = !order.completed_at && !order.cancelled_at;
   // Dòng vận chuyển (giao/thu hồi xe máy) — Cửa hàng trưởng/Kỹ thuật-Sale
   // được tự điền (theo yêu cầu CEO), khác các dòng dịch vụ tĩnh khác chỉ
   // canManage mới sửa được.
@@ -610,8 +614,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       ];
     }
     if (t.product_type === "rental" && t.tracking_type === "individual") {
-      // Phương án B (CEO 2026-10-03): 1 dòng/loại máy — nhập số lượng, hệ
-      // thống tự lấy máy rảnh. Từng máy vẫn chọn được bằng cách gõ serial.
+      // 1 dòng/loại máy — nhập số lượng, lên đơn "chưa gán serial" (kiểu
+      // Booqable, CEO 2026-10-05), gán lúc giao. Gõ serial để chọn đúng máy.
       const machines = (equipmentInstances ?? []).filter(
         (i) => i.equipment_type_id === t.id && i.status === "available",
       );
@@ -1029,6 +1033,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     isDeliveryLine ? "Địa chỉ + SĐT nhận/trả hàng" : undefined
                                   }
                                 />
+                                {linesEditable && type && type.product_type !== "service" && (
+                                  <ChangeProductButton
+                                    lineIds={[line.id]}
+                                    currentLabel={type.name}
+                                    quantity={line.quantity}
+                                  />
+                                )}
                               </>,
                             )}
                             {availabilityCell(
@@ -1069,10 +1080,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     // chip dưới tên. Chỉ gộp dòng thiết bị serial thuần — dòng
                     // dịch vụ/vận chuyển có người thực hiện vẫn tách riêng từng
                     // dòng. Nhóm đứng ở vị trí máy đầu tiên.
+                    // Gồm cả dòng serial "chưa gán" (instance null).
                     const isGroupable = (line: Line) => {
-                      if (!line.equipment_instance_id || !line.equipment_type_id) return false;
-                      if (line.parent_line_id) return false;
+                      if (!line.equipment_type_id || line.parent_line_id) return false;
                       const t = equipmentTypeById.get(line.equipment_type_id);
+                      if (!line.equipment_instance_id && t?.tracking_type !== "individual") return false;
                       return (
                         !!t &&
                         t.payout_percentage == null &&
@@ -1091,7 +1103,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       const first = members[0];
                       const type = equipmentTypeById.get(first.equipment_type_id!)!;
                       const memberIds = members.map((m) => m.id);
-                      const chips = members.map((m) => {
+                      const unassignedIds = members.filter((m) => !m.equipment_instance_id).map((m) => m.id);
+                      const chips = members.filter((m) => m.equipment_instance_id).map((m) => {
                         const inst = equipmentInstanceById.get(m.equipment_instance_id!);
                         const variant = inst?.equipment_unit_id
                           ? equipmentUnitById.get(inst.equipment_unit_id)?.brand_model
@@ -1115,12 +1128,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               <>
                                 <SerialChipList
                                   items={chips}
+                                  unassignedLineIds={unassignedIds}
                                   canRemove={canManage}
                                   canSwap={
                                     !order.cancelled_at &&
                                     (canManage || (!order.completed_at && !order.return_stock_transferred_at))
                                   }
+                                  canAutoAssign={linesEditable && !order.return_stock_transferred_at}
                                 />
+                                {linesEditable && (
+                                  <ChangeProductButton
+                                    lineIds={memberIds}
+                                    currentLabel={type.name}
+                                    quantity={members.length}
+                                  />
+                                )}
                                 <LineNoteEditor
                                   lineIds={memberIds}
                                   note={members.find((m) => m.extra_information)?.extra_information ?? null}
@@ -1129,7 +1151,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               </>,
                             )}
                             {availabilityCell(null, false)}
-                            <TableCell className="tabular-nums">{members.length}</TableCell>
+                            <TableCell className="tabular-nums">
+                              {linesEditable ? (
+                                <SerialQuantityStepper lineIds={memberIds} quantity={members.length} />
+                              ) : (
+                                members.length
+                              )}
+                            </TableCell>
                             {chargeCell(
                               type,
                               { kind: "group", lineIds: memberIds },

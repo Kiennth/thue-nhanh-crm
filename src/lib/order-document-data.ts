@@ -138,9 +138,10 @@ export function buildDocRows({
 
     // Máy serial cùng sản phẩm + cùng đơn giá + cùng số kỳ → gộp 1 dòng, SL =
     // số máy, serial liệt kê riêng (mẫu biên bản bàn giao có cột Serial).
-    if (isRental && line.equipment_instance_id) {
+    // Gồm cả dòng serial chưa gán (instance null) — gộp chung, không có serial.
+    if (isRental && type?.tracking_type === "individual") {
       const key = `${line.equipment_type_id}|${line.unit_price}|${line.charge_duration ?? ""}`;
-      const code = instanceCodeById.get(line.equipment_instance_id);
+      const code = line.equipment_instance_id ? instanceCodeById.get(line.equipment_instance_id) : undefined;
       const existing = groupRowByKey.get(key);
       if (existing) {
         existing.quantity += line.quantity;

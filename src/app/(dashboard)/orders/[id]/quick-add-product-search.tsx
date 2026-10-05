@@ -32,7 +32,7 @@ export function QuickAddProductSearch({
   options: QuickAddOption[];
 }) {
   const [query, setQuery] = useState("");
-  // Số lượng thêm 1 lần — hàng serial: hệ thống tự lấy đủ số máy rảnh.
+  // Số lượng thêm 1 lần — hàng serial: lên đơn "chưa gán serial", gán lúc giao.
   const [quantity, setQuantity] = useState(1);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export function QuickAddProductSearch({
           onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
           className="w-20"
           aria-label="Số lượng"
-          title="Số lượng thêm (máy serial: tự lấy đủ số máy rảnh)"
+          title="Số lượng thêm (máy serial: để trống serial, gán lúc giao)"
           disabled={pending}
         />
       </div>
