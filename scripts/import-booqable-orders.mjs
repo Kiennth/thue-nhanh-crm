@@ -500,6 +500,22 @@ async function syncOpenOrderTimes(bqOrder, orderCode, ctx) {
   if (!starts_at || !stops_at) return;
   const same = (a, b) => a && b && Math.abs(Date.parse(a) - Date.parse(b)) < 60_000;
   if (same(crm.rental_start_at, starts_at) && same(crm.rental_end_at, stops_at)) return;
+  // CEO 2026-10-05: giờ đã có người sửa tay trong CRM (actor_id có trong
+  // activity_log) thì CRM là gốc — không lấy giờ Booqable đè lên (BQ13084 bị
+  // đè 2 lần trong ngày).
+  const { data: logs } = await db
+    .from("activity_log")
+    .select("old_s:old_data->>rental_start_at, new_s:new_data->>rental_start_at, old_e:old_data->>rental_end_at, new_e:new_data->>rental_end_at")
+    .eq("table_name", "orders")
+    .eq("record_id", crm.id)
+    .eq("action", "update")
+    .not("actor_id", "is", null)
+    .limit(200);
+  const editedInCrm = (logs ?? []).some((l) => l.old_s !== l.new_s || l.old_e !== l.new_e);
+  if (editedInCrm) {
+    console.log(`  ✋ ${orderCode} giữ giờ CRM (đã sửa tay trong CRM) — Booqable: ${starts_at} / ${stops_at}`);
+    return;
+  }
   const { error } = await db
     .from("orders")
     .update({ rental_start_at: starts_at, rental_end_at: stops_at })
