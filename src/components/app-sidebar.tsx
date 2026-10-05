@@ -22,6 +22,12 @@ import {
   UserRound,
   Users,
   WalletCards,
+  Building2,
+  FolderTree,
+  History,
+  Percent,
+  Tags,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -121,6 +127,37 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     tile: "bg-sky-500/12 text-sky-600 dark:text-sky-400",
     active: "data-active:bg-sky-500/12 data-active:text-sky-700 dark:data-active:text-sky-300",
   },
+  // 6 mục quản trị đưa từ menu Cài đặt lên nav chính (CEO 2026-10-05).
+  "/branches": {
+    icon: Building2,
+    tile: "bg-stone-500/12 text-stone-600 dark:text-stone-300",
+    active: "data-active:bg-stone-500/12 data-active:text-stone-800 dark:data-active:text-stone-100",
+  },
+  "/equipment-categories": {
+    icon: FolderTree,
+    tile: "bg-lime-500/12 text-lime-700 dark:text-lime-400",
+    active: "data-active:bg-lime-500/12 data-active:text-lime-800 dark:data-active:text-lime-300",
+  },
+  "/pricing-templates": {
+    icon: Tags,
+    tile: "bg-fuchsia-500/12 text-fuchsia-600 dark:text-fuchsia-400",
+    active: "data-active:bg-fuchsia-500/12 data-active:text-fuchsia-700 dark:data-active:text-fuchsia-300",
+  },
+  "/employees": {
+    icon: UsersRound,
+    tile: "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
+    active: "data-active:bg-cyan-500/12 data-active:text-cyan-700 dark:data-active:text-cyan-300",
+  },
+  "/commission": {
+    icon: Percent,
+    tile: "bg-yellow-500/12 text-yellow-700 dark:text-yellow-400",
+    active: "data-active:bg-yellow-500/12 data-active:text-yellow-800 dark:data-active:text-yellow-300",
+  },
+  "/activity": {
+    icon: History,
+    tile: "bg-zinc-500/12 text-zinc-600 dark:text-zinc-300",
+    active: "data-active:bg-zinc-500/12 data-active:text-zinc-800 dark:data-active:text-zinc-100",
+  },
 };
 const FALLBACK_STYLE = {
   icon: BadgeDollarSign,
@@ -151,8 +188,10 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
 
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
-  const items = NAV_ITEMS.filter((item) => item.roles.includes(employee.role));
   const settingsItems = SETTINGS_ITEMS.filter((item) => item.roles.includes(employee.role));
+  // Mục quản trị (Chi nhánh, Nhân viên, Chính sách khoán…) lên nav chính luôn
+  // (CEO 2026-10-05); menu Cài đặt ở footer vẫn giữ làm lối tắt.
+  const items = [...NAV_ITEMS, ...SETTINGS_ITEMS].filter((item) => item.roles.includes(employee.role));
   // Chia nav theo khu vực chuyên môn (CEO 2026-10-05); mục chưa xếp vào khu
   // nào rơi xuống nhóm "Khác" để không bị mất khi thêm mục mới quên khai báo.
   const itemByHref = new Map(items.map((item) => [item.href, item]));
