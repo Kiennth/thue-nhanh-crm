@@ -31,7 +31,8 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const OrderSchema = z
   .object({
-    order_code: z.string().trim().min(1, { message: "Mã đơn không được để trống." }),
+    // Để trống khi tạo = tự đánh số nối tiếp Booqable (next_order_code).
+    order_code: z.string().trim().optional(),
     pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh giao." }),
     // Bỏ trống = thu hồi tại chính chi nhánh giao (tình huống phổ biến).
     return_branch_id: z.string().uuid().optional(),
@@ -55,7 +56,7 @@ const OrderSchema = z
 
 function parseOrderForm(formData: FormData) {
   return OrderSchema.safeParse({
-    order_code: formData.get("order_code"),
+    order_code: formData.get("order_code") || undefined,
     pickup_branch_id: formData.get("pickup_branch_id"),
     return_branch_id: formData.get("return_branch_id") || undefined,
     customer_id: formData.get("customer_id"),
@@ -75,9 +76,10 @@ export async function createOrder(_prevState: ActionState, formData: FormData): 
   }
 
   const supabase = await createClient();
+  const orderCode = parsed.data.order_code || (await nextOrderCode(supabase));
   const { data, error } = await supabase
     .from("orders")
-    .insert({ ...parsed.data, created_by: employee.id })
+    .insert({ ...parsed.data, order_code: orderCode, created_by: employee.id })
     .select("id")
     .single();
 
@@ -100,6 +102,7 @@ export async function updateOrder(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
+  if (!parsed.data.order_code) return { error: "Mã đơn không được để trống." };
 
   const supabase = await createClient();
   // Đã xuất kho thì hàng đã trừ ở kho giao cũ — đổi kho giao lúc này làm
@@ -830,12 +833,12 @@ export async function cancelOrder(id: string) {
   revalidatePath(`/orders/${id}`);
 }
 
-function generateOrderCode(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const rand = String(Math.floor(Math.random() * 900) + 100);
-  return `DH${y}${m}${d}-${rand}`;
+// Số đơn nối tiếp Booqable (CEO 2026-10-05): 13111, 13112… — sequence
+// order_number_seq qua RPC next_order_code (bỏ qua số đã bị gõ tay).
+async function nextOrderCode(supabase: SupabaseServerClient): Promise<string> {
+  const { data, error } = await (supabase as unknown as UntypedSupabaseClient).rpc("next_order_code");
+  if (error || typeof data !== "string") throw new Error("Không cấp được số đơn: " + (error?.message ?? ""));
+  return data;
 }
 
 // Nhân bản đơn — tạo đơn mới (nháp, 0/10 khâu, chưa hoàn tất/huỷ) copy chi
@@ -876,7 +879,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: newOrder, error: insertError } = await supabase
     .from("orders")
     .insert({
-      order_code: generateOrderCode(today),
+      order_code: await nextOrderCode(supabase),
       pickup_branch_id: source.pickup_branch_id,
       return_branch_id: source.return_branch_id,
       customer_id: source.customer_id,
@@ -2515,7 +2518,8 @@ const QuickOrderSchema = z.object({
   return_branch_id: z.string().uuid().nullable().optional(),
   rental_start_at: z.string().min(1, { message: "Vui lòng chọn thời gian bắt đầu thuê." }),
   rental_end_at: z.string().min(1, { message: "Vui lòng chọn thời gian kết thúc thuê." }),
-  order_code: z.string().trim().min(1, { message: "Mã đơn không được để trống." }),
+  // Trống = tự đánh số nối tiếp.
+  order_code: z.string().trim().nullable().optional(),
   order_date: z.string().min(1),
   orderer_name: z.string().trim().nullable().optional(),
   orderer_phone: z.string().trim().nullable().optional(),
@@ -2564,7 +2568,7 @@ export async function quickCreateOrder(
   const { data: order, error } = await supabase
     .from("orders")
     .insert({
-      order_code: d.order_code,
+      order_code: d.order_code || (await nextOrderCode(supabase)),
       pickup_branch_id: d.pickup_branch_id,
       return_branch_id: d.return_branch_id || d.pickup_branch_id,
       customer_id: d.customer_id,
@@ -3164,7 +3168,7 @@ export async function extendOrder(
   const { data: newOrder, error: insertError } = await supabase
     .from("orders")
     .insert({
-      order_code: generateOrderCode(today),
+      order_code: await nextOrderCode(supabase),
       pickup_branch_id: src.pickup_branch_id,
       return_branch_id: src.return_branch_id,
       customer_id: src.customer_id,

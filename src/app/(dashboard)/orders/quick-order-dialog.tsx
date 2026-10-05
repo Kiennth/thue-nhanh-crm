@@ -58,10 +58,6 @@ function minutePart(d: Date) {
 function combine(date: string, hour: string, minute = "00") {
   return new Date(`${date}T${hour}:${minute}:00`);
 }
-function randomOrderCode() {
-  const now = new Date();
-  return `DH${datePart(now).replaceAll("-", "")}-${Math.floor(Math.random() * 900) + 100}`;
-}
 
 type CartLine = { item: QuickOrderCatalogItem; quantity: number };
 
@@ -147,7 +143,8 @@ export function QuickOrderDialog({
   const searchRef = useRef<HTMLDivElement>(null);
   const [employeeId, setEmployeeId] = useState("");
   // "Thêm chi tiết"
-  const [orderCode, setOrderCode] = useState(randomOrderCode);
+  // Trống = server tự đánh số nối tiếp Booqable (13111…); gõ tay vẫn được.
+  const [orderCode, setOrderCode] = useState("");
   const [returnBranchId, setReturnBranchId] = useState("");
   const [ordererName, setOrdererName] = useState(prefill?.ordererName ?? "");
   const [ordererPhone, setOrdererPhone] = useState(prefill?.ordererPhone ?? "");
@@ -290,7 +287,7 @@ export function QuickOrderDialog({
         return_branch_id: returnBranchId || null,
         rental_start_at: startAt.toISOString(),
         rental_end_at: endAt.toISOString(),
-        order_code: orderCode,
+        order_code: orderCode.trim() || null,
         order_date: orderDate,
         orderer_name: ordererName || null,
         orderer_phone: ordererPhone || null,
@@ -572,7 +569,12 @@ export function QuickOrderDialog({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_code">Mã đơn</Label>
-                <Input id="quick_order_code" value={orderCode} onChange={(e) => setOrderCode(e.target.value)} />
+                <Input
+                  id="quick_order_code"
+                  value={orderCode}
+                  onChange={(e) => setOrderCode(e.target.value)}
+                  placeholder="Tự đánh số tiếp theo"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_return_branch">Kho thu hồi</Label>

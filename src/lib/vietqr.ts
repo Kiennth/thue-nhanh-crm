@@ -26,7 +26,8 @@ export function vietQrImageUrl(amount: number, ref: string): string {
 
 // Đọc mã đơn từ nội dung chuyển khoản. Ngân hàng hay chèn thêm chữ (tên
 // người chuyển, "CHUYEN TIEN", mã giao dịch...) và bỏ dấu "-" → tìm mẫu
-// DH + 8 số ngày + 3 số, hoặc BQ + số.
+// DH + 8 số ngày + 3 số, BQ + số, hoặc số đơn thuần (13111… — CEO
+// 2026-10-05) đứng ngay sau "THANH TOAN"/"DAT COC" (tránh ăn nhầm số khác).
 export function parseTransferContent(content: string): { orderCode: string; deposit: boolean } | null {
   const up = content
     .normalize("NFD")
@@ -38,5 +39,7 @@ export function parseTransferContent(content: string): { orderCode: string; depo
   if (dh) return { orderCode: `DH${dh[1]}-${dh[2]}`, deposit };
   const bq = /BQ\s?(\d{3,6})(?!\d)/.exec(up);
   if (bq) return { orderCode: `BQ${bq[1]}`, deposit };
+  const num = /(?:THANH\s?TOAN|DAT\s?COC)\s?(\d{5,7})(?!\d)/.exec(up);
+  if (num) return { orderCode: num[1], deposit };
   return null;
 }

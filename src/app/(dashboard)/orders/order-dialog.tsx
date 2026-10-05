@@ -68,14 +68,6 @@ function BranchPills({
   );
 }
 
-function generateOrderCode() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const rand = String(Math.floor(Math.random() * 900) + 100);
-  return `DH${y}${m}${d}-${rand}`;
-}
 
 export function OrderDialog({ branches, order }: OrderDialogProps) {
   const isEdit = !!order;
@@ -92,7 +84,8 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [orderCode] = useState(() => order?.order_code ?? generateOrderCode());
+  // Đơn mới để trống = server tự đánh số nối tiếp Booqable (13111…).
+  const [orderCode] = useState(() => order?.order_code ?? "");
   const formRef = useRef<HTMLFormElement>(null);
   const [pickupId, setPickupId] = useState(order?.pickup_branch_id ?? "");
   const [returnId, setReturnId] = useState(order?.return_branch_id ?? "");
@@ -142,7 +135,13 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="order_code">Mã đơn</Label>
-            <Input id="order_code" name="order_code" defaultValue={orderCode} required />
+            <Input
+              id="order_code"
+              name="order_code"
+              defaultValue={orderCode}
+              required={!!order}
+              placeholder={order ? undefined : "Tự đánh số tiếp theo"}
+            />
           </div>
 
           {/* Chi nhánh bấm 1 chạm (CEO 2026-10-04): kho nào giao thì mặc định
