@@ -29,12 +29,16 @@ interface Branch {
 }
 
 interface EquipmentPurchaseDialogProps {
-  equipmentUnitId: string;
+  // Mã chưa có biến thể: truyền equipmentTypeId thay vì equipmentUnitId —
+  // server tự tạo biến thể mặc định trùng tên sản phẩm.
+  equipmentUnitId?: string;
+  equipmentTypeId?: string;
   branches: Branch[];
 }
 
 export function EquipmentPurchaseDialog({
   equipmentUnitId,
+  equipmentTypeId,
   branches,
 }: EquipmentPurchaseDialogProps) {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
@@ -72,7 +76,11 @@ export function EquipmentPurchaseDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="equipment_unit_id" value={equipmentUnitId} />
+          {equipmentUnitId ? (
+            <input type="hidden" name="equipment_unit_id" value={equipmentUnitId} />
+          ) : (
+            <input type="hidden" name="equipment_type_id" value={equipmentTypeId} />
+          )}
           <DialogHeader>
             <DialogTitle>Mua hàng</DialogTitle>
           </DialogHeader>

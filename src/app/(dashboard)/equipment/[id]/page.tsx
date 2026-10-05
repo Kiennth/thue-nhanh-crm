@@ -837,7 +837,11 @@ export default async function EquipmentDetailPage({
             })}
 
           {showUnitsBlock && !unitList.length && (
-            <p className="text-center text-sm text-muted-foreground">Chưa có biến thể nào.</p>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-center text-sm text-muted-foreground">Chưa có biến thể nào.</p>
+              {/* Mã mới tạo: Mua hàng luôn được — tự tạo biến thể mặc định. */}
+              {canManageStock && <EquipmentPurchaseDialog equipmentTypeId={type.id} branches={branchList} />}
+            </div>
           )}
 
           {showUnitsBlock && canManageCatalog && (

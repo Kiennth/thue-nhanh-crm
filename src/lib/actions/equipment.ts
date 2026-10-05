@@ -775,7 +775,10 @@ export async function disposeEquipmentInstance(
 // ---------------------------------------------------------------------------
 
 const EquipmentPurchaseSchema = z.object({
-  equipment_unit_id: z.string().uuid(),
+  // Mã hàng số lượng mới tạo chưa có biến thể (CEO 2026-10-05: không thấy nút
+  // Mua hàng) → gửi equipment_type_id, server tự tạo biến thể mặc định.
+  equipment_unit_id: z.string().uuid().optional(),
+  equipment_type_id: z.string().uuid().optional(),
   branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
   quantity: z.coerce.number().int().min(1, { message: "Số lượng mua phải lớn hơn 0." }),
   unit_cost: z.coerce.number().min(0, { message: "Giá mua không được âm." }),
@@ -790,7 +793,8 @@ export async function createEquipmentPurchase(
   const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
 
   const parsed = EquipmentPurchaseSchema.safeParse({
-    equipment_unit_id: formData.get("equipment_unit_id"),
+    equipment_unit_id: formData.get("equipment_unit_id") || undefined,
+    equipment_type_id: formData.get("equipment_type_id") || undefined,
     branch_id: formData.get("branch_id"),
     quantity: formData.get("quantity"),
     unit_cost: formData.get("unit_cost"),
@@ -806,8 +810,19 @@ export async function createEquipmentPurchase(
   if (branchError) return { error: branchError };
 
   const supabase = await createClient();
+  let unitId = parsed.data.equipment_unit_id;
+  if (!unitId && parsed.data.equipment_type_id) {
+    const { data: newUnitId, error: unitError } = await supabase.rpc("ensure_default_equipment_unit", {
+      p_equipment_type_id: parsed.data.equipment_type_id,
+    });
+    if (unitError || !newUnitId) {
+      return { error: "Không tạo được biến thể mặc định: " + (unitError?.message ?? "") };
+    }
+    unitId = newUnitId;
+  }
+  if (!unitId) return { error: "Thiếu biến thể sản phẩm." };
   const { error } = await supabase.rpc("record_equipment_purchase", {
-    p_equipment_unit_id: parsed.data.equipment_unit_id,
+    p_equipment_unit_id: unitId,
     p_branch_id: parsed.data.branch_id,
     p_quantity: parsed.data.quantity,
     p_unit_cost: parsed.data.unit_cost,
