@@ -2752,16 +2752,52 @@ export async function extendOrder(
   if (!rentalLines.length) return { error: "Đơn không có hàng cho thuê để gia hạn." };
 
   const newEndIso = end.toISOString();
-  // Giữ đơn giá/ngày: giá cũ ÷ số kỳ cũ × số kỳ mới (theo đơn vị thuê của SP).
-  const scaled = (l: L) => {
-    const unit = l.equipment_types?.rental_period_unit;
-    if (!unit) return { unit_price: l.unit_price, line_total: l.line_total };
+  // Giá kỳ gia hạn: dòng đang theo bảng giá → tính lại theo bảng giá cho kỳ
+  // mới (được giảm thuê dài); dòng đã sửa giá tay → giữ đơn giá/ngày đó.
+  const keepRate = (l: L, unit: RentalPeriodUnit) => {
     const oldDur = l.charge_duration ?? computeRentalDurationInUnit(src.rental_start_at!, src.rental_end_at!, unit);
     const newDur = computeRentalDurationInUnit(startAt, newEndIso, unit);
-    if (!oldDur) return { unit_price: l.unit_price, line_total: l.line_total };
-    const unitPrice = Math.round((Number(l.unit_price) / oldDur) * newDur * 100) / 100;
-    return { unit_price: unitPrice, line_total: Math.round(unitPrice * l.quantity * 100) / 100 };
+    const up = oldDur ? Math.round((Number(l.unit_price) / oldDur) * newDur * 100) / 100 : Number(l.unit_price);
+    return { unit_price: up, line_total: Math.round(up * l.quantity * 100) / 100 };
   };
+  const priceById = new Map<string, { unit_price: number; line_total: number }>();
+  for (const l of rentalLines) {
+    const unit = l.equipment_types?.rental_period_unit;
+    if (!unit || !l.equipment_type_id || Number(l.unit_price) === 0) {
+      priceById.set(l.id, { unit_price: Number(l.unit_price), line_total: Number(l.line_total) });
+      continue;
+    }
+    // Dòng con combo: chia theo dòng combo — giữ tỉ lệ theo số kỳ.
+    if (l.parent_line_id) {
+      priceById.set(l.id, keepRate(l, unit));
+      continue;
+    }
+    const override = await resolveUnitPriceOverride(supabase, l.equipment_unit_id, l.equipment_instance_id);
+    const { computed: oldDefault } = await computeLineForEquipmentType(
+      supabase,
+      l.equipment_type_id,
+      src.rental_start_at,
+      src.rental_end_at,
+      l.quantity,
+      override,
+      l.charge_duration,
+    );
+    if (Math.abs(Number(l.unit_price) - oldDefault.unitPrice) <= 1) {
+      const { computed } = await computeLineForEquipmentType(
+        supabase,
+        l.equipment_type_id,
+        startAt,
+        newEndIso,
+        l.quantity,
+        override,
+        null,
+      );
+      priceById.set(l.id, { unit_price: computed.unitPrice, line_total: computed.lineTotal });
+    } else {
+      priceById.set(l.id, keepRate(l, unit));
+    }
+  }
+  const scaled = (l: L) => priceById.get(l.id)!;
 
   const today = vnNow();
   const nowIso = new Date().toISOString();
