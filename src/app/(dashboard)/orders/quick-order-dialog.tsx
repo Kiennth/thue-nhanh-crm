@@ -78,6 +78,7 @@ export interface QuickOrderPrefill {
   ordererName: string;
   ordererPhone: string;
   ordererEmail: string;
+  deliveryAddress?: string | null;
 }
 const BIKE_DELIVERY_ID = "38f5c644-3898-4b1f-a3f5-901e55f77c6a";
 const BIKE_COLLECTION_ID = "13c85fe0-8b13-4d76-9df5-a20b19598cc9";
@@ -151,6 +152,10 @@ export function QuickOrderDialog({
   const [ordererName, setOrdererName] = useState(prefill?.ordererName ?? "");
   const [ordererPhone, setOrdererPhone] = useState(prefill?.ordererPhone ?? "");
   const [ordererEmail, setOrdererEmail] = useState(prefill?.ordererEmail ?? "");
+  // 3 ô giao hàng (CEO 2026-10-05) — tên/SĐT người nhận trống thì lấy người đặt.
+  const [deliveryAddress, setDeliveryAddress] = useState(prefill?.deliveryAddress ?? "");
+  const [receiverName, setReceiverName] = useState("");
+  const [receiverPhone, setReceiverPhone] = useState("");
   const [orderDate, setOrderDate] = useState(() => datePart(new Date()));
 
   function handleOpenChange(next: boolean) {
@@ -285,6 +290,9 @@ export function QuickOrderDialog({
         orderer_name: ordererName || null,
         orderer_phone: ordererPhone || null,
         orderer_email: ordererEmail || null,
+        delivery_address: deliveryAddress || null,
+        receiver_name: receiverName || ordererName || null,
+        receiver_phone: receiverPhone || ordererPhone || null,
         employee_id: employeeId,
         stage,
         web_order_id: prefill?.webOrderId ?? null,
@@ -605,6 +613,34 @@ export function QuickOrderDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="quick_orderer_email">Email người đặt</Label>
                 <Input id="quick_orderer_email" type="email" value={ordererEmail} onChange={(e) => setOrdererEmail(e.target.value)} placeholder="Không bắt buộc" />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="quick_delivery_address">Địa chỉ nhận hàng</Label>
+                <Input
+                  id="quick_delivery_address"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="Để trống = khách tự đến kho lấy"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="quick_receiver_name">Tên người nhận</Label>
+                <Input
+                  id="quick_receiver_name"
+                  value={receiverName}
+                  onChange={(e) => setReceiverName(e.target.value)}
+                  placeholder={ordererName || "Trống = người đặt"}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="quick_receiver_phone">SĐT người nhận</Label>
+                <Input
+                  id="quick_receiver_phone"
+                  inputMode="tel"
+                  value={receiverPhone}
+                  onChange={(e) => setReceiverPhone(e.target.value)}
+                  placeholder={ordererPhone || "Trống = SĐT người đặt"}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_date">Ngày đơn</Label>

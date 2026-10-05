@@ -430,6 +430,11 @@ export interface Database {
           orderer_name: string | null;
           orderer_phone: string | null;
           orderer_email: string | null;
+          // Thông tin giao hàng có cấu trúc (CEO 2026-10-05) — chứng từ, lịch
+          // lấy từ đây trước, không có mới dò trong ghi chú dòng phí giao.
+          delivery_address: string | null;
+          receiver_name: string | null;
+          receiver_phone: string | null;
           order_date: string;
           total_value: number;
           status: TaskType;
@@ -465,6 +470,9 @@ export interface Database {
           orderer_name?: string | null;
           orderer_phone?: string | null;
           orderer_email?: string | null;
+          delivery_address?: string | null;
+          receiver_name?: string | null;
+          receiver_phone?: string | null;
           order_date?: string;
           total_value?: number;
           status?: TaskType;

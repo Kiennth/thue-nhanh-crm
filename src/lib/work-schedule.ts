@@ -54,11 +54,23 @@ type JobLine = {
     rental_start_at: string | null;
     rental_end_at: string | null;
     cancelled_at: string | null;
+    delivery_address: string | null;
     customers: { name: string } | null;
   } | null;
 };
 
 // Việc được giao trong [fromIso, toIso). employeeId null = mọi người.
+// Giao: địa chỉ nhận hàng trên đơn thắng ghi chú dòng phí; thu hồi: ghi chú
+// dòng thu hồi trước (có thể khác chỗ giao); lắp đặt/tháo dỡ: chỗ giao.
+function jobAddress(l: JobLine, kind: JobKind): string | null {
+  const lineAddr =
+    l.extra_information?.trim() || (l.note?.trim().startsWith("Gắn lại") ? null : l.note?.trim() || null);
+  const orderAddr = l.orders?.delivery_address?.trim() || null;
+  if (kind === "delivery") return orderAddr || lineAddr;
+  if (kind === "collection") return lineAddr || orderAddr;
+  return orderAddr;
+}
+
 export async function loadJobs(
   db: SupabaseClient,
   fromIso: string,
@@ -70,7 +82,7 @@ export async function loadJobs(
     let q = db
       .from("order_equipment")
       .select(
-        "employee_id, equipment_type_id, note, extra_information, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, customers(name))",
+        "employee_id, equipment_type_id, note, extra_information, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, delivery_address, customers(name))",
       )
       .not("employee_id", "is", null)
       .in("equipment_type_id", typeIds)
@@ -96,10 +108,7 @@ export async function loadJobs(
       orderId: l.orders.id,
       orderCode: l.orders.order_code,
       customer: l.orders.customers?.name ?? "—",
-      address:
-        kind === "delivery" || kind === "collection"
-          ? l.extra_information?.trim() || (l.note?.trim().startsWith("Gắn lại") ? null : l.note?.trim() || null)
-          : null,
+      address: jobAddress(l, kind),
     });
   };
   for (const l of byStart) push(l, false);

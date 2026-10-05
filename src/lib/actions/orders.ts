@@ -723,6 +723,27 @@ export async function updateOrderContactInfo(
   return { success: true };
 }
 
+// 3 ô giao hàng của đơn (CEO 2026-10-05) — chứng từ/lịch lấy từ đây.
+export async function updateOrderDeliveryInfo(
+  orderId: string,
+  info: { address: string; name: string; phone: string },
+): Promise<ActionState> {
+  await requireRole([...ALL_ROLES]);
+  const clean = (v: string) => v.replace(/\s+/g, " ").trim() || null;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({
+      delivery_address: clean(info.address),
+      receiver_name: clean(info.name),
+      receiver_phone: clean(info.phone),
+    })
+    .eq("id", orderId);
+  if (error) return { error: "Không lưu được thông tin giao hàng: " + error.message };
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
 export async function deleteOrder(id: string) {
   await requireRole([...DELETE_ROLES]);
 
@@ -821,7 +842,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: source, error: sourceError } = await supabase
     .from("orders")
     .select(
-      "pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, deposit_override_amount, orderer_name, orderer_phone, orderer_email",
+      "pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, deposit_override_amount, orderer_name, orderer_phone, orderer_email, delivery_address, receiver_name, receiver_phone",
     )
     .eq("id", id)
     .single();
@@ -858,6 +879,9 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       orderer_name: source.orderer_name,
       orderer_phone: source.orderer_phone,
       orderer_email: source.orderer_email,
+      delivery_address: source.delivery_address,
+      receiver_name: source.receiver_name,
+      receiver_phone: source.receiver_phone,
       created_by: employee.id,
     })
     .select("id")
@@ -2487,6 +2511,9 @@ const QuickOrderSchema = z.object({
     .union([z.literal(""), z.string().trim().email({ message: "Email người đặt không hợp lệ." })])
     .nullable()
     .optional(),
+  delivery_address: z.string().trim().nullable().optional(),
+  receiver_name: z.string().trim().nullable().optional(),
+  receiver_phone: z.string().trim().nullable().optional(),
   employee_id: z.string().uuid({ message: "Vui lòng chọn người phụ trách." }),
   // "quote" = Tiếp nhận + Báo giá; "deal" = thêm Chốt đơn.
   stage: z.enum(["quote", "deal"]),
@@ -2529,6 +2556,9 @@ export async function quickCreateOrder(
       orderer_name: d.orderer_name || null,
       orderer_phone: d.orderer_phone || null,
       orderer_email: d.orderer_email || null,
+      delivery_address: d.delivery_address || null,
+      receiver_name: d.receiver_name || null,
+      receiver_phone: d.receiver_phone || null,
       order_date: d.order_date,
       rental_start_at: d.rental_start_at,
       rental_end_at: d.rental_end_at,
@@ -3023,7 +3053,7 @@ export async function extendOrder(
   const { data: src } = await supabase
     .from("orders")
     .select(
-      "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, cancelled_at, delivery_stock_moved_at, return_stock_transferred_at, orderer_name, orderer_phone, orderer_email",
+      "id, order_code, pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, cancelled_at, delivery_stock_moved_at, return_stock_transferred_at, orderer_name, orderer_phone, orderer_email, delivery_address, receiver_name, receiver_phone",
     )
     .eq("id", orderId)
     .single();
@@ -3123,6 +3153,9 @@ export async function extendOrder(
       orderer_name: src.orderer_name,
       orderer_phone: src.orderer_phone,
       orderer_email: src.orderer_email,
+      delivery_address: src.delivery_address,
+      receiver_name: src.receiver_name,
+      receiver_phone: src.receiver_phone,
       delivery_stock_moved_at: nowIso,
       extended_from_order_id: orderId,
       created_by: employee.id,

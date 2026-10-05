@@ -64,6 +64,8 @@ import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
 import { RentalPeriodForm } from "./rental-period-form";
+import { DeliveryInfoForm } from "./delivery-info-form";
+import { suggestDeliveryContact } from "@/lib/delivery-contact";
 import { OrderInfoForm } from "./order-info-form";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
@@ -186,7 +188,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ data: orderCustomer }, { data: reservationRows }] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, email, deposit_percentage")
+      .select("id, name, email, phone, deposit_percentage")
       .eq("id", order.customer_id)
       .maybeSingle(),
     relevantUnitIds.length > 0
@@ -814,6 +816,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               orderId={order.id}
               rentalStartAt={order.rental_start_at}
               rentalEndAt={order.rental_end_at}
+            />
+            <DeliveryInfoForm
+              key={`${order.delivery_address ?? ""}|${order.receiver_name ?? ""}|${order.receiver_phone ?? ""}`}
+              orderId={order.id}
+              address={order.delivery_address}
+              name={order.receiver_name}
+              phone={order.receiver_phone}
+              suggested={suggestDeliveryContact(lines ?? [], order, orderCustomer?.phone ?? null)}
             />
           </CardContent>
         </Card>

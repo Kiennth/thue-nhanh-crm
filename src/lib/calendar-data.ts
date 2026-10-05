@@ -80,11 +80,14 @@ type OrderRow = {
   delivery_stock_moved_at: string | null;
   completed_at: string | null;
   return_stock_transferred_at: string | null;
+  delivery_address: string | null;
+  receiver_name: string | null;
+  receiver_phone: string | null;
   customers: { name: string; phone: string | null } | null;
 };
 
 const ORDER_COLUMNS =
-  "id, order_code, rental_start_at, rental_end_at, pickup_branch_id, return_branch_id, delivery_stock_moved_at, completed_at, return_stock_transferred_at, customers(name, phone)";
+  "id, order_code, rental_start_at, rental_end_at, pickup_branch_id, return_branch_id, delivery_stock_moved_at, completed_at, return_stock_transferred_at, delivery_address, receiver_name, receiver_phone, customers(name, phone)";
 
 type AnyClient = SupabaseClient;
 
@@ -349,6 +352,11 @@ export async function loadAgenda(
       const noteAddr = l.note?.trim().startsWith("Gắn lại") ? "" : l.note?.trim();
       address = l.extra_information?.trim() || noteAddr || address;
     }
+    // 3 ô giao hàng trên đơn (CEO 2026-10-05): giao thì địa chỉ nhận hàng
+    // thắng ghi chú dòng phí; thu hồi ưu tiên ghi chú dòng thu hồi (có thể
+    // khác chỗ giao), không có mới lấy địa chỉ nhận hàng.
+    const orderAddr = o.delivery_address?.trim() || null;
+    address = kind === "delivery" ? orderAddr || address : address || orderAddr;
     const items = orderLines
       .filter((l) => l.equipment_types?.product_type !== "service" && !CAR_TRANSPORT[l.equipment_type_id ?? ""])
       .filter((l) => !TRANSPORT_LINE_CATEGORY_BY_TYPE_ID[l.equipment_type_id ?? ""])
@@ -361,7 +369,7 @@ export async function loadAgenda(
       orderId: o.id,
       orderCode: o.order_code,
       customer: o.customers?.name ?? "—",
-      phone: o.customers?.phone ?? null,
+      phone: o.receiver_phone?.trim() || o.customers?.phone || null,
       at: kind === "delivery" ? o.rental_start_at : o.rental_end_at,
       kind,
       done:

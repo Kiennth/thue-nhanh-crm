@@ -205,6 +205,7 @@ export function WebOrderCard({
                 ordererName: row.customer_name,
                 ordererPhone: row.phone,
                 ordererEmail: row.email,
+                deliveryAddress: row.pickup_key === "ship" ? row.address : null,
               }}
             />
           </>

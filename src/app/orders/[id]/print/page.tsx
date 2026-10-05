@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { resolveDeliveryContact } from "@/lib/delivery-contact";
 import { Tinos } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import { fetchRowsByIds } from "@/lib/supabase/fetch-all";
@@ -273,22 +274,9 @@ export default async function OrderPrintPage({
           .filter(Boolean),
       ),
     ];
-    // Biên bản giao hàng (CEO 2026-10-05): địa chỉ giao = dòng phí GIAO (xe máy/ô tô).
-    const DELIVERY_TYPE_IDS = new Set(["38f5c644-3898-4b1f-a3f5-901e55f77c6a", "ce4a5f88-8daa-47c2-92fc-196d1fc321db"]);
-    const deliveryAddress =
-      (lines ?? [])
-        .filter((l) => l.equipment_type_id && DELIVERY_TYPE_IDS.has(l.equipment_type_id))
-        .map(addressOf)
-        .find(Boolean) ?? null;
-    // SĐT trong ghi chú địa chỉ: ưu tiên số sau chữ "SĐT/ĐT", không thì số di
-    // động VN 10 chữ số đứng riêng (không ăn nhầm số CCCD 12 chữ số).
-    const compact = (deliveryAddress ?? "").replace(/(\d)[ .](?=\d)/g, "$1");
-    const phoneInText =
-      compact.match(/(?:SĐT|ĐT|Sđt|sdt|Tel|Phone)\s*:?\s*((?:\+?84|0)\d{9})(?!\d)/i)?.[1] ??
-      compact.match(/(?<!\d)(?:\+?84|0)[35789]\d{8}(?!\d)/)?.[0] ??
-      null;
-    const nameInText =
-      deliveryAddress?.match(/(?:Người (?:thuê|nhận)|Liên hệ)\s*:\s*([^\-\n,;]+?)\s*(?:-|,|;|$)/i)?.[1]?.trim() ?? null;
+    // Biên bản giao hàng: 3 ô giao hàng trên đơn; đơn chưa điền thì dò từ
+    // dòng phí GIAO + người đặt (xem lib/delivery-contact.ts).
+    const delivery = resolveDeliveryContact(order, lines ?? [], customer?.phone ?? null);
 
     // Cột mới chưa có trong types/database.ts (WIP phiên khác).
     const extra = customer as {
@@ -325,10 +313,12 @@ export default async function OrderPrintPage({
         order.rental_start_at && order.rental_end_at
           ? computeRentalDurationInUnit(order.rental_start_at, order.rental_end_at, "day")
           : null,
-      placeText: deliveryNotes.length ? deliveryNotes.join(" / ") : `Kho Thuê Nhanh ${branchName}`.trim(),
-      deliveryAddress: deliveryAddress ?? `Nhận tại kho Thuê Nhanh ${branchName}`.trim(),
-      receiverName: order.orderer_name?.trim() || nameInText,
-      receiverPhone: order.orderer_phone?.trim() || phoneInText || customer?.phone || null,
+      placeText: deliveryNotes.length
+        ? deliveryNotes.join(" / ")
+        : order.delivery_address?.trim() || `Kho Thuê Nhanh ${branchName}`.trim(),
+      deliveryAddress: delivery.address ?? `Nhận tại kho Thuê Nhanh ${branchName}`.trim(),
+      receiverName: delivery.name,
+      receiverPhone: delivery.phone,
       paid: sumPayments("invoice"),
       depositHeld: sumPayments("deposit_collect") - sumPayments("deposit_refund"),
     };
