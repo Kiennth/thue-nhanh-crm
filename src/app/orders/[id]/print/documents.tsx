@@ -42,6 +42,10 @@ export interface DocContext {
   returnDateText: string;
   rentalDays: number | null;
   placeText: string;
+  // Biên bản giao hàng: địa chỉ giao + người nhận/SĐT (CEO 2026-10-05).
+  deliveryAddress: string;
+  receiverName: string | null;
+  receiverPhone: string | null;
   paid: number;
   depositHeld: number;
 }
@@ -401,12 +405,13 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
       <div>
         <p className="font-bold">BÊN NHẬN : {ctx.customer.name}</p>
         <PartyLine label="Địa chỉ">{ctx.customer.address ?? ""}</PartyLine>
+        <PartyLine label="Địa chỉ giao hàng">{ctx.deliveryAddress}</PartyLine>
         <PartyLine label="MST">{ctx.customer.taxCode ?? ""}</PartyLine>
         {ctx.customer.budgetUnitCode && (
           <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
         )}
-        <PartyLine label="Người nhận">{DOTS}</PartyLine>
-        <PartyLine label="Số điện thoại">{DOTS}</PartyLine>
+        <PartyLine label="Người nhận">{ctx.receiverName ?? DOTS}</PartyLine>
+        <PartyLine label="Số điện thoại">{ctx.receiverPhone ?? DOTS}</PartyLine>
         <PartyLine label="Số CCCD">
           {DOTS} Cấp ngày: {DOTS}
         </PartyLine>

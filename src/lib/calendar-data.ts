@@ -117,6 +117,7 @@ type LineRow = {
   custom_name: string | null;
   quantity: number;
   note: string | null;
+  extra_information: string | null;
   equipment_types: { name: string; product_type: string } | null;
 };
 
@@ -129,7 +130,7 @@ async function loadLines(supabase: AnyClient, orderIds: string[]): Promise<LineR
           supabase
             .from("order_equipment")
             .select(
-              "order_id, equipment_type_id, equipment_instance_id, custom_name, quantity, note, equipment_types(name, product_type)",
+              "order_id, equipment_type_id, equipment_instance_id, custom_name, quantity, note, extra_information, equipment_types(name, product_type)",
             )
             .in("order_id", ids)
             .order("position")
@@ -344,7 +345,9 @@ export async function loadAgenda(
       if (TRANSPORT_LINE_CATEGORY_BY_TYPE_ID[id] === wanted) transport = "bike";
       else if (CAR_TRANSPORT[id] === wanted) transport = "car";
       else continue;
-      address = l.note?.trim() || address;
+      // Địa chỉ thường ở "Chi tiết" (extra_information); ghi chú hệ thống "Gắn lại…" bỏ qua.
+      const noteAddr = l.note?.trim().startsWith("Gắn lại") ? "" : l.note?.trim();
+      address = l.extra_information?.trim() || noteAddr || address;
     }
     const items = orderLines
       .filter((l) => l.equipment_types?.product_type !== "service" && !CAR_TRANSPORT[l.equipment_type_id ?? ""])

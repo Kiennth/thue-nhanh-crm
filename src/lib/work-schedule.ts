@@ -47,6 +47,7 @@ type JobLine = {
   employee_id: string;
   equipment_type_id: string;
   note: string | null;
+  extra_information: string | null;
   orders: {
     id: string;
     order_code: string;
@@ -69,7 +70,7 @@ export async function loadJobs(
     let q = db
       .from("order_equipment")
       .select(
-        "employee_id, equipment_type_id, note, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, customers(name))",
+        "employee_id, equipment_type_id, note, extra_information, orders!inner(id, order_code, rental_start_at, rental_end_at, cancelled_at, customers(name))",
       )
       .not("employee_id", "is", null)
       .in("equipment_type_id", typeIds)
@@ -95,7 +96,10 @@ export async function loadJobs(
       orderId: l.orders.id,
       orderCode: l.orders.order_code,
       customer: l.orders.customers?.name ?? "—",
-      address: (kind === "delivery" || kind === "collection") && l.note?.trim() ? l.note.trim() : null,
+      address:
+        kind === "delivery" || kind === "collection"
+          ? l.extra_information?.trim() || (l.note?.trim().startsWith("Gắn lại") ? null : l.note?.trim() || null)
+          : null,
     });
   };
   for (const l of byStart) push(l, false);

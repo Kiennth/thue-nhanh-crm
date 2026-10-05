@@ -259,18 +259,28 @@ export default async function OrderPrintPage({
       : branchName || "TP. Hồ Chí Minh";
     // Địa điểm nhận & trả: lấy ghi chú địa chỉ trên dòng phí giao/thu hồi; khách
     // tự đến lấy thì là kho giao.
+    // Địa chỉ trên dòng vận chuyển: thường ở "Chi tiết" (extra_information),
+    // nhập tay trên trang đơn thì ở ghi chú (note) — bỏ ghi chú hệ thống "Gắn lại…".
+    const addressOf = (l: { extra_information: string | null; note: string | null }) => {
+      const text = l.extra_information?.trim() || (l.note?.trim().startsWith("Gắn lại") ? "" : l.note?.trim()) || "";
+      return text.replace(/\s*[\r\n]+\s*/g, " - ");
+    };
     const deliveryNotes = [
       ...new Set(
         (lines ?? [])
-          .filter(
-            (l) =>
-              l.equipment_type_id &&
-              DELIVERY_NOTE_TYPE_IDS.has(l.equipment_type_id) &&
-              l.extra_information?.trim(),
-          )
-          .map((l) => l.extra_information!.trim().replace(/\s*\n+\s*/g, " - ")),
+          .filter((l) => l.equipment_type_id && DELIVERY_NOTE_TYPE_IDS.has(l.equipment_type_id))
+          .map(addressOf)
+          .filter(Boolean),
       ),
     ];
+    // Biên bản giao hàng (CEO 2026-10-05): địa chỉ giao = dòng phí GIAO (xe máy/ô tô).
+    const DELIVERY_TYPE_IDS = new Set(["38f5c644-3898-4b1f-a3f5-901e55f77c6a", "ce4a5f88-8daa-47c2-92fc-196d1fc321db"]);
+    const deliveryAddress =
+      (lines ?? [])
+        .filter((l) => l.equipment_type_id && DELIVERY_TYPE_IDS.has(l.equipment_type_id))
+        .map(addressOf)
+        .find(Boolean) ?? null;
+    const phoneInText = deliveryAddress?.match(/(?:\+?84|0)\d[\d .]{7,12}\d/)?.[0]?.replace(/[ .]/g, "") ?? null;
 
     // Cột mới chưa có trong types/database.ts (WIP phiên khác).
     const extra = customer as {
@@ -308,6 +318,9 @@ export default async function OrderPrintPage({
           ? computeRentalDurationInUnit(order.rental_start_at, order.rental_end_at, "day")
           : null,
       placeText: deliveryNotes.length ? deliveryNotes.join(" / ") : `Kho Thuê Nhanh ${branchName}`.trim(),
+      deliveryAddress: deliveryAddress ?? `Nhận tại kho Thuê Nhanh ${branchName}`.trim(),
+      receiverName: order.orderer_name?.trim() || null,
+      receiverPhone: order.orderer_phone?.trim() || phoneInText || customer?.phone || null,
       paid: sumPayments("invoice"),
       depositHeld: sumPayments("deposit_collect") - sumPayments("deposit_refund"),
     };
