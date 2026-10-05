@@ -2762,14 +2762,18 @@ async function loadSwapContext(
     if (r.status === "maintenance") reason = "Đang bảo trì";
     else if (clash.has(r.id)) reason = clash.get(r.id)!;
     else if (mode === "live" && r.status !== "available") reason = "Đang ở chỗ khách";
-    else if (r.branch_id !== order.pickup_branch_id)
-      reason = `Ở kho ${(r.branch_id && branchName.get(r.branch_id)) || "khác"}`;
+    else if (r.branch_id && r.branch_id !== order.pickup_branch_id)
+      reason = `Ở kho ${branchName.get(r.branch_id) ?? "khác"}`;
+    // Máy chưa ghi kho (branch_id trống — nhiều máy cũ) vẫn chọn được, chỉ
+    // ghi chú; trước đây bị loại hết nên toàn sinh máy tạm CHỜ MUA oan.
+    if (!reason && !r.branch_id) return { id: r.id, label, free: true, reason: "Chưa ghi kho" };
     // Chỉnh lịch sử: chọn máy nào cũng được, lý do chỉ để tham khảo.
     return { id: r.id, label, free: mode === "history" || !reason, reason };
   });
   options.sort(
     (a, b) =>
       Number(b.free) - Number(a.free) ||
+      Number(!!a.reason) - Number(!!b.reason) ||
       Number(a.label.startsWith("AUTO")) - Number(b.label.startsWith("AUTO")) ||
       a.label.localeCompare(b.label),
   );
