@@ -177,3 +177,53 @@ export async function saveEmployeeProfile(
   revalidatePath(`/employees/${employeeId}`);
   return { success: true };
 }
+
+// "Hồ sơ của tôi" (CEO 2026-10-05): nhân viên tự sửa ô không nhạy cảm qua
+// RPC update_my_profile (chỉ ghi đúng hàng của mình).
+export async function updateMyProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient();
+  let facebook = String(formData.get("facebook_url") ?? "").trim();
+  if (facebook && !/^https?:\/\//i.test(facebook)) facebook = `https://${facebook}`;
+  const birthday = String(formData.get("birthday") ?? "");
+  const { error } = await supabase.rpc("update_my_profile" as never, {
+    p_personal_phone: String(formData.get("personal_phone") ?? ""),
+    p_facebook_url: facebook,
+    p_address: String(formData.get("address") ?? ""),
+    p_emergency_name: String(formData.get("emergency_name") ?? ""),
+    p_emergency_relation: String(formData.get("emergency_relation") ?? ""),
+    p_emergency_phone: String(formData.get("emergency_phone") ?? ""),
+    p_bio: String(formData.get("bio") ?? "").slice(0, 500),
+    p_birthday: /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : null,
+  } as never);
+  if (error) return { error: "Không lưu được: " + error.message };
+  revalidatePath("/me");
+  return { success: true };
+}
+
+// Ảnh đại diện — chính chủ hoặc Giám đốc. Lưu ở bucket công khai
+// equipment-images/avatars/ (ADMIN client như ảnh web).
+export async function uploadEmployeeAvatar(
+  employeeId: string,
+  formData: FormData,
+): Promise<{ url: string } | { error: string }> {
+  const { getCurrentEmployee } = await import("@/lib/dal");
+  const me = await getCurrentEmployee();
+  if (!me || (me.id !== employeeId && me.role !== "giam_doc")) return { error: "Không có quyền đổi ảnh." };
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) return { error: "Chưa chọn ảnh." };
+  if (file.size > 5 * 1024 * 1024) return { error: "Ảnh không được vượt quá 5MB." };
+  if (!file.type.startsWith("image/")) return { error: "File không phải ảnh." };
+  const ext = ((file.name.includes(".") ? file.name.split(".").pop() : "jpg") ?? "jpg").toLowerCase();
+  const path = `avatars/${employeeId}-${Date.now()}.${ext}`;
+  const admin = createAdminClient();
+  const { error } = await admin.storage.from("equipment-images").upload(path, file, { contentType: file.type });
+  if (error) return { error: "Không tải được ảnh: " + error.message };
+  const url = admin.storage.from("equipment-images").getPublicUrl(path).data.publicUrl;
+  const { error: e2 } = await admin
+    .from("employee_profiles" as never)
+    .upsert({ employee_id: employeeId, avatar_url: url, updated_at: new Date().toISOString() } as never);
+  if (e2) return { error: "Không lưu được ảnh: " + e2.message };
+  revalidatePath("/me");
+  revalidatePath(`/employees/${employeeId}`);
+  return { url };
+}

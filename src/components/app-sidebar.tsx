@@ -18,6 +18,7 @@ import {
   LogOut,
   Receipt,
   Settings,
+  UserRound,
   Users,
   WalletCards,
   type LucideIcon,
@@ -184,10 +185,11 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="gap-2 px-4 py-3">
-        <div className="text-sm">
-          <p className="font-medium">{employee.name}</p>
+        {/* Bấm tên mở "Hồ sơ của tôi" (CEO 2026-10-05). */}
+        <Link href="/me" className="group block rounded-lg p-1 text-sm hover:bg-sidebar-accent">
+          <p className="font-medium group-hover:underline">{employee.name}</p>
           <p className="text-muted-foreground">{ROLE_LABELS[employee.role]}</p>
-        </div>
+        </Link>
         {settingsItems.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -212,6 +214,10 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         )}
         {/* Đổi mật khẩu (CEO 2026-10-03) — dùng lại trang đặt mật khẩu của
             luồng mời nhân viên, đang đăng nhập là đổi được ngay. */}
+        <Button variant="outline" size="sm" className="w-full justify-start" render={<Link href="/me" />}>
+          <UserRound className="size-4" />
+          Hồ sơ của tôi
+        </Button>
         <Button
           variant="outline"
           size="sm"
