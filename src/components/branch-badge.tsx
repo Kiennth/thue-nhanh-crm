@@ -12,6 +12,12 @@ const BRANCH_BADGE: Record<string, { code: string; colorVar: string }> = {
   HQ: { code: "HQ", colorVar: "--chart-4" },
 };
 
+// Biến màu CSS của chi nhánh (vd "--chart-1") — cho chỗ cần tô cả khối theo
+// kho chứ không chỉ 1 badge. null khi chi nhánh chưa có màu riêng.
+export function branchColorVar(name: string): string | null {
+  return BRANCH_BADGE[name]?.colorVar ?? null;
+}
+
 export function BranchBadge({ name, className }: { name: string; className?: string }) {
   const cfg = BRANCH_BADGE[name];
   if (!cfg) return <span className="text-muted-foreground">{name}</span>;

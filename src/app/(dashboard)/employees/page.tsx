@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BranchBadge } from "@/components/branch-badge";
+import { BranchBadge, branchColorVar } from "@/components/branch-badge";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { ALL_ROLES, DIRECTOR_ONLY, MANAGE_ROLES as HR_ROLES, ROLE_LABELS } from "@/lib/roles";
@@ -46,6 +47,30 @@ export default async function EmployeesPage() {
   );
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
+  // Chia ô theo kho (CEO 2026-10-01): mỗi kho 1 khối có dải tiêu đề + nền
+  // nhuộm màu riêng của kho (cùng màu BranchBadge). Giữ nguyên thứ tự ở
+  // trên nên nhân viên đã vô hiệu vẫn nằm cuối, gom thành 1 khối xám.
+  const groups: { key: string; label: string; colorVar: string | null; members: typeof sortedEmployees }[] = [];
+  for (const emp of sortedEmployees) {
+    const branchName = emp.branch_id ? (branchNameById.get(emp.branch_id) ?? null) : null;
+    const key = emp.is_active ? (emp.branch_id ?? "none") : "inactive";
+    const last = groups[groups.length - 1];
+    if (last?.key === key) {
+      last.members.push(emp);
+    } else {
+      groups.push({
+        key,
+        label: emp.is_active ? (branchName ?? "Chưa gán kho") : "Đã vô hiệu",
+        colorVar: emp.is_active && branchName ? branchColorVar(branchName) : null,
+        members: [emp],
+      });
+    }
+  }
+  const columnCount = isHr ? 7 : 5;
+  // Không có màu riêng (chưa gán kho / đã vô hiệu) thì dùng xám trung tính.
+  const tint = (colorVar: string | null, percent: number) =>
+    `color-mix(in srgb, var(${colorVar ?? "--muted-foreground"}) ${percent}%, transparent)`;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -68,44 +93,66 @@ export default async function EmployeesPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedEmployees.map((emp) => (
-            <TableRow key={emp.id}>
-              <TableCell className="font-medium">
-                {/* Tên mở trang hồ sơ (CEO 2026-10-05). */}
-                <Link href={`/employees/${emp.id}`} className="hover:underline">
-                  {emp.name}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
-              <TableCell>
-                {emp.branch_id ? <BranchBadge name={branchNameById.get(emp.branch_id) ?? "—"} /> : "—"}
-              </TableCell>
-              <TableCell>{ROLE_LABELS[emp.role]}</TableCell>
-              {isHr && (
-                <TableCell>{currencyFormatter.format(emp.base_salary)}</TableCell>
-              )}
-              <TableCell>
-                <Badge variant={emp.is_active ? "default" : "secondary"}>
-                  {emp.is_active ? "Hoạt động" : "Vô hiệu"}
-                </Badge>
-              </TableCell>
-              {isHr && (
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <EmployeeDialog branches={branchList} employee={emp} />
-                    <ToggleActiveButton
-                      id={emp.id}
-                      name={emp.name}
-                      isActive={emp.is_active}
-                    />
-                  </div>
+          {groups.map((group) => (
+            <Fragment key={group.key}>
+              <TableRow
+                className="hover:bg-transparent"
+                style={{ backgroundColor: tint(group.colorVar, 22) }}
+              >
+                <TableCell
+                  colSpan={columnCount}
+                  className="border-l-4 py-1.5 text-sm font-semibold"
+                  style={{ borderLeftColor: `var(${group.colorVar ?? "--muted-foreground"})` }}
+                >
+                  {group.label}
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {group.members.length} người
+                  </span>
                 </TableCell>
-              )}
-            </TableRow>
+              </TableRow>
+              {group.members.map((emp) => (
+                <TableRow key={emp.id} style={{ backgroundColor: tint(group.colorVar, 7) }}>
+                  <TableCell
+                    className="border-l-4 font-medium"
+                    style={{ borderLeftColor: `var(${group.colorVar ?? "--muted-foreground"})` }}
+                  >
+                    {/* Tên mở trang hồ sơ (CEO 2026-10-05). */}
+                    <Link href={`/employees/${emp.id}`} className="hover:underline">
+                      {emp.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{emp.email ?? "—"}</TableCell>
+                  <TableCell>
+                    {emp.branch_id ? <BranchBadge name={branchNameById.get(emp.branch_id) ?? "—"} /> : "—"}
+                  </TableCell>
+                  <TableCell>{ROLE_LABELS[emp.role]}</TableCell>
+                  {isHr && (
+                    <TableCell>{currencyFormatter.format(emp.base_salary)}</TableCell>
+                  )}
+                  <TableCell>
+                    <Badge variant={emp.is_active ? "default" : "secondary"}>
+                      {emp.is_active ? "Hoạt động" : "Vô hiệu"}
+                    </Badge>
+                  </TableCell>
+                  {isHr && (
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <EmployeeDialog branches={branchList} employee={emp} />
+                        <ToggleActiveButton
+                          id={emp.id}
+                          name={emp.name}
+                          isActive={emp.is_active}
+                        />
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </Fragment>
           ))}
           {!employees?.length && (
             <TableRow>
-              <TableCell colSpan={isHr ? 7 : 5} className="text-center text-muted-foreground">
+              <TableCell colSpan={columnCount} className="text-center text-muted-foreground">
                 Chưa có nhân viên nào.
               </TableCell>
             </TableRow>
