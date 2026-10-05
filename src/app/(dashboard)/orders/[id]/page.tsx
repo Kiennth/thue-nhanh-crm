@@ -1116,7 +1116,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                 <SerialChipList
                                   items={chips}
                                   canRemove={canManage}
-                                  canSwap={!order.delivery_stock_moved_at && !order.completed_at && !order.cancelled_at}
+                                  canSwap={
+                                    !order.cancelled_at &&
+                                    (canManage || (!order.completed_at && !order.return_stock_transferred_at))
+                                  }
                                 />
                                 <LineNoteEditor
                                   lineIds={memberIds}

@@ -2622,72 +2622,162 @@ export async function closeOrderDeal(orderId: string, employeeId: string): Promi
 // Đổi máy serial của 1 dòng (phương án B: hệ thống tự chọn máy, nhân viên
 // đổi được) — chỉ khi đơn CHƯA giao (sau khi giao, máy đã sang "đang cho
 // thuê", đổi lúc đó phải hoàn tác giao trước).
-export async function getSwapInstanceOptions(
-  lineId: string,
-): Promise<{ id: string; label: string }[]> {
-  await requireRole([...ALL_ROLES]);
-  const supabase = await createClient();
-  const { data: line } = await supabase
-    .from("order_equipment")
-    .select("order_id, equipment_type_id, equipment_instance_id")
-    .eq("id", lineId)
-    .single();
-  if (!line?.equipment_type_id || !line.equipment_instance_id) return [];
-  const { data: order } = await supabase
-    .from("orders")
-    .select("pickup_branch_id, rental_start_at, rental_end_at")
-    .eq("id", line.order_id)
-    .single();
-  if (!order) return [];
-  const ids = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set(), null, {
-    start: order.rental_start_at,
-    end: order.rental_end_at,
-  });
-  if (!ids.length) return [];
-  const { data: rows } = await supabase
-    .from("equipment_instances")
-    .select("id, identifier_code, equipment_units(brand_model)")
-    .in("id", ids);
-  return (rows ?? [])
-    .map((r) => {
-      const variant = (r.equipment_units as unknown as { brand_model: string } | null)?.brand_model;
-      return { id: r.id, label: variant ? `${r.identifier_code} · ${variant}` : r.identifier_code };
-    })
-    .sort((a, b) => Number(a.label.startsWith("AUTO")) - Number(b.label.startsWith("AUTO")) || a.label.localeCompare(b.label));
+// Đổi serial trên dòng đơn kiểu Booqable (CEO 2026-10-05): chỉ thay máy —
+// dòng, số lượng, đơn giá giữ nguyên. 3 chế độ theo trạng thái đơn:
+//  - plan: chưa giao → máy mới phải rảnh suốt khung thuê.
+//  - live: máy đang ở chỗ khách → máy mới phải đang trong kho giao, rảnh từ
+//    bây giờ tới ngày trả; RPC tự trả máy cũ về kho + xuất máy mới.
+//  - history: đã nhập kho/hoàn tất → chỉ sửa nhãn cho đúng thực tế (quản lý).
+export type SwapMode = "plan" | "live" | "history";
+export interface SwapInstanceOption {
+  id: string;
+  label: string;
+  free: boolean;
+  reason: string | null;
 }
 
-export async function swapOrderLineInstance(lineId: string, instanceId: string): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
-  const supabase = await createClient();
+type SwapContext = {
+  lineId: string;
+  orderId: string;
+  mode: SwapMode;
+  options: SwapInstanceOption[];
+};
+
+const ddmm = (iso: string | null) => {
+  if (!iso) return "?";
+  const d = vnNow(new Date(iso));
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+async function loadSwapContext(
+  supabase: SupabaseServerClient,
+  lineId: string,
+): Promise<SwapContext | { error: string }> {
   const { data: line } = await supabase
     .from("order_equipment")
     .select("order_id, equipment_type_id, equipment_instance_id")
     .eq("id", lineId)
     .single();
-  if (!line?.equipment_type_id || !line.equipment_instance_id) {
-    return { error: "Dòng này không phải máy serial." };
-  }
+  if (!line?.equipment_type_id || !line.equipment_instance_id) return { error: "Dòng này không phải máy serial." };
   const { data: order } = await supabase
     .from("orders")
-    .select("pickup_branch_id, rental_start_at, rental_end_at, delivery_stock_moved_at, completed_at, cancelled_at")
+    .select(
+      "id, pickup_branch_id, rental_start_at, rental_end_at, delivery_stock_moved_at, return_stock_transferred_at, completed_at, cancelled_at",
+    )
     .eq("id", line.order_id)
     .single();
   if (!order) return { error: "Không tìm thấy đơn." };
-  if (order.delivery_stock_moved_at || order.completed_at || order.cancelled_at) {
-    return { error: "Đơn đã giao/đã đóng — không đổi máy ở đây được." };
-  }
-  const free = await pickAvailableInstances(supabase, line.equipment_type_id, order.pickup_branch_id, 500, new Set(), null, {
-    start: order.rental_start_at,
-    end: order.rental_end_at,
-  });
-  if (!free.includes(instanceId)) {
-    return { error: "Máy này không còn trống — chọn máy khác." };
+  if (order.cancelled_at) return { error: "Đơn đã huỷ." };
+  const mode: SwapMode =
+    order.completed_at || order.return_stock_transferred_at
+      ? "history"
+      : order.delivery_stock_moved_at
+        ? "live"
+        : "plan";
+
+  const [{ data: instances }, { data: bookings }, { data: branches }] = await Promise.all([
+    supabase
+      .from("equipment_instances")
+      .select("id, identifier_code, status, branch_id, equipment_units(brand_model)")
+      .eq("equipment_type_id", line.equipment_type_id)
+      .neq("status", "disposed")
+      .neq("id", line.equipment_instance_id)
+      .order("identifier_code")
+      .limit(2000),
+    supabase
+      .from("order_equipment")
+      .select(
+        "equipment_instance_id, order_id, orders!inner(order_code, rental_start_at, rental_end_at, return_stock_transferred_at)",
+      )
+      .eq("equipment_type_id", line.equipment_type_id)
+      .not("equipment_instance_id", "is", null)
+      .is("orders.completed_at", null)
+      .is("orders.cancelled_at", null)
+      .limit(5000),
+    supabase.from("branches").select("id, name"),
+  ]);
+  const branchName = new Map((branches ?? []).map((b) => [b.id, b.name]));
+
+  // Lịch bận của từng máy (đơn khác, máy chưa về kho) trong khung cần dùng.
+  const now = Date.now();
+  const winStart =
+    mode === "live" ? now : order.rental_start_at ? Date.parse(order.rental_start_at) : -Infinity;
+  const winEnd = order.rental_end_at ? Math.max(Date.parse(order.rental_end_at), now) : Infinity;
+  const clash = new Map<string, string>();
+  for (const r of (bookings ?? []) as unknown as {
+    equipment_instance_id: string;
+    order_id: string;
+    orders: {
+      order_code: string;
+      rental_start_at: string | null;
+      rental_end_at: string | null;
+      return_stock_transferred_at: string | null;
+    };
+  }[]) {
+    if (clash.has(r.equipment_instance_id)) continue;
+    if (r.order_id === order.id) {
+      clash.set(r.equipment_instance_id, "Đã có trong đơn này");
+      continue;
+    }
+    if (r.orders.return_stock_transferred_at) continue;
+    const s = r.orders.rental_start_at ? Date.parse(r.orders.rental_start_at) : -Infinity;
+    const e = r.orders.rental_end_at ? Math.max(Date.parse(r.orders.rental_end_at), now) : Infinity;
+    if (s < winEnd && e > winStart) {
+      clash.set(
+        r.equipment_instance_id,
+        `Trùng lịch ${r.orders.order_code} (${ddmm(r.orders.rental_start_at)}–${ddmm(r.orders.rental_end_at)})`,
+      );
+    }
   }
 
-  // Giữ nguyên giá dòng (có thể đã sửa tay) — chỉ đổi máy.
-  const update = { equipment_instance_id: instanceId };
-  const { error } = await supabase.from("order_equipment").update(update).eq("id", lineId);
-  revalidatePath(`/orders/${line.order_id}`);
+  const options: SwapInstanceOption[] = (instances ?? []).map((r) => {
+    const variant = (r.equipment_units as unknown as { brand_model: string } | null)?.brand_model;
+    const label = variant ? `${r.identifier_code} · ${variant}` : r.identifier_code;
+    let reason: string | null = null;
+    if (r.status === "maintenance") reason = "Đang bảo trì";
+    else if (clash.has(r.id)) reason = clash.get(r.id)!;
+    else if (mode === "live" && r.status !== "available") reason = "Đang ở chỗ khách";
+    else if (r.branch_id !== order.pickup_branch_id)
+      reason = `Ở kho ${(r.branch_id && branchName.get(r.branch_id)) || "khác"}`;
+    // Chỉnh lịch sử: chọn máy nào cũng được, lý do chỉ để tham khảo.
+    return { id: r.id, label, free: mode === "history" || !reason, reason };
+  });
+  options.sort(
+    (a, b) =>
+      Number(b.free) - Number(a.free) ||
+      Number(a.label.startsWith("AUTO")) - Number(b.label.startsWith("AUTO")) ||
+      a.label.localeCompare(b.label),
+  );
+  return { lineId, orderId: order.id, mode, options };
+}
+
+export async function getSwapInstanceOptions(
+  lineId: string,
+): Promise<{ mode: SwapMode; options: SwapInstanceOption[] } | { error: string }> {
+  await requireRole([...ALL_ROLES]);
+  const ctx = await loadSwapContext(await createClient(), lineId);
+  if ("error" in ctx) return ctx;
+  return { mode: ctx.mode, options: ctx.options };
+}
+
+export async function swapOrderLineInstance(lineId: string, instanceId: string): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+  const ctx = await loadSwapContext(supabase, lineId);
+  if ("error" in ctx) return ctx;
+  if (ctx.mode === "history" && !MANAGE_ROLES.includes(employee.role)) {
+    return { error: "Đơn đã nhập kho/hoàn tất — chỉ quản lý được sửa serial." };
+  }
+  const target = ctx.options.find((o) => o.id === instanceId);
+  if (!target) return { error: "Không tìm thấy máy này." };
+  if (!target.free) return { error: `Không đổi được: ${target.reason}.` };
+
+  // Giữ nguyên giá dòng (có thể đã sửa tay) — chỉ đổi máy; kho xử lý trong RPC.
+  const { error } = await (supabase as unknown as UntypedSupabaseClient).rpc("swap_order_line_instance", {
+    p_line_id: lineId,
+    p_instance_id: instanceId,
+  });
+  revalidatePath(`/orders/${ctx.orderId}`);
   return error ? { error: "Không đổi được máy: " + error.message } : { success: true };
 }
 
