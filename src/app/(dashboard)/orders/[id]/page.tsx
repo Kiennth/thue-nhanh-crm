@@ -25,6 +25,7 @@ import {
   ORDER_PAYMENT_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
   TASK_TYPE_LABELS,
+  OPTIONAL_TASK_TYPES,
   TASK_TYPE_SEQUENCE,
   VAT_RATE,
 } from "@/lib/order-labels";
@@ -1432,7 +1433,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
                       const task = taskByType.get(taskType);
                       const isDone = !!task?.completed_date;
-                      const canComplete = earlier.every((t) => taskByType.get(t)?.completed_date);
+                      // Khâu tuỳ chọn (Vận hành / xử lý sự cố) không chặn khâu sau.
+                      const canComplete = earlier
+                        .filter((t) => !OPTIONAL_TASK_TYPES.has(t))
+                        .every((t) => taskByType.get(t)?.completed_date);
                       const status: "done" | "current" | "locked" = isDone
                         ? "done"
                         : canComplete
@@ -1495,7 +1499,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   <OrderTaskRow
                                     orderId={order.id}
                                     taskType={taskType}
-                                    label={TASK_TYPE_LABELS[taskType]}
+                                    label={
+                                      OPTIONAL_TASK_TYPES.has(taskType)
+                                        ? `${TASK_TYPE_LABELS[taskType]} (không bắt buộc)`
+                                        : TASK_TYPE_LABELS[taskType]
+                                    }
                                     {...taskEmployeeOptions(taskType, task?.employee_id)}
                                     task={task}
                                     status={status}

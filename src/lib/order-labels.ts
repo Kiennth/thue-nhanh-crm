@@ -32,6 +32,11 @@ export const TASK_TYPE_SEQUENCE = [
   "nhap_kho_bao_tri",
 ] as const satisfies readonly TaskType[];
 
+// Khâu TUỲ CHỌN (CEO 2026-10-05): "Vận hành / xử lý sự cố" — đơn không cần hỗ
+// trợ, không có sự cố thì coi như không ai làm, bỏ qua để tick thẳng Thu hồi;
+// đơn vẫn chạy và hoàn tất bình thường (trigger sync_order_status cũng bỏ qua).
+export const OPTIONAL_TASK_TYPES: ReadonlySet<TaskType> = new Set<TaskType>(["van_hanh_xu_ly_su_co"]);
+
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   tien_mat: "Tiền mặt",
   chuyen_khoan: "Chuyển khoản",

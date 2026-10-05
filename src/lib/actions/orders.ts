@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, computeRentalDurationInUnit, type PricingTierInput } from "@/lib/rental-pricing";
-import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { OPTIONAL_TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
@@ -2215,7 +2215,7 @@ export async function upsertOrderTask(
 
   if (parsed.data.completed) {
     const sequenceIndex = TASK_TYPE_SEQUENCE.indexOf(parsed.data.task_type);
-    const earlierStages = TASK_TYPE_SEQUENCE.slice(0, sequenceIndex);
+    const earlierStages = TASK_TYPE_SEQUENCE.slice(0, sequenceIndex).filter((t) => !OPTIONAL_TASK_TYPES.has(t));
     if (earlierStages.length > 0) {
       const { data: doneTasks } = await supabase
         .from("order_tasks")
