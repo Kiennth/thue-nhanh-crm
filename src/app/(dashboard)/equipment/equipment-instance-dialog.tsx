@@ -203,7 +203,7 @@ export function EquipmentInstanceDialog({
                 name="purchase_price"
                 type="number"
                 min={0}
-                step={1000}
+                step="any"
                 defaultValue={instance?.purchase_price ?? ""}
               />
             </div>

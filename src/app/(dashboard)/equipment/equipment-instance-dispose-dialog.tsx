@@ -71,7 +71,7 @@ export function EquipmentInstanceDisposeDialog({
               name="disposal_price"
               type="number"
               min={0}
-              step={1000}
+              step="any"
               required
             />
           </div>

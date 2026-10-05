@@ -67,11 +67,11 @@ export function CommissionTierDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="min_value">Từ giá trị đơn</Label>
-              <Input id="min_value" name="min_value" type="number" min={0} step={1000} defaultValue={0} required />
+              <Input id="min_value" name="min_value" type="number" min={0} step="any" defaultValue={0} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="max_value">Đến (để trống = không giới hạn)</Label>
-              <Input id="max_value" name="max_value" type="number" min={0} step={1000} />
+              <Input id="max_value" name="max_value" type="number" min={0} step="any" />
             </div>
           </div>
 

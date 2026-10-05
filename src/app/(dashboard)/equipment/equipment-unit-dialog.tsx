@@ -113,7 +113,7 @@ export function EquipmentUnitDialog({
               name="price"
               type="number"
               min={0}
-              step={1000}
+              step="any"
               defaultValue={unit?.price ?? ""}
               placeholder={`Để trống = dùng giá chung (${typePrice.toLocaleString("vi-VN")}đ)`}
             />

@@ -71,14 +71,14 @@ export function BonusTierDialog({
               name="threshold_amount"
               type="number"
               min={0}
-              step={1000}
+              step="any"
               required
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="bonus_amount">Số tiền thưởng</Label>
-            <Input id="bonus_amount" name="bonus_amount" type="number" min={0} step={1000} required />
+            <Input id="bonus_amount" name="bonus_amount" type="number" min={0} step="any" required />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

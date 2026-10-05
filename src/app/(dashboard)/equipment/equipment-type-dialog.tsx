@@ -310,7 +310,7 @@ export function EquipmentTypeDialog({
                     name="price"
                     type="number"
                     min={0}
-                    step={1000}
+                    step="any"
                     defaultValue={equipmentType?.price ?? 0}
                     required
                   />
@@ -344,7 +344,7 @@ export function EquipmentTypeDialog({
                   name="deposit_amount"
                   type="number"
                   min={0}
-                  step={1000}
+                  step="any"
                   defaultValue={equipmentType?.deposit_amount ?? 0}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -410,7 +410,7 @@ export function EquipmentTypeDialog({
                 name="price"
                 type="number"
                 min={0}
-                step={1000}
+                step="any"
                 defaultValue={equipmentType?.price ?? 0}
                 required
               />

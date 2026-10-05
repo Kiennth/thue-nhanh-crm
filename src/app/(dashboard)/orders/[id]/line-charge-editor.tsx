@@ -188,7 +188,7 @@ export function LineChargeEditor({
           name="unit_price"
           type="number"
           min={0}
-          step={1000}
+          step="any"
           defaultValue={unitPrice}
           className="h-8 w-28"
           aria-label="Đơn giá"

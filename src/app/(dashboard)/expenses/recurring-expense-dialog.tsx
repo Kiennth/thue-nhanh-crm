@@ -161,7 +161,7 @@ export function RecurringExpenseDialog({
               name="amount"
               type="number"
               min={0}
-              step={1000}
+              step="any"
               required
               defaultValue={recurring?.amount ?? ""}
             />

@@ -135,7 +135,7 @@ export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
               name="base_salary"
               type="number"
               min={0}
-              step={1000}
+              step="any"
               defaultValue={employee?.base_salary ?? 0}
               required
             />

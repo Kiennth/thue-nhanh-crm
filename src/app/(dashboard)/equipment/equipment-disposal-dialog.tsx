@@ -102,7 +102,7 @@ export function EquipmentDisposalDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit_price">Giá bán / đơn vị</Label>
-              <Input id="unit_price" name="unit_price" type="number" min={0} step={1000} required />
+              <Input id="unit_price" name="unit_price" type="number" min={0} step="any" required />
             </div>
           </div>
 

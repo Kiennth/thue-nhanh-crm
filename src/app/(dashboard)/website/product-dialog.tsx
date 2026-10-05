@@ -205,7 +205,7 @@ export function WebsiteProductDialog({
               name="ship_fee"
               type="number"
               min={0}
-              step={10000}
+              step="any"
               placeholder="Để trống = tính theo mô hình xe máy/ô tô bên dưới"
               defaultValue={product.ship_fee ?? ""}
             />

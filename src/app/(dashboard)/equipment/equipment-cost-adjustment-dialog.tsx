@@ -107,7 +107,7 @@ export function EquipmentCostAdjustmentDialog({
 
           <div className="space-y-2">
             <Label htmlFor="unit_cost">Giá vốn / đơn vị</Label>
-            <Input id="unit_cost" name="unit_cost" type="number" min={0} step={1000} required />
+            <Input id="unit_cost" name="unit_cost" type="number" min={0} step="any" required />
           </div>
 
           <div className="space-y-2">

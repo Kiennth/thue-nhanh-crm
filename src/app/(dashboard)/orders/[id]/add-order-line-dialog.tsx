@@ -172,7 +172,7 @@ export function AddOrderLineDialog({
 
             <div className="space-y-2">
               <Label htmlFor="custom_unit_price">Đơn giá (đ)</Label>
-              <Input id="custom_unit_price" name="unit_price" type="number" min={0} step={1000} defaultValue={0} required />
+              <Input id="custom_unit_price" name="unit_price" type="number" min={0} step="any" defaultValue={0} required />
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
