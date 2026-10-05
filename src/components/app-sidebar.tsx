@@ -18,7 +18,6 @@ import {
   KeyRound,
   LogOut,
   Receipt,
-  Settings,
   UserRound,
   Users,
   WalletCards,
@@ -42,12 +41,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { NAV_ITEMS, NAV_SECTIONS, ROLE_LABELS, SETTINGS_ITEMS } from "@/lib/roles";
 import { logout } from "@/lib/actions/auth";
@@ -188,7 +181,6 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
 
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
-  const settingsItems = SETTINGS_ITEMS.filter((item) => item.roles.includes(employee.role));
   // Mục quản trị (Chi nhánh, Nhân viên, Chính sách khoán…) lên nav chính luôn
   // (CEO 2026-10-05); menu Cài đặt ở footer vẫn giữ làm lối tắt.
   const items = [...NAV_ITEMS, ...SETTINGS_ITEMS].filter((item) => item.roles.includes(employee.role));
@@ -254,28 +246,6 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
           <p className="font-medium group-hover:underline">{employee.name}</p>
           <p className="text-muted-foreground">{ROLE_LABELS[employee.role]}</p>
         </Link>
-        {settingsItems.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <button
-                  type="button"
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Settings className="size-3" />
-                  Cài đặt
-                </button>
-              }
-            />
-            <DropdownMenuContent align="start" side="top">
-              {settingsItems.map((item) => (
-                <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
         {/* Đổi mật khẩu (CEO 2026-10-03) — dùng lại trang đặt mật khẩu của
             luồng mời nhân viên, đang đăng nhập là đổi được ngay. */}
         <Button variant="outline" size="sm" className="w-full justify-start" render={<Link href="/me" />}>
