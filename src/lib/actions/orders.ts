@@ -847,7 +847,9 @@ async function nextOrderCode(supabase: SupabaseServerClient): Promise<string> {
 // buộc đơn phải có thời gian thuê mới thêm được dòng cho thuê — nhân viên
 // chỉnh lại ngày giờ thực tế ngay sau khi tạo (giá dòng cho thuê tự tính lại
 // theo thời gian mới lúc đó).
-export async function duplicateOrder(id: string): Promise<ActionState> {
+// newStartAt (CEO 2026-10-05): chọn luôn giờ bắt đầu mới lúc nhân bản — giờ
+// trả dời theo, giữ nguyên thời lượng nên giá dòng (đã chép nguyên) vẫn đúng.
+export async function duplicateOrder(id: string, newStartAt?: string): Promise<ActionState> {
   const employee = await requireRole([...ALL_ROLES]);
 
   const supabase = await createClient();
@@ -875,6 +877,15 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
     return { error: "Không đọc được dòng hàng gốc: " + linesError.message };
   }
 
+  let rentalStartAt = source.rental_start_at;
+  let rentalEndAt = source.rental_end_at;
+  if (newStartAt && rentalStartAt) {
+    const shift = Date.parse(newStartAt) - Date.parse(rentalStartAt);
+    if (Number.isNaN(shift)) return { error: "Giờ bắt đầu mới không hợp lệ." };
+    rentalStartAt = new Date(Date.parse(rentalStartAt) + shift).toISOString();
+    rentalEndAt = rentalEndAt ? new Date(Date.parse(rentalEndAt) + shift).toISOString() : null;
+  }
+
   const today = vnNow();
   const { data: newOrder, error: insertError } = await supabase
     .from("orders")
@@ -884,8 +895,8 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       return_branch_id: source.return_branch_id,
       customer_id: source.customer_id,
       order_date: formatVNDate(today),
-      rental_start_at: source.rental_start_at,
-      rental_end_at: source.rental_end_at,
+      rental_start_at: rentalStartAt,
+      rental_end_at: rentalEndAt,
       // Giữ nguyên cọc đã sửa tay + người đặt (CEO 2026-10-05).
       deposit_override_amount: source.deposit_override_amount,
       orderer_name: source.orderer_name,

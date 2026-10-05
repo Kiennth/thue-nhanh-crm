@@ -130,6 +130,19 @@ export function QuickOrderDialog({
   const [endDate, setEndDate] = useState(() => datePart(prefillEnd ?? new Date(start.getTime() + 86_400_000)));
   const [endHour, setEndHour] = useState(() => hourPart(prefillEnd ?? start));
   const [endMinute] = useState(() => (prefillEnd ? minutePart(prefillEnd) : "00"));
+  // Đổi giờ nhận → giờ trả dời theo, giữ nguyên thời lượng (CEO 2026-10-05).
+  function changeStart(nextDate: string, nextHour: string) {
+    const oldStart = combine(startDate, startHour, startMinute).getTime();
+    const oldEnd = combine(endDate, endHour, endMinute).getTime();
+    const nextStart = combine(nextDate, nextHour, startMinute).getTime();
+    setStartDate(nextDate);
+    setStartHour(nextHour);
+    const duration = oldEnd - oldStart;
+    if (Number.isNaN(nextStart) || Number.isNaN(duration) || duration <= 0) return;
+    const nextEnd = new Date(nextStart + duration);
+    setEndDate(datePart(nextEnd));
+    setEndHour(hourPart(nextEnd));
+  }
   // Hàng (không gồm phí vận chuyển). Phí giao/thu hồi tính riêng ở dưới.
   const [cart, setCart] = useState<CartLine[]>([]);
   // Phí giao + thu hồi (CEO 2026-10-04): null = TỰ ĐỘNG theo hàng — món nào
@@ -399,10 +412,10 @@ export function QuickOrderDialog({
                 <DateInput
                   id="quick_start_date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => changeStart(e.target.value, startHour)}
                   className="w-40"
                 />
-                <HourSelect value={startHour} onChange={setStartHour} />
+                <HourSelect value={startHour} onChange={(h) => changeStart(startDate, h)} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-16 text-sm font-medium">Trả</span>

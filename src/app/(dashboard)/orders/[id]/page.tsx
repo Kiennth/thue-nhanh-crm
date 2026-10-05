@@ -758,7 +758,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               rentalEndAt={order.rental_end_at!}
             />
           )}
-          <DuplicateOrderButton orderId={order.id} />
+          <DuplicateOrderButton
+            orderId={order.id}
+            rentalStartAt={order.rental_start_at}
+            rentalEndAt={order.rental_end_at}
+          />
           {/* Không còn nút "Hoàn tất đơn" — đơn tự hoàn tất khi đủ 10 khâu
               (trigger auto_complete_order). */}
           {!order.completed_at && !order.cancelled_at && (

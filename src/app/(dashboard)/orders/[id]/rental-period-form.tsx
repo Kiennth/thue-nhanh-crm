@@ -70,6 +70,22 @@ export function RentalPeriodForm({
 
   const startAtDate = useMemo(() => combineDateHour(startDate, startHour), [startDate, startHour]);
 
+  // Đổi giờ BẮT ĐẦU → giờ trả dời theo, giữ nguyên thời lượng thuê (CEO
+  // 2026-10-05: nhân bản đơn 1 ngày 16:00 05/10, chọn 16:00 20/10 thì trả tự
+  // thành 16:00 21/10). Sửa tay giờ trả sau đó vẫn được.
+  function changeStart(nextDate: string, nextHour: string) {
+    const oldStart = combineDateHour(startDate, startHour).getTime();
+    const oldEnd = combineDateHour(endDate, endHour).getTime();
+    const nextStart = combineDateHour(nextDate, nextHour).getTime();
+    setStartDate(nextDate);
+    setStartHour(nextHour);
+    const duration = oldEnd - oldStart;
+    if (Number.isNaN(nextStart) || Number.isNaN(duration) || duration <= 0) return;
+    const nextEnd = new Date(nextStart + duration);
+    setEndDate(datePart(nextEnd));
+    setEndHour(hourPart(nextEnd));
+  }
+
   const presetEnd = useMemo(() => {
     const preset = RENTAL_PRESET_OPTIONS.find((p) => p.key === presetKey);
     if (!preset) return null;
@@ -103,7 +119,8 @@ export function RentalPeriodForm({
   return (
     <form action={handleSubmit} className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Áp dụng chung cho mọi thiết bị cho thuê trong đơn — bắt đầu và kết thúc cùng nhau.
+        Áp dụng chung cho mọi thiết bị cho thuê trong đơn — bắt đầu và kết thúc cùng nhau. Đổi giờ bắt
+        đầu thì giờ trả tự dời theo, giữ nguyên số ngày thuê.
       </p>
 
       <div className="flex gap-2">
@@ -131,10 +148,10 @@ export function RentalPeriodForm({
           <DateInput
             id="rental_start_date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => changeStart(e.target.value, startHour)}
             required
           />
-          <Select value={startHour} onValueChange={(value) => setStartHour(value ?? startHour)}>
+          <Select value={startHour} onValueChange={(value) => changeStart(startDate, value ?? startHour)}>
             <SelectTrigger className="w-24">
               <SelectValue>{(value: string) => `${value}:00`}</SelectValue>
             </SelectTrigger>
