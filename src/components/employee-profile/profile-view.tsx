@@ -95,6 +95,8 @@ export function ProfileView({
   const c = `var(${color ?? "--primary"})`;
   const gradient = `linear-gradient(135deg, ${c}, color-mix(in srgb, ${c} 55%, #7c3aed))`;
   const bday = e.birthday ? daysToBirthday(e.birthday, today) : null;
+  // Ngày vào công ty do Giám đốc nhập; chưa nhập thì lấy ngày tạo tài khoản CRM.
+  const joined = p?.joined_on ?? e.created_at.slice(0, 10);
   const tel = (v: string | null) => (v ? <a href={`tel:${v.replace(/\s/g, "")}`} className="hover:underline">{v}</a> : null);
 
   const stats = [
@@ -132,7 +134,9 @@ export function ProfileView({
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{ROLE_LABELS[e.role]}</span>
               {data.branchName && <BranchBadge name={data.branchName} />}
-              <span>· Gia nhập {dmy(e.created_at)} ({tenureText(e.created_at, today)})</span>
+              <span>
+                · Vào công ty {dmy(joined)} ({tenureText(joined, today)})
+              </span>
             </div>
             {bday !== null && (
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-pink-500/10 px-3 py-1 text-sm font-medium text-pink-700 dark:text-pink-300">
@@ -195,12 +199,15 @@ export function ProfileView({
           <InfoRow icon={MapPin} label="Địa chỉ">{p?.address}</InfoRow>
         </Section>
 
-        <Section title="Liên lạc khẩn cấp" icon={HeartPulse}>
+        <Section title="Cá nhân & khẩn cấp" icon={HeartPulse}>
           <InfoRow icon={HeartPulse} label="Người liên lạc">
             {p?.emergency_name ? `${p.emergency_name}${p.emergency_relation ? ` (${p.emergency_relation})` : ""}` : null}
           </InfoRow>
           <InfoRow icon={Phone} label="SĐT khẩn cấp">{tel(p?.emergency_phone ?? null)}</InfoRow>
           <InfoRow icon={CalendarHeart} label="Ngày sinh">{e.birthday ? dmy(e.birthday) : null}</InfoRow>
+          <InfoRow icon={BadgeCheck} label="Ngày vào công ty">
+            {p?.joined_on ? `${dmy(p.joined_on)} · ${tenureText(p.joined_on, today)}` : mode === "director" ? "Chưa nhập — sửa ở khối bên dưới" : null}
+          </InfoRow>
         </Section>
 
         <Section title="Căn cước công dân" icon={IdCard}>

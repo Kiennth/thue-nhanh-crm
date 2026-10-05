@@ -143,6 +143,7 @@ const ProfileSchema = z.object({
   citizen_id_issued_place: z.string().trim().optional(),
   address: z.string().trim().optional(),
   notes: z.string().trim().optional(),
+  joined_on: z.string().optional().or(z.literal("")),
 });
 
 export async function saveEmployeeProfile(

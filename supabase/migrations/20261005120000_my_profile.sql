@@ -47,3 +47,7 @@ $$;
 
 revoke all on function public.update_my_profile(text, text, text, text, text, text, text, date) from public, anon;
 grant execute on function public.update_my_profile(text, text, text, text, text, text, text, date) to authenticated;
+
+-- Ngày vào công ty (CEO 2026-10-05) — Giám đốc nhập; hồ sơ tính thâm niên
+-- theo ngày này (thiếu thì lấy ngày tạo tài khoản CRM).
+alter table public.employee_profiles add column if not exists joined_on date;

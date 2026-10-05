@@ -22,6 +22,7 @@ export interface EmployeeProfile {
   citizen_id_issued_place: string | null;
   address: string | null;
   notes: string | null;
+  joined_on?: string | null;
 }
 
 function Field({
@@ -78,6 +79,10 @@ export function EmployeeProfileForm({
             <div className="space-y-1.5">
               <Label htmlFor="birthday">Ngày sinh</Label>
               <DateInput id="birthday" name="birthday" defaultValue={birthday ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="joined_on">Ngày vào công ty</Label>
+              <DateInput id="joined_on" name="joined_on" defaultValue={p?.joined_on ?? ""} />
             </div>
             <Field id="company_phone" label="SĐT công ty" value={p?.company_phone ?? null} />
             <Field id="personal_phone" label="SĐT cá nhân" value={p?.personal_phone ?? null} />

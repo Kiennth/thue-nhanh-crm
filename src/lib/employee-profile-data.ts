@@ -23,6 +23,7 @@ export interface ProfileInfo {
   notes: string | null;
   avatar_url: string | null;
   bio: string | null;
+  joined_on: string | null;
 }
 
 export interface ProfileData {
