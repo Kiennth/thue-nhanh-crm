@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee, requireRole } from "@/lib/dal";
-import { computeOrderLinePrice, type PricingTierInput } from "@/lib/rental-pricing";
+import { computeOrderLinePrice, computeRentalDurationInUnit, type PricingTierInput } from "@/lib/rental-pricing";
 import { TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
@@ -585,6 +585,15 @@ export async function updateOrderRentalPeriod(
 
   const supabase = await createClient();
 
+  // Khung thuê CŨ — để nhận ra dòng đã sửa giá tay (khác giá bảng giá của
+  // khung cũ) và giữ nguyên đơn giá/ngày của dòng đó (CEO 2026-10-05: nhân bản
+  // đơn rồi đổi ngày thì giá tự nhảy về mặc định).
+  const { data: before } = await supabase
+    .from("orders")
+    .select("rental_start_at, rental_end_at")
+    .eq("id", id)
+    .single();
+
   const { error: updateError } = await supabase.from("orders").update(parsed.data).eq("id", id);
   if (updateError) {
     return { error: "Không thể cập nhật thời gian thuê: " + updateError.message };
@@ -593,7 +602,7 @@ export async function updateOrderRentalPeriod(
   const { data: lines } = await supabase
     .from("order_equipment")
     .select(
-      "id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, parent_line_id, charge_duration",
+      "id, equipment_type_id, equipment_unit_id, equipment_instance_id, quantity, parent_line_id, charge_duration, unit_price",
     )
     .eq("order_id", id);
 
@@ -631,6 +640,32 @@ export async function updateOrderRentalPeriod(
       line.charge_duration,
     );
     if (equipmentType.product_type !== "rental" || equipmentType.tracking_type === "combo") continue;
+
+    // Dòng đã sửa giá tay: giữ đơn giá/ngày, chỉ nhân lại theo số ngày mới.
+    if (before?.rental_start_at && before.rental_end_at && equipmentType.rental_period_unit) {
+      const { computed: oldDefault } = await computeLineForEquipmentType(
+        supabase,
+        line.equipment_type_id,
+        before.rental_start_at,
+        before.rental_end_at,
+        line.quantity,
+        unitPriceOverride,
+        line.charge_duration,
+      );
+      if (Math.abs(Number(line.unit_price) - oldDefault.unitPrice) > 1) {
+        if (line.charge_duration != null) continue; // số kỳ cố định → giá không đổi
+        const unit = equipmentType.rental_period_unit;
+        const oldDur = computeRentalDurationInUnit(before.rental_start_at, before.rental_end_at, unit);
+        const newDur = computeRentalDurationInUnit(parsed.data.rental_start_at, parsed.data.rental_end_at, unit);
+        if (!oldDur || oldDur === newDur) continue;
+        const unitPrice = Math.round((Number(line.unit_price) / oldDur) * newDur * 100) / 100;
+        await supabase
+          .from("order_equipment")
+          .update({ unit_price: unitPrice, line_total: Math.round(unitPrice * line.quantity * 100) / 100 })
+          .eq("id", line.id);
+        continue;
+      }
+    }
 
     await supabase
       .from("order_equipment")
@@ -785,7 +820,9 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const supabase = await createClient();
   const { data: source, error: sourceError } = await supabase
     .from("orders")
-    .select("pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at")
+    .select(
+      "pickup_branch_id, return_branch_id, customer_id, rental_start_at, rental_end_at, deposit_override_amount, orderer_name, orderer_phone, orderer_email",
+    )
     .eq("id", id)
     .single();
 
@@ -796,7 +833,7 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information, note, delivery_method",
     )
     .eq("order_id", id)
     .order("position");
@@ -816,6 +853,11 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       order_date: formatVNDate(today),
       rental_start_at: source.rental_start_at,
       rental_end_at: source.rental_end_at,
+      // Giữ nguyên cọc đã sửa tay + người đặt (CEO 2026-10-05).
+      deposit_override_amount: source.deposit_override_amount,
+      orderer_name: source.orderer_name,
+      orderer_phone: source.orderer_phone,
+      orderer_email: source.orderer_email,
       created_by: employee.id,
     })
     .select("id")
@@ -837,6 +879,8 @@ export async function duplicateOrder(id: string): Promise<ActionState> {
       line_total: line.line_total,
       charge_duration: line.charge_duration,
       extra_information: line.extra_information,
+      note: line.note,
+      delivery_method: line.delivery_method,
     });
     // Dòng thường + dòng combo trước, rồi mới tới món con (trỏ về id dòng
     // combo MỚI) — giữ nguyên cấu trúc combo ở đơn nhân bản.
