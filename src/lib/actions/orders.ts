@@ -2314,6 +2314,30 @@ export async function upsertOrderTask(
 // Chỉ cho bỏ khâu CUỐI CÙNG đã hoàn thành (không có khâu nào SAU nó cũng
 // "done") — giữ đúng tính tuần tự bắt buộc của upsertOrderTask, tránh tình
 // huống khâu giữa chừng dở dang trong khi khâu sau vẫn báo xong.
+// Đổi người hoàn thành khâu khoán đã xong mà KHÔNG phải bỏ hoàn thành (CEO
+// 2026-10-05) — chỉ Giám đốc/Admin/Kế toán. Giữ nguyên ngày hoàn thành, ghi
+// chú, trạng thái đơn; khoán tự tính lại theo người mới.
+export async function reassignOrderTask(
+  orderId: string,
+  taskType: TaskType,
+  employeeId: string,
+): Promise<ActionState> {
+  await requireRole([...MANAGE_ROLES]);
+  if (!z.string().uuid().safeParse(employeeId).success) return { error: "Nhân viên không hợp lệ." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("order_tasks")
+    .update({ employee_id: employeeId })
+    .eq("order_id", orderId)
+    .eq("task_type", taskType)
+    .not("completed_date", "is", null)
+    .select("id");
+  if (error) return { error: "Không đổi được người hoàn thành: " + error.message };
+  if (!data?.length) return { error: "Khâu này chưa hoàn thành." };
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
 export async function uncompleteOrderTask(orderId: string, taskType: TaskType) {
   await requireRole([...EQUIPMENT_WRITE_ROLES]);
 

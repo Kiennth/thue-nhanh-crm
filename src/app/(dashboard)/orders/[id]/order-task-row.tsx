@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { upsertOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
+import { reassignOrderTask, upsertOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
 import type { TaskType } from "@/types/database";
 
 interface EmployeeOption {
@@ -53,6 +53,9 @@ interface OrderTaskRowProps {
   // Chỉ true cho ĐÚNG khâu "done" cuối cùng (page.tsx tự tính) — bỏ tick khâu
   // giữa chừng trong khi khâu sau vẫn "done" sẽ phá tính tuần tự bắt buộc.
   canUncomplete?: boolean;
+  // Giám đốc/Admin/Kế toán: đổi người hoàn thành khâu đã xong ngay tại chỗ,
+  // không phải Bỏ hoàn thành (CEO 2026-10-05).
+  canReassign?: boolean;
 }
 
 function UncompleteTaskButton({
@@ -124,6 +127,7 @@ export function OrderTaskRow({
   task,
   status,
   canUncomplete,
+  canReassign,
 }: OrderTaskRowProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -143,6 +147,31 @@ export function OrderTaskRow({
       <div className="flex items-center justify-between gap-2 py-0.5">
         <span className="text-sm font-medium">{label}</span>
         <div className="flex items-center gap-2">
+          {canReassign && (
+            <select
+              aria-label="Người hoàn thành"
+              title="Đổi người hoàn thành (khoán tính theo người này)"
+              disabled={pending}
+              value={task?.employee_id ?? ""}
+              onChange={(e) => {
+                const employeeId = e.target.value;
+                if (!employeeId) return;
+                startTransition(async () => {
+                  const result = await reassignOrderTask(orderId, taskType, employeeId);
+                  if (result && "error" in result) toast.error(result.error);
+                  else toast.success(`Đã đổi người hoàn thành khâu "${label}".`);
+                });
+              }}
+              className="h-7 max-w-40 rounded-md border bg-transparent px-1.5 text-xs"
+            >
+              {!task?.employee_id && <option value="">— Chưa ghi người —</option>}
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          )}
           {task?.completed_date && (
             <span className="text-xs text-muted-foreground">{task.completed_date}</span>
           )}

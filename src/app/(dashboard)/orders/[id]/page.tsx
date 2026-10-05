@@ -1508,6 +1508,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     task={task}
                                     status={status}
                                     canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}
+                                    canReassign={canManage}
                                   />
                                 </div>
                                 {scanType && status === "current" && (
