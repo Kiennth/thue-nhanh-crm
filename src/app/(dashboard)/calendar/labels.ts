@@ -5,6 +5,7 @@ import type { BarStatus } from "@/lib/calendar-data";
 export const STATUS_LABEL: Record<BarStatus, string> = {
   reserved: "Đã đặt, chưa giao",
   out: "Đang ở chỗ khách",
-  overdue: "Quá hạn chưa thu hồi",
+  late: "Quá giờ trả (trong ngày)",
+  overdue: "Quá hạn chưa thu hồi (sang ngày sau)",
   done: "Đã xong",
 };

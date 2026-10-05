@@ -1,4 +1,5 @@
 import "server-only";
+import { lateness, type Lateness } from "@/lib/vn-day";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
@@ -8,7 +9,9 @@ import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 // serial), thanh = đơn thuê trong khung đang xem. Chỉ đọc — sửa đơn vẫn ở
 // trang đơn.
 
-export type BarStatus = "reserved" | "out" | "overdue" | "done";
+// "late": đã qua giờ trả nhưng còn trong ngày trả (cam); "overdue": sang ngày
+// hôm sau vẫn chưa thu hồi (đỏ) — CEO 2026-10-05.
+export type BarStatus = "reserved" | "out" | "late" | "overdue" | "done";
 
 export interface CalendarBar {
   orderId: string;
@@ -65,7 +68,8 @@ export function barStatus(o: {
   // Đã nhập kho hoặc đã chuyển máy sang đơn gia hạn → coi như xong.
   if (o.completed_at || o.return_stock_transferred_at) return "done";
   if (o.delivery_stock_moved_at) {
-    return o.rental_end_at && Date.parse(o.rental_end_at) < Date.now() ? "overdue" : "out";
+    const late = o.rental_end_at ? lateness(o.rental_end_at) : null;
+    return late === "overdue" ? "overdue" : late === "late-today" ? "late" : "out";
   }
   return "reserved";
 }
@@ -285,6 +289,8 @@ export interface AgendaItem {
   at: string; // ISO
   kind: AgendaKind;
   done: boolean;
+  // Chưa xong mà đã qua giờ hẹn: "late-today" (cam) / "overdue" sang ngày sau (đỏ).
+  lateness: Lateness;
   // Cách giao/thu: xe máy, ô tô, hay không có dòng vận chuyển (khách tự đến).
   transport: "bike" | "car" | "self";
   // Ghi chú địa chỉ + SĐT trên dòng vận chuyển.
@@ -368,6 +374,11 @@ export async function loadAgenda(
         acc.set(name, (acc.get(name) ?? 0) + l.quantity);
         return acc;
       }, new Map<string, number>());
+    const at = kind === "delivery" ? o.rental_start_at : o.rental_end_at;
+    const done =
+      kind === "delivery"
+        ? Boolean(o.delivery_stock_moved_at || o.completed_at)
+        : Boolean(o.completed_at || o.return_stock_transferred_at || returnTasks.has(o.id));
     return {
       orderId: o.id,
       orderCode: o.order_code,
@@ -377,12 +388,10 @@ export async function loadAgenda(
         o.receiver_phone?.trim() ||
         o.customers?.phone ||
         null,
-      at: kind === "delivery" ? o.rental_start_at : o.rental_end_at,
+      at,
       kind,
-      done:
-        kind === "delivery"
-          ? Boolean(o.delivery_stock_moved_at || o.completed_at)
-          : Boolean(o.completed_at || o.return_stock_transferred_at || returnTasks.has(o.id)),
+      done,
+      lateness: done ? null : lateness(at),
       transport,
       address,
       branchId: kind === "delivery" ? o.pickup_branch_id : o.return_branch_id,

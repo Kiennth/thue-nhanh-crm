@@ -4,6 +4,7 @@ import { TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
 import type { DateRange } from "@/lib/date-range-presets";
 import { vnEndOfDay, vnStartOfDay } from "@/lib/vn-time";
 import type { TaskType } from "@/types/database";
+import { lateness } from "@/lib/vn-day";
 
 export interface OrderToHandle {
   id: string;
@@ -43,9 +44,10 @@ function isWithinDateRange(actionDate: string, range: DateRange | null): boolean
 
 // Học theo Booqable: đơn đã trễ hẹn (giao/thu hồi) bị ẩn khỏi danh sách
 // chính cho đỡ rối, chỉ hiện khi bấm nút "Trễ hạn (N)" — xem lateOnly bên
-// dưới.
+// dưới. CEO 2026-10-05: chỉ tính trễ khi đã SANG NGÀY HÔM SAU — đơn hôm nay
+// quá giờ (khách chưa tới lấy/trả) vẫn ở danh sách chính, nhãn "Quá giờ".
 function isLate(actionDate: string, now: Date): boolean {
-  return new Date(actionDate) < now;
+  return lateness(actionDate, now.getTime()) === "overdue";
 }
 
 // "Đơn hàng sắp tới" (cần giao) — hiện ngay khi đã Chốt đơn xong, cho đến khi

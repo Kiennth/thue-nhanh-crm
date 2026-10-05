@@ -190,7 +190,7 @@ export default async function CalendarPage({
               {showAll ? "Chỉ hiện mã có đơn" : "Hiện cả mã không có đơn"}
             </Link>
             <div className="ml-auto flex flex-wrap items-center gap-3 text-xs">
-              {(["reserved", "out", "overdue", "done"] as const).map((s) => (
+              {(["reserved", "out", "late", "overdue", "done"] as const).map((s) => (
                 <span key={s} className="inline-flex items-center gap-1.5">
                   <span
                     className={`size-3 rounded-sm ${
@@ -198,8 +198,10 @@ export default async function CalendarPage({
                         ? "bg-amber-400"
                         : s === "out"
                           ? "bg-emerald-500"
-                          : s === "overdue"
-                            ? "bg-red-500"
+                          : s === "late"
+                            ? "bg-orange-500"
+                            : s === "overdue"
+                              ? "bg-red-500"
                             : "bg-slate-300"
                     }`}
                   />

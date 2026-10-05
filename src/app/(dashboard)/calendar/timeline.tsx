@@ -23,6 +23,7 @@ const ROW_PAD = 6;
 const STATUS_CLASS: Record<BarStatus, string> = {
   reserved: "bg-amber-400/90 text-amber-950 hover:bg-amber-400",
   out: "bg-emerald-500 text-white hover:bg-emerald-600",
+  late: "bg-orange-500 text-white hover:bg-orange-600",
   overdue: "bg-red-500 text-white hover:bg-red-600",
   done: "bg-slate-300 text-slate-700 hover:bg-slate-400 dark:bg-slate-600 dark:text-slate-100",
 };

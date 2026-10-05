@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { lateness } from "@/lib/vn-day";
 
 function formatDuration(ms: number) {
   const totalMinutes = Math.floor(Math.abs(ms) / 60_000);
@@ -30,11 +31,20 @@ export function CountdownTimer({ targetDate }: { targetDate: string }) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
 
-  const overdue = remainingMs < 0;
+  // Quá giờ trong ngày hẹn → cam "Quá giờ"; sang ngày hôm sau → đỏ "Quá hạn".
+  const late = lateness(targetDate);
 
   return (
-    <span className={`font-mono text-sm ${overdue ? "font-medium text-destructive" : "text-foreground"}`}>
-      {overdue ? "Quá hạn " : "Còn "}
+    <span
+      className={`font-mono text-sm ${
+        late === "overdue"
+          ? "font-medium text-destructive"
+          : late === "late-today"
+            ? "rounded bg-orange-500/15 px-1.5 font-medium text-orange-700 dark:text-orange-300"
+            : "text-foreground"
+      }`}
+    >
+      {late === "overdue" ? "Quá hạn " : late === "late-today" ? "Quá giờ " : "Còn "}
       {formatDuration(remainingMs)}
     </span>
   );

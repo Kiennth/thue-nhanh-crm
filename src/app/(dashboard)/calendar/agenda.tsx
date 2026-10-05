@@ -72,6 +72,17 @@ export function CalendarAgenda({
                         </Link>
                         <span className="font-medium">{it.customer}</span>
                         {it.phone && <span className="text-sm text-muted-foreground tabular-nums">{it.phone}</span>}
+                        {it.lateness && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              it.lateness === "overdue"
+                                ? "bg-red-500/15 text-red-700 dark:text-red-300"
+                                : "bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                            }`}
+                          >
+                            {it.lateness === "overdue" ? "Trễ hạn" : "Quá giờ"}
+                          </span>
+                        )}
                         {it.done && (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
                             <CheckCircle2 className="size-3.5" />
