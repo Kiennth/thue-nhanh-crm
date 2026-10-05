@@ -26,6 +26,7 @@ import {
 } from "@/lib/order-document-data";
 import {
   AcceptanceDocument,
+  ContractDocument,
   HandoverDocument,
   PaymentRequestDocument,
   QuoteDocument,
@@ -212,9 +213,9 @@ export default async function OrderPrintPage({
     docType === "collection" ? resolveReturnContact(order, lines ?? [], customer?.phone ?? null) : null;
 
   // Báo giá / Đề nghị thanh toán / Biên bản bàn giao / Biên bản nghiệm thu in
-  // theo đúng file mẫu CEO gửi 2026-09-30 (documents.tsx). Hợp đồng và biên
-  // bản thu hồi chưa có mẫu → vẫn dùng khuôn chung bên dưới.
-  const TEMPLATE_DOCS: PrintDocType[] = ["quote", "payment_request", "handover", "acceptance"];
+  // theo đúng file mẫu CEO gửi 2026-09-30 (documents.tsx); Hợp đồng theo mẫu
+  // 2026-10-05. Biên bản thu hồi chưa có mẫu → vẫn dùng khuôn chung bên dưới.
+  const TEMPLATE_DOCS: PrintDocType[] = ["contract", "quote", "payment_request", "handover", "acceptance"];
   if (TEMPLATE_DOCS.includes(docType)) {
     const { data: payments } = await supabase
       .from("order_payments")
@@ -336,6 +337,7 @@ export default async function OrderPrintPage({
           style={{ fontFamily: `${docFont.style.fontFamily}, "Times New Roman", Times, serif` }}
         >
           {printButton}
+          {docType === "contract" && <ContractDocument ctx={ctx} />}
           {docType === "quote" && <QuoteDocument ctx={ctx} />}
           {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} />}
           {docType === "handover" && <HandoverDocument ctx={ctx} />}

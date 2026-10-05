@@ -19,7 +19,7 @@ export const PRINT_DOC_TYPES: PrintDocType[] = [
 ];
 
 export const PRINT_DOC_TITLES: Record<PrintDocType, string> = {
-  contract: "HỢP ĐỒNG CHO THUÊ",
+  contract: "HỢP ĐỒNG DỊCH VỤ",
   quote: "BÁO GIÁ",
   payment_request: "ĐỀ NGHỊ THANH TOÁN",
   handover: "BIÊN BẢN BÀN GIAO",
