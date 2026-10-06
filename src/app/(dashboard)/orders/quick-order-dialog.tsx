@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Minus, Plus, Search, Truck, X } from "lucide-react";
+import { CalendarClock, ClipboardList, Loader2, Minus, Package, Plus, Search, Truck, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,67 @@ const CAR_COLLECTION_ID = "1a53924a-a070-44b0-9441-3f09042af7e7";
 // Mặc định xe máy chở tối đa 5 cái/món (giống web — SHIP_RATES.defaultBikeMaxQty).
 const DEFAULT_BIKE_MAX_QTY = 5;
 
+// Popup chia 4 ô đánh số, mỗi ô 1 tông màu nhạt (CEO 2026-10-06: "màu mè, chia
+// ô cho đỡ nhàm chán, dễ bấm"). Ô số tròn đậm, nền ô nhạt cùng tông, dark mode
+// dịu lại. Tông cố định theo bước: 1 xanh dương (khách) · 2 hổ phách (thời
+// gian) · 3 xanh lá (hàng) · 4 tím (giao nhận).
+const SECTION_TONES = {
+  blue: {
+    card: "border-blue-200 bg-blue-50/70 dark:border-blue-900/70 dark:bg-blue-950/30",
+    badge: "bg-blue-600 text-white",
+    title: "text-blue-900 dark:text-blue-200",
+  },
+  amber: {
+    card: "border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/30",
+    badge: "bg-amber-500 text-white",
+    title: "text-amber-900 dark:text-amber-200",
+  },
+  emerald: {
+    card: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/70 dark:bg-emerald-950/30",
+    badge: "bg-emerald-600 text-white",
+    title: "text-emerald-900 dark:text-emerald-200",
+  },
+  violet: {
+    card: "border-violet-200 bg-violet-50/70 dark:border-violet-900/70 dark:bg-violet-950/30",
+    badge: "bg-violet-600 text-white",
+    title: "text-violet-900 dark:text-violet-200",
+  },
+} as const;
+
+function Section({
+  n,
+  title,
+  hint,
+  tone,
+  icon,
+  children,
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  tone: keyof typeof SECTION_TONES;
+  icon: ReactElement;
+  children: React.ReactNode;
+}) {
+  const t = SECTION_TONES[tone];
+  return (
+    <section className={cn("rounded-xl border p-3.5 sm:p-4", t.card)}>
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold", t.badge)}>
+          {n}
+        </span>
+        <span className={cn("[&_svg]:size-4", t.title)}>{icon}</span>
+        <h3 className={cn("text-sm font-semibold", t.title)}>{title}</h3>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Gói thuê bấm nhanh ở ô Thời gian: trả = nhận + N ngày (giờ giữ nguyên).
+const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30] as const;
+
 function HourSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
   return (
     <select
@@ -140,6 +201,13 @@ export function QuickOrderDialog({
     const duration = oldEnd - oldStart;
     if (Number.isNaN(nextStart) || Number.isNaN(duration) || duration <= 0) return;
     const nextEnd = new Date(nextStart + duration);
+    setEndDate(datePart(nextEnd));
+    setEndHour(hourPart(nextEnd));
+  }
+  function applyDays(days: number) {
+    const start = combine(startDate, startHour, startMinute).getTime();
+    if (Number.isNaN(start)) return;
+    const nextEnd = new Date(start + days * 86_400_000);
     setEndDate(datePart(nextEnd));
     setEndHour(hourPart(nextEnd));
   }
@@ -245,6 +313,8 @@ export function QuickOrderDialog({
   const dayCount = periodValid
     ? computeRentalDurationInUnit(startAt.toISOString(), endAt.toISOString(), "day")
     : 0;
+  // Chip "chọn nhanh" sáng khi khoảng thuê đúng bội số ngày tròn.
+  const activeDays = periodValid && dayCount > 0 && (endAt.getTime() - startAt.getTime()) % 86_400_000 === 0 ? dayCount : null;
 
   function linePrice(line: CartLine): number | null {
     if (!catalog || !periodValid) return null;
@@ -403,6 +473,7 @@ export function QuickOrderDialog({
             </div>
           )}
           {/* Khách + kho */}
+          <Section n={1} title="Khách hàng & kho giao" tone="blue" icon={<UserRound />}>
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
               <Label>Khách hàng</Label>
@@ -443,8 +514,8 @@ export function QuickOrderDialog({
                   <Button
                     key={b.id}
                     type="button"
-                    size="sm"
                     variant={branchId === b.id ? "default" : "outline"}
+                    className={cn("h-10 px-4 text-sm", branchId !== b.id && "bg-background")}
                     onClick={() => setBranchId(b.id)}
                   >
                     {b.name}
@@ -453,10 +524,25 @@ export function QuickOrderDialog({
               </div>
             </div>
           </div>
+          </Section>
 
           {/* Thời gian */}
-          <div className="space-y-2">
-            <Label htmlFor="quick_start_date">Thời gian thuê</Label>
+          <Section n={2} title="Thời gian thuê" tone="amber" icon={<CalendarClock />}>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-muted-foreground">Chọn nhanh</span>
+              {QUICK_DAYS.map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  variant={activeDays === d ? "default" : "outline"}
+                  className={cn("h-9 rounded-full px-3.5", activeDays !== d && "bg-background")}
+                  onClick={() => applyDays(d)}
+                >
+                  {d === 30 ? "1 tháng" : `${d} ngày`}
+                </Button>
+              ))}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-16 text-sm font-medium">Nhận</span>
@@ -480,10 +566,11 @@ export function QuickOrderDialog({
                 : "Thời gian kết thúc phải sau thời gian bắt đầu."}
             </p>
           </div>
+          </Section>
 
           {/* Hàng */}
+          <Section n={3} title="Hàng thuê" tone="emerald" icon={<Package />} hint="Gõ tên, Enter chọn dòng đầu">
           <div className="space-y-2">
-            <Label>Hàng thuê</Label>
             {!catalog ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" /> Đang tải danh mục hàng…
@@ -511,8 +598,8 @@ export function QuickOrderDialog({
                         addItem(results[0]);
                       }
                     }}
-                    placeholder="Gõ tên hàng (vd: ipad gen 9, loa jbl) rồi chọn — Enter chọn dòng đầu"
-                    className="pl-8"
+                    placeholder="Gõ tên hàng (vd: ipad gen 9, loa jbl) rồi chọn"
+                    className="h-11 bg-background pl-9 text-base"
                   />
                   {showResults && results.length > 0 && (
                     <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
@@ -571,13 +658,13 @@ export function QuickOrderDialog({
                 )}
 
                 {allLines.length > 0 && (
-                  <div className="divide-y rounded-md border">
+                  <div className="divide-y rounded-lg border bg-background">
                     {allLines.map((line, i) => {
                       const isTransport = line.item.typeId in TRANSPORT_LABELS;
                       const free = freeAt(line.item);
                       const short = free !== null && line.quantity > free;
                       return (
-                        <div key={line.item.key} className="flex items-center gap-2 px-2.5 py-1.5 text-sm">
+                        <div key={line.item.key} className="flex items-center gap-2 px-3 py-2 text-sm">
                           <div className="min-w-0 flex-1">
                             <p className="truncate">{line.item.label}</p>
                             {short && (
@@ -588,18 +675,18 @@ export function QuickOrderDialog({
                             )}
                           </div>
                           <div className={cn("flex items-center gap-1", isTransport && "invisible")}>
-                            <Button type="button" size="icon-sm" variant="ghost" onClick={() => setQty(line.item.key, line.quantity - 1)}>
-                              <Minus className="size-3.5" />
+                            <Button type="button" size="icon" variant="outline" className="size-9 rounded-full" onClick={() => setQty(line.item.key, line.quantity - 1)}>
+                              <Minus className="size-4" />
                             </Button>
                             <Input
                               type="number"
                               min={1}
                               value={line.quantity}
                               onChange={(e) => setQty(line.item.key, Math.max(1, Number(e.target.value) || 1))}
-                              className="h-8 w-14 text-center"
+                              className="h-9 w-14 text-center text-base"
                             />
-                            <Button type="button" size="icon-sm" variant="ghost" onClick={() => setQty(line.item.key, line.quantity + 1)}>
-                              <Plus className="size-3.5" />
+                            <Button type="button" size="icon" variant="outline" className="size-9 rounded-full" onClick={() => setQty(line.item.key, line.quantity + 1)}>
+                              <Plus className="size-4" />
                             </Button>
                           </div>
                           <span className="w-28 text-right tabular-nums">
@@ -617,9 +704,9 @@ export function QuickOrderDialog({
                         </div>
                       );
                     })}
-                    <div className="flex justify-between px-2.5 py-2 text-sm font-semibold">
-                      <span>Tạm tính (chưa VAT, chưa giảm giá)</span>
-                      <span className="tabular-nums">{vnd(total)}</span>
+                    <div className="flex items-baseline justify-between bg-emerald-50 px-3 py-2.5 dark:bg-emerald-950/40">
+                      <span className="text-sm font-medium text-emerald-900 dark:text-emerald-200">Tạm tính (chưa VAT, chưa giảm giá)</span>
+                      <span className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{vnd(total)}</span>
                     </div>
                   </div>
                 )}
@@ -627,10 +714,11 @@ export function QuickOrderDialog({
             )}
           </div>
 
+          </Section>
+
           {/* Chi tiết luôn mở sẵn (CEO 2026-10-05: không ẩn mã đơn, người đặt). */}
-          <div className="rounded-md border px-3 py-3">
-            <p className="text-sm font-medium text-muted-foreground">Chi tiết đơn</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Section n={4} title="Chi tiết đơn & giao nhận" tone="violet" icon={<ClipboardList />}>
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="quick_order_code">Mã đơn</Label>
                 <Input
@@ -757,7 +845,7 @@ export function QuickOrderDialog({
                 <DateInput id="quick_order_date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
               </div>
             </div>
-          </div>
+          </Section>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -778,10 +866,10 @@ export function QuickOrderDialog({
               ))}
             </select>
             <div className="ml-auto flex gap-2">
-              <Button type="button" variant="outline" disabled={saving || !catalog} onClick={() => submit("quote")}>
+              <Button type="button" variant="outline" className="h-10" disabled={saving || !catalog} onClick={() => submit("quote")}>
                 Tạo đơn (đã báo giá)
               </Button>
-              <Button type="button" disabled={saving || !catalog} onClick={() => submit("deal")}>
+              <Button type="button" className="h-10 px-5 text-base" disabled={saving || !catalog} onClick={() => submit("deal")}>
                 {saving ? <Loader2 className="size-4 animate-spin" /> : null}
                 Tạo &amp; chốt đơn
               </Button>
