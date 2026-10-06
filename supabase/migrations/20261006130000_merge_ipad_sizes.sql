@@ -1,0 +1,15 @@
+-- Gộp iPad 2 kích thước thành 1 mã (CEO 2026-10-06, đã áp trực tiếp qua REST —
+-- file ghi lại cho lịch sử repo; chạy lại không cần thiết).
+-- Giữ mã có nhiều lịch sử hơn, đổi tên, biến thể "<size> · Wi-Fi / 5G":
+--   iPad Pro M5   (giữ 13", gộp 11")   cọc 15.000.000
+--   iPad Pro M4   (giữ 13", gộp 11")   cọc 10.000.000 (trước 0)
+--   iPad Pro M2   (giữ 12.9", gộp 11") cọc  5.000.000
+--   iPad Pro M1   (giữ 11", gộp 12.9") cọc  5.000.000
+--   iPad Air 7 M3 (giữ 11", gộp 13")   cọc  5.000.000
+--   iPad Air 6 M2 (giữ 11", gộp 13")   cọc  5.000.000
+-- Biến thể mã cũ chuyển sang mã giữ (equipment_units.equipment_type_id), máy
+-- giữ nguyên biến thể; máy chưa gắn biến thể → "<size> · Wi-Fi". Mọi dòng
+-- đơn (cả lịch sử) sang mã giữ; xoá mã cũ (website_products cascade). Không
+-- đơn mở nào bị đổi cọc. Web: slug mới thue-ipad-pro-m5… + 301 12 link cũ.
+-- Sao lưu: scratchpad backup-ipad-merge-2026-10-06.json.
+select 1;
