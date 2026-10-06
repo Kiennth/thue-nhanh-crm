@@ -2,11 +2,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { EQUIPMENT_WRITE_ROLES } from "@/lib/roles";
-import { StocktakeClient } from "./stocktake-client";
+import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { ScanClient } from "./scan-client";
 
-// Kiểm kho bằng bảng tính (CEO 2026-10-06) — xem lib/actions/stocktake.ts.
-export default async function StocktakePage() {
+// Quét kiểm kho (CEO 2026-10-07) — xem lib/actions/stocktake-scan.ts.
+export default async function StocktakeScanPage() {
   const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
   const supabase = await createClient();
   const [{ data: branches }, { data: categories }] = await Promise.all([
@@ -19,21 +19,21 @@ export default async function StocktakePage() {
         <Link href="/equipment" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> Thiết bị
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">Kiểm kho bằng bảng tính</h1>
+        <h1 className="mt-1 text-2xl font-bold">Quét kiểm kho</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Xuất danh sách máy theo serial ra file, sửa trên Google Sheets hoặc Excel (serial, biến thể, kho, ghi chú,
-          ngày hết bảo hành, thêm máy mới, xoá máy không còn), rồi tải lên lại. CRM hiện bảng thay đổi để duyệt trước khi
-          ghi. Máy không có trong file thì không bị đụng tới. Đi kiểm từng máy tại kho thì dùng{" "}
-          <Link href="/equipment/stocktake/scan" className="underline">
-            Quét kiểm kho
+          Chọn kho, bấm Bắt đầu, rồi quét từng máy. CRM đối chiếu ngay: máy có mặt, máy còn thiếu, máy lạ (ở kho khác, đang cho
+          thuê, hoặc chưa có trong CRM). Sửa hàng loạt serial, biến thể, bảo hành thì dùng{" "}
+          <Link href="/equipment/stocktake" className="underline">
+            Kiểm kho bằng bảng tính
           </Link>
           .
         </p>
       </div>
-      <StocktakeClient
+      <ScanClient
         branches={branches ?? []}
         categories={categories ?? []}
         lockedBranchId={employee.role === "cua_hang_truong" ? employee.branch_id : null}
+        canMove={MANAGE_ROLES.includes(employee.role)}
       />
     </div>
   );

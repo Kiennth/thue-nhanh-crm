@@ -367,6 +367,14 @@ export default async function EquipmentPage({
                 Kiểm kho bằng bảng tính
               </Link>
             )}
+            {canManageStock && (
+              <Link
+                href="/equipment/stocktake/scan"
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
+              >
+                Quét kiểm kho
+              </Link>
+            )}
             <Link
               href="/shortages"
               className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
