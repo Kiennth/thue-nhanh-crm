@@ -158,7 +158,11 @@ export function StocktakeClient({
             type="file"
             accept=".csv,text/csv"
             className="hidden"
-            onChange={(e) => onFile(e.target.files?.[0])}
+            onChange={(e) => {
+              onFile(e.target.files?.[0]);
+              // Cho chọn lại cùng 1 file (sửa xong lưu đè rồi tải lên lại).
+              e.target.value = "";
+            }}
           />
         </label>
         {checking && (
