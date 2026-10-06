@@ -2894,7 +2894,7 @@ export async function swapOrderLineInstance(lineId: string, instanceId: string |
 // AUTO-*. Thiếu máy thì gán được bao nhiêu gán bấy nhiêu, báo số còn thiếu.
 export async function autoAssignSerials(
   lineIds: string[],
-): Promise<{ error: string } | { success: true; assigned: number; missing: number }> {
+): Promise<{ error: string } | { success: true; assigned: number; missing: number; placeholders: number }> {
   await requireRole([...ALL_ROLES]);
   const supabase = await createClient();
   const { data: lines } = await supabase
@@ -2903,12 +2903,18 @@ export async function autoAssignSerials(
     .in("id", lineIds)
     .is("equipment_instance_id", null)
     .order("position");
-  if (!lines?.length) return { success: true, assigned: 0, missing: 0 };
+  if (!lines?.length) return { success: true, assigned: 0, missing: 0, placeholders: 0 };
   const ctx = await loadSwapContext(supabase, lines[0].id);
   if ("error" in ctx) return ctx;
   if (ctx.mode === "history") return { error: "Đơn đã nhập kho/hoàn tất — gán từng máy bằng tay." };
-  const pool = ctx.options.filter((o) => o.free && !o.label.startsWith("AUTO")).map((o) => o.id);
+  // Ưu tiên máy có serial thật; hết máy thật mới lấy máy tạm AUTO-* (mã chưa
+  // nhập serial, vd cục phát 5G — PO13142 2026-10-06 bị kẹt "thiếu 1 máy" dù kho
+  // còn 14 máy AUTO). Gán AUTO thì báo để nhập serial thật sau.
+  const real = ctx.options.filter((o) => o.free && !o.label.startsWith("AUTO")).map((o) => o.id);
+  const placeholders = ctx.options.filter((o) => o.free && o.label.startsWith("AUTO")).map((o) => o.id);
+  const pool = [...real, ...placeholders];
   let assigned = 0;
+  let assignedPlaceholders = 0;
   // Tuần tự — mỗi lần gán là 1 transaction RPC riêng.
   for (const line of lines) {
     const instanceId = pool.shift();
@@ -2919,9 +2925,10 @@ export async function autoAssignSerials(
     });
     if (error) return { error: "Gán serial lỗi: " + error.message };
     assigned += 1;
+    if (assigned > real.length) assignedPlaceholders += 1;
   }
   revalidatePath(`/orders/${ctx.orderId}`);
-  return { success: true, assigned, missing: lines.length - assigned };
+  return { success: true, assigned, missing: lines.length - assigned, placeholders: assignedPlaceholders };
 }
 
 type CloneableLine = {

@@ -84,6 +84,11 @@ export function AutoAssignButton({ lineIds }: { lineIds: string[] }) {
             toast.error(result.error);
             return;
           }
+          if (result.placeholders > 0) {
+            toast.warning(
+              `Đã gán ${result.assigned} máy, trong đó ${result.placeholders} máy tạm AUTO (mã này chưa nhập serial thật) — vào trang mã hàng đổi mã máy thành serial thật khi có.`,
+            );
+          }
           if (result.missing > 0) {
             toast.warning(
               `Đã gán ${result.assigned} máy — còn thiếu ${result.missing} máy trống ở kho giao (điều chuyển hoặc mua thêm).`,
