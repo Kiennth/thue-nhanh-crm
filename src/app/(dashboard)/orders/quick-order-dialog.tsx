@@ -146,6 +146,13 @@ function Section({
 
 // Gói thuê bấm nhanh ở ô Thời gian: trả = nhận + N ngày (giờ giữ nguyên).
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30] as const;
+// Thuê dài hạn (CEO 2026-10-06, giống web): gói cam kết 3/6/12 tháng = 90/180/360
+// ngày (1 tháng = 30 ngày theo quy ước bảng giá), tạm tính hiện thêm giá mỗi tháng.
+const LONG_TERM = [
+  { months: 3, days: 90 },
+  { months: 6, days: 180 },
+  { months: 12, days: 360 },
+] as const;
 
 function HourSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
   return (
@@ -261,6 +268,7 @@ export function QuickOrderDialog({
     setEndDate(datePart(e0));
     setEndHour(hourPart(e0));
     setEndMinute(minutePart(e0));
+    setLongTermOpen(false);
     setCart([]);
     setManualTransport(null);
     setQuery("");
@@ -318,6 +326,9 @@ export function QuickOrderDialog({
     : 0;
   // Chip "chọn nhanh" sáng khi khoảng thuê đúng bội số ngày tròn.
   const activeDays = periodValid && dayCount > 0 && (endAt.getTime() - startAt.getTime()) % 86_400_000 === 0 ? dayCount : null;
+  const commitMonths = LONG_TERM.find((l) => l.days === activeDays)?.months ?? null;
+  const [longTermOpen, setLongTermOpen] = useState(false);
+  const longTermActive = longTermOpen || commitMonths !== null;
 
   function linePrice(line: CartLine): number | null {
     if (!catalog || !periodValid) return null;
@@ -554,7 +565,36 @@ export function QuickOrderDialog({
                   {d === 30 ? "1 tháng" : `${d} ngày`}
                 </Button>
               ))}
+              <Button
+                type="button"
+                variant={longTermActive ? "default" : "outline"}
+                className={cn("h-9 rounded-full px-3.5", !longTermActive && "bg-background")}
+                aria-expanded={longTermActive}
+                onClick={() => {
+                  if (!longTermActive) applyDays(LONG_TERM[0].days);
+                  setLongTermOpen(true);
+                }}
+              >
+                Thuê dài hạn
+              </Button>
             </div>
+            {longTermActive && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs font-medium text-muted-foreground">Cam kết</span>
+                {LONG_TERM.map((l) => (
+                  <Button
+                    key={l.months}
+                    type="button"
+                    variant={commitMonths === l.months ? "default" : "outline"}
+                    className={cn("h-9 rounded-full px-3.5", commitMonths !== l.months && "bg-background")}
+                    onClick={() => applyDays(l.days)}
+                  >
+                    {l.months} tháng
+                  </Button>
+                ))}
+                <span className="text-xs text-muted-foreground">= {commitMonths ? commitMonths * 30 : LONG_TERM[0].days} ngày, giá bậc tháng tự áp</span>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-16 text-sm font-medium">Nhận</span>
@@ -731,7 +771,14 @@ export function QuickOrderDialog({
                       );
                     })}
                     <div className="flex items-baseline justify-between bg-emerald-50 px-3 py-2.5 dark:bg-emerald-950/40">
-                      <span className="text-sm font-medium text-emerald-900 dark:text-emerald-200">Tạm tính (chưa VAT, chưa giảm giá)</span>
+                      <span className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                        Tạm tính (chưa VAT, chưa giảm giá)
+                        {commitMonths && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            gói {commitMonths} tháng ≈ {vnd(Math.round(total / commitMonths))}/tháng
+                          </span>
+                        )}
+                      </span>
                       <span className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{vnd(total)}</span>
                     </div>
                   </div>
