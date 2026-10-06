@@ -405,11 +405,12 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
       <div>
         <p className="font-bold">BÊN NHẬN : {ctx.customer.name}</p>
         <PartyLine label="Địa chỉ">{ctx.customer.address ?? ""}</PartyLine>
-        <PartyLine label="Địa chỉ giao hàng">{ctx.deliveryAddress}</PartyLine>
+        {/* MST đứng trên Địa chỉ giao hàng (CEO 2026-10-06). */}
         <PartyLine label="MST">{ctx.customer.taxCode ?? ""}</PartyLine>
         {ctx.customer.budgetUnitCode && (
           <PartyLine label="Mã số ĐVQHNS">{ctx.customer.budgetUnitCode}</PartyLine>
         )}
+        <PartyLine label="Địa chỉ giao hàng">{ctx.deliveryAddress}</PartyLine>
         <PartyLine label="Người nhận">{ctx.receiverName ?? DOTS}</PartyLine>
         <PartyLine label="Số điện thoại">{ctx.receiverPhone ?? DOTS}</PartyLine>
         <PartyLine label="Số CCCD">
