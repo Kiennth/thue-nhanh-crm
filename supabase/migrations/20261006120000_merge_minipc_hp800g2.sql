@@ -1,0 +1,19 @@
+-- Gộp mã trùng Mini PC (CEO 2026-10-06, đã áp trực tiếp qua REST — file này
+-- ghi lại để lịch sử repo đầy đủ; chạy lại không cần thiết).
+--
+-- "Máy miniPC HP 800 G2 i5 6500T 8G 256GB" (bf37e423…, serial, 34 máy, 0 đơn)
+-- là cùng loại máy với "Mini PC i5 6th 8GB 256GB SSD" (0170d203…, theo số
+-- lượng, 95 dòng đơn). Giữ mã có lịch sử, chuyển sang theo dõi serial:
+--  1. Dòng đơn dùng biến thể gõ nhầm "HD" → "HP"; xoá biến thể "HD".
+--  2. Mã giữ: tracking individual, tên "Mini PC HP EliteDesk 800 G2 i5-6500T
+--     8GB 256GB", giá 200.000đ/ngày, cọc 1.000.000đ (CEO chốt).
+--  3. 34 máy serial của mã HP → mã giữ (biến thể HP): HN 32, HCM 2.
+--  4. Máy tạm AUTO-MINIPC-* cho phần sổ số lượng chưa có serial: HCM 34, ĐN 10
+--     (sổ cũ HN 30 · HCM 36 · ĐN 10) — nhập serial thật / xoá bớt khi CEO đếm.
+--  5. 6 đơn đang mở tách dòng quantity N → N dòng 1 máy (giữ đơn giá, tổng
+--     không đổi); BQ12863 gán HP800G2-29/30, BQ12894 gán 2 máy AUTO HCM (đang
+--     ở khách → status rented); 4 đơn chưa giao để trống, gán lúc giao.
+--  6. Xoá equipment_stock theo số lượng của biến thể HP; xoá mã HP 800 G2.
+-- Dòng đơn đã hoàn tất (quantity > 1, có equipment_unit_id) giữ nguyên.
+-- Sao lưu trước khi gộp: scratchpad backup-minipc-merge-2026-10-06.json.
+select 1;
