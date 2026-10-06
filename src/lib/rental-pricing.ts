@@ -133,11 +133,14 @@ export function findApplicableTier(
   return applicable[0] ?? null;
 }
 
-// Giá thuê theo bậc = giá tuyến tính × (1 − % bậc đang áp), nhưng KHÔNG BAO GIỜ
-// đắt hơn thuê trọn một bậc cao hơn (CEO 2026-10-06, sau đơn PO13142: 25 ngày
-// ở bậc 14 ngày 65% = 2.625.000đ trong khi 30 ngày ở bậc tháng 80% chỉ
-// 1.800.000đ). Thuê 14–29 ngày nay tính = min(giá bậc hiện tại, giá trọn 30
-// ngày) → "càng dài càng rẻ" đúng nghĩa, không phải thêm bậc trung gian.
+// Giá thuê theo bậc — quy tắc CEO 2026-10-06 (sau đơn PO13142: 25 ngày ở bậc
+// 14 ngày 65% = 2.625.000đ, đắt hơn 30 ngày 1.800.000đ):
+//  1. Dưới 1 tháng: giá trọn gói tại từng mốc bậc (ngưỡng × giá × (1 − %)),
+//     ngày lẻ giữa 2 mốc NỘI SUY tuyến tính giữa giá 2 gói gần nhất
+//     (9–10 ngày ≈ trung bình gói 7 và gói 14). Làm tròn nghìn đồng.
+//  2. Từ 1 tháng (mốc có duration_unit "month"): giá ngày = giá tháng / 30,
+//     thuê thêm ngày nào cộng ngày đó = tuyến tính × (1 − % bậc tháng đang áp).
+//     Các mốc cam kết 3/6/12 tháng là bậc riêng, không nội suy vào.
 export function tieredPrice(
   price: number,
   rentalPeriodUnit: RentalPeriodUnit,
@@ -146,13 +149,25 @@ export function tieredPrice(
 ): number {
   const unitHours = PERIOD_LENGTH_IN_HOURS[rentalPeriodUnit];
   const rentedHours = durationInUnit * unitHours;
-  const priceAt = (units: number, tier: PricingTierInput | null) =>
-    price * units * (tier ? 1 - tier.discount_percentage / 100 : 1);
-  const own = priceAt(durationInUnit, findApplicableTier(tiers, rentalPeriodUnit, durationInUnit));
-  const higher = tiers
-    .filter((t) => t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit] > rentedHours)
-    .map((t) => priceAt((t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit]) / unitHours, t));
-  return Math.min(own, ...higher);
+  const thresholdHours = (t: PricingTierInput) => t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit];
+  const packagePrice = (t: PricingTierInput) =>
+    (price * thresholdHours(t) * (1 - t.discount_percentage / 100)) / unitHours;
+  const lower = findApplicableTier(tiers, rentalPeriodUnit, durationInUnit);
+  const linear = price * durationInUnit;
+  // Chưa tới mốc đầu tiên, hoặc đã qua mốc tháng → tuyến tính theo % bậc đang áp.
+  if (!lower) return linear;
+  if (lower.duration_unit === "month" || thresholdHours(lower) === rentedHours) {
+    return linear * (1 - lower.discount_percentage / 100);
+  }
+  const upper = tiers
+    .filter((t) => thresholdHours(t) > rentedHours)
+    .sort((a, b) => thresholdHours(a) - thresholdHours(b))[0];
+  if (!upper) return linear * (1 - lower.discount_percentage / 100);
+  const lo = thresholdHours(lower);
+  const hi = thresholdHours(upper);
+  const ratio = (rentedHours - lo) / (hi - lo);
+  const interpolated = packagePrice(lower) + (packagePrice(upper) - packagePrice(lower)) * ratio;
+  return Math.round(interpolated / 1000) * 1000;
 }
 
 export function computeOrderLinePrice(input: ComputeLinePriceInput): ComputedLinePrice {
