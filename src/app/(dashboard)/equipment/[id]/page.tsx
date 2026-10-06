@@ -555,6 +555,21 @@ export default async function EquipmentDetailPage({
                 )}
               </div>
               <p className="text-sm text-muted-foreground">{priceLine}</p>
+              {/* Phụ kiện đi kèm (CEO 2026-10-06, học Booqable) — chip từng món, tách bằng "|". */}
+              {type.default_extra_information?.trim() && (
+                <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                  <span className="text-xs text-muted-foreground">Phụ kiện:</span>
+                  {type.default_extra_information
+                    .split("|")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .map((item, i) => (
+                      <Badge key={i} variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
+                        {item}
+                      </Badge>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
           {canManageCatalog && (

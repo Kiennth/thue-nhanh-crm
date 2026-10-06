@@ -438,18 +438,19 @@ export function EquipmentTypeDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="default_extra_information">Ghi chú mặc định trên đơn</Label>
+            <Label htmlFor="default_extra_information">Phụ kiện đi kèm (học Booqable)</Label>
             <Textarea
               id="default_extra_information"
               name="default_extra_information"
               defaultValue={equipmentType?.default_extra_information ?? ""}
-              placeholder="VD: Kèm Remote | Dây nguồn | Chân đế tuỳ chọn"
+              placeholder="VD: Gậy | Thẻ nhớ | Sạc"
               className="min-h-16"
               maxLength={1000}
             />
             <p className="text-xs text-muted-foreground">
-              Thêm sản phẩm này vào đơn thì ghi chú tự điền dưới tên dòng hàng (sửa được trên từng
-              đơn) và in ra chứng từ.
+              Liệt kê phụ kiện cách nhau bằng dấu &quot;|&quot;. Thêm sản phẩm vào đơn thì tự điền dưới
+              tên dòng hàng (sửa được trên từng đơn), in ra báo giá và cột Phụ kiện trên biên bản bàn
+              giao / trả hàng để kiểm đếm.
             </p>
           </div>
 

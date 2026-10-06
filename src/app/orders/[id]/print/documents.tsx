@@ -100,6 +100,22 @@ function RowDescription({ row, showNote = true }: { row: DocRow; showNote?: bool
   );
 }
 
+// Phụ kiện đi kèm (CEO 2026-10-06, học Booqable): ghi chú dòng "Gậy | Thẻ nhớ
+// | Sạc" in thành từng ô ☐ để kỹ thuật/khách tick kiểm đếm lúc bàn giao.
+function AccessoryChecklist({ note }: { note: string | null }) {
+  const items = (note ?? "").split("|").map((s) => s.trim()).filter(Boolean);
+  if (!items.length) return null;
+  return (
+    <>
+      {items.map((item, i) => (
+        <span key={i} className="block text-[11px] leading-4 whitespace-nowrap">
+          ☐ {item}
+        </span>
+      ))}
+    </>
+  );
+}
+
 // Bảng giá 9 cột dùng chung cho Báo giá (có thêm cột "Đơn giá/gói") và Biên
 // bản nghiệm thu.
 function PriceRows({ rows, withPackageColumn }: { rows: DocRow[]; withPackageColumn: boolean }) {
@@ -432,8 +448,9 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
             <Th>Mô tả</Th>
             <Th className="w-10">ĐVT</Th>
             <Th className="w-10">SL</Th>
-            <Th className="w-44">Serial Number</Th>
-            <Th className="w-28">Tình trạng</Th>
+            <Th className="w-40">Serial Number</Th>
+            <Th className="w-32">Phụ kiện</Th>
+            <Th className="w-24">Tình trạng</Th>
           </tr>
         </thead>
         <tbody>
@@ -441,7 +458,8 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
             <tr key={row.key}>
               <Td className="text-center">{index + 1}</Td>
               <Td>
-                <RowDescription row={row} />
+                {/* Ghi chú phụ kiện đã có cột riêng — không in lặp dưới tên. */}
+                <RowDescription row={row} showNote={false} />
               </Td>
               <Td className="text-center">{row.unit}</Td>
               <Td className="text-center">{row.quantity}</Td>
@@ -452,12 +470,15 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
                   </span>
                 ))}
               </Td>
+              <Td>
+                <AccessoryChecklist note={row.note} />
+              </Td>
               <Td />
             </tr>
           ))}
           {!rows.length && (
             <tr>
-              <Td colSpan={6} className="text-center">
+              <Td colSpan={7} className="text-center">
                 Chưa có thiết bị nào trên đơn.
               </Td>
             </tr>
