@@ -481,7 +481,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     unitPrice: number,
     durationOverride?: number | null,
   ) {
-    if (type.product_type !== "rental" || !type.rental_period_unit) return null;
+    if (!type.rental_period_unit) return null;
+    // Dịch vụ theo giờ (CEO 2026-10-06): số giờ = charge_duration (mặc định 1),
+    // không có "số kỳ tự tính theo đơn" nên không hiện cảnh báo/nút về lại.
+    if (type.product_type === "service") {
+      const duration = durationOverride ?? 1;
+      return {
+        duration,
+        unitLabel: RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit],
+        basePrice: type.price,
+        tier: null,
+        isCustom: Math.abs(type.price * duration - unitPrice) > 0.5,
+        defaultUnitPrice: type.price * duration,
+        autoDuration: null,
+        isDurationCustom: false,
+      };
+    }
+    if (type.product_type !== "rental") return null;
     const autoDuration =
       orderRentalStartAt && orderRentalEndAt
         ? computeRentalDurationInUnit(orderRentalStartAt, orderRentalEndAt, type.rental_period_unit)

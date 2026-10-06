@@ -59,7 +59,10 @@ function combine(date: string, hour: string, minute = "00") {
   return new Date(`${date}T${hour}:${minute}:00`);
 }
 
-type CartLine = { item: QuickOrderCatalogItem; quantity: number };
+// hours: dịch vụ tính theo giờ (rentalPeriodUnit có) — số giờ thực hiện, mặc định 1.
+type CartLine = { item: QuickOrderCatalogItem; quantity: number; hours?: number };
+const isHourlyService = (item: QuickOrderCatalogItem) => item.productType === "service" && !!item.rentalPeriodUnit;
+const HOUR_UNIT_LABELS: Record<string, string> = { hour: "giờ", day: "ngày", week: "tuần", month: "tháng", year: "năm" };
 
 // Dữ liệu điền sẵn khi "Lên đơn" từ 1 đơn web (CEO 2026-10-04).
 export interface QuickOrderPrefill {
@@ -329,6 +332,7 @@ export function QuickOrderDialog({
         rentalStartAt: startAt.toISOString(),
         rentalEndAt: endAt.toISOString(),
         quantity: line.quantity,
+        durationOverride: isHourlyService(item) ? (line.hours ?? 1) : null,
       }).lineTotal;
     } catch {
       return null;
@@ -378,10 +382,13 @@ export function QuickOrderDialog({
     setCart((c) => {
       const idx = c.findIndex((l) => l.item.key === item.key);
       if (idx >= 0) return c.map((l, i) => (i === idx ? { ...l, quantity: l.quantity + 1 } : l));
-      return [...c, { item, quantity: 1 }];
+      return [...c, { item, quantity: 1, hours: isHourlyService(item) ? 1 : undefined }];
     });
     setQuery("");
     setShowResults(false);
+  }
+  function setHours(key: string, hours: number) {
+    setCart((c) => c.map((l) => (l.item.key === key ? { ...l, hours: Math.max(0.5, hours) } : l)));
   }
   function setQty(key: string, quantity: number) {
     setCart((c) =>
@@ -422,7 +429,12 @@ export function QuickOrderDialog({
         employee_id: employeeId,
         stage,
         web_order_id: prefill?.webOrderId ?? null,
-        items: allLines.map((l) => ({ typeId: l.item.typeId, unitId: l.item.unitId, quantity: l.quantity })),
+        items: allLines.map((l) => ({
+          typeId: l.item.typeId,
+          unitId: l.item.unitId,
+          quantity: l.quantity,
+          chargeDuration: isHourlyService(l.item) ? (l.hours ?? 1) : null,
+        })),
       });
       if ("error" in result) {
         setError(result.error);
@@ -674,6 +686,20 @@ export function QuickOrderDialog({
                               </p>
                             )}
                           </div>
+                          {isHourlyService(line.item) && (
+                            <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Input
+                                type="number"
+                                min={0.5}
+                                step={0.5}
+                                value={line.hours ?? 1}
+                                onChange={(e) => setHours(line.item.key, Number(e.target.value) || 1)}
+                                className="h-9 w-16 text-center text-base"
+                                aria-label="Số giờ thực hiện"
+                              />
+                              {HOUR_UNIT_LABELS[line.item.rentalPeriodUnit!] ?? line.item.rentalPeriodUnit} ×
+                            </label>
+                          )}
                           <div className={cn("flex items-center gap-1", isTransport && "invisible")}>
                             <Button type="button" size="icon" variant="outline" className="size-9 rounded-full" onClick={() => setQty(line.item.key, line.quantity - 1)}>
                               <Minus className="size-4" />

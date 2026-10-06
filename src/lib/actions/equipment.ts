@@ -145,7 +145,8 @@ function normalizeEquipmentType(
       price: data.price,
       tracking_type: null,
       pricing_method: null,
-      rental_period_unit: null,
+      // Dịch vụ theo giờ/ngày (CEO 2026-10-06): có đơn vị thì tiền = giá × số kỳ trên dòng đơn.
+      rental_period_unit: data.rental_period_unit ?? null,
       pricing_template_id: null,
       deposit_amount: 0,
       payout_percentage: data.payout_percentage ?? null,

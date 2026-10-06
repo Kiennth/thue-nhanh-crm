@@ -1581,7 +1581,14 @@ export async function addOrderEquipmentLine(
 async function insertEquipmentLine(
   supabase: SupabaseServerClient,
   orderId: string,
-  item: { typeId: string; unitId: string | null; instanceId: string | null; quantity: number },
+  item: {
+    typeId: string;
+    unitId: string | null;
+    instanceId: string | null;
+    quantity: number;
+    // Dịch vụ theo giờ: số giờ thực hiện (ghi charge_duration, giá = giá/giờ × giờ).
+    chargeDuration?: number | null;
+  },
 ): Promise<string | null> {
   const { data: order } = await supabase
     .from("orders")
@@ -1696,6 +1703,10 @@ async function insertEquipmentLine(
   // giá chung equipmentType.price như trước giờ.
   const unitPriceOverride = await resolveUnitPriceOverride(supabase, equipmentUnitId, item.instanceId);
 
+  const chargeDuration =
+    equipmentType.product_type === "service" && equipmentType.rental_period_unit && item.chargeDuration
+      ? item.chargeDuration
+      : null;
   let computed;
   try {
     computed = computeLinePrice(
@@ -1705,6 +1716,7 @@ async function insertEquipmentLine(
       order?.rental_end_at ?? null,
       item.quantity,
       unitPriceOverride,
+      chargeDuration,
     );
   } catch (e) {
     return e instanceof Error ? e.message : "Không tính được giá dòng hàng.";
@@ -1718,6 +1730,7 @@ async function insertEquipmentLine(
     quantity: item.quantity,
     unit_price: computed.unitPrice,
     line_total: computed.lineTotal,
+    charge_duration: chargeDuration,
     // Ghi chú mặc định của sản phẩm (vd "Kèm Remote | Dây nguồn").
     extra_information: equipmentType.default_extra_information,
   });
@@ -1908,6 +1921,7 @@ export async function updateOrderLineChargeDuration(
 
     let computed;
     let productType;
+    let periodUnit: string | null = null;
     try {
       const unitPriceOverride = await resolveUnitPriceOverride(
         supabase,
@@ -1925,11 +1939,13 @@ export async function updateOrderLineChargeDuration(
       );
       computed = result.computed;
       productType = result.equipmentType.product_type;
+      periodUnit = result.equipmentType.rental_period_unit;
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Không tính được giá dòng hàng." };
     }
-    if (productType !== "rental") {
-      return { error: "Chỉ hàng cho thuê mới có số kỳ tính tiền." };
+    // Dịch vụ theo giờ (rental_period_unit có) cũng dùng charge_duration = số giờ.
+    if (productType !== "rental" && !(productType === "service" && periodUnit)) {
+      return { error: "Chỉ hàng cho thuê hoặc dịch vụ tính theo giờ mới có số kỳ tính tiền." };
     }
 
     // Lần lượt từng dòng — song song thì trigger tổng đơn đọc số cũ của nhau.
@@ -2579,6 +2595,8 @@ const QuickOrderSchema = z.object({
         typeId: z.string().uuid(),
         unitId: z.string().uuid().nullable(),
         quantity: z.number().int().min(1),
+        // Dịch vụ theo giờ: số giờ thực hiện (charge_duration).
+        chargeDuration: z.number().positive().max(9999).nullable().optional(),
       }),
     )
     .max(200),
@@ -2635,6 +2653,7 @@ export async function quickCreateOrder(
       unitId: item.unitId,
       instanceId: null,
       quantity: item.quantity,
+      chargeDuration: item.chargeDuration ?? null,
     });
     if (lineError) warnings.push(lineError);
   }

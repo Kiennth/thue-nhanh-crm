@@ -174,7 +174,14 @@ export function computeOrderLinePrice(input: ComputeLinePriceInput): ComputedLin
   const { productType, price, quantity } = input;
 
   if (productType !== "rental") {
-    return { unitPrice: price, lineTotal: round2(price * quantity) };
+    // Dịch vụ có đơn vị thời gian (vd hỗ trợ kỹ thuật theo giờ, CEO 2026-10-06
+    // học Booqable): đơn giá = giá/giờ × số giờ (charge_duration), mặc định 1.
+    const hours =
+      productType === "service" && input.rentalPeriodUnit && input.durationOverride != null && input.durationOverride > 0
+        ? input.durationOverride
+        : 1;
+    const unitPrice = round2(price * hours);
+    return { unitPrice, lineTotal: round2(unitPrice * quantity) };
   }
 
   const hasOverride = input.durationOverride != null && input.durationOverride > 0;

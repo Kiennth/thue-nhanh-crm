@@ -419,6 +419,25 @@ export function EquipmentTypeDialog({
 
           {productType === "service" && (
             <div className="space-y-2">
+              <Label htmlFor="service_unit">Tính tiền theo</Label>
+              <select
+                id="service_unit"
+                name="rental_period_unit"
+                defaultValue={equipmentType?.rental_period_unit ?? ""}
+                className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              >
+                <option value="">Trọn gói (1 lần)</option>
+                <option value="hour">Theo giờ — chọn số giờ khi lên đơn</option>
+                <option value="day">Theo ngày — chọn số ngày khi lên đơn</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Theo giờ/ngày: giá ở trên là giá 1 giờ/ngày, lên đơn nhập số giờ/ngày thực hiện (học Booqable).
+              </p>
+            </div>
+          )}
+
+          {productType === "service" && (
+            <div className="space-y-2">
               <Label htmlFor="payout_percentage">% trả trực tiếp cho người thực hiện</Label>
               <Input
                 id="payout_percentage"

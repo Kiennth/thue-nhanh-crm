@@ -2,6 +2,8 @@ import { VAT_RATE } from "@/lib/order-labels";
 import { computeRentalDurationInUnit } from "@/lib/rental-pricing";
 import type { ProductType, RentalPeriodUnit, TrackingType } from "@/types/database";
 
+const SERVICE_UNIT_LABELS: Record<RentalPeriodUnit, string> = { hour: "giờ", day: "ngày", week: "tuần", month: "tháng", year: "năm" };
+
 // Dữ liệu dòng hàng đã gom sẵn cho các chứng từ in (Báo giá, Đề nghị thanh
 // toán, Biên bản bàn giao, Biên bản nghiệm thu) — theo mẫu CEO gửi 2026-09-30.
 // Bảng trên chứng từ có cột: Mô tả · ĐVT · Số lượng · Số ngày · Đơn giá/ngày ·
@@ -134,7 +136,9 @@ export function buildDocRows({
     }
 
     const isRental = type?.product_type === "rental";
-    const days = isRental ? durationOf(type, line.charge_duration) : null;
+    // Dịch vụ theo giờ/ngày: cột "số kỳ" = số giờ (charge_duration, mặc định 1), đơn vị "giờ".
+    const serviceUnit = type?.product_type === "service" ? type.rental_period_unit : null;
+    const days = isRental ? durationOf(type, line.charge_duration) : serviceUnit ? (line.charge_duration ?? 1) : null;
 
     // Máy serial cùng sản phẩm + cùng đơn giá + cùng số kỳ → gộp 1 dòng, SL =
     // số máy, serial liệt kê riêng (mẫu biên bản bàn giao có cột Serial).
@@ -180,11 +184,11 @@ export function buildDocRows({
       details: variant && variant !== type?.name ? [variant] : [],
       note: line.extra_information,
       serials: [],
-      unit: isRental ? "bộ" : type?.product_type === "sale" ? "cái" : "gói",
+      unit: isRental ? "bộ" : type?.product_type === "sale" ? "cái" : serviceUnit ? SERVICE_UNIT_LABELS[serviceUnit] : "gói",
       quantity: line.quantity,
       days,
-      pricePerDay: isRental && days ? round0(line.unit_price / days) : null,
-      pricePerPackage: isRental ? null : line.unit_price,
+      pricePerDay: (isRental || serviceUnit) && days ? round0(line.unit_price / days) : null,
+      pricePerPackage: isRental || serviceUnit ? null : line.unit_price,
       amount: line.line_total,
       isRental,
       isService: type?.product_type === "service",
