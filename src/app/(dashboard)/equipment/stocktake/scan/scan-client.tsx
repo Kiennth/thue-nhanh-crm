@@ -146,7 +146,20 @@ export function ScanClient({
     setExtra((e) => ({ ...e, [c]: "pending" }));
     setLast({ text: `? ${c} — không có trong danh sách kho này, đang tra…`, ok: false });
     const r = await lookupScannedCodes([c]);
-    setExtra((e) => ({ ...e, [c]: r[c] ?? null }));
+    const hitElsewhere = r[c] ?? null;
+    setExtra((e) => ({ ...e, [c]: hitElsewhere }));
+    setLast({
+      text: hitElsewhere
+        ? `? ${c} — ${hitElsewhere.typeName}: ${
+            hitElsewhere.status === "rented"
+              ? "CRM ghi đang cho thuê"
+              : hitElsewhere.status === "disposed"
+                ? "CRM ghi đã thanh lý"
+                : `CRM ghi ở ${hitElsewhere.branchName ?? "chưa có kho"}`
+          }`
+        : `? ${c} — chưa có trong CRM`,
+      ok: false,
+    });
   }
 
   const scanRef = useRef(scan);
@@ -517,7 +530,7 @@ function UnknownRow({
           setTypeName(e.target.value);
           setUnitId("");
         }}
-        placeholder={types ? "Gõ tên mã hàng…" : "Đang tải mã hàng…"}
+        placeholder="Gõ tên mã hàng…"
         className="h-8 min-w-56 flex-1"
       />
       <datalist id="kk-types">
