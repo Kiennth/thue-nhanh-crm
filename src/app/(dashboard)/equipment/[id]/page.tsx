@@ -414,7 +414,19 @@ export default async function EquipmentDetailPage({
     const idx = INSTANCE_BRANCH_ORDER.indexOf(branchNameById.get(inst.branch_id ?? "") ?? "");
     return idx === -1 ? INSTANCE_BRANCH_ORDER.length : idx;
   };
-  const sortedInstances = [...(instances ?? [])].sort((a, b) => {
+  // Máy tạm lịch sử (CEO 2026-10-06 hỏi "ĐÃ THANH LÝ xám xám là gì"): lúc nhập
+  // lịch sử Booqable, dòng đơn cũ không ghi serial được gắn 1 máy tạm AUTO-*
+  // rồi đánh "đã thanh lý" để không tính tồn kho. Không phải thanh lý thật
+  // (không ngày, không giá) → tách khỏi nhóm "Đã thanh lý", gom vào 1 khối
+  // thu gọn dưới bảng. ~1.984 máy kiểu này trên 224 mã, thanh lý thật chỉ ~12.
+  const isHistoryPlaceholder = (inst: EquipmentInstanceRow) =>
+    inst.status === "disposed" &&
+    inst.identifier_code.startsWith("AUTO") &&
+    !inst.disposal_date &&
+    !inst.disposal_price;
+  const historyPlaceholders = (instances ?? []).filter(isHistoryPlaceholder);
+  const realInstances = (instances ?? []).filter((i) => !isHistoryPlaceholder(i));
+  const sortedInstances = [...realInstances].sort((a, b) => {
     if (activeSort === "branch") {
       const branchA = branchNameById.get(a.branch_id ?? "") ?? "—";
       const branchB = branchNameById.get(b.branch_id ?? "") ?? "—";
@@ -447,7 +459,7 @@ export default async function EquipmentDetailPage({
   const instanceGroupSummary = new Map<string, string>();
   {
     const byGroup = new Map<string, EquipmentInstanceRow[]>();
-    for (const inst of instances ?? []) {
+    for (const inst of realInstances) {
       const key =
         inst.status === "disposed" ? "__disposed" : (branchNameById.get(inst.branch_id ?? "") ?? "");
       byGroup.set(key, [...(byGroup.get(key) ?? []), inst]);
@@ -1052,7 +1064,7 @@ export default async function EquipmentDetailPage({
                       </Fragment>
                     );
                   })}
-                  {!instances?.length && (
+                  {!realInstances.length && (
                     <TableRow>
                       <TableCell
                         colSpan={instanceTableColSpan}
@@ -1064,6 +1076,25 @@ export default async function EquipmentDetailPage({
                   )}
                 </TableBody>
               </Table>
+              {historyPlaceholders.length > 0 && (
+                <details className="mt-3 rounded-md border border-dashed px-3 py-2 text-sm">
+                  <summary className="cursor-pointer select-none text-muted-foreground">
+                    Lịch sử nhập từ Booqable · {historyPlaceholders.length} dòng
+                    <span className="ml-1 text-xs">
+                      (máy tạm gắn cho đơn cũ không ghi serial — không phải máy thật, không tính tồn kho)
+                    </span>
+                  </summary>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {historyPlaceholders
+                      .sort((a, b) => a.identifier_code.localeCompare(b.identifier_code))
+                      .map((i) => (
+                        <span key={i.id} className="rounded border bg-muted/40 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                          {i.identifier_code}
+                        </span>
+                      ))}
+                  </div>
+                </details>
+              )}
 
               {canManageStock && (
                 <EquipmentInstanceDialog
