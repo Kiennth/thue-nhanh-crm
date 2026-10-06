@@ -114,16 +114,22 @@ export function defaultRentalStart(now: Date): Date {
   return plusOneHour;
 }
 
-// Bậc giảm giá áp dụng = bậc có min_duration lớn nhất mà vẫn <= số đơn vị thời
-// gian thuê thực tế (hiệu ứng ngưỡng, giống commission_tiers).
+// Bậc giảm giá áp dụng = bậc có ngưỡng lớn nhất mà vẫn <= thời gian thuê thực
+// tế (hiệu ứng ngưỡng, giống commission_tiers). Ngưỡng bậc và thời gian thuê
+// đều quy ra GIỜ để so — bậc "1 tháng" (= 30 ngày) áp được cho mã thuê theo
+// ngày. Trước 2026-10-06 chỉ so bậc cùng đơn vị với mã → mọi mã đều thuê theo
+// ngày nên các bậc tháng (80/82/84/88%) không bao giờ ăn, thuê 30+ ngày vẫn
+// chỉ giảm 65% (bậc 14 ngày) — CEO rà lại công thức: 1tr/ngày → 1 tháng 6tr.
 export function findApplicableTier(
   tiers: PricingTierInput[],
   rentalPeriodUnit: RentalPeriodUnit,
   durationInUnit: number,
 ): PricingTierInput | null {
+  const rentedHours = durationInUnit * PERIOD_LENGTH_IN_HOURS[rentalPeriodUnit];
+  const thresholdHours = (t: PricingTierInput) => t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit];
   const applicable = tiers
-    .filter((t) => t.duration_unit === rentalPeriodUnit && t.min_duration <= durationInUnit)
-    .sort((a, b) => b.min_duration - a.min_duration);
+    .filter((t) => thresholdHours(t) <= rentedHours)
+    .sort((a, b) => thresholdHours(b) - thresholdHours(a));
   return applicable[0] ?? null;
 }
 
