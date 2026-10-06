@@ -133,6 +133,28 @@ export function findApplicableTier(
   return applicable[0] ?? null;
 }
 
+// Giá thuê theo bậc = giá tuyến tính × (1 − % bậc đang áp), nhưng KHÔNG BAO GIỜ
+// đắt hơn thuê trọn một bậc cao hơn (CEO 2026-10-06, sau đơn PO13142: 25 ngày
+// ở bậc 14 ngày 65% = 2.625.000đ trong khi 30 ngày ở bậc tháng 80% chỉ
+// 1.800.000đ). Thuê 14–29 ngày nay tính = min(giá bậc hiện tại, giá trọn 30
+// ngày) → "càng dài càng rẻ" đúng nghĩa, không phải thêm bậc trung gian.
+export function tieredPrice(
+  price: number,
+  rentalPeriodUnit: RentalPeriodUnit,
+  durationInUnit: number,
+  tiers: PricingTierInput[],
+): number {
+  const unitHours = PERIOD_LENGTH_IN_HOURS[rentalPeriodUnit];
+  const rentedHours = durationInUnit * unitHours;
+  const priceAt = (units: number, tier: PricingTierInput | null) =>
+    price * units * (tier ? 1 - tier.discount_percentage / 100 : 1);
+  const own = priceAt(durationInUnit, findApplicableTier(tiers, rentalPeriodUnit, durationInUnit));
+  const higher = tiers
+    .filter((t) => t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit] > rentedHours)
+    .map((t) => priceAt((t.min_duration * PERIOD_LENGTH_IN_HOURS[t.duration_unit]) / unitHours, t));
+  return Math.min(own, ...higher);
+}
+
 export function computeOrderLinePrice(input: ComputeLinePriceInput): ComputedLinePrice {
   const { productType, price, quantity } = input;
 
@@ -152,10 +174,7 @@ export function computeOrderLinePrice(input: ComputeLinePriceInput): ComputedLin
 
   let unitPrice = linear;
   if (input.pricingMethod === "pricing_structure") {
-    const tier = findApplicableTier(input.tiers, input.rentalPeriodUnit, durationInUnit);
-    if (tier) {
-      unitPrice = linear * (1 - tier.discount_percentage / 100);
-    }
+    unitPrice = tieredPrice(price, input.rentalPeriodUnit, durationInUnit, input.tiers);
   }
 
   return { unitPrice: round2(unitPrice), lineTotal: round2(unitPrice * quantity) };
