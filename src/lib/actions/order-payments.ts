@@ -75,3 +75,30 @@ export async function deleteOrderPayment(id: string) {
     revalidatePath(`/orders/${payment.order_id}`);
   }
 }
+
+// Nút "Thu đủ tiền" (CEO 2026-10-06): 1 bấm ghi phần còn thiếu của tiền thuê
+// (gồm VAT) và tiền cọc, cùng phương thức, ngày hôm nay. Số tiền do trang đơn
+// tính (cùng công thức hiển thị) — khoản nào đã đủ (≤ 0) thì bỏ qua.
+export async function collectAllDue(
+  orderId: string,
+  method: (typeof PAYMENT_METHOD_OPTIONS)[number],
+  invoiceDue: number,
+  depositDue: number,
+): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
+  if (!z.string().uuid().safeParse(orderId).success) return { error: "Đơn không hợp lệ." };
+  if (!PAYMENT_METHOD_OPTIONS.includes(method)) return { error: "Phương thức không hợp lệ." };
+  const rows = [
+    { payment_type: "invoice" as const, amount: Math.round(invoiceDue) },
+    { payment_type: "deposit_collect" as const, amount: Math.round(depositDue) },
+  ].filter((r) => r.amount > 0);
+  if (!rows.length) return { error: "Đơn đã thu đủ tiền thuê và tiền cọc." };
+  const supabase = await createClient();
+  const paidAt = new Date().toISOString();
+  const { error } = await supabase.from("order_payments").insert(
+    rows.map((r) => ({ order_id: orderId, method, paid_at: paidAt, note: "Thu đủ tiền", created_by: employee.id, ...r })),
+  );
+  if (error) return { error: "Không ghi nhận được thanh toán: " + error.message };
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}

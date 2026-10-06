@@ -61,6 +61,8 @@ import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { CloseDealButton } from "./close-deal-button";
+import { CompleteAllTasksButton } from "./complete-all-tasks-button";
+import { CollectAllButton } from "./collect-all-button";
 import { OrderDiscountForm } from "./order-discount-form";
 import { OrderLineQuantityForm } from "./order-line-quantity-form";
 import { OrderLineEmployeeForm } from "./order-line-employee-form";
@@ -1442,6 +1444,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       defaultEmployeeId={employee?.id ?? null}
                     />
                   )}
+                  {canManage && !order.cancelled_at && !order.completed_at && doneCount < TASK_TYPE_SEQUENCE.length && (
+                    <CompleteAllTasksButton orderId={order.id} remaining={TASK_TYPE_SEQUENCE.length - doneCount} />
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div>
@@ -1625,7 +1630,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <CardTitle className="text-base">
                   <AccentTitle accent="emerald" icon={Wallet}>Thanh toán</AccentTitle>
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
+                  {!order.cancelled_at && (
+                    <CollectAllButton
+                      orderId={order.id}
+                      invoiceDue={remaining}
+                      depositDue={rawDeposit > 0 ? Math.max(totalDeposit - depositCollected, 0) : 0}
+                    />
+                  )}
                   <OrderPaymentDialog orderId={order.id} defaultAmount={remaining} />
                   {rawDeposit > 0 && (
                     <>

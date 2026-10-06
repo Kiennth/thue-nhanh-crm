@@ -2706,6 +2706,82 @@ async function completeEarlyTasks(
   return null;
 }
 
+// Nút "Hoàn tất 10 khâu" (CEO 2026-10-06): đơn cần xong nhanh (nhập muộn, đơn
+// nhỏ) — tick hết khâu còn dở trong 1 lần, admin chia lại khoán sau. Giữ đúng
+// nghiệp vụ như bấm tay: máy serial chưa gán thì tự gán (kể cả máy tạm AUTO),
+// thiếu máy thì dừng; hoàn thành Giao hàng → trừ kho, Nhập kho → trả kho.
+// Ngày hoàn thành: khâu tới Giao hàng lấy ngày nhận hàng của đơn, khâu sau
+// lấy ngày trả — không vượt hôm nay (doanh số ghi theo ngày khâu Giao hàng).
+// Mọi khâu ghi người bấm + ghi chú "Hoàn tất nhanh". Chỉ quản lý.
+export async function completeAllOrderTasks(orderId: string): Promise<ActionState> {
+  const employee = await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, rental_start_at, rental_end_at, completed_at, cancelled_at")
+    .eq("id", orderId)
+    .single();
+  if (!order) return { error: "Không tìm thấy đơn." };
+  if (order.cancelled_at) return { error: "Đơn đã huỷ." };
+  if (order.completed_at) return { error: "Đơn đã hoàn tất." };
+
+  const today = vnTodayString();
+  const startDay = order.rental_start_at ? formatVNDate(vnNow(new Date(order.rental_start_at))) : today;
+  const endDay = order.rental_end_at ? formatVNDate(vnNow(new Date(order.rental_end_at))) : today;
+  const clampToday = (d: string) => (d > today ? today : d);
+
+  const { data: unassigned } = await supabase
+    .from("order_equipment")
+    .select("id, equipment_types!inner(product_type, tracking_type)")
+    .eq("order_id", orderId)
+    .is("equipment_instance_id", null)
+    .eq("equipment_types.product_type", "rental")
+    .eq("equipment_types.tracking_type", "individual");
+  if (unassigned?.length) {
+    const r = await autoAssignSerials(unassigned.map((l) => l.id));
+    if ("error" in r) return r;
+    if (r.missing > 0) return { error: `Còn ${r.missing} máy không có serial trống ở kho giao — gán tay rồi bấm lại.` };
+  }
+
+  const { data: done } = await supabase
+    .from("order_tasks")
+    .select("task_type")
+    .eq("order_id", orderId)
+    .not("completed_date", "is", null);
+  const doneSet = new Set((done ?? []).map((t) => t.task_type));
+  const deliverIdx = TASK_TYPE_SEQUENCE.indexOf("giao_hang_ban_giao");
+  for (const [i, stage] of TASK_TYPE_SEQUENCE.entries()) {
+    if (doneSet.has(stage)) continue;
+    const { error } = await supabase.from("order_tasks").upsert(
+      {
+        order_id: orderId,
+        task_type: stage,
+        employee_id: employee.id,
+        note: "Hoàn tất nhanh",
+        completed_date: clampToday(i <= deliverIdx ? startDay : endDay),
+      },
+      { onConflict: "order_id,task_type" },
+    );
+    if (error) return { error: `Không ghi được khâu "${TASK_TYPE_LABELS[stage]}": ${error.message}` };
+    if (stage === "giao_hang_ban_giao") {
+      const { error: e } = await supabase.rpc("deliver_order_stock", { p_order_id: orderId });
+      if (e) {
+        revalidatePath(`/orders/${orderId}`);
+        return { error: "Đã ghi khâu Giao hàng nhưng trừ kho thất bại: " + e.message };
+      }
+    }
+    if (stage === "nhap_kho_bao_tri") {
+      const { error: e } = await supabase.rpc("return_order_stock", { p_order_id: orderId });
+      if (e) {
+        revalidatePath(`/orders/${orderId}`);
+        return { error: "Đã ghi khâu Nhập kho nhưng trả kho thất bại: " + e.message };
+      }
+    }
+  }
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
 // Nút "Chốt đơn" trên trang đơn (phương án C): hoàn thành Tiếp nhận + Báo giá
 // + Chốt đơn còn dở trong 1 click.
 export async function closeOrderDeal(orderId: string, employeeId: string): Promise<ActionState> {
