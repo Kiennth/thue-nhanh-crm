@@ -1,0 +1,12 @@
+-- Gộp MacBook Pro M2 Max 14/16 inch thành 1 mã có biến thể (CEO 2026-10-07:
+-- "gom mấy con M2 Max", đã áp trực tiếp qua REST — file ghi lại cho lịch sử
+-- repo; chạy lại không cần thiết). Cả 6 mã chưa có máy, chưa có dòng đơn:
+--   MacBook Pro M2 Max 32GB RAM  900.000/ngày  cọc 20.000.000
+--   MacBook Pro M2 Max 64GB RAM  1.000.000     cọc 25.000.000
+--   MacBook Pro M2 Max 96GB RAM  1.500.000     cọc 25.000.000
+-- Giữ mã "14 inch", đổi tên bỏ cỡ, thêm biến thể "14 inch" / "16 inch"; xoá
+-- mã "16 inch" (website_products cascade). Web: slug mã giữ đổi
+-- thue-macbook-pro-m2-max-<ram>gb-ram, vẫn ẩn (M2 Max ngừng cho thuê
+-- 2026-10-05); 6 slug cũ vẫn 301 về /thue-macbook-pro. Sao lưu:
+-- scratchpad backup-m2max-2026-10-07.json.
+select 1;
