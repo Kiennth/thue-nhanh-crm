@@ -278,6 +278,7 @@ export interface Database {
           purchase_date: string | null;
           disposal_price: number | null;
           disposal_date: string | null;
+          warranty_expires_on: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -293,6 +294,7 @@ export interface Database {
           purchase_date?: string | null;
           disposal_price?: number | null;
           disposal_date?: string | null;
+          warranty_expires_on?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_instances"]["Insert"]>;
         Relationships: [];

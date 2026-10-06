@@ -624,6 +624,8 @@ const EquipmentInstanceSchema = z.object({
   condition_notes: z.string().trim().optional(),
   purchase_price: z.coerce.number().min(0, { message: "Giá mua không được âm." }).optional(),
   purchase_date: z.string().optional(),
+  // Ngày hết hạn bảo hành (CEO 2026-10-06).
+  warranty_expires_on: z.string().optional(),
 });
 
 function parseEquipmentInstanceForm(formData: FormData) {
@@ -637,6 +639,7 @@ function parseEquipmentInstanceForm(formData: FormData) {
     condition_notes: formData.get("condition_notes") || undefined,
     purchase_price: formData.get("purchase_price") || undefined,
     purchase_date: formData.get("purchase_date") || undefined,
+    warranty_expires_on: formData.get("warranty_expires_on") || undefined,
   });
 }
 
@@ -694,6 +697,7 @@ export async function updateEquipmentInstance(
     condition_notes: parsed.data.condition_notes ?? null,
     purchase_price: parsed.data.purchase_price ?? null,
     purchase_date: parsed.data.purchase_date ?? null,
+    warranty_expires_on: parsed.data.warranty_expires_on ?? null,
   };
   if (
     data.condition_notes &&

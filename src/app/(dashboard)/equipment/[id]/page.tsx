@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { vnTodayString } from "@/lib/vn-time";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { PaginationControls } from "@/components/pagination-controls";
@@ -454,7 +455,20 @@ export default async function EquipmentDetailPage({
   const showRentalProductColumn = isRentalIndividual || unitList.length > 1;
   // Chỉ 1 biến thể thì tên biến thể trùng/thừa — ẩn (CEO 2026-10-01).
   const showInstanceUnitColumn = unitList.length > 1;
-  const instanceTableColSpan = (canManageStock ? 5 : 4) + (showInstanceUnitColumn ? 1 : 0);
+  const instanceTableColSpan = (canManageStock ? 6 : 5) + (showInstanceUnitColumn ? 1 : 0);
+  // Bảo hành (CEO 2026-10-06): đỏ = đã hết, vàng = còn ≤ 30 ngày.
+  const todayKey = vnTodayString();
+  const soonDate = new Date(`${todayKey}T00:00:00Z`);
+  soonDate.setUTCDate(soonDate.getUTCDate() + 30);
+  const soonKey = soonDate.toISOString().slice(0, 10);
+  const warrantyCell = (d: string | null) => {
+    if (!d) return <span className="text-muted-foreground">—</span>;
+    const [y, m, day] = d.slice(0, 10).split("-");
+    const label = `${day}/${m}/${y}`;
+    if (d < todayKey) return <span className="font-medium text-red-600 dark:text-red-400" title="Đã hết bảo hành">{label} · hết</span>;
+    if (d <= soonKey) return <span className="font-medium text-amber-600 dark:text-amber-400" title="Sắp hết bảo hành">{label}</span>;
+    return <span>{label}</span>;
+  };
   // Dòng tiêu đề mỗi nhóm kho: "TP HCM · 12 máy — 9 sẵn sàng · 3 đang thuê".
   const instanceGroupSummary = new Map<string, string>();
   {
@@ -956,6 +970,7 @@ export default async function EquipmentDetailPage({
                     {showInstanceUnitColumn && <TableHead>Biến thể</TableHead>}
                     <SortableTableHead sortKey="branch" label="Chi nhánh" />
                     <SortableTableHead sortKey="status" label="Trạng thái" />
+                    <TableHead>Bảo hành đến</TableHead>
                     <TableHead>Ghi chú</TableHead>
                     {canManageStock && <TableHead className="w-20"></TableHead>}
                   </TableRow>
@@ -1028,6 +1043,9 @@ export default async function EquipmentDetailPage({
                           <Badge variant={INSTANCE_STATUS_VARIANT[inst.status]}>
                             {EQUIPMENT_INSTANCE_STATUS_LABELS[inst.status]}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {inst.status === "disposed" ? "—" : warrantyCell(inst.warranty_expires_on)}
                         </TableCell>
                         <TableCell>{inst.condition_notes ?? "—"}</TableCell>
                         {canManageStock && (

@@ -359,6 +359,14 @@ export default async function EquipmentPage({
         <h1 className="text-2xl font-semibold">Thiết bị</h1>
         {!isReportTab && (
           <div className="flex flex-wrap items-center gap-2">
+            {canManageStock && (
+              <Link
+                href="/equipment/stocktake"
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
+              >
+                Kiểm kho bằng bảng tính
+              </Link>
+            )}
             <Link
               href="/shortages"
               className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"

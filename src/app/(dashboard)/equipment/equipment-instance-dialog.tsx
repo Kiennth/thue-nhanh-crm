@@ -53,6 +53,7 @@ interface EquipmentInstanceDialogProps {
     condition_notes: string | null;
     purchase_price: number | null;
     purchase_date: string | null;
+    warranty_expires_on?: string | null;
   };
 }
 
@@ -215,6 +216,15 @@ export function EquipmentInstanceDialog({
                 defaultValue={instance?.purchase_date ?? ""}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="warranty_expires_on">Ngày hết hạn bảo hành</Label>
+            <DateInput
+              id="warranty_expires_on"
+              name="warranty_expires_on"
+              defaultValue={instance?.warranty_expires_on ?? ""}
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
