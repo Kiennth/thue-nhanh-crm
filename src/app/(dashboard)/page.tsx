@@ -34,7 +34,9 @@ import { ShortageAlert } from "@/components/shortage-alert";
 
 // Trang chủ hiện tối đa 10 đơn mỗi khối "Đơn hàng sắp tới"/"Đơn hàng sắp về"
 // (CEO chốt 2026-08-02, áp dụng cho mọi phân quyền).
-const HANDLE_LIMIT = 10;
+// Không cắt 10 đơn nữa (CEO 2026-10-06: "nhiều đơn quá") — khối tự cuộn
+// trong chiều cao cố định (orders-to-handle-card.tsx), hiện đủ mọi đơn.
+const HANDLE_LIMIT = undefined;
 
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);

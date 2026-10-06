@@ -97,7 +97,9 @@ function OrderCountdownList({
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      {/* Thân khối cuộn riêng, tiêu đề + bộ lọc đứng yên (CEO 2026-10-06).
+          Chiều cao ~8 dòng đơn; thanh cuộn luôn hiện để biết còn đơn bên dưới. */}
+      <CardContent className="max-h-[32rem] space-y-3 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]">
         {!orders.length && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
         {groups.map((group, i) => {
           const colorVar = DAY_GROUP_COLOR_VARS[i % DAY_GROUP_COLOR_VARS.length];
