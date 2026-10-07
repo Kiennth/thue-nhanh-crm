@@ -7,8 +7,9 @@
 -- cả lịch sử) chuyển mã — dòng đơn hàng serial không giữ biến thể (trigger
 -- "Hàng cho thuê theo từng sản phẩm không dùng biến thể số lượng"), biến thể
 -- nằm ở máy. 15 Pro: CEO cho gộp biến thể vùng VN/LL vào "Pro" (2 biến thể
--- rỗng đã xoá). 14 Pro Max còn biến thể vùng "Pro Max · LL/A" (3 máy) và
--- "Pro Max · VN/A" (0 máy) — chưa gộp. Web: slug thue-iphone-<đời>-pro-pro-max,
+-- rỗng đã xoá). Sau đó CEO cho gộp luôn vùng của 14 Pro Max: 3 máy LL/A →
+-- "Pro Max", xoá LL/A + VN/A; cọc 14 Pro / Pro Max 2tr → 5tr (đơn mở không
+-- đổi: 4 đơn khách miễn cọc Song Trang, 2 đơn đã sửa tay 5tr sẵn). Web: slug thue-iphone-<đời>-pro-pro-max,
 -- mô tả ghép 2 cỡ ("Pro: … · Pro Max: …"), ảnh gộp, 301 6 slug cũ.
 -- Sao lưu scratchpad backup-iphone-pro-2026-10-07.json.
 select 1;
