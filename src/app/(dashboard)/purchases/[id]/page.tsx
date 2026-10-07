@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { vnTodayString } from "@/lib/vn-time";
 import { cn } from "@/lib/utils";
-import { PURCHASE_STATUS, type PurchaseStatus } from "../purchase-labels";
+import { KIND_BADGE, PURCHASE_STATUS, statusLabel, type PurchaseKind, type PurchaseStatus } from "../purchase-labels";
 import { PurchaseEditor, type EditorLine, type PickType } from "./purchase-editor";
 
 // Chi tiết phiếu mua (CEO 2026-10-07) — xem actions/purchases.ts.
@@ -19,12 +19,13 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const { data: po } = await db
     .from("purchase_orders")
     .select(
-      "id, code, order_date, status, supplier_invoice_no, note, received_at, supplier_id, branch_id, suppliers(name, phone, bank_account_number, bank_name, bank_account_holder), branches(name)",
+      "id, code, order_date, status, kind, supplier_invoice_no, note, received_at, supplier_id, branch_id, suppliers(name, phone, bank_account_number, bank_name, bank_account_holder), branches(name)",
     )
     .eq("id", id)
     .maybeSingle();
   if (!po) notFound();
   const status = po.status as PurchaseStatus;
+  const kind = ((po.kind as string) ?? "new") as PurchaseKind;
   const editable = status === "draft" || status === "ordered";
 
   const [{ data: lines }, { data: payments }, { data: suppliers }, { data: branches }, { data: received }] = await Promise.all([
@@ -120,11 +121,14 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold">Phiếu mua {po.code as string}</h1>
           <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", PURCHASE_STATUS[status].className)}>
-            {PURCHASE_STATUS[status].label}
+            {statusLabel(status, kind)}
+          </span>
+          <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", KIND_BADGE[kind].className)}>
+            {KIND_BADGE[kind].label}
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {supplier?.name} · nhập về kho {branch?.name}
+          {supplier?.name} · {kind === "new" ? "nhập về kho" : "kho ghi sổ"} {branch?.name}
           {po.received_at &&
             ` · nhập kho lúc ${new Date(po.received_at as string).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}`}
         </p>
@@ -135,6 +139,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           id: po.id as string,
           code: po.code as string,
           status,
+          kind,
           supplierId: po.supplier_id as string,
           branchId: po.branch_id as string,
           orderDate: po.order_date as string,

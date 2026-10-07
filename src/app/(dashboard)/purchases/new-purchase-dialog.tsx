@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { History, PackagePlus, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,7 @@ export function NewPurchaseDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [kind, setKind] = useState<"new" | "backfill">("new");
 
   function submit(fd: FormData) {
     setError(null);
@@ -38,6 +40,7 @@ export function NewPurchaseDialog({
         orderDate: String(fd.get("date") ?? ""),
         supplierInvoiceNo: String(fd.get("invoice") ?? ""),
         note: String(fd.get("note") ?? ""),
+        kind,
       });
       if ("error" in r) {
         setError(r.error);
@@ -68,6 +71,30 @@ export function NewPurchaseDialog({
             </p>
           ) : (
             <>
+              {/* Loại phiếu: mua mới (nhập kho) hay ghi lại máy đã có (gắn NCC ngược). */}
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["new", PackagePlus, "Mua hàng mới", "Nhận hàng → nhập kho, tạo máy mới", "border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"],
+                    ["backfill", History, "Ghi lại hàng đã có", "Gắn NCC + giá mua cho máy đang có", "border-violet-500 bg-violet-50 text-violet-900 dark:bg-violet-950/40 dark:text-violet-200"],
+                  ] as const
+                ).map(([k, Icon, title, sub, on]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setKind(k)}
+                    aria-pressed={kind === k}
+                    className={cn(
+                      "rounded-lg border-2 p-3 text-left transition",
+                      kind === k ? on : "border-border hover:border-muted-foreground/40",
+                    )}
+                  >
+                    <Icon className="mb-1 size-5" />
+                    <p className="text-sm font-semibold">{title}</p>
+                    <p className="text-xs opacity-75">{sub}</p>
+                  </button>
+                ))}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="po_supplier">Nhà cung cấp</Label>
                 <select
@@ -89,7 +116,7 @@ export function NewPurchaseDialog({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="po_branch">Nhập về kho</Label>
+                  <Label htmlFor="po_branch">{kind === "new" ? "Nhập về kho" : "Kho (ghi sổ)"}</Label>
                   <select
                     id="po_branch"
                     name="branch"
@@ -106,7 +133,7 @@ export function NewPurchaseDialog({
                   {lockBranch && <input type="hidden" name="branch" value={defaultBranchId} />}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="po_date">Ngày mua</Label>
+                  <Label htmlFor="po_date">{kind === "new" ? "Ngày mua" : "Ngày mua thực tế"}</Label>
                   <Input id="po_date" name="date" type="date" defaultValue={today} />
                 </div>
               </div>
@@ -123,7 +150,7 @@ export function NewPurchaseDialog({
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={pending || suppliers.length === 0}>
-              {pending ? "Đang tạo…" : "Tạo phiếu & thêm hàng"}
+              {pending ? "Đang tạo…" : kind === "new" ? "Tạo phiếu & thêm hàng" : "Tạo phiếu & chọn máy"}
             </Button>
           </DialogFooter>
         </form>

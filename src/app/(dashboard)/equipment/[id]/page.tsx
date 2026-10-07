@@ -390,6 +390,22 @@ export default async function EquipmentDetailPage({
     list.sort((a, b) => (branchPositionById.get(a.branch_id) ?? 0) - (branchPositionById.get(b.branch_id) ?? 0));
   }
 
+  // Nguồn mua từng máy (CEO 2026-10-07): phiếu mua → NCC. RLS chỉ trả phiếu
+  // người xem có quyền (GĐ/Admin/KT/CHT kho mình) — không quyền thì "—".
+  const poIds = [
+    ...new Set(
+      (instances ?? [])
+        .map((i) => (i as { purchase_order_id?: string | null }).purchase_order_id)
+        .filter((x): x is string => !!x),
+    ),
+  ];
+  const { data: poRows } = poIds.length
+    ? await supabase.from("purchase_orders" as never).select("id, code, suppliers(name)").in("id", poIds)
+    : { data: [] };
+  const poById = new Map(
+    ((poRows ?? []) as unknown as { id: string; code: string; suppliers: { name: string } | null }[]).map((p) => [p.id, p]),
+  );
+
   const rfidTagsByUnit = new Map<string, NonNullable<typeof rfidTags>>();
   const rfidTagsByInstance = new Map<string, NonNullable<typeof rfidTags>>();
   for (const tag of rfidTags ?? []) {
@@ -455,7 +471,7 @@ export default async function EquipmentDetailPage({
   const showRentalProductColumn = isRentalIndividual || unitList.length > 1;
   // Chỉ 1 biến thể thì tên biến thể trùng/thừa — ẩn (CEO 2026-10-01).
   const showInstanceUnitColumn = unitList.length > 1;
-  const instanceTableColSpan = (canManageStock ? 6 : 5) + (showInstanceUnitColumn ? 1 : 0);
+  const instanceTableColSpan = (canManageStock ? 7 : 6) + (showInstanceUnitColumn ? 1 : 0);
   // Bảo hành (CEO 2026-10-06): đỏ = đã hết, vàng = còn ≤ 30 ngày.
   const todayKey = vnTodayString();
   const soonDate = new Date(`${todayKey}T00:00:00Z`);
@@ -971,6 +987,7 @@ export default async function EquipmentDetailPage({
                     <SortableTableHead sortKey="branch" label="Chi nhánh" />
                     <SortableTableHead sortKey="status" label="Trạng thái" />
                     <TableHead>Bảo hành đến</TableHead>
+                    <TableHead>Mua từ</TableHead>
                     <TableHead>Ghi chú</TableHead>
                     {canManageStock && <TableHead className="w-20"></TableHead>}
                   </TableRow>
@@ -1046,6 +1063,23 @@ export default async function EquipmentDetailPage({
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-sm">
                           {inst.status === "disposed" ? "—" : warrantyCell(inst.warranty_expires_on)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const poId = (inst as { purchase_order_id?: string | null }).purchase_order_id;
+                            const po = poId ? poById.get(poId) : undefined;
+                            return po ? (
+                              <Link href={`/purchases/${po.id}`} className="hover:underline">
+                                <span className="font-medium">{po.suppliers?.name}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {po.code}
+                                  {inst.purchase_price ? ` · ${new Intl.NumberFormat("vi-VN").format(Number(inst.purchase_price))}đ` : ""}
+                                </span>
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>{inst.condition_notes ?? "—"}</TableCell>
                         {canManageStock && (

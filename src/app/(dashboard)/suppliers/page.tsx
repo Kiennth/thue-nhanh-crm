@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Building2, UserRound } from "lucide-react";
+import { Building2, CircleDollarSign, PackagePlus, UserRound, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SearchInput } from "@/components/search-input";
 import { requireRole } from "@/lib/dal";
@@ -64,10 +64,29 @@ export default async function SuppliersPage({
     const s = sp.toString();
     return s ? `/suppliers?${s}` : "/suppliers";
   };
-  const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm font-medium transition ${
-      active ? "border-primary bg-primary text-primary-foreground" : "hover:border-primary hover:text-primary"
-    }`;
+  const chip = (active: boolean, tone: "all" | "company" | "individual" | "muted" = "all") => {
+    const on = {
+      all: "border-primary bg-primary text-primary-foreground",
+      company: "border-sky-600 bg-sky-600 text-white",
+      individual: "border-amber-500 bg-amber-500 text-white",
+      muted: "border-slate-500 bg-slate-500 text-white",
+    }[tone];
+    const off = {
+      all: "hover:border-primary hover:text-primary",
+      company: "border-sky-300 text-sky-800 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950/40",
+      individual: "border-amber-300 text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40",
+      muted: "text-muted-foreground hover:border-slate-400",
+    }[tone];
+    return `rounded-full border px-3 py-1 text-sm font-medium transition ${active ? on : off}`;
+  };
+  const activeAll = all.filter((s) => s.is_active);
+  const totalOwed = [...bySupplier.values()].reduce((s, v) => s + v.owed, 0);
+  const totalBought = [...bySupplier.values()].reduce((s, v) => s + v.bought, 0);
+  const cards = [
+    { icon: Users, label: "Đang hợp tác", value: `${activeAll.length} NCC`, sub: `${activeAll.filter((s) => s.supplier_type === "company").length} công ty · ${activeAll.filter((s) => s.supplier_type === "individual").length} cá nhân`, tone: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200", href: "/suppliers" },
+    { icon: PackagePlus, label: "Đã mua (tất cả phiếu)", value: money(totalBought), tone: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200", href: "/purchases" },
+    { icon: CircleDollarSign, label: "Còn nợ NCC", value: money(totalOwed), tone: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200", href: "/purchases?debt=1" },
+  ];
 
   return (
     <div className="space-y-5">
@@ -82,19 +101,31 @@ export default async function SuppliersPage({
         <SupplierDialog />
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        {cards.map((c) => (
+          <Link key={c.label} href={c.href} className={`rounded-xl border p-3 transition hover:shadow-sm ${c.tone}`}>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-80">
+              <c.icon className="size-4" /> {c.label}
+            </div>
+            <p className="mt-1 text-lg font-bold tabular-nums">{c.value}</p>
+            {c.sub && <p className="text-xs opacity-75">{c.sub}</p>}
+          </Link>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput paramName="q" placeholder="Tìm tên, mặt hàng, SĐT, STK…" value={query} />
         <Link href={href({ type: undefined })} className={chip(!type)}>
           Tất cả
         </Link>
-        <Link href={href({ type: "company" })} className={chip(type === "company")}>
+        <Link href={href({ type: "company" })} className={chip(type === "company", "company")}>
           Công ty
         </Link>
-        <Link href={href({ type: "individual" })} className={chip(type === "individual")}>
+        <Link href={href({ type: "individual" })} className={chip(type === "individual", "individual")}>
           Cá nhân
         </Link>
         {inactiveCount > 0 && (
-          <Link href={href({ show: show === "all" ? undefined : "all" })} className={chip(show === "all")}>
+          <Link href={href({ show: show === "all" ? undefined : "all" })} className={chip(show === "all", "muted")}>
             Gồm cả ngừng hợp tác ({inactiveCount})
           </Link>
         )}
@@ -123,7 +154,7 @@ export default async function SuppliersPage({
                 const bank = [s.bank_account_number, s.bank_name, s.bank_account_holder].filter(Boolean).join(" · ");
                 return (
                   <TableRow key={s.id} className={s.is_active ? "" : "opacity-55"}>
-                    <TableCell className="align-top">
+                    <TableCell className={`border-l-4 align-top ${s.supplier_type === "company" ? "border-l-sky-500" : "border-l-amber-500"}`}>
                       <div className="flex items-start gap-2">
                         {s.supplier_type === "company" ? (
                           <Building2 className="mt-0.5 size-4 shrink-0 text-sky-600" />
@@ -185,7 +216,13 @@ export default async function SuppliersPage({
                       )}
                     </TableCell>
                     <TableCell className="align-top">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end">
+                        <Link
+                          href={`/purchases?supplier=${s.id}`}
+                          className="mr-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Phiếu mua
+                        </Link>
                         <SupplierDialog supplier={s} />
                         {canDelete && <DeleteSupplierButton id={s.id} name={s.name} />}
                       </div>

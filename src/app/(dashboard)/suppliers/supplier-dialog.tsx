@@ -126,8 +126,14 @@ export function SupplierDialog({ supplier }: { supplier?: Supplier }) {
                   onClick={() => setType(v)}
                   aria-pressed={type === v}
                   className={cn(
-                    "h-10 rounded-md border text-sm font-medium transition",
-                    type === v ? "border-primary bg-primary text-primary-foreground" : "hover:border-primary",
+                    "h-10 rounded-md border-2 text-sm font-semibold transition",
+                    type === v
+                      ? v === "company"
+                        ? "border-sky-600 bg-sky-600 text-white"
+                        : "border-amber-500 bg-amber-500 text-white"
+                      : v === "company"
+                        ? "border-sky-200 text-sky-800 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950/40"
+                        : "border-amber-200 text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40",
                   )}
                 >
                   {label}
@@ -167,8 +173,8 @@ export function SupplierDialog({ supplier }: { supplier?: Supplier }) {
             </div>
           </div>
 
-          <fieldset className="space-y-3 rounded-lg border p-3">
-            <legend className="px-1 text-sm font-semibold">Tài khoản ngân hàng</legend>
+          <fieldset className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+            <legend className="px-1 text-sm font-semibold text-emerald-800 dark:text-emerald-300">Tài khoản ngân hàng</legend>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="s_acc">Số tài khoản</Label>

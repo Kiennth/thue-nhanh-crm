@@ -1,4 +1,17 @@
 export type PurchaseStatus = "draft" | "ordered" | "received" | "cancelled";
+export type PurchaseKind = "new" | "backfill";
+
+// Nhãn trạng thái — phiếu "ghi lại hàng đã có" xong thì là "Đã ghi nhận".
+export function statusLabel(status: PurchaseStatus, kind: PurchaseKind): string {
+  if (kind === "backfill" && status === "received") return "Đã ghi nhận";
+  if (kind === "backfill" && status === "ordered") return "Đã đặt";
+  return PURCHASE_STATUS[status].label;
+}
+
+export const KIND_BADGE: Record<PurchaseKind, { label: string; className: string }> = {
+  new: { label: "Mua mới", className: "bg-sky-500/12 text-sky-800 dark:text-sky-300" },
+  backfill: { label: "Ghi lại hàng có sẵn", className: "bg-violet-500/15 text-violet-800 dark:text-violet-300" },
+};
 
 export const PURCHASE_STATUS: Record<PurchaseStatus, { label: string; className: string }> = {
   draft: { label: "Nháp", className: "bg-slate-500/12 text-slate-700 dark:text-slate-300" },

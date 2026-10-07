@@ -37,6 +37,7 @@ export async function createPurchaseOrder(input: {
   orderDate: string;
   supplierInvoiceNo?: string;
   note?: string;
+  kind?: "new" | "backfill";
 }): Promise<Result<{ id: string }>> {
   const employee = await requireRole([...SUPPLIER_ROLES]);
   if (!input.supplierId) return { error: "Chọn nhà cung cấp." };
@@ -52,6 +53,7 @@ export async function createPurchaseOrder(input: {
       order_date: input.orderDate || vnTodayString(),
       supplier_invoice_no: input.supplierInvoiceNo?.trim() || null,
       note: input.note?.trim() || null,
+      kind: input.kind === "backfill" ? "backfill" : "new",
       created_by: employee.id,
     })
     .select("id")
@@ -144,6 +146,13 @@ export async function updatePurchaseLine(
     const dup = list.find((s, i) => list.findIndex((x) => x.toLowerCase() === s.toLowerCase()) !== i);
     if (dup) return { error: `Serial ${dup} bị nhập 2 lần.` };
     patch.serials = list;
+    // Phiếu ghi lại máy có sẵn: số lượng = số máy đã chọn.
+    const { data: po } = await supabase
+      .from("purchase_orders")
+      .select("kind")
+      .eq("id", line.purchase_order_id as string)
+      .maybeSingle();
+    if (po?.kind === "backfill" && list.length > 0) patch.quantity = list.length;
   }
   if (input.warrantyExpiresOn !== undefined) patch.warranty_expires_on = input.warrantyExpiresOn || null;
   if (input.note !== undefined) patch.note = input.note.trim() || null;
@@ -258,4 +267,44 @@ export async function deletePurchaseOrder(id: string): Promise<Result> {
   if (error) return { error: "Không xoá được phiếu: " + error.message };
   refresh();
   return { success: true };
+}
+
+// Máy serial có sẵn của 1 mã hàng để chọn vào phiếu "Ghi lại hàng đã có" —
+// kèm phiếu đang gắn (nếu có) để biết máy nào đã có NCC.
+export async function listBackfillMachines(typeId: string): Promise<
+  | { error: string }
+  | {
+      machines: {
+        code: string;
+        unitName: string | null;
+        branchName: string | null;
+        status: string;
+        purchaseDate: string | null;
+        purchasePrice: number | null;
+        poCode: string | null;
+      }[];
+    }
+> {
+  await requireRole([...SUPPLIER_ROLES]);
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from("equipment_instances")
+    .select(
+      "identifier_code, status, purchase_date, purchase_price, purchase_order_id, equipment_units(brand_model), branches(name), purchase_orders(code)",
+    )
+    .eq("equipment_type_id", typeId)
+    .order("identifier_code")
+    .limit(1000);
+  if (error) return { error: "Không tải được danh sách máy: " + error.message };
+  return {
+    machines: (data ?? []).map((m) => ({
+      code: m.identifier_code as string,
+      unitName: (m.equipment_units as unknown as { brand_model: string } | null)?.brand_model ?? null,
+      branchName: (m.branches as unknown as { name: string } | null)?.name ?? null,
+      status: m.status as string,
+      purchaseDate: (m.purchase_date as string | null) ?? null,
+      purchasePrice: m.purchase_price == null ? null : Number(m.purchase_price),
+      poCode: (m.purchase_orders as unknown as { code: string } | null)?.code ?? null,
+    })),
+  };
 }

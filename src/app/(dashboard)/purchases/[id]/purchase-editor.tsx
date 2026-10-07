@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Loader2, PackageCheck, Trash2, Truck, Undo2, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, History, ListChecks, Loader2, PackageCheck, Trash2, Truck, Undo2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,13 @@ import {
   deletePurchaseLine,
   deletePurchaseOrder,
   deleteSupplierPayment,
+  listBackfillMachines,
   receivePurchaseOrder,
   setPurchaseStatus,
   updatePurchaseHeader,
   updatePurchaseLine,
 } from "@/lib/actions/purchases";
-import { PAYMENT_METHOD, paymentState, vnd, type PurchaseStatus } from "../purchase-labels";
+import { PAYMENT_METHOD, paymentState, vnd, type PurchaseKind, type PurchaseStatus } from "../purchase-labels";
 
 export type PickType = {
   key: string;
@@ -71,6 +72,7 @@ export function PurchaseEditor({
     id: string;
     code: string;
     status: PurchaseStatus;
+    kind: PurchaseKind;
     supplierId: string;
     branchId: string;
     orderDate: string;
@@ -108,6 +110,7 @@ export function PurchaseEditor({
     setTimeout(() => setArmed((a) => (a === key ? null : a)), 4000);
   };
   const editable = po.status === "draft" || po.status === "ordered";
+  const backfill = po.kind === "backfill";
   const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
   const paid = payments.reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(total - paid, 0);
@@ -137,15 +140,23 @@ export function PurchaseEditor({
         <HeaderCard po={po} editable={editable} suppliers={suppliers} branches={branches} lockBranch={lockBranch} run={run} />
 
         {/* Dòng hàng */}
-        <section className="space-y-3 rounded-xl border p-4">
+        <section
+          className={cn(
+            "space-y-3 rounded-xl border p-4",
+            backfill ? "border-violet-200 dark:border-violet-900/60" : "border-sky-200 dark:border-sky-900/60",
+          )}
+        >
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Hàng mua ({lines.length})</h2>
+            <h2 className={cn("flex items-center gap-2 font-semibold", backfill ? "text-violet-800 dark:text-violet-300" : "text-sky-800 dark:text-sky-300")}>
+              {backfill ? <History className="size-4" /> : <PackageCheck className="size-4" />}
+              {backfill ? `Máy có sẵn cần gắn NCC (${lines.length} mã)` : `Hàng mua (${lines.length})`}
+            </h2>
             {busy && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
           </div>
           {lines.length === 0 && <p className="text-sm text-muted-foreground">Chưa có dòng hàng — gõ tên mã hàng ở ô bên dưới để thêm.</p>}
           <div className="space-y-3">
             {lines.map((l) => (
-              <LineRow key={l.id} line={l} editable={editable} run={run} armed={armed} twoStep={twoStep} />
+              <LineRow key={l.id} line={l} editable={editable} run={run} armed={armed} twoStep={twoStep} backfill={backfill} />
             ))}
           </div>
           {editable && (
@@ -166,8 +177,9 @@ export function PurchaseEditor({
           )}
           {editable && types.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Chưa có mã hàng thì tạo ở trang Thiết bị trước. Hàng serial: dán danh sách serial (mỗi dòng 1 máy) — có thể điền
-              lúc nhận hàng.
+              {backfill
+                ? "Chọn mã hàng → bấm “Chọn máy có sẵn” để tick máy (hoặc dán danh sách serial) → điền giá mua. Bấm Ghi nhận để gắn NCC, giá và ngày mua cho các máy đó — tồn kho không đổi."
+                : "Chưa có mã hàng thì tạo ở trang Thiết bị trước. Hàng serial: dán danh sách serial (mỗi dòng 1 máy) — có thể điền lúc nhận hàng."}
             </p>
           )}
           <div className="flex justify-end border-t pt-3 text-sm">
@@ -181,7 +193,7 @@ export function PurchaseEditor({
         {po.status === "received" && received.length > 0 && (
           <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
             <h2 className="mb-2 flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
-              <PackageCheck className="size-4" /> Máy đã nhập kho từ phiếu này ({received.length})
+              <PackageCheck className="size-4" /> {backfill ? "Máy đã gắn phiếu này" : "Máy đã nhập kho từ phiếu này"} ({received.length})
             </h2>
             <div className="flex flex-wrap gap-1.5">
               {received.map((m) => (
@@ -200,8 +212,8 @@ export function PurchaseEditor({
 
       {/* Cột phải: trạng thái + trả tiền */}
       <div className="space-y-5">
-        <section className="space-y-3 rounded-xl border p-4">
-          <h2 className="font-semibold">Xử lý phiếu</h2>
+        <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+          <h2 className="font-semibold text-emerald-900 dark:text-emerald-200">Xử lý phiếu</h2>
           {editable && (
             <>
               {(serialIssues.length > 0 || variantIssues.length > 0) && lines.length > 0 && (
@@ -217,20 +229,35 @@ export function PurchaseEditor({
                 </ul>
               )}
               <Button
-                className="w-full"
+                className="h-11 w-full bg-emerald-600 text-white hover:bg-emerald-700"
                 disabled={busy || lines.length === 0 || serialIssues.length > 0 || variantIssues.length > 0}
-                onClick={() => twoStep("receive", () => run(() => receivePurchaseOrder(po.id), "Đã nhập kho."))}
+                onClick={() =>
+                  twoStep("receive", () => run(() => receivePurchaseOrder(po.id), backfill ? "Đã ghi nhận cho máy có sẵn." : "Đã nhập kho."))
+                }
               >
-                <PackageCheck className="size-4" />
-                {armed === "receive" ? "Bấm lần nữa để nhập kho" : "Nhận hàng & nhập kho"}
+                {backfill ? <History className="size-4" /> : <PackageCheck className="size-4" />}
+                {armed === "receive"
+                  ? backfill
+                    ? "Bấm lần nữa để ghi nhận"
+                    : "Bấm lần nữa để nhập kho"
+                  : backfill
+                    ? "Ghi nhận cho máy có sẵn"
+                    : "Nhận hàng & nhập kho"}
               </Button>
               {armed === "receive" && (
                 <p className="text-xs text-muted-foreground">
-                  Máy serial sẽ được tạo, hàng số lượng cộng tồn. Sau đó dòng hàng bị khoá.
+                  {backfill
+                    ? "Các máy đã chọn được gắn phiếu này (NCC, giá mua, ngày mua). Tồn kho không đổi. Sau đó dòng hàng bị khoá."
+                    : "Máy serial sẽ được tạo, hàng số lượng cộng tồn. Sau đó dòng hàng bị khoá."}
                 </p>
               )}
               {po.status === "draft" ? (
-                <Button variant="outline" className="w-full" disabled={busy} onClick={() => run(() => setPurchaseStatus(po.id, "ordered"), "Đã chuyển sang Đã đặt.")}>
+                <Button
+                  variant="outline"
+                  className="w-full border-amber-400 text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                  disabled={busy}
+                  onClick={() => run(() => setPurchaseStatus(po.id, "ordered"), "Đã chuyển sang Đã đặt.")}
+                >
                   <Truck className="size-4" /> Đã đặt hàng — chờ giao
                 </Button>
               ) : (
@@ -239,8 +266,8 @@ export function PurchaseEditor({
                 </Button>
               )}
               <Button
-                variant="ghost"
-                className="w-full text-destructive"
+                variant="outline"
+                className="w-full border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
                 disabled={busy}
                 onClick={() => twoStep("cancel", () => run(() => setPurchaseStatus(po.id, "cancelled"), "Đã huỷ phiếu."))}
               >
@@ -250,7 +277,7 @@ export function PurchaseEditor({
           )}
           {po.status === "received" && (
             <p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="size-4" /> Đã nhập kho — dòng hàng đã khoá, vẫn ghi trả tiền và sửa số hoá đơn được.
+              <CheckCircle2 className="size-4" /> {backfill ? "Đã ghi nhận" : "Đã nhập kho"} — dòng hàng đã khoá, vẫn ghi trả tiền và sửa số hoá đơn được.
             </p>
           )}
           {po.status === "cancelled" && <p className="text-sm text-muted-foreground">Phiếu đã huỷ.</p>}
@@ -269,7 +296,14 @@ export function PurchaseEditor({
           )}
         </section>
 
-        <section className="space-y-3 rounded-xl border p-4">
+        <section
+          className={cn(
+            "space-y-3 rounded-xl border p-4",
+            remaining > 0
+              ? "border-rose-200 bg-rose-50/40 dark:border-rose-900/60 dark:bg-rose-950/20"
+              : "border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20",
+          )}
+        >
           <div className="flex items-baseline justify-between">
             <h2 className="font-semibold">Trả tiền NCC</h2>
             <span className={cn("text-xs font-semibold", ps.className)}>{ps.label}</span>
@@ -360,7 +394,7 @@ function HeaderCard({
     supplierId !== po.supplierId || branchId !== po.branchId || date !== po.orderDate || invoice !== po.invoiceNo || note !== po.note;
   const sel = "h-9 w-full rounded-md border bg-background px-2 text-sm disabled:opacity-70";
   return (
-    <section className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+    <section className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-900/30">
       <div className="space-y-1.5">
         <Label>Nhà cung cấp</Label>
         <select className={sel} value={supplierId} disabled={!editable} onChange={(e) => setSupplierId(e.target.value)}>
@@ -428,12 +462,14 @@ function LineRow({
   run,
   armed,
   twoStep,
+  backfill,
 }: {
   line: EditorLine;
   editable: boolean;
   run: RunFn;
   armed: string | null;
   twoStep: (key: string, action: () => void) => void;
+  backfill: boolean;
 }) {
   const [qty, setQty] = useState(String(line.quantity));
   const [cost, setCost] = useState(fmt(line.unitCost));
@@ -442,7 +478,14 @@ function LineRow({
   const save = (patch: Parameters<typeof updatePurchaseLine>[1]) => run(() => updatePurchaseLine(line.id, patch));
 
   return (
-    <div className="space-y-2 rounded-lg border p-3">
+    <div
+      className={cn(
+        "space-y-2 rounded-lg border border-l-4 p-3",
+        line.tracking === "individual"
+          ? "border-l-violet-500 bg-violet-50/30 dark:bg-violet-950/15"
+          : "border-l-teal-500 bg-teal-50/30 dark:bg-teal-950/15",
+      )}
+    >
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <p className="font-medium">{line.typeName}</p>
@@ -471,8 +514,9 @@ function LineRow({
           <Input
             className="h-9 tabular-nums"
             inputMode="numeric"
-            value={qty}
-            disabled={!editable}
+            value={backfill && line.tracking === "individual" ? String(serialList.length || line.quantity) : qty}
+            disabled={!editable || (backfill && line.tracking === "individual")}
+            title={backfill && line.tracking === "individual" ? "Tự tính theo số máy đã chọn" : undefined}
             onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
             onBlur={() => Number(qty) !== line.quantity && Number(qty) > 0 && save({ quantity: Number(qty) })}
           />
@@ -507,17 +551,29 @@ function LineRow({
       {line.tracking === "individual" && (
         <div className="grid gap-2 sm:grid-cols-[1fr_11rem]">
           <div className="space-y-1">
-            <Label className="text-xs">
-              Serial ({serialList.length}/{line.quantity}) — mỗi dòng 1 máy
-            </Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs">
+                {backfill ? `Máy có sẵn (${serialList.length})` : `Serial (${serialList.length}/${line.quantity})`} — mỗi dòng 1 máy
+              </Label>
+              {backfill && editable && (
+                <MachinePicker
+                  typeId={line.typeId}
+                  selected={serialList}
+                  onApply={(codes) => {
+                    setSerials(codes.join("\n"));
+                    save({ serials: codes });
+                  }}
+                />
+              )}
+            </div>
             <Textarea
               rows={Math.min(Math.max(line.quantity, 2), 8)}
               value={serials}
               disabled={!editable}
               onChange={(e) => setSerials(e.target.value)}
               onBlur={() => serialList.join("\n") !== line.serials.join("\n") && save({ serials: serialList })}
-              placeholder="Quét hoặc dán serial…"
-              className={cn("font-mono text-sm", serialList.length !== line.quantity && editable && "border-amber-400")}
+              placeholder={backfill ? "Bấm “Chọn máy có sẵn” hoặc dán serial…" : "Quét hoặc dán serial…"}
+              className={cn("font-mono text-sm", !backfill && serialList.length !== line.quantity && editable && "border-amber-400")}
             />
           </div>
           <div className="space-y-1">
@@ -585,6 +641,169 @@ function PaymentForm({
       >
         Ghi trả {num(amount) ? vnd(num(amount)) : ""}
       </Button>
+    </div>
+  );
+}
+
+// Chọn máy serial có sẵn của 1 mã hàng (phiếu "Ghi lại hàng đã có"). Mặc định
+// ẩn máy đã gắn phiếu khác; tick → Áp dụng điền vào ô serial.
+function MachinePicker({
+  typeId,
+  selected,
+  onApply,
+}: {
+  typeId: string;
+  selected: string[];
+  onApply: (codes: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, startLoad] = useTransition();
+  const [machines, setMachines] = useState<
+    | {
+        code: string;
+        unitName: string | null;
+        branchName: string | null;
+        status: string;
+        purchaseDate: string | null;
+        purchasePrice: number | null;
+        poCode: string | null;
+      }[]
+    | null
+  >(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [q, setQ] = useState("");
+  const [showLinked, setShowLinked] = useState(false);
+
+  function openPicker() {
+    setOpen(true);
+    setPicked(new Set(selected));
+    if (machines) return;
+    startLoad(async () => {
+      const r = await listBackfillMachines(typeId);
+      if ("error" in r) {
+        toast.error(r.error);
+        return;
+      }
+      setMachines(r.machines);
+    });
+  }
+
+  const needle = q.trim().toLowerCase();
+  const visible = (machines ?? []).filter(
+    (m) =>
+      (showLinked || !m.poCode || picked.has(m.code)) &&
+      (!needle || [m.code, m.unitName, m.branchName].join(" ").toLowerCase().includes(needle)),
+  );
+  const linkedCount = (machines ?? []).filter((m) => m.poCode).length;
+
+  if (!open)
+    return (
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 bg-violet-600 text-white hover:bg-violet-700"
+        onClick={openPicker}
+      >
+        <ListChecks className="size-4" /> Chọn máy có sẵn
+      </Button>
+    );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-2 border-b p-4">
+          <h3 className="font-semibold">Chọn máy có sẵn</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input className="h-9 flex-1" placeholder="Lọc serial, biến thể, kho…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPicked(new Set([...picked, ...visible.filter((m) => !m.poCode).map((m) => m.code)]))}
+            >
+              Chọn tất cả đang hiện
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setPicked(new Set())}>
+              Bỏ chọn
+            </Button>
+          </div>
+          {linkedCount > 0 && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={showLinked} onChange={(e) => setShowLinked(e.target.checked)} />
+              Hiện cả {linkedCount} máy đã gắn phiếu khác (không chọn được)
+            </label>
+          )}
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {loading || !machines ? (
+            <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Đang tải máy…
+            </p>
+          ) : visible.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">Không có máy nào khớp.</p>
+          ) : (
+            visible.map((m) => {
+              const on = picked.has(m.code);
+              const locked = !!m.poCode && !on;
+              return (
+                <label
+                  key={m.code}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-sm",
+                    on ? "bg-violet-100 dark:bg-violet-950/50" : "hover:bg-muted",
+                    locked && "cursor-not-allowed opacity-50",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    disabled={locked}
+                    onChange={() => {
+                      const next = new Set(picked);
+                      if (on) next.delete(m.code);
+                      else next.add(m.code);
+                      setPicked(next);
+                    }}
+                  />
+                  <span className="min-w-36 font-mono font-medium">{m.code}</span>
+                  <span className="flex-1 text-xs text-muted-foreground">
+                    {[m.unitName, m.branchName, m.status === "disposed" ? "đã thanh lý" : m.status === "rented" ? "đang thuê" : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {m.poCode
+                      ? `phiếu ${m.poCode}`
+                      : m.purchasePrice
+                        ? `đã có giá ${vnd(m.purchasePrice)}`
+                        : ""}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t p-3">
+          <span className="text-sm">
+            Đã chọn <b>{picked.size}</b> máy
+          </span>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              className="bg-violet-600 text-white hover:bg-violet-700"
+              onClick={() => {
+                onApply([...picked].sort());
+                setOpen(false);
+              }}
+            >
+              Áp dụng {picked.size} máy
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
