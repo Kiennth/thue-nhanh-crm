@@ -1,0 +1,14 @@
+-- Gộp iPhone 14/15/16 Pro + Pro Max thành 1 mã có biến thể "Pro" / "Pro Max"
+-- (CEO 2026-10-07, đã áp trực tiếp qua REST — file ghi lại cho lịch sử repo):
+--   Điện thoại iPhone 16 Pro / Pro Max  giữ mã Pro Max  1.000.000  cọc 10tr
+--   Điện thoại iPhone 15 Pro / Pro Max  giữ mã Pro      800.000 (biến thể Pro Max giá riêng 900.000)  cọc 5tr
+--   Điện thoại iPhone 14 Pro / Pro Max  giữ mã Pro Max  800.000    cọc 2tr
+-- Máy mã gộp chuyển sang mã giữ, gắn biến thể đúng cỡ; toàn bộ dòng đơn (kể
+-- cả lịch sử) chuyển mã — dòng đơn hàng serial không giữ biến thể (trigger
+-- "Hàng cho thuê theo từng sản phẩm không dùng biến thể số lượng"), biến thể
+-- nằm ở máy. 15 Pro: CEO cho gộp biến thể vùng VN/LL vào "Pro" (2 biến thể
+-- rỗng đã xoá). 14 Pro Max còn biến thể vùng "Pro Max · LL/A" (3 máy) và
+-- "Pro Max · VN/A" (0 máy) — chưa gộp. Web: slug thue-iphone-<đời>-pro-pro-max,
+-- mô tả ghép 2 cỡ ("Pro: … · Pro Max: …"), ảnh gộp, 301 6 slug cũ.
+-- Sao lưu scratchpad backup-iphone-pro-2026-10-07.json.
+select 1;
