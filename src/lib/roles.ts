@@ -57,7 +57,8 @@ export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "nhan_su" 
 // lối tắt phụ ở footer.
 export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] }[] = [
   // Hàng hoá: đơn thuê, thiết bị, lịch máy + cấu hình kho/danh mục/giá.
-  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/calendar", "/equipment-categories"] },
+  // Website ngay dưới Thiết bị (CEO 2026-10-07) — chỉ quản lý thấy (roles của mục).
+  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/website", "/calendar", "/equipment-categories"] },
   // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
   { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
   { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses"] },
@@ -67,7 +68,7 @@ export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] 
     hrefs: ["/employees", "/schedule", "/payroll", "/commission", "/rewards", "/training"],
   },
   // Quản trị (CEO 2026-10-05): cấu hình hệ thống, ít dùng hằng ngày.
-  { key: "quan_tri", label: "Quản trị", hrefs: ["/branches", "/pricing-templates", "/website", "/activity"] },
+  { key: "quan_tri", label: "Quản trị", hrefs: ["/branches", "/pricing-templates", "/activity"] },
   // "Khác" hiện trống — chỉ hứng mục mới chưa xếp nhóm (sidebar tự ẩn khi rỗng).
   { key: "khac", label: "Khác", hrefs: [] },
 ];
