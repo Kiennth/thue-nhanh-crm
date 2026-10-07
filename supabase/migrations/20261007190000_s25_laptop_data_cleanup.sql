@@ -1,0 +1,14 @@
+-- Ghi chép dữ liệu (CEO 2026-10-07, đã áp trực tiếp qua REST — chạy lại không cần thiết).
+-- Samsung S25 Ultra: toàn hệ thống còn 8 máy thật.
+--   HCM: 4 máy đơn BQ12827 (ALCHERA) → S25U-001..004, status rented (đơn đã giao mà máy ghi available);
+--        xoá 10 máy ảo (AUTO-CHOMUA/AUTO-HIST/AUTO-SYNC), 10 dòng DH20261005-252 (chưa giao) bỏ gán chờ máy mới.
+--   HN:  4 máy về từ BQ12932/BQ13049 (Phúc Nguyên) → S25U-005..008; BQ13049 từng gán trùng máy với BQ12932 →
+--        chuyển sang máy thứ 4; xoá 1 AUTO thừa.
+--   Xoá 8 bản ghi cũ S25U-01..08 (không kho), 55 dòng lịch sử chuyển sang S25U-001..008.
+-- Laptop i7 11th 16GB 256GB: chuyển quantity → serial; phiếu mua MH0001 (NCC Trần Quốc Khánh, cá nhân)
+--   10 máy Dell 5320 × 6,8tr ngày 03/10/2026, kho HN, serial tạm DELL5320-XXXXXX; dòng PO13165 (2 máy)
+--   tách 2 dòng chưa gán, requested_unit_id = Dell 5320.
+-- Tay Arm Màn Hình Máy Tính: tồn 10 cái kho HCM (ghi thẳng equipment_stock).
+-- PO13160: dòng Màn hình 4K 32 inch → requested SAMSUNG M7, máy SAMSUNG-M7-01. PO13153 (trùng PO13129) đã huỷ.
+-- Sao lưu scratchpad backup-s25-*.json, backup-laptop-i7-convert-2026-10-07.json.
+select 1;
