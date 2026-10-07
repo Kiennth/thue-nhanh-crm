@@ -228,6 +228,11 @@ const CategorySchema = z.object({
   is_published: z.coerce.boolean(),
   intro_html: z.string().trim().max(20000).optional(),
   intro_html_en: z.string().trim().max(20000).optional(),
+  // SEO tiếng Việt (CEO 2026-10-08). Mô tả/giới thiệu viết được "{gia_tu}",
+  // "{so_mau}" — web tự điền giá thấp nhất + số mẫu.
+  seo_title: z.string().trim().max(120).optional(),
+  h1: z.string().trim().max(160).optional(),
+  seo_description: z.string().trim().max(400).optional(),
   parent_id: z.string().uuid().optional(),
 });
 
@@ -246,6 +251,9 @@ export async function upsertWebsiteCategory(
     is_published: formData.get("is_published") === "on",
     intro_html: formData.get("intro_html") || undefined,
     intro_html_en: formData.get("intro_html_en") || undefined,
+    seo_title: formData.get("seo_title") || undefined,
+    h1: formData.get("h1") || undefined,
+    seo_description: formData.get("seo_description") || undefined,
     parent_id: formData.get("parent_id") || undefined,
   });
   if (!parsed.success) {
@@ -261,6 +269,9 @@ export async function upsertWebsiteCategory(
     is_published: parsed.data.is_published,
     intro_html: parsed.data.intro_html ?? null,
     intro_html_en: parsed.data.intro_html_en ?? null,
+    seo_title: parsed.data.seo_title ?? null,
+    h1: parsed.data.h1 ?? null,
+    seo_description: parsed.data.seo_description ?? null,
     // Không cho tự làm cha chính mình — DB cũng chặn vòng qua FK nhưng chặn sớm.
     parent_id: parsed.data.parent_id && parsed.data.parent_id !== id ? parsed.data.parent_id : null,
   };

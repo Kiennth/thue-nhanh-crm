@@ -938,6 +938,8 @@ export interface Database {
           seo_description_en: string | null;
           intro_html: string | null;
           intro_html_en: string | null;
+          h1: string | null;
+          h1_en: string | null;
           hero_image_url: string | null;
           sort_order: number;
           is_published: boolean;
@@ -957,6 +959,8 @@ export interface Database {
           seo_description_en?: string | null;
           intro_html?: string | null;
           intro_html_en?: string | null;
+          h1?: string | null;
+          h1_en?: string | null;
           hero_image_url?: string | null;
           sort_order?: number;
           is_published?: boolean;

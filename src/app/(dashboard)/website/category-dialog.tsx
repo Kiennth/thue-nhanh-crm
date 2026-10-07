@@ -114,6 +114,40 @@ export function WebsiteCategoryDialog({
             </select>
           </div>
 
+          <fieldset className="space-y-3 rounded-lg border border-sky-200 bg-sky-50/40 p-3 dark:border-sky-900/60 dark:bg-sky-950/20">
+            <legend className="px-1 text-sm font-semibold text-sky-800 dark:text-sky-300">SEO Google (tiếng Việt)</legend>
+            <div className="space-y-2">
+              <Label htmlFor="seo_title">Tiêu đề trên Google</Label>
+              <Input
+                id="seo_title"
+                name="seo_title"
+                maxLength={120}
+                placeholder="Cho thuê iPhone theo ngày tại HCM, Hà Nội"
+                defaultValue={category?.seo_title ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">Web tự thêm “| Thuê Nhanh” phía sau. Nên dưới 48 ký tự. Trống = “Thuê {"{tên}"} giá tốt”.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="h1">Tiêu đề lớn đầu trang (H1)</Label>
+              <Input id="h1" name="h1" maxLength={160} placeholder="Cho thuê iPhone mới nhất" defaultValue={category?.h1 ?? ""} />
+              <p className="text-xs text-muted-foreground">Trống = dùng tên danh mục.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="seo_description">Mô tả trên Google (meta description)</Label>
+              <Textarea
+                id="seo_description"
+                name="seo_description"
+                rows={3}
+                maxLength={400}
+                defaultValue={category?.seo_description ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                140–160 ký tự. Viết <code>{"{gia_tu}"}</code> để web tự điền giá thấp nhất, <code>{"{so_mau}"}</code> để điền số mẫu.
+                Trống = web tự sinh.
+              </p>
+            </div>
+          </fieldset>
+
           <div className="space-y-2">
             <Label htmlFor="intro_html">Đoạn giới thiệu SEO đầu trang (HTML)</Label>
             <Textarea
