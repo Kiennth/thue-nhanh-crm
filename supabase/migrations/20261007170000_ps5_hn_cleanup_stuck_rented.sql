@@ -1,0 +1,12 @@
+-- Ghi chép dọn dữ liệu (CEO 2026-10-07, đã áp trực tiếp qua REST — chạy lại không cần thiết).
+-- 1) Máy kẹt "đang cho thuê" không nằm trên đơn đã giao còn mở → 'available':
+--    PS5 AUTO…3295b286 + BL-12 (kẹt từ BQ12579 DOJI, xong 03/09; BL-12 đang gán PO13129 chưa giao),
+--    PCI5-12TH-HN-01/02, 3 Meta Quest 3 + 3 Samsung S25 Ultra (BQ12932/BQ13049 đã thu hồi,
+--    chưa tick Nhập kho — tick sau vẫn idempotent).
+-- 2) PS5 thường kho Hà Nội: CEO "chỉ 5 máy thật BL-05, BL-06, BL-11, BL-12, DG-01".
+--    Xoá 7 máy ảo (6 AUTO-MAY-CHOI-GAMES-PLAYSTATION-5-* + PS5-BL-05); 147 dòng đơn lịch sử
+--    chuyển sang máy thật (PS5-BL-05 → BL-05, AUTO chia vòng); dòng PO13129 của PS5-BL-05 → BL-05.
+--    Sao lưu scratchpad backup-ps5-hn-virtual-2026-10-07.json.
+-- Lưu ý: orders.status là khâu ĐANG CHỜ — 'nhap_kho_bao_tri' chưa chắc đã xong; đơn mở =
+-- completed_at và cancelled_at null.
+select 1;
