@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   ke_toan: "Kế toán",
   cua_hang_truong: "Cửa hàng trưởng",
   ky_thuat_sales: "Kỹ thuật/Sales",
+  web_admin: "Web admin",
 };
 
 // Cấp bậc quyền dùng chung toàn app (không có kế thừa thật ở tầng code —
@@ -19,11 +20,17 @@ export const ALL_ROLES: UserRole[] = [
   "ke_toan",
   "cua_hang_truong",
   "ky_thuat_sales",
+  "web_admin",
 ];
+// Web admin (CEO 2026-10-08) = quyền Kỹ thuật/Sales + viết Blog web. Mọi chỗ
+// code xét riêng Kỹ thuật/Sales dùng mảng này (RLS: 20261008130000).
+export const TECH_SALES_ROLES: UserRole[] = ["ky_thuat_sales", "web_admin"];
+// Viết/sửa/xoá bài Blog web: Giám đốc + Web admin (khớp RLS blog_posts).
+export const BLOG_ROLES: UserRole[] = ["giam_doc", "web_admin"];
 // Cửa hàng trưởng/Kỹ thuật-Sale chỉ thấy/thao tác đơn hàng + thiết bị đúng
 // chi nhánh mình (RLS + query filter) — không áp dụng cho khách hàng (dùng
 // chung toàn hệ thống, xem CEO quyết định trong plan cải tổ phân quyền).
-export const BRANCH_SCOPED_ROLES: UserRole[] = ["cua_hang_truong", "ky_thuat_sales"];
+export const BRANCH_SCOPED_ROLES: UserRole[] = ["cua_hang_truong", "ky_thuat_sales", "web_admin"];
 // Ai được SỬA thiết bị (tồn kho/mua/thanh lý/chuyển kho) — Cửa hàng trưởng
 // có quyền mới này (giới hạn chi nhánh mình), Kỹ thuật/Sale vẫn chỉ xem.
 export const EQUIPMENT_WRITE_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
@@ -61,7 +68,7 @@ export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "nhan_su" 
 export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] }[] = [
   // Hàng hoá: đơn thuê, thiết bị, lịch máy + cấu hình kho/danh mục/giá.
   // Website ngay dưới Thiết bị (CEO 2026-10-07) — chỉ quản lý thấy (roles của mục).
-  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/website", "/calendar", "/equipment-categories"] },
+  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/website", "/website/blog", "/calendar", "/equipment-categories"] },
   // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
   { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
   // Nhà cung cấp cạnh Chi phí — nơi trả tiền mua máy / dịch vụ (CEO 2026-10-07).
@@ -113,6 +120,12 @@ export const SETTINGS_ITEMS: NavItem[] = [
     href: "/activity",
     label: "Nhật ký hoạt động",
     roles: [...MANAGE_ROLES],
+  },
+  {
+    href: "/website/blog",
+    label: "Blog",
+    // Viết bài blog web thuenhanh.vn/blog (CEO 2026-10-08) — mục riêng dưới Website.
+    roles: [...BLOG_ROLES],
   },
 ];
 

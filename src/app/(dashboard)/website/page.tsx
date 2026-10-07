@@ -171,12 +171,6 @@ export default async function WebsitePage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Website</h1>
         <div className="flex items-center gap-2">
-          <Link
-            href="/website/blog"
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Blog
-          </Link>
           <Link href="/website/leads" className="text-sm font-medium text-primary hover:underline">
             Khách hỏi thuê ({leadRes.count ?? 0})
           </Link>

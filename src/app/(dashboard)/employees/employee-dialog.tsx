@@ -43,7 +43,7 @@ interface EmployeeDialogProps {
   };
 }
 
-const ROLE_OPTIONS: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"];
+const ROLE_OPTIONS: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales", "web_admin"];
 
 export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server

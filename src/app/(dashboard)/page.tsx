@@ -2,7 +2,7 @@ import Link from "next/link";
 import { vnDayKey, vnDayStartIso } from "@/lib/vn-day";
 import { BranchComparisonSection, previousMonthOf } from "@/components/branch-comparison";
 import { isProfitPeriod, type ProfitPeriod } from "@/lib/profit-period";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, TECH_SALES_ROLES } from "@/lib/roles";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { todayParts } from "@/lib/dashboard-reports";
@@ -187,7 +187,7 @@ export default async function DashboardHomePage({
     // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
     // khối biểu đồ hiệu suất toàn công ty riêng). Bỏ luôn cho Kỹ thuật/Sales:
     // tính 6 tháng payroll riêng lẻ quá nặng, kéo trang chủ chậm hẳn.
-    canManage || employee.role === "ky_thuat_sales"
+    canManage || TECH_SALES_ROLES.includes(employee.role)
       ? Promise.resolve(null)
       : computeMyMonthlyTrend(employee.id),
     // Tổng quan đơn hàng (Tuần/Tháng/Năm + xu hướng) của RIÊNG chi nhánh mà

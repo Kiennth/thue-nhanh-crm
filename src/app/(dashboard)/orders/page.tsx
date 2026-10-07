@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { ALL_ROLES, MANAGE_ROLES, TECH_SALES_ROLES } from "@/lib/roles";
 import { OrdersListSection } from "./orders-list-section";
 
 export default async function OrdersPage({
@@ -41,7 +41,7 @@ export default async function OrdersPage({
   // CEO chốt 2026-08-05: Kỹ thuật/Sales xem đơn TOÀN HỆ THỐNG luôn (không
   // cần bật/tắt như Cửa hàng trưởng) — RLS đã cho đọc, xem
   // 20260805120000_ky_thuat_sales_reads_all_orders.sql.
-  const isTechSales = employee.role === "ky_thuat_sales";
+  const isTechSales = TECH_SALES_ROLES.includes(employee.role);
   const listBranchId =
     viewingAllBranches || isTechSales ? null : canManage ? managerBranchId : branchId;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp (doanh số, xu hướng) —
@@ -50,7 +50,7 @@ export default async function OrdersPage({
   // giờ có toggle theo tháng/năm + biểu đồ trực quan (không còn là số dồn
   // "Tất cả thời gian" vô nghĩa như bản cũ), nên mở lại cho Admin luôn
   // (trước đó từng ẩn vì bản cũ đúng là không có giá trị với Admin).
-  const canViewAggregates = employee.role !== "ky_thuat_sales";
+  const canViewAggregates = !TECH_SALES_ROLES.includes(employee.role);
 
   // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
   // chung — chỉ cần khi có ô chọn đó.

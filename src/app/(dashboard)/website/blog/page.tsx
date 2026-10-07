@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ArrowLeft, ExternalLink, PenLine } from "lucide-react";
+import { ExternalLink, PenLine } from "lucide-react";
 import { requireRole } from "@/lib/dal";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { BLOG_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { BLOG_CATEGORIES, type BlogPostRow } from "@/lib/blog";
 import { createBlogPost } from "@/lib/actions/blog";
@@ -23,7 +23,7 @@ function isFuture(iso: string | null) {
 
 // Danh sách bài blog web (CEO 2026-10-08).
 export default async function BlogListPage() {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...BLOG_ROLES]);
   const db = (await createClient()) as unknown as SupabaseClient;
   const { data } = await db
     .from("blog_posts")
@@ -38,10 +38,7 @@ export default async function BlogListPage() {
   return (
     <div className="space-y-5">
       <div>
-        <Link href="/website" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> Website
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold">Blog</h1>
+        <h1 className="text-2xl font-semibold">Blog</h1>
         <p className="text-sm text-muted-foreground">
           Bài viết hiện ở {WEB.replace(/^https?:\/\//, "")}/blog. Chia bài bằng “Tiêu đề lớn” — web tự làm mục lục.
         </p>

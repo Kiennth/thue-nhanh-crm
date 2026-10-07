@@ -2,7 +2,7 @@
 // Sau khi link project Supabase thật, chạy lệnh sau để thay bằng bản generate chính xác:
 //   npx supabase gen types typescript --linked > src/types/database.ts
 
-export type UserRole = "giam_doc" | "admin" | "ke_toan" | "cua_hang_truong" | "ky_thuat_sales";
+export type UserRole = "giam_doc" | "admin" | "ke_toan" | "cua_hang_truong" | "ky_thuat_sales" | "web_admin";
 
 export type CustomerType = "individual" | "company";
 

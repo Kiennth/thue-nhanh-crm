@@ -30,6 +30,7 @@ import {
   Tags,
   UsersRound,
   type LucideIcon,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -126,6 +127,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: GraduationCap,
     tile: "bg-teal-500/12 text-teal-600 dark:text-teal-400",
     active: "data-active:bg-teal-500/12 data-active:text-teal-700 dark:data-active:text-teal-300",
+  },
+  "/website/blog": {
+    icon: Newspaper,
+    tile: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
+    active: "data-active:bg-emerald-500/12 data-active:text-emerald-700 dark:data-active:text-emerald-300",
   },
   "/website": {
     icon: Globe,
@@ -244,7 +250,13 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
                     key={item.href}
                     href={item.href}
                     label={item.label}
-                    active={pathname.startsWith(item.href)}
+                    // Khớp tiền tố DÀI nhất: ở /website/blog chỉ sáng "Blog", không sáng "Website".
+                    active={
+                      pathname.startsWith(item.href) &&
+                      !NAV_ITEMS.some(
+                        (o) => o.href.length > item.href.length && o.href.startsWith(item.href) && pathname.startsWith(o.href),
+                      )
+                    }
                   />
                 ))}
               </SidebarMenu>

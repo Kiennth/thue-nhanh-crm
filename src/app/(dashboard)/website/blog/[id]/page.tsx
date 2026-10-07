@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/dal";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { BLOG_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { BlogPostRow } from "@/lib/blog";
 import { BlogPostForm } from "./blog-post-form";
 
 // Soạn 1 bài blog (CEO 2026-10-08) — xem actions/blog.ts.
 export default async function BlogPostPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...BLOG_ROLES]);
   const { id } = await params;
   const db = (await createClient()) as unknown as SupabaseClient;
   const [{ data: post }, { data: cats }] = await Promise.all([

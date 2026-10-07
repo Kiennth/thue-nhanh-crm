@@ -7,12 +7,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { BLOG_ROLES } from "@/lib/roles";
 import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
 import { BLOG_CATEGORIES, slugifyVi } from "@/lib/blog";
 
-// Blog web (CEO 2026-10-08) — bảng blog_posts, RLS giam_doc/admin/ke_toan
-// (migration 20261008120000); requireRole ở đây chỉ là lớp chặn sớm.
+// Blog web (CEO 2026-10-08) — bảng blog_posts, RLS Giám đốc + Web admin
+// (migration 20261008130000); requireRole ở đây chỉ là lớp chặn sớm.
 
 export type BlogActionState = { error: string } | { success: true; message: string } | undefined;
 
@@ -34,7 +34,7 @@ async function uniqueSlug(supabase: SupabaseClient, base: string, exceptId?: str
 }
 
 export async function createBlogPost(formData: FormData) {
-  const employee = await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...BLOG_ROLES]);
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
   const supabase = await db();
@@ -77,7 +77,7 @@ export async function saveBlogPost(
   _prev: BlogActionState,
   formData: FormData,
 ): Promise<BlogActionState> {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...BLOG_ROLES]);
   const parsed = PostSchema.safeParse({
     title: formData.get("title"),
     slug: formData.get("slug"),
@@ -142,7 +142,7 @@ export async function saveBlogPost(
 }
 
 export async function deleteBlogPost(id: string) {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...BLOG_ROLES]);
   const supabase = await db();
   const { data } = await supabase.from("blog_posts").select("status").eq("id", id).maybeSingle();
   const { error } = await supabase.from("blog_posts").delete().eq("id", id);
@@ -157,7 +157,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 // Ảnh trong bài + ảnh đại diện → bucket equipment-images/blog/ (admin client
 // vì policy bucket cũ chỉ cho admin/ke_toan — xem uploadWebsiteProductImage).
 export async function uploadBlogImage(formData: FormData): Promise<{ url: string } | { error: string }> {
-  await requireRole([...MANAGE_ROLES]);
+  await requireRole([...BLOG_ROLES]);
   const file = formData.get("image");
   if (!(file instanceof File) || file.size === 0) return { error: "Chưa chọn ảnh." };
   if (file.size > MAX_IMAGE_BYTES) return { error: "Ảnh không được vượt quá 5MB." };

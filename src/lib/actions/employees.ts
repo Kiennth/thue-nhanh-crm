@@ -12,7 +12,7 @@ const employeeShape = {
   name: z.string().trim().min(1, { message: "Tên không được để trống." }),
   branch_id: z.string().uuid().optional().or(z.literal("")),
   base_salary: z.coerce.number().min(0, { message: "Lương cứng không được âm." }),
-  role: z.enum(["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"]),
+  role: z.enum(["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales", "web_admin"]),
   // Ngày sinh — để module Thưởng tự nhắc sinh nhật trong tháng (CEO
   // 2026-08-09). Không bắt buộc.
   birthday: z.string().optional().or(z.literal("")),
