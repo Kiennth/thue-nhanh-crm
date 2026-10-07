@@ -19,6 +19,8 @@ export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   task_weights: "Trọng số khâu",
   reward_entries: "Thưởng đột xuất",
   suppliers: "Nhà cung cấp",
+  purchase_orders: "Phiếu mua hàng",
+  supplier_payments: "Trả tiền NCC",
 };
 
 export const ACTIVITY_TABLE_OPTIONS = Object.entries(ACTIVITY_TABLE_LABELS).map(([value, label]) => ({
@@ -44,6 +46,10 @@ export function getActivityRecordLabel(
   if (!data) return "";
 
   switch (tableName) {
+    case "purchase_orders":
+      return typeof data.code === "string" ? data.code : "";
+    case "supplier_payments":
+      return typeof data.amount === "number" ? currencyFormatter.format(data.amount) + "đ" : "";
     case "orders":
       return typeof data.order_code === "string" ? data.order_code : "";
     case "order_tasks": {

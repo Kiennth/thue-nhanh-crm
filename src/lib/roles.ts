@@ -65,7 +65,7 @@ export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] 
   // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
   { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
   // Nhà cung cấp cạnh Chi phí — nơi trả tiền mua máy / dịch vụ (CEO 2026-10-07).
-  { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses", "/suppliers"] },
+  { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses", "/purchases", "/suppliers"] },
   {
     key: "nhan_su",
     label: "Nhân sự",
@@ -190,6 +190,11 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/suppliers",
     label: "Nhà cung cấp",
+    roles: [...SUPPLIER_ROLES],
+  },
+  {
+    href: "/purchases",
+    label: "Mua hàng",
     roles: [...SUPPLIER_ROLES],
   },
   {

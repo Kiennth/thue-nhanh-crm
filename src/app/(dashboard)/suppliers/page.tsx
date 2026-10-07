@@ -23,7 +23,23 @@ export default async function SuppliersPage({
   const { q, type, show } = await searchParams;
   const query = q?.trim() ?? "";
   const db = (await createClient()) as unknown as SupabaseClient;
-  const { data } = await db.from("suppliers").select("*").order("name").limit(2000);
+  const [{ data }, { data: totals }, { data: pos }] = await Promise.all([
+    db.from("suppliers").select("*").order("name").limit(2000),
+    db.from("purchase_order_totals").select("purchase_order_id, supplier_id, total, paid"),
+    db.from("purchase_orders").select("id, status"),
+  ]);
+  // Tổng đã mua / còn nợ theo NCC (bỏ phiếu huỷ).
+  const cancelled = new Set(((pos ?? []) as { id: string; status: string }[]).filter((p) => p.status === "cancelled").map((p) => p.id));
+  const bySupplier = new Map<string, { bought: number; owed: number; count: number }>();
+  for (const t of (totals ?? []) as { purchase_order_id: string; supplier_id: string; total: number; paid: number }[]) {
+    if (cancelled.has(t.purchase_order_id)) continue;
+    const cur = bySupplier.get(t.supplier_id) ?? { bought: 0, owed: 0, count: 0 };
+    cur.bought += Number(t.total);
+    cur.owed += Math.max(Number(t.total) - Number(t.paid), 0);
+    cur.count += 1;
+    bySupplier.set(t.supplier_id, cur);
+  }
+  const money = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
   const all = (data ?? []) as Supplier[];
   const needle = fold(query);
   const digits = query.replace(/\D/g, "");
@@ -98,6 +114,7 @@ export default async function SuppliersPage({
                 <TableHead>MST / CCCD</TableHead>
                 <TableHead>Chuyển khoản</TableHead>
                 <TableHead>Mặt hàng</TableHead>
+                <TableHead className="text-right">Đã mua</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -151,6 +168,21 @@ export default async function SuppliersPage({
                     <TableCell className="max-w-56 align-top text-sm">
                       {s.products}
                       {s.notes && <p className="text-xs text-muted-foreground">{s.notes}</p>}
+                    </TableCell>
+                    <TableCell className="align-top text-right text-sm tabular-nums">
+                      {bySupplier.get(s.id) ? (
+                        <Link href={`/purchases?supplier=${s.id}`} className="hover:underline">
+                          <p className="font-medium">{money(bySupplier.get(s.id)!.bought)}</p>
+                          <p className="text-xs text-muted-foreground">{bySupplier.get(s.id)!.count} phiếu</p>
+                          {bySupplier.get(s.id)!.owed > 0 && (
+                            <p className="text-xs font-semibold text-rose-700 dark:text-rose-400">nợ {money(bySupplier.get(s.id)!.owed)}</p>
+                          )}
+                        </Link>
+                      ) : (
+                        <Link href={`/purchases?supplier=${s.id}`} className="text-xs text-muted-foreground hover:underline">
+                          Chưa có phiếu
+                        </Link>
+                      )}
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="flex justify-end">
