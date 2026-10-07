@@ -20,8 +20,11 @@ import {
   listBackfillMachines,
   receivePurchaseOrder,
   setPurchaseStatus,
+  renameReceivedMachine,
   updatePurchaseHeader,
   updatePurchaseLine,
+  updateReceivedLineCost,
+  updateReceivedLineWarranty,
 } from "@/lib/actions/purchases";
 import { PAYMENT_METHOD, paymentState, vnd, type PurchaseKind, type PurchaseStatus } from "../purchase-labels";
 
@@ -111,6 +114,9 @@ export function PurchaseEditor({
   };
   const editable = po.status === "draft" || po.status === "ordered";
   const backfill = po.kind === "backfill";
+  // Sửa phiếu đã nhập kho (CEO 2026-10-07, gõ nhầm giá thừa số 0): quản lý sửa
+  // được NCC, ngày mua, đơn giá, serial, bảo hành — không đổi số lượng/kho.
+  const fixable = po.status === "received" && canDelete;
   const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
   const paid = payments.reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(total - paid, 0);
@@ -137,7 +143,7 @@ export function PurchaseEditor({
     <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
       <div className="min-w-0 space-y-5">
         {/* Thông tin phiếu */}
-        <HeaderCard po={po} editable={editable} suppliers={suppliers} branches={branches} lockBranch={lockBranch} run={run} />
+        <HeaderCard po={po} editable={editable} fixable={fixable} suppliers={suppliers} branches={branches} lockBranch={lockBranch} run={run} />
 
         {/* Dòng hàng */}
         <section
@@ -156,7 +162,7 @@ export function PurchaseEditor({
           {lines.length === 0 && <p className="text-sm text-muted-foreground">Chưa có dòng hàng — gõ tên mã hàng ở ô bên dưới để thêm.</p>}
           <div className="space-y-3">
             {lines.map((l) => (
-              <LineRow key={l.id} line={l} editable={editable} run={run} armed={armed} twoStep={twoStep} backfill={backfill} />
+              <LineRow key={l.id} line={l} editable={editable} fixable={fixable} run={run} armed={armed} twoStep={twoStep} backfill={backfill} />
             ))}
           </div>
           {editable && (
@@ -195,17 +201,28 @@ export function PurchaseEditor({
             <h2 className="mb-2 flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
               <PackageCheck className="size-4" /> {backfill ? "Máy đã gắn phiếu này" : "Máy đã nhập kho từ phiếu này"} ({received.length})
             </h2>
-            <div className="flex flex-wrap gap-1.5">
-              {received.map((m) => (
-                <Link
-                  key={m.id}
-                  href={`/equipment/${m.equipment_type_id}`}
-                  className="rounded-md border bg-background px-2 py-0.5 text-xs font-medium tabular-nums hover:border-primary"
-                >
-                  {m.identifier_code}
-                </Link>
-              ))}
-            </div>
+            {fixable ? (
+              <>
+                <p className="mb-2 text-xs text-muted-foreground">Sửa serial từng máy (vd thay serial tạm bằng serial thật) — bấm ra ngoài ô là lưu.</p>
+                <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {received.map((m) => (
+                    <MachineCodeInput key={m.id} machine={m} run={run} />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {received.map((m) => (
+                  <Link
+                    key={m.id}
+                    href={`/equipment/${m.equipment_type_id}`}
+                    className="rounded-md border bg-background px-2 py-0.5 text-xs font-medium tabular-nums hover:border-primary"
+                  >
+                    {m.identifier_code}
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
         )}
       </div>
@@ -277,7 +294,10 @@ export function PurchaseEditor({
           )}
           {po.status === "received" && (
             <p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="size-4" /> {backfill ? "Đã ghi nhận" : "Đã nhập kho"} — dòng hàng đã khoá, vẫn ghi trả tiền và sửa số hoá đơn được.
+              <CheckCircle2 className="size-4" /> {backfill ? "Đã ghi nhận" : "Đã nhập kho"} —{" "}
+              {fixable
+                ? "quản lý vẫn sửa được NCC, ngày mua, đơn giá, serial, bảo hành (không đổi số lượng/kho)."
+                : "dòng hàng đã khoá, vẫn ghi trả tiền và sửa số hoá đơn được."}
             </p>
           )}
           {po.status === "cancelled" && <p className="text-sm text-muted-foreground">Phiếu đã huỷ.</p>}
@@ -373,6 +393,7 @@ type RunFn = (fn: () => Promise<{ error: string } | { success: true } | undefine
 function HeaderCard({
   po,
   editable,
+  fixable,
   suppliers,
   branches,
   lockBranch,
@@ -380,6 +401,7 @@ function HeaderCard({
 }: {
   po: { id: string; supplierId: string; branchId: string; orderDate: string; invoiceNo: string; note: string };
   editable: boolean;
+  fixable: boolean;
   suppliers: { id: string; name: string }[];
   branches: { id: string; name: string }[];
   lockBranch: boolean;
@@ -397,7 +419,7 @@ function HeaderCard({
     <section className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-900/30">
       <div className="space-y-1.5">
         <Label>Nhà cung cấp</Label>
-        <select className={sel} value={supplierId} disabled={!editable} onChange={(e) => setSupplierId(e.target.value)}>
+        <select className={sel} value={supplierId} disabled={!editable && !fixable} onChange={(e) => setSupplierId(e.target.value)}>
           {!suppliers.some((s) => s.id === supplierId) && <option value={supplierId}>(NCC đã ngừng hợp tác)</option>}
           {suppliers.map((s) => (
             <option key={s.id} value={s.id}>
@@ -419,7 +441,7 @@ function HeaderCard({
         </div>
         <div className="space-y-1.5">
           <Label>Ngày mua</Label>
-          <Input type="date" className="h-9" value={date} disabled={!editable} onChange={(e) => setDate(e.target.value)} />
+          <Input type="date" className="h-9" value={date} disabled={!editable && !fixable} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
       <div className="space-y-1.5">
@@ -459,6 +481,7 @@ function HeaderCard({
 function LineRow({
   line,
   editable,
+  fixable,
   run,
   armed,
   twoStep,
@@ -466,6 +489,7 @@ function LineRow({
 }: {
   line: EditorLine;
   editable: boolean;
+  fixable: boolean;
   run: RunFn;
   armed: string | null;
   twoStep: (key: string, action: () => void) => void;
@@ -527,9 +551,13 @@ function LineRow({
             className="h-9 tabular-nums"
             inputMode="numeric"
             value={cost}
-            disabled={!editable}
+            disabled={!editable && !fixable}
             onChange={(e) => setCost(fmt(num(e.target.value)))}
-            onBlur={() => num(cost) !== line.unitCost && save({ unitCost: num(cost) })}
+            onBlur={() => {
+              if (num(cost) === line.unitCost) return;
+              if (fixable) run(() => updateReceivedLineCost(line.id, num(cost)), "Đã sửa đơn giá — giá mua của máy đã cập nhật.");
+              else save({ unitCost: num(cost) });
+            }}
           />
         </div>
         <div className="w-32 text-right">
@@ -582,8 +610,13 @@ function LineRow({
               type="date"
               className="h-9"
               defaultValue={line.warranty ?? ""}
-              disabled={!editable}
-              onBlur={(e) => (e.target.value || null) !== line.warranty && save({ warrantyExpiresOn: e.target.value || null })}
+              disabled={!editable && !fixable}
+              onBlur={(e) => {
+                const v = e.target.value || null;
+                if (v === line.warranty) return;
+                if (fixable) run(() => updateReceivedLineWarranty(line.id, v), "Đã sửa bảo hành.");
+                else save({ warrantyExpiresOn: v });
+              }}
             />
           </div>
         </div>
@@ -804,6 +837,33 @@ function MachinePicker({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MachineCodeInput({
+  machine,
+  run,
+}: {
+  machine: { id: string; identifier_code: string; equipment_type_id: string };
+  run: RunFn;
+}) {
+  const [code, setCode] = useState(machine.identifier_code);
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        className="h-8 font-mono text-xs"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        onBlur={() => {
+          const v = code.trim();
+          if (!v || v === machine.identifier_code) return setCode(machine.identifier_code);
+          run(() => renameReceivedMachine(machine.id, v), `Đã đổi serial thành ${v}.`);
+        }}
+      />
+      <Link href={`/equipment/${machine.equipment_type_id}`} className="shrink-0 text-xs text-muted-foreground hover:text-primary">
+        xem
+      </Link>
     </div>
   );
 }

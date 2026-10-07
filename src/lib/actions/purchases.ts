@@ -67,9 +67,9 @@ export async function updatePurchaseHeader(
   id: string,
   input: { supplierId?: string; branchId?: string; orderDate?: string; supplierInvoiceNo?: string; note?: string },
 ): Promise<Result> {
-  await requireRole([...SUPPLIER_ROLES]);
+  const employee = await requireRole([...SUPPLIER_ROLES]);
   const supabase = await db();
-  const { data: po } = await supabase.from("purchase_orders").select("status").eq("id", id).maybeSingle();
+  const { data: po } = await supabase.from("purchase_orders").select("status, order_date").eq("id", id).maybeSingle();
   if (!po) return { error: "Không tìm thấy phiếu mua." };
   const patch: Record<string, unknown> = {};
   // Số hoá đơn NCC + ghi chú sửa được cả sau khi nhập kho (hoá đơn hay về sau).
@@ -80,10 +80,118 @@ export async function updatePurchaseHeader(
     if (input.supplierId) patch.supplier_id = input.supplierId;
     if (input.branchId) patch.branch_id = input.branchId;
     if (input.orderDate) patch.order_date = input.orderDate;
+  } else if (po.status === "received" && MANAGE_ROLES.includes(employee.role)) {
+    // Sửa phiếu đã nhập kho (CEO 2026-10-07): đổi NCC + ngày mua (ngày mua
+    // của máy / giá vốn đi theo). Kho nhận không đổi được — máy đã ở kho.
+    if (input.supplierId) patch.supplier_id = input.supplierId;
+    if (input.orderDate && input.orderDate !== po.order_date) {
+      patch.order_date = input.orderDate;
+      const { error: e1 } = await supabase
+        .from("equipment_instances")
+        .update({ purchase_date: input.orderDate })
+        .eq("purchase_order_id", id);
+      if (e1) return { error: "Không đổi được ngày mua của máy: " + e1.message };
+      await supabase.from("equipment_purchases").update({ purchase_date: input.orderDate }).eq("purchase_order_id", id);
+    }
   }
   const { error } = await supabase.from("purchase_orders").update(patch).eq("id", id);
   if (error) return { error: "Không lưu được phiếu: " + error.message };
   refresh(id);
+  return { success: true };
+}
+
+// ---- Sửa phiếu ĐÃ NHẬP KHO (CEO 2026-10-07: "cho tao sửa phiếu mua hàng") ----
+// Chỉ GĐ/Admin/KT. Sửa được: đơn giá (giá mua máy + giá vốn đi theo), serial
+// từng máy, hạn bảo hành. Không đổi số lượng/kho (phải tạo/xoá máy thật).
+async function receivedLine(supabase: SupabaseClient, lineId: string) {
+  const { data: line } = await supabase
+    .from("purchase_order_lines")
+    .select("id, purchase_order_id, equipment_type_id, equipment_unit_id, serials, purchase_orders(status)")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Không tìm thấy dòng hàng." } as const;
+  if ((line.purchase_orders as unknown as { status: string } | null)?.status !== "received")
+    return { error: "Phiếu chưa nhập kho — sửa trực tiếp trên dòng." } as const;
+  return { line } as const;
+}
+
+export async function updateReceivedLineCost(lineId: string, unitCost: number): Promise<Result> {
+  await requireRole([...MANAGE_ROLES]);
+  if (!(unitCost >= 0)) return { error: "Đơn giá không hợp lệ." };
+  const supabase = await db();
+  const r = await receivedLine(supabase, lineId);
+  if ("error" in r) return { error: r.error as string };
+  const cost = Math.round(unitCost);
+  const poId = r.line.purchase_order_id as string;
+  const { error } = await supabase.from("purchase_order_lines").update({ unit_cost: cost }).eq("id", lineId);
+  if (error) return { error: "Không lưu được đơn giá: " + error.message };
+  await supabase
+    .from("equipment_instances")
+    .update({ purchase_price: cost })
+    .eq("purchase_order_id", poId)
+    .eq("equipment_type_id", r.line.equipment_type_id as string);
+  if (r.line.equipment_unit_id) {
+    await supabase
+      .from("equipment_purchases")
+      .update({ unit_cost: cost })
+      .eq("purchase_order_id", poId)
+      .eq("equipment_unit_id", r.line.equipment_unit_id as string);
+  }
+  refresh(poId);
+  revalidatePath("/equipment");
+  return { success: true };
+}
+
+export async function updateReceivedLineWarranty(lineId: string, warranty: string | null): Promise<Result> {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await db();
+  const r = await receivedLine(supabase, lineId);
+  if ("error" in r) return { error: r.error as string };
+  const poId = r.line.purchase_order_id as string;
+  await supabase.from("purchase_order_lines").update({ warranty_expires_on: warranty || null }).eq("id", lineId);
+  const { error } = await supabase
+    .from("equipment_instances")
+    .update({ warranty_expires_on: warranty || null })
+    .eq("purchase_order_id", poId)
+    .eq("equipment_type_id", r.line.equipment_type_id as string);
+  if (error) return { error: "Không lưu được bảo hành: " + error.message };
+  refresh(poId);
+  return { success: true };
+}
+
+// Đổi serial 1 máy đã nhập từ phiếu (vd thay serial tạm bằng serial thật).
+export async function renameReceivedMachine(instanceId: string, newCode: string): Promise<Result> {
+  await requireRole([...MANAGE_ROLES]);
+  const code = newCode.trim();
+  if (!code) return { error: "Serial không được trống." };
+  const supabase = await db();
+  const { data: inst } = await supabase
+    .from("equipment_instances")
+    .select("id, identifier_code, purchase_order_id, equipment_type_id")
+    .eq("id", instanceId)
+    .maybeSingle();
+  if (!inst?.purchase_order_id) return { error: "Máy này không thuộc phiếu mua nào." };
+  if (inst.identifier_code === code) return { success: true };
+  const { data: dup } = await supabase.from("equipment_instances").select("id").ilike("identifier_code", code.replace(/[%_]/g, "\\$&")).neq("id", instanceId).limit(1);
+  if (dup?.length) return { error: `Serial ${code} đã có trong CRM.` };
+  const { error } = await supabase.from("equipment_instances").update({ identifier_code: code }).eq("id", instanceId);
+  if (error) return { error: "Không đổi được serial: " + error.message };
+  // Cập nhật danh sách serial trên dòng phiếu cho khớp.
+  const { data: lines } = await supabase
+    .from("purchase_order_lines")
+    .select("id, serials")
+    .eq("purchase_order_id", inst.purchase_order_id as string)
+    .eq("equipment_type_id", inst.equipment_type_id as string);
+  for (const l of lines ?? []) {
+    const list = (l.serials as string[]) ?? [];
+    const i = list.findIndex((s) => s.toLowerCase() === String(inst.identifier_code).toLowerCase());
+    if (i >= 0) {
+      list[i] = code;
+      await supabase.from("purchase_order_lines").update({ serials: list }).eq("id", l.id as string);
+    }
+  }
+  refresh(inst.purchase_order_id as string);
+  revalidatePath("/equipment");
   return { success: true };
 }
 
