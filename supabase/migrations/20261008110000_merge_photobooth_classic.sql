@@ -1,0 +1,13 @@
+-- GHI CHÚ (đã áp qua REST 2026-10-08, CEO: "Photo Booth Classic xoá luôn,
+-- trùng mã Photobooth - Cổ Điển"). Không chạy lại.
+-- 5 dòng đơn (BQ12580, BQ12802, BQ12811, BQ12999, BQ13002 — đều đã hoàn tất)
+-- chuyển sang Photobooth - Cổ Điển, gói "CƠ BẢN 2H", GIỮ NGUYÊN unit_price/line_total.
+-- update public.order_equipment
+--    set equipment_type_id = '06672eef-5fbb-473e-8dba-e2ae3752940b',
+--        equipment_unit_id = '0f8a6a38-1f55-4f4c-92a3-6651f6c06e63'
+--  where equipment_type_id = '72595c46-2528-48ff-ab0e-eafad2c98f17';
+-- delete from public.website_products where equipment_type_id = '72595c46-2528-48ff-ab0e-eafad2c98f17';
+-- delete from public.equipment_units  where equipment_type_id = '72595c46-2528-48ff-ab0e-eafad2c98f17';
+-- delete from public.equipment_types  where id = '72595c46-2528-48ff-ab0e-eafad2c98f17';
+-- Web: /thue-photo-booth-classic 301 → /thue-photo-booth-co-dien (src/lib/renamed-slugs.ts).
+select 1;
