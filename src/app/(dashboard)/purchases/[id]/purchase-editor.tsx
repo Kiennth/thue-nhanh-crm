@@ -512,7 +512,9 @@ function LineRow({
     >
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
-          <p className="font-medium">{line.typeName}</p>
+          <Link href={`/equipment/${line.typeId}`} className="font-medium text-primary hover:underline">
+            {line.typeName}
+          </Link>
           <p className="text-xs text-muted-foreground">{line.tracking === "individual" ? "Theo serial" : "Theo số lượng"}</p>
         </div>
         {line.units.length > 0 && (
