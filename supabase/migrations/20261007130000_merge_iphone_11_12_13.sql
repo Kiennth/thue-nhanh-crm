@@ -1,0 +1,11 @@
+-- Gộp iPhone đợt 2 (CEO 2026-10-07, đã áp trực tiếp qua REST — file ghi lại
+-- cho lịch sử repo). Mỗi cặp → 1 mã, biến thể theo cỡ:
+--   iPhone 12 Pro / Pro Max  (giữ Pro Max)  600k  cọc 2tr
+--   iPhone 12 / 12 Mini      (giữ 12)       500k  cọc 1tr   biến thể "Bản thường"/"Mini"
+--   iPhone 11 Pro / Pro Max  (giữ Pro Max)  600k → CEO chỉnh 400k; cọc 2tr (11 Pro trước 1tr — lấy mức cao, không đơn mở nào bị ảnh hưởng)
+--   iPhone 13 Pro / Pro Max  (giữ Pro Max)  700k  cọc 2tr
+--   iPhone 13 / 13 Mini      (giữ 13)       600k  cọc 1tr   (CEO nhắn "13 Pro Max và 13" rồi "13 và 13 mini" → hiểu là Pro+Pro Max và thường+Mini)
+-- Máy + toàn bộ dòng đơn sang mã giữ, máy gắn biến thể cỡ; slug thue-iphone-<…>-pro-pro-max / -<n>-<n>-mini + 301.
+-- Cùng ngày: cọc ghi trong mô tả web mọi iPhone đồng bộ theo CRM (CEO "cọc lấy theo CRM, tao sửa sau"): 11 mã lệch đã sửa vi+en.
+-- Sao lưu scratchpad backup-iphone-batch2-2026-10-07.json.
+select 1;
