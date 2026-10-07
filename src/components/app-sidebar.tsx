@@ -12,6 +12,7 @@ import {
   FileText,
   Gift,
   GraduationCap,
+  Handshake,
   Globe,
   HandCoins,
   House,
@@ -109,6 +110,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: Receipt,
     tile: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
     active: "data-active:bg-amber-500/15 data-active:text-amber-700 dark:data-active:text-amber-300",
+  },
+  "/suppliers": {
+    icon: Handshake,
+    tile: "bg-lime-500/15 text-lime-700 dark:text-lime-400",
+    active: "data-active:bg-lime-500/15 data-active:text-lime-800 dark:data-active:text-lime-300",
   },
   "/training": {
     icon: GraduationCap,

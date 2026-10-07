@@ -41,6 +41,9 @@ export const TRAINING_MANAGE_ROLES: UserRole[] = ["giam_doc", "admin"];
 // Người đặt hàng (CEO 2026-10-05): danh bạ người liên hệ đặt đơn để chăm
 // sóc mối quan hệ — Giám đốc/Admin/Kế toán/Cửa hàng trưởng xem.
 export const ORDERER_VIEW_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
+// Nhà cung cấp (CEO 2026-10-07): xem/thêm/sửa — Giám đốc/Admin/Kế toán/Cửa
+// hàng trưởng (người đi mua hàng); xoá chỉ MANAGE_ROLES. Khớp RLS suppliers.
+export const SUPPLIER_ROLES: UserRole[] = ["giam_doc", "admin", "ke_toan", "cua_hang_truong"];
 
 export interface NavItem {
   href: string;
@@ -61,7 +64,8 @@ export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] 
   { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/website", "/calendar", "/equipment-categories"] },
   // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
   { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
-  { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses"] },
+  // Nhà cung cấp cạnh Chi phí — nơi trả tiền mua máy / dịch vụ (CEO 2026-10-07).
+  { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses", "/suppliers"] },
   {
     key: "nhan_su",
     label: "Nhân sự",
@@ -182,6 +186,11 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/expenses",
     label: "Chi phí",
     roles: [...EXPENSE_ROLES],
+  },
+  {
+    href: "/suppliers",
+    label: "Nhà cung cấp",
+    roles: [...SUPPLIER_ROLES],
   },
   {
     href: "/training",

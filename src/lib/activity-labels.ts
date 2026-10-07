@@ -18,6 +18,7 @@ export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   bonus_tiers: "Bậc thưởng",
   task_weights: "Trọng số khâu",
   reward_entries: "Thưởng đột xuất",
+  suppliers: "Nhà cung cấp",
 };
 
 export const ACTIVITY_TABLE_OPTIONS = Object.entries(ACTIVITY_TABLE_LABELS).map(([value, label]) => ({
@@ -55,6 +56,7 @@ export function getActivityRecordLabel(
       const methodLabel = method ? (PAYMENT_METHOD_LABELS[method] ?? String(method)) : "";
       return [amount, methodLabel].filter(Boolean).join(" · ");
     }
+    case "suppliers":
     case "customers":
     case "employees":
     case "branches":
