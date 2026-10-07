@@ -868,10 +868,15 @@ export async function duplicateOrder(id: string, newStartAt?: string): Promise<A
   const { data: sourceLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information, note, delivery_method",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, requested_unit_id, quantity, unit_price, line_total, charge_duration, extra_information, note, delivery_method",
     )
     .eq("order_id", id)
     .order("position");
+  const srcInstanceIds = (sourceLines ?? []).map((l) => l.equipment_instance_id).filter((x): x is string => !!x);
+  const { data: srcInstances } = srcInstanceIds.length
+    ? await supabase.from("equipment_instances").select("id, equipment_unit_id").in("id", srcInstanceIds)
+    : { data: [] as { id: string; equipment_unit_id: string | null }[] };
+  const unitOfInstance = new Map((srcInstances ?? []).map((i) => [i.id, i.equipment_unit_id]));
 
   if (linesError) {
     return { error: "Không đọc được dòng hàng gốc: " + linesError.message };
@@ -926,6 +931,9 @@ export async function duplicateOrder(id: string, newStartAt?: string): Promise<A
       // Máy serial: đơn mới để trống serial (kiểu Booqable) — gán lại lúc
       // giao vì khung thuê mới có thể trùng lịch máy cũ. Món combo giữ máy.
       equipment_instance_id: line.parent_line_id ? line.equipment_instance_id : null,
+      requested_unit_id:
+        line.requested_unit_id ??
+        (line.equipment_instance_id ? (unitOfInstance.get(line.equipment_instance_id) ?? null) : null),
       quantity: line.quantity,
       unit_price: line.unit_price,
       line_total: line.line_total,
@@ -1652,6 +1660,10 @@ async function insertEquipmentLine(
         equipment_type_id: item.typeId,
         equipment_unit_id: null,
         equipment_instance_id: null,
+        // Biến thể khách chọn (vd "SAMSUNG M7") — dòng serial không dùng
+        // equipment_unit_id, giữ ở requested_unit_id để hiện ảnh/tên và gán
+        // đúng máy (CEO 2026-10-07, PO13160).
+        requested_unit_id: item.unitId ?? null,
         quantity: 1,
         unit_price: computed.unitPrice,
         line_total: computed.lineTotal,
@@ -2832,7 +2844,7 @@ async function loadSwapContext(
 ): Promise<SwapContext | { error: string }> {
   const { data: line } = await supabase
     .from("order_equipment")
-    .select("order_id, equipment_type_id, equipment_instance_id, equipment_types(tracking_type)")
+    .select("order_id, equipment_type_id, equipment_instance_id, requested_unit_id, equipment_types(tracking_type)")
     .eq("id", lineId)
     .single();
   const tracking = (line?.equipment_types as unknown as { tracking_type: string } | null)?.tracking_type;
@@ -2855,7 +2867,7 @@ async function loadSwapContext(
 
   let instanceQuery = supabase
     .from("equipment_instances")
-    .select("id, identifier_code, status, branch_id, equipment_units(brand_model)")
+    .select("id, identifier_code, status, branch_id, equipment_unit_id, equipment_units(brand_model)")
     .eq("equipment_type_id", line.equipment_type_id)
     .neq("status", "disposed");
   if (line.equipment_instance_id) instanceQuery = instanceQuery.neq("id", line.equipment_instance_id);
@@ -2911,7 +2923,11 @@ async function loadSwapContext(
     const variant = (r.equipment_units as unknown as { brand_model: string } | null)?.brand_model;
     const label = variant ? `${r.identifier_code} · ${variant}` : r.identifier_code;
     let reason: string | null = null;
-    if (r.status === "maintenance") reason = "Đang bảo trì";
+    // Khách đã chọn biến thể (vd SAMSUNG M7) → máy biến thể khác không chọn
+    // được (CEO 2026-10-07, PO13160 bị tự gán máy ACER).
+    if (line.requested_unit_id && r.equipment_unit_id && r.equipment_unit_id !== line.requested_unit_id)
+      reason = `Khác biến thể (${variant ?? "khác"})`;
+    else if (r.status === "maintenance") reason = "Đang bảo trì";
     else if (clash.has(r.id)) reason = clash.get(r.id)!;
     else if (mode === "live" && r.status !== "available") reason = "Đang ở chỗ khách";
     else if (r.branch_id && r.branch_id !== order.pickup_branch_id)
@@ -3012,6 +3028,7 @@ type CloneableLine = {
   order_id: string;
   equipment_type_id: string | null;
   equipment_instance_id: string | null;
+  requested_unit_id: string | null;
   parent_line_id: string | null;
   quantity: number;
   unit_price: number;
@@ -3035,7 +3052,7 @@ async function loadEditableLines(
   const { data } = await supabase
     .from("order_equipment")
     .select(
-      "id, order_id, equipment_type_id, equipment_instance_id, parent_line_id, quantity, unit_price, line_total, charge_duration, extra_information, position",
+      "id, order_id, equipment_type_id, equipment_instance_id, requested_unit_id, parent_line_id, quantity, unit_price, line_total, charge_duration, extra_information, position",
     )
     .in("id", lineIds)
     .order("position");
@@ -3084,6 +3101,7 @@ export async function setSerialGroupQuantity(lineIds: string[], quantity: number
         order_id: order.id,
         equipment_type_id: template.equipment_type_id,
         equipment_instance_id: null,
+        requested_unit_id: template.requested_unit_id,
         quantity: 1,
         unit_price: template.unit_price,
         line_total: template.line_total,
@@ -3241,7 +3259,7 @@ export async function extendOrder(
   const { data: srcLines, error: linesError } = await supabase
     .from("order_equipment")
     .select(
-      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, quantity, unit_price, line_total, charge_duration, extra_information, equipment_types(product_type, rental_period_unit)",
+      "id, parent_line_id, equipment_type_id, custom_name, equipment_unit_id, equipment_instance_id, requested_unit_id, quantity, unit_price, line_total, charge_duration, extra_information, equipment_types(product_type, rental_period_unit)",
     )
     .eq("order_id", orderId)
     .order("position");
@@ -3337,6 +3355,7 @@ export async function extendOrder(
     custom_name: l.custom_name,
     equipment_unit_id: l.equipment_unit_id,
     equipment_instance_id: l.equipment_instance_id,
+    requested_unit_id: l.requested_unit_id,
     quantity: l.quantity,
     ...scaled(l),
     charge_duration: null,

@@ -508,6 +508,7 @@ export interface Database {
           equipment_type_id: string | null;
           custom_name: string | null;
           equipment_unit_id: string | null;
+          requested_unit_id: string | null;
           equipment_instance_id: string | null;
           quantity: number;
           unit_price: number;
@@ -548,6 +549,7 @@ export interface Database {
           equipment_type_id?: string | null;
           custom_name?: string | null;
           equipment_unit_id?: string | null;
+          requested_unit_id?: string | null;
           equipment_instance_id?: string | null;
           quantity?: number;
           unit_price?: number;

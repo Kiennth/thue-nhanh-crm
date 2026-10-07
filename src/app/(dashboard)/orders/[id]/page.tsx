@@ -136,7 +136,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url",
       )
       .order("name"),
-    supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
+    supabase.from("equipment_units").select("id, equipment_type_id, brand_model, image_url"),
     supabase.from("equipment_stock").select("equipment_unit_id, branch_id, quantity_in_stock"),
     supabase
       .from("pricing_template_tiers")
@@ -909,12 +909,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       type: EqType | undefined,
                       fallbackName: string | null,
                       below: React.ReactNode,
+                      imageOverride?: string | null,
                     ) => (
                       <TableCell className="whitespace-normal">
                         <div className="flex items-start gap-2.5">
-                          {type?.image_url ? (
+                          {(imageOverride ?? type?.image_url) ? (
                             // eslint-disable-next-line @next/next/no-img-element -- ảnh Supabase storage, cùng convention trang thiết bị
-                            <img src={type.image_url} alt="" className="size-9 shrink-0 rounded object-cover" />
+                            <img src={(imageOverride ?? type?.image_url)!} alt="" className="size-9 shrink-0 rounded object-cover" />
                           ) : (
                             <span className="bg-muted size-9 shrink-0 rounded" />
                           )}
@@ -1138,7 +1139,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         !DELIVERY_NOTE_TYPE_IDS.has(line.equipment_type_id)
                       );
                     };
-                    const groupKey = (line: Line) => `${line.equipment_type_id}|${line.unit_price}`;
+                    // Gom theo cả biến thể yêu cầu — 2 dòng M7 và ACER của cùng mã tách riêng.
+                    const groupKey = (line: Line) =>
+                      `${line.equipment_type_id}|${line.unit_price}|${line.requested_unit_id ?? ""}`;
                     const groupMembers = new Map<string, Line[]>();
                     for (const line of lines) {
                       if (!isGroupable(line)) continue;
@@ -1150,6 +1153,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       const type = equipmentTypeById.get(first.equipment_type_id!)!;
                       const memberIds = members.map((m) => m.id);
                       const unassignedIds = members.filter((m) => !m.equipment_instance_id).map((m) => m.id);
+                      // Biến thể khách yêu cầu (lưu lúc lên đơn) → hiện tên + ảnh biến thể;
+                      // chưa có thì lấy biến thể chung của các máy đã gán (nếu cùng 1 biến thể).
+                      const requestedUnit = first.requested_unit_id
+                        ? equipmentUnitById.get(first.requested_unit_id)
+                        : undefined;
+                      const assignedUnitIds = [
+                        ...new Set(
+                          members
+                            .map((m) => (m.equipment_instance_id ? equipmentInstanceById.get(m.equipment_instance_id)?.equipment_unit_id : null))
+                            .filter((u): u is string => !!u),
+                        ),
+                      ];
+                      const shownUnit =
+                        requestedUnit ?? (assignedUnitIds.length === 1 ? equipmentUnitById.get(assignedUnitIds[0]) : undefined);
+                      const groupImage = (shownUnit as { image_url?: string | null } | undefined)?.image_url ?? null;
                       const chips = members.filter((m) => m.equipment_instance_id).map((m) => {
                         const inst = equipmentInstanceById.get(m.equipment_instance_id!);
                         const variant = inst?.equipment_unit_id
@@ -1172,6 +1190,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               type,
                               null,
                               <>
+                                {requestedUnit && (unitCountByType.get(type.id) ?? 0) > 1 && (
+                                  <p className="text-xs">
+                                    <span className="rounded bg-violet-500/12 px-1.5 py-0.5 font-semibold text-violet-800 dark:text-violet-300">
+                                      Biến thể: {requestedUnit.brand_model}
+                                    </span>
+                                  </p>
+                                )}
                                 <SerialChipList
                                   items={chips}
                                   unassignedLineIds={unassignedIds}
@@ -1195,6 +1220,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                   canEdit={canNote}
                                 />
                               </>,
+                              groupImage,
                             )}
                             {availabilityCell(null, false)}
                             <TableCell className="tabular-nums">
