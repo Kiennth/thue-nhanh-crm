@@ -253,7 +253,7 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
                     // Khớp tiền tố DÀI nhất: ở /website/blog chỉ sáng "Blog", không sáng "Website".
                     active={
                       pathname.startsWith(item.href) &&
-                      !NAV_ITEMS.some(
+                      !items.some(
                         (o) => o.href.length > item.href.length && o.href.startsWith(item.href) && pathname.startsWith(o.href),
                       )
                     }

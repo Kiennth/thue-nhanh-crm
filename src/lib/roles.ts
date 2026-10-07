@@ -121,12 +121,6 @@ export const SETTINGS_ITEMS: NavItem[] = [
     label: "Nhật ký hoạt động",
     roles: [...MANAGE_ROLES],
   },
-  {
-    href: "/website/blog",
-    label: "Blog",
-    // Viết bài blog web thuenhanh.vn/blog (CEO 2026-10-08) — mục riêng dưới Website.
-    roles: [...BLOG_ROLES],
-  },
 ];
 
 export const NAV_ITEMS: NavItem[] = [
@@ -223,5 +217,11 @@ export const NAV_ITEMS: NavItem[] = [
     // Quản trị nội dung web công khai new.thuenhanh.vn (CEO 2026-08-16) —
     // cùng bộ role được sửa equipment_types/website_* theo RLS.
     roles: [...MANAGE_ROLES],
+  },
+  {
+    href: "/website/blog",
+    label: "Blog",
+    // Viết bài blog web thuenhanh.vn/blog (CEO 2026-10-08) — mục riêng dưới Website.
+    roles: [...BLOG_ROLES],
   },
 ];
