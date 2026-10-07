@@ -47,7 +47,7 @@ export async function shrinkImage(file: File): Promise<File> {
 }
 
 // Soạn bài blog — xuất HTML vào hidden input. H2 của bài thành mục lục tự
-// động trên web, nên chia bài bằng "Tiêu đề lớn".
+// động trên web, nên chia bài bằng "Tiêu đề lớn" (hoặc gõ "## " đầu dòng).
 export function BlogEditor({ name, defaultValue }: { name: string; defaultValue?: string }) {
   const [html, setHtml] = useState(defaultValue ?? "");
   const [, setSelectionTick] = useState(0);
@@ -100,7 +100,15 @@ export function BlogEditor({ name, defaultValue }: { name: string; defaultValue?
   }
 
   const toolBtn = (active: boolean, onClick: () => void, icon: React.ReactNode, label: string) => (
-    <Button type="button" variant={active ? "secondary" : "ghost"} size="icon-sm" onClick={onClick} title={label}>
+    <Button
+      type="button"
+      variant={active ? "secondary" : "ghost"}
+      size="icon-sm"
+      // Không cho nút giành focus khỏi khung soạn — bấm H2 rồi gõ tiếp được ngay.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      title={label}
+    >
       {icon}
       <span className="sr-only">{label}</span>
     </Button>
