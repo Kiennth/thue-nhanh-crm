@@ -1,0 +1,18 @@
+-- Gộp MacBook Air 13/15 inch thành 1 mã có biến thể "13 inch" / "15 inch"
+-- (CEO 2026-10-07, đã áp trực tiếp qua REST — file ghi lại cho lịch sử repo;
+-- chạy lại không cần thiết). Mỗi cặp cùng giá + cọc:
+--   MacBook Air M5 16GB RAM  (giữ 13", xoá 15")  800.000   cọc 10tr
+--   MacBook Air M5 24GB RAM  (giữ 13", xoá 15")  900.000   cọc 10tr
+--   MacBook Air M5 32GB RAM  (giữ 13", xoá 15")  1.000.000 cọc 10tr
+--   MacBook Air M4 16GB RAM  (giữ 13", xoá 15")  700.000   cọc 10tr
+--   MacBook Air M3 16GB RAM  (giữ 15" — 11 máy lịch sử + 11 dòng đơn, xoá 13") 600.000 cọc 10tr
+--   MacBook Air M2 16GB RAM  (giữ 13" — 7 máy, 57 dòng đơn, xoá 15") 500.000 cọc 5tr
+-- Mã xoá đều không có máy/dòng đơn. Máy của mã giữ gắn biến thể đúng cỡ.
+-- Web: slug mới thue-macbook-air-<chip>-<ram>gb-ram, mô tả ghép 2 cỡ (dòng
+-- thông số lệch ghi "13 inch: … · 15 inch: …"), 301 cả 2 slug cũ.
+-- M1 8GB/16GB chỉ có 13 inch: đổi tên bỏ " 13 inch" (giữ biến thể màu),
+-- slug thue-macbook-air-m1-<ram>gb-ram + 301. Sao lưu scratchpad
+-- backup-macbook-air-2026-10-07.json.
+-- Cùng ngày: phụ kiện đi kèm "Sạc | Cable | Ốp lưng" cho 16 mã iPad + 48 mã
+-- MacBook (equipment_types.default_extra_information; trừ "Giá đỡ iPad").
+select 1;
