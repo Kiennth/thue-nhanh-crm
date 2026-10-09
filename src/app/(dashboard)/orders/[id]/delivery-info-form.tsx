@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateOrderDeliveryInfo } from "@/lib/actions/orders";
 import type { DeliveryContact } from "@/lib/delivery-contact";
+import { useUnsavedSection, UNSAVED_RING } from "@/components/unsaved-changes";
+import { cn } from "@/lib/utils";
 
 type Contact = { address: string; name: string; phone: string };
 
@@ -55,6 +57,12 @@ export function DeliveryInfoForm({
         ret.name !== (returnContact.name ?? "") ||
         ret.phone !== (returnContact.phone ?? "")));
 
+  // Thanh "chưa lưu" chỉ tính khi nhân viên tự sửa so với lúc mở trang — địa
+  // chỉ GỢI Ý điền sẵn (chưa lưu) không bắt người dùng lưu mới được rời trang.
+  const [openedKey] = useState(() => JSON.stringify([values, sameReturn, ret]));
+  const editedSinceOpen = dirty && JSON.stringify([values, sameReturn, ret]) !== openedKey;
+  useUnsavedSection("delivery", "Giao nhận", editedSinceOpen, () => save());
+
   function save() {
     startTransition(async () => {
       const result = await updateOrderDeliveryInfo(orderId, {
@@ -78,7 +86,7 @@ export function DeliveryInfoForm({
       setter((v) => ({ ...v, [key]: e.target.value }));
 
   return (
-    <div className="mt-4 space-y-3 border-t pt-4">
+    <div className={cn("mt-4 space-y-3 border-t pt-4", editedSinceOpen && UNSAVED_RING)}>
       <p className="flex items-center gap-1.5 text-sm font-medium">
         <Truck className="size-4 text-sky-600" />
         Giao hàng

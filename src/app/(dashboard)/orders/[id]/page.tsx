@@ -88,6 +88,7 @@ import { LineNoteEditor } from "./line-note-editor";
 import { ORDER_LINES_TABLE_CLASS } from "./order-lines-table-style";
 import { countAssemblableSets } from "@/lib/combo";
 import { BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES, ORDERER_VIEW_ROLES } from "@/lib/roles";
+import { UnsavedChangesProvider } from "@/components/unsaved-changes";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -717,6 +718,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     !!order.rental_end_at;
 
   return (
+    <UnsavedChangesProvider>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -1859,5 +1861,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         canDelete={employee?.role === "giam_doc"}
       />
     </div>
+    </UnsavedChangesProvider>
   );
 }

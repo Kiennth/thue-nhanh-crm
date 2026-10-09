@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { overrideOrderTotal } from "@/lib/actions/orders";
+import { useUnsavedSection } from "@/components/unsaved-changes";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
@@ -44,6 +45,8 @@ export function OrderDiscountForm({
       : Math.round(raw);
   const remaining = totalValue - discount;
   const tooLarge = discount > rentalSubtotal;
+
+  useUnsavedSection("discount", "Giảm giá", amount.trim() !== "", () => handleSubmit());
 
   function handleSubmit() {
     setError(null);

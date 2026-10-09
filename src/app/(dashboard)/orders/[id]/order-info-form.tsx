@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { updateOrderContactInfo } from "@/lib/actions/orders";
 import { CustomerCombobox } from "../customer-combobox";
 import { OrdererSuggestInput, fillOrdererFields } from "@/components/orderer-suggest-input";
+import { useUnsavedSection, UNSAVED_RING } from "@/components/unsaved-changes";
+import { cn } from "@/lib/utils";
 
 interface OrderInfoFormProps {
   orderId: string;
@@ -34,6 +36,16 @@ export function OrderInfoForm({
   const [success, setSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  // Thanh "chưa lưu": so giá trị form hiện tại với lúc mở/lưu gần nhất.
+  const snapRef = useRef("");
+  const [dirty, setDirty] = useState(false);
+  const snapshot = () =>
+    formRef.current ? JSON.stringify([...new FormData(formRef.current)].map(([k, v]) => [k, String(v)])) : "";
+  useEffect(() => {
+    snapRef.current = snapshot();
+  }, []);
+  const recheck = () => setTimeout(() => setDirty(snapshot() !== snapRef.current), 0);
+  useUnsavedSection("order-info", "Khách & người đặt", dirty, () => formRef.current?.requestSubmit());
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -44,12 +56,21 @@ export function OrderInfoForm({
         setError(result.error);
       } else {
         setSuccess(true);
+        snapRef.current = snapshot();
+        setDirty(false);
       }
     });
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="col-span-2 space-y-3">
+    <form
+      ref={formRef}
+      action={handleSubmit}
+      onInput={recheck}
+      onChange={recheck}
+      onClick={recheck}
+      className={cn("col-span-2 space-y-3", dirty && UNSAVED_RING)}
+    >
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <div className="flex items-center justify-between">

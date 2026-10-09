@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,6 +18,8 @@ import {
   hoursBetween,
 } from "@/lib/rental-pricing";
 import { DateInput } from "@/components/date-input";
+import { useUnsavedSection, UNSAVED_RING } from "@/components/unsaved-changes";
+import { cn } from "@/lib/utils";
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 
@@ -106,18 +108,28 @@ export function RentalPeriodForm({
       ? computeRentalDurationInUnit(startAtDate.toISOString(), endAtDate.toISOString(), "day")
       : 0;
 
+  // Thanh "chưa lưu": so thời gian đang chọn với lúc mở/lưu gần nhất.
+  const formRef = useRef<HTMLFormElement>(null);
+  const currentKey = `${startAtDate.toISOString()}|${endAtDate?.toISOString() ?? ""}`;
+  const [savedKey, setSavedKey] = useState(currentKey);
+  const dirty = currentKey !== savedKey;
+  useUnsavedSection("rental-period", "Thời gian thuê", dirty, () => formRef.current?.requestSubmit());
+
   function handleSubmit(formData: FormData) {
     setError(null);
+    const submittedKey = currentKey;
     startTransition(async () => {
       const result = await updateOrderRentalPeriod(orderId, undefined, formData);
       if (result && "error" in result) {
         setError(result.error);
+      } else {
+        setSavedKey(submittedKey);
       }
     });
   }
 
   return (
-    <form action={handleSubmit} className="space-y-3">
+    <form ref={formRef} action={handleSubmit} className={cn("space-y-3", dirty && UNSAVED_RING)}>
       <p className="text-xs text-muted-foreground">
         Áp dụng chung cho mọi thiết bị cho thuê trong đơn — bắt đầu và kết thúc cùng nhau. Đổi giờ bắt
         đầu thì giờ trả tự dời theo, giữ nguyên số ngày thuê.
