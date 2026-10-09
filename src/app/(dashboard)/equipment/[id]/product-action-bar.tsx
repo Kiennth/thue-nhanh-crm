@@ -65,7 +65,8 @@ export function ProductActionBar({
       }
       toast.success(ok);
       after?.();
-      router.refresh();
+      // Không router.refresh(): server action đã revalidatePath trang này nên
+      // phản hồi kèm sẵn trang mới — refresh thêm là dựng trang 2 lần (~4 giây).
     });
 
   const stop = () =>
@@ -82,13 +83,12 @@ export function ProductActionBar({
         toast.error(res.error);
         return;
       }
-      router.refresh();
       toast.success(next ? `Đã bật nhãn ${label}` : `Đã tắt nhãn ${label}`, {
         duration: 5000,
         action: {
           label: "Hoàn tác",
           onClick: () => {
-            void setEquipmentWebFlags(id, { [key]: !next }).then(() => router.refresh());
+            void setEquipmentWebFlags(id, { [key]: !next });
           },
         },
       });
