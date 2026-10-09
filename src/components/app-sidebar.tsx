@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -31,6 +32,7 @@ import {
   UsersRound,
   type LucideIcon,
   Newspaper,
+  ChevronDown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -197,8 +199,46 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   );
 }
 
+// Nhóm menu thu gọn được (đề xuất CRM v2 §4.1): bấm tên nhóm để gập/mở, máy
+// nhớ lựa chọn (localStorage). Mặc định MỞ HẾT như cũ (CEO 2026-10-05).
+const COLLAPSED_KEY = "sidebar-collapsed-sections";
+const collapsedEvent = "sidebar-collapsed-change";
+function readCollapsed(): string {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+function useCollapsedSections() {
+  const raw = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener(collapsedEvent, cb);
+      window.addEventListener("storage", cb);
+      return () => {
+        window.removeEventListener(collapsedEvent, cb);
+        window.removeEventListener("storage", cb);
+      };
+    },
+    readCollapsed,
+    () => "",
+  );
+  const collapsed = new Set(raw.split(",").filter(Boolean));
+  const toggle = (key: string) => {
+    const next = new Set(collapsed);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, [...next].join(","));
+    } catch {}
+    window.dispatchEvent(new Event(collapsedEvent));
+  };
+  return { collapsed, toggle };
+}
+
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
+  const { collapsed, toggle } = useCollapsedSections();
   // Mục quản trị (Chi nhánh, Nhân viên, Chính sách khoán…) lên nav chính luôn
   // (CEO 2026-10-05); menu Cài đặt ở footer vẫn giữ làm lối tắt.
   const items = [...NAV_ITEMS, ...SETTINGS_ITEMS].filter((item) => item.roles.includes(employee.role));
@@ -240,12 +280,28 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         </SidebarGroup>
         {sections.map((section) => (
           <SidebarGroup key={section.key} className="py-1">
-            <SidebarGroupLabel className="h-7 text-[12px] font-bold tracking-[0.1em] text-sidebar-foreground/60 uppercase">
+            <SidebarGroupLabel
+              render={
+                <button
+                  type="button"
+                  onClick={() => toggle(section.key)}
+                  aria-expanded={!collapsed.has(section.key)}
+                />
+              }
+              className="h-7 w-full cursor-pointer justify-between text-[12px] font-bold tracking-[0.1em] text-sidebar-foreground/60 uppercase hover:text-sidebar-foreground"
+            >
               {section.label}
+              <ChevronDown
+                className={`size-3.5 transition-transform ${collapsed.has(section.key) ? "-rotate-90" : ""}`}
+                aria-hidden
+              />
             </SidebarGroupLabel>
+            {/* Nhóm đang gập vẫn hiện mục của trang đang mở để biết mình ở đâu. */}
             <SidebarGroupContent>
               <SidebarMenu className="gap-1">
-                {section.items.map((item) => (
+                {section.items
+                  .filter((item) => !collapsed.has(section.key) || pathname.startsWith(item.href))
+                  .map((item) => (
                   <NavLink
                     key={item.href}
                     href={item.href}

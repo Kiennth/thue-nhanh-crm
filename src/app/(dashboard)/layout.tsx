@@ -7,6 +7,8 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { QuickOrderFab } from "@/components/quick-order-fab";
 import { HeaderClock } from "./header-clock";
+import { CommandPalette } from "@/components/command-palette";
+import { NAV_ITEMS, SETTINGS_ITEMS } from "@/lib/roles";
 
 // Vị trí theo IP người dùng — Cloudflare edge đã tự phân giải geo-IP cho mọi
 // request (cf.city/cf.country), không cần gọi API bên thứ ba hay lộ IP ra
@@ -49,6 +51,11 @@ export default async function DashboardLayout({
           <span className="text-sm text-muted-foreground">
             Xin chào, {employee.name}
           </span>
+          <CommandPalette
+            pages={[{ href: "/", label: "Trang chủ" }, ...NAV_ITEMS, ...SETTINGS_ITEMS]
+              .filter((i) => !("roles" in i) || i.roles.includes(employee.role))
+              .map(({ href, label }) => ({ href, label }))}
+          />
           <HeaderClock location={location} />
         </header>
         {/* pb-24: chừa chỗ cho nút nổi Tạo đơn nhanh không che nội dung cuối trang. */}
