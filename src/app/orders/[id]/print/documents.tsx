@@ -240,6 +240,9 @@ const QUOTE_TEXT = {
     refundText:
       "Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có) sau khi bên B trả lại thiết bị cho bên A, tối đa 24h làm việc.",
     terms: "Điều khoản",
+    noDeposit: "Không áp dụng ký quỹ",
+    payMonthlyNoDeposit: (first: string) =>
+      `Kỳ 1 (${first} VNĐ, gồm phí giao/thu hồi nếu có) thanh toán ngay sau khi nhận báo giá để giữ chỗ. Các kỳ sau thanh toán vào ĐẦU mỗi kỳ, trước ngày ghi trong lịch thanh toán.`,
   },
   en: {
     title: "QUOTATION",
@@ -315,6 +318,9 @@ const QUOTE_TEXT = {
     refundText:
       "Party A refunds the deposit by bank transfer (less any incurred costs) within 24 working hours after Party B returns the equipment.",
     terms: "Terms",
+    noDeposit: "No security deposit",
+    payMonthlyNoDeposit: (first: string) =>
+      `Period 1 (${first} VND, including delivery/collection fees if any) is paid upon receiving this quotation to reserve the equipment. Later periods are paid at the START of each period, by the due date in the schedule.`,
   },
 } as const;
 
@@ -514,7 +520,7 @@ export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "v
               <tr className="font-bold">
                 <Td />
                 <Td colSpan={6}>{T.deposit}</Td>
-                <Td className="text-right">{f(totals.deposit)}</Td>
+                <Td className="text-right">{totals.deposit > 0 ? f(totals.deposit) : T.noDeposit}</Td>
               </tr>
             </tbody>
           </table>
@@ -592,7 +598,15 @@ export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "v
           <b>{m ? T.contractTotal(months) : T.rentalLine}:</b> {f(totals.rentalWithVat)} {cur}{words(totals.rentalWithVat)}.
         </p>
         <p>
-          <b>{T.depositLine}:</b> {f(totals.deposit)} {cur}{words(totals.deposit)}./.{T.depositNote}
+          <b>{T.depositLine}:</b>{" "}
+          {totals.deposit > 0 ? (
+            <>
+              {f(totals.deposit)} {cur}
+              {words(totals.deposit)}./.{T.depositNote}
+            </>
+          ) : (
+            T.noDeposit
+          )}
         </p>
         <p>
           <b>{T.pickup}:</b> {pickupText}
@@ -608,16 +622,19 @@ export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "v
         </p>
         {m ? (
           <p>
-            <b>{T.payMonthlyLabel}:</b> {T.payMonthly(f(firstPeriod))}
+            <b>{T.payMonthlyLabel}:</b>{" "}
+            {totals.deposit > 0 ? T.payMonthly(f(firstPeriod)) : T.payMonthlyNoDeposit(f(firstPeriod))}
           </p>
         ) : (
           <>
             <p>
               <b>{T.pay1Label}:</b> {T.pay1(f(totals.rentalWithVat), vndToWords(totals.rentalWithVat))}
             </p>
-            <p>
-              <b>{T.pay2Label}:</b> {T.pay2(f(totals.deposit), vndToWords(totals.deposit))}
-            </p>
+            {totals.deposit > 0 && (
+              <p>
+                <b>{T.pay2Label}:</b> {T.pay2(f(totals.deposit), vndToWords(totals.deposit))}
+              </p>
+            )}
           </>
         )}
         <p>
@@ -640,9 +657,11 @@ export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "v
             <PaymentQr orderCode={ctx.orderCode} amount={totals.deposit} deposit label={m ? T.depositLine : T.qr2} size={120} lang={lang} />
           )}
         </div>
-        <p>
-          <b>{T.refund}:</b> {T.refundText}
-        </p>
+        {totals.deposit > 0 && (
+          <p>
+            <b>{T.refund}:</b> {T.refundText}
+          </p>
+        )}
         <p className="pt-1 font-bold">{T.terms}</p>
         <ul className="list-disc pl-5">
           {QUOTE_TERMS[lang].map((t) => (

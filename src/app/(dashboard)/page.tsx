@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { vnDayKey, vnDayStartIso } from "@/lib/vn-day";
 import { BranchComparisonSection, previousMonthOf } from "@/components/branch-comparison";
@@ -109,16 +110,10 @@ export default async function DashboardHomePage({
     return [dayAfterStr, nextMonthOfMonth, `${Number(year) + 1}-01-01`].sort().reverse()[0];
   })();
 
-  const supabase = await createClient();
-
   // Kỳ của khối Lợi nhuận gộp — Năm nay/Năm trước cộng dồn quỹ lương TỪNG
   // THÁNG (bậc thưởng chỉ có ý nghĩa xét theo tổng khoán TRONG THÁNG); Năm
   // hiện tại dừng ở tháng hiện tại (YTD) để khớp vế doanh thu và không cộng
   // trước chi phí định kỳ của tháng chưa tới.
-  const nextMonthOf = (ym: string) => {
-    const [y, m] = ym.split("-").map(Number);
-    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-  };
   let profitMonths: string[] = [month];
   if (profitPeriod === "prevMonth") {
     profitMonths = [previousMonthOf(month)];
@@ -132,125 +127,114 @@ export default async function DashboardHomePage({
     );
   }
 
-  const [
-    branchList,
-    orders,
-    ordersToHandle,
-    myPerformance,
-    payrollByMonth,
-    myTrend,
-    branchOrdersOverview,
-    periodExpensesRes,
-    recurringDefsRes,
-  ] = await Promise.all([
+  const branchListPromise = createClient().then((supabase) =>
     supabase.from("branches").select("id, name").order("position"),
-    canViewBranchComparison
-      ? fetchAllRows<{ pickup_branch_id: string; delivered_at: string; total_value: number }>(
-          (from, to) =>
-            supabase
-              .from("orders")
-              .select("pickup_branch_id, delivered_at, total_value")
-              // Đơn huỷ không phải doanh thu; doanh số ghi nhận khi ĐÃ GIAO
-              // HÀNG và GỒM VAT (CEO 2026-09-02, thay quy tắc đơn-hoàn-tất
-              // 2026-08-08) — lưu ý lãi/lỗ gộp vì thế cũng gồm phần VAT 8%.
-              .is("cancelled_at", null)
-              .not("delivered_at", "is", null)
-              // BranchComparisonSection chỉ đọc lại đúng 3 mốc Ngày/Tháng/
-              // Năm đang chọn — trước đây fetch NGUYÊN bảng orders all-time
-              // (10.020 dòng) chỉ để dùng khoảng này.
-              // Ghi vào NGÀY GIAO (CEO 2026-10-05) — order_date bên dưới là
-              // ngày giao giờ VN, giữ tên trường cho các hàm revenueFor*.
-              .gte("delivered_at", vnDayStartIso(comparisonRangeStart))
-              .lt("delivered_at", vnDayStartIso(comparisonRangeEndExclusive))
-              .range(from, to),
-        ).then((rows) =>
-          rows.map((o) => ({
-            pickup_branch_id: o.pickup_branch_id,
-            order_date: vnDayKey(o.delivered_at),
-            total_value: Math.round(o.total_value * 1.08 * 100) / 100,
-          })),
-        )
-      : Promise.resolve([]),
+  );
+
+  // Trang chủ STREAM theo khối (CEO 2026-10-09 "CRM vô chậm lắm" — trước chờ
+  // CẢ 9 phần, gồm tính bảng lương toàn công ty cho Lợi nhuận gộp, mới hiện
+  // trang ~3,5s): khung + từng khối tự hiện khi xong, khối chậm có khung chờ.
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Trang chủ</h1>
+        <p className="text-sm text-muted-foreground">
+          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
+        </p>
+      </div>
+
+      {/* CEO chốt 2026-08-08: "Thu nhập của bạn" xuống DƯỚI CÙNG trang chủ
+          cho MỌI vai trò — đơn hàng và so sánh chi nhánh mới là thứ cần thấy
+          ngay khi mở app. 4 thẻ KPI (đề xuất CRM v2) thay 2 thanh báo Đơn
+          web / Thiếu hàng cũ; người không xem số tiền thấy "Hôm nay giao". */}
+      <Suspense fallback={<BlockSkeleton className="h-28" />}>
+        <HomeKpiCards branchId={branchId} canSeeMoney={canManage || isBranchManager} />
+      </Suspense>
+
+      <Suspense fallback={<BlockSkeleton className="h-96" />}>
+        <OrdersBlock
+          handleBranchId={handleBranchId}
+          upcomingDateRange={upcomingDateRange}
+          returningDateRange={returningDateRange}
+          upcomingLateActive={upcomingLateActive}
+          returningLateActive={returningLateActive}
+          upcomingRangePreset={upcomingRangePreset}
+          returningRangePreset={returningRangePreset}
+          now={now}
+          branchOverviewId={isBranchManager && branchId ? branchId : null}
+          branchListPromise={branchListPromise}
+        />
+      </Suspense>
+
+      {canViewBranchComparison && (
+        <Suspense fallback={<BlockSkeleton className="h-96" />}>
+          <ComparisonBlock
+            day={day}
+            month={month}
+            year={year}
+            profitPeriod={profitPeriod}
+            profitMonths={profitMonths}
+            comparisonRangeStart={comparisonRangeStart}
+            comparisonRangeEndExclusive={comparisonRangeEndExclusive}
+            branchListPromise={branchListPromise}
+          />
+        </Suspense>
+      )}
+
+      <Suspense fallback={<BlockSkeleton className="h-40" />}>
+        <IncomeBlock
+          employeeId={employee.id}
+          employeeBranchId={employee.branch_id}
+          baseSalary={employee.base_salary}
+          withTrend={!(canManage || TECH_SALES_ROLES.includes(employee.role))}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+function BlockSkeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-xl border bg-muted/40 ${className ?? ""}`} />;
+}
+
+type BranchListPromise = Promise<{ data: { id: string; name: string }[] | null }>;
+
+// "Đơn hàng sắp tới"/"sắp về" + tổng quan đơn hàng chi nhánh (Cửa hàng trưởng).
+async function OrdersBlock({
+  handleBranchId,
+  upcomingDateRange,
+  returningDateRange,
+  upcomingLateActive,
+  returningLateActive,
+  upcomingRangePreset,
+  returningRangePreset,
+  now,
+  branchOverviewId,
+  branchListPromise,
+}: {
+  handleBranchId: string | null;
+  upcomingDateRange: ReturnType<typeof computeDateRange>;
+  returningDateRange: ReturnType<typeof computeDateRange>;
+  upcomingLateActive: boolean;
+  returningLateActive: boolean;
+  upcomingRangePreset: DateRangePreset;
+  returningRangePreset: DateRangePreset;
+  now: Date;
+  branchOverviewId: string | null;
+  branchListPromise: BranchListPromise;
+}) {
+  const [ordersToHandle, branchOrdersOverview, branchList] = await Promise.all([
     getOrdersToHandle(handleBranchId, HANDLE_LIMIT, {
       delivery: upcomingDateRange,
       collection: returningDateRange,
       lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
     }),
-    computeMyPerformance(employee.id, employee.branch_id, employee.base_salary),
-    // Chỉ khối Lợi nhuận gộp cần bảng lương theo tháng — khối Hiệu suất nhân
-    // viên đã bỏ khỏi trang chủ (CEO chốt 2026-08-01: số liệu đủ đầy ở Bảng
-    // lương rồi, không cần lặp lại).
-    canViewBranchComparison
-      ? Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m)))
-      : Promise.resolve(null),
-    // Xu hướng thu nhập cá nhân 6 tháng — chỉ cho nhân viên (quản lý đã có
-    // khối biểu đồ hiệu suất toàn công ty riêng). Bỏ luôn cho Kỹ thuật/Sales:
-    // tính 6 tháng payroll riêng lẻ quá nặng, kéo trang chủ chậm hẳn.
-    canManage || TECH_SALES_ROLES.includes(employee.role)
-      ? Promise.resolve(null)
-      : computeMyMonthlyTrend(employee.id),
     // Tổng quan đơn hàng (Tuần/Tháng/Năm + xu hướng) của RIÊNG chi nhánh mà
     // Cửa hàng trưởng phụ trách — Giám đốc đã có khối So sánh chi nhánh.
-    isBranchManager && branchId
-      ? computeOrdersOverview(branchId)
-      : Promise.resolve(null),
-    // Chi phí của khối Lợi nhuận gộp — nạp cùng đợt (trước đây chờ xong cả
-    // đợt trên mới gọi, thêm 1 lượt DB nối đuôi).
-    canViewBranchComparison
-      ? supabase
-          .from("expenses")
-          .select("branch_id, amount")
-          .gte("expense_date", `${profitMonths[0]}-01`)
-          .lt("expense_date", `${nextMonthOf(profitMonths[profitMonths.length - 1])}-01`)
-      : Promise.resolve(null),
-    canViewBranchComparison
-      ? supabase
-          .from("recurring_expenses")
-          .select("id, branch_id, category_id, amount, frequency, start_date, end_date, note")
-      : Promise.resolve(null),
+    branchOverviewId ? computeOrdersOverview(branchOverviewId) : Promise.resolve(null),
+    branchListPromise,
   ]);
-
-  // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
-  // hành (bảng expenses) − quỹ lương. payrollByMonth đã tính sẵn ở trên nên
-  // ở đây chỉ cần gom chi phí + cộng quỹ lương theo chi nhánh.
-  let branchProfit: {
-    operatingByBranch: Map<string, number>;
-    payrollByBranch: Map<string, number>;
-  } | null = null;
-  if (canViewBranchComparison) {
-    const periodExpenses = periodExpensesRes?.data;
-    const recurringDefs = recurringDefsRes?.data;
-    const operatingByBranch = new Map<string, number>();
-    // Khoản nhập tay + khoản định kỳ trải vào từng tháng của kỳ (thuê nhà,
-    // trả góp...) — thiếu vế sau thì chi phí vận hành trên bảng lãi luôn 0.
-    const periodOperatingRows = [
-      ...(periodExpenses ?? []),
-      ...expandRecurring(recurringDefs ?? [], profitMonths),
-    ];
-    for (const e of periodOperatingRows) {
-      operatingByBranch.set(
-        e.branch_id,
-        (operatingByBranch.get(e.branch_id) ?? 0) + Number(e.amount),
-      );
-    }
-    const payrollByBranch = new Map<string, number>();
-    for (const r of (payrollByMonth ?? []).flat()) {
-      if (!r.branchId) continue;
-      payrollByBranch.set(r.branchId, (payrollByBranch.get(r.branchId) ?? 0) + r.totalIncome);
-    }
-    branchProfit = { operatingByBranch, payrollByBranch };
-  }
-
-  // "Thu nhập của bạn" + xu hướng theo tháng.
-  const incomeSection = (
-    <>
-      <MyPerformanceCard perf={myPerformance} />
-      {myTrend && <MyPerformanceTrendCard points={myTrend} />}
-    </>
-  );
-
-  // "Đơn hàng sắp tới"/"sắp về" + tổng quan đơn hàng chi nhánh (Cửa hàng trưởng).
-  const ordersSection = (
+  return (
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UpcomingDeliveriesCard
@@ -294,7 +278,7 @@ export default async function DashboardHomePage({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Đơn hàng chi nhánh {branchList.data?.find((b) => b.id === branchId)?.name ?? ""}
+              Đơn hàng chi nhánh {branchList.data?.find((b) => b.id === branchOverviewId)?.name ?? ""}
             </h2>
             <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
               Xem tất cả đơn →
@@ -310,38 +294,115 @@ export default async function DashboardHomePage({
       )}
     </>
   );
+}
+
+// So sánh chi nhánh + Lợi nhuận gộp (Giám đốc/Kế toán) — phần NẶNG nhất
+// (bảng lương toàn công ty theo tháng của kỳ) nên tải riêng, không chặn trang.
+async function ComparisonBlock({
+  day,
+  month,
+  year,
+  profitPeriod,
+  profitMonths,
+  comparisonRangeStart,
+  comparisonRangeEndExclusive,
+  branchListPromise,
+}: {
+  day: string;
+  month: string;
+  year: string;
+  profitPeriod: ProfitPeriod;
+  profitMonths: string[];
+  comparisonRangeStart: string;
+  comparisonRangeEndExclusive: string;
+  branchListPromise: BranchListPromise;
+}) {
+  const supabase = await createClient();
+  const nextMonthOf = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  };
+  const [branchList, orders, payrollByMonth, periodExpensesRes, recurringDefsRes] = await Promise.all([
+    branchListPromise,
+    fetchAllRows<{ pickup_branch_id: string; delivered_at: string; total_value: number }>((from, to) =>
+      supabase
+        .from("orders")
+        .select("pickup_branch_id, delivered_at, total_value")
+        // Đơn huỷ không phải doanh thu; doanh số ghi nhận khi ĐÃ GIAO HÀNG
+        // và GỒM VAT (CEO 2026-09-02), ghi vào NGÀY GIAO (CEO 2026-10-05) —
+        // order_date bên dưới là ngày giao giờ VN, giữ tên trường cho các hàm
+        // revenueFor*. Chỉ lấy khoảng 3 mốc Ngày/Tháng/Năm đang chọn.
+        .is("cancelled_at", null)
+        .not("delivered_at", "is", null)
+        .gte("delivered_at", vnDayStartIso(comparisonRangeStart))
+        .lt("delivered_at", vnDayStartIso(comparisonRangeEndExclusive))
+        .range(from, to),
+    ).then((rows) =>
+      rows.map((o) => ({
+        pickup_branch_id: o.pickup_branch_id,
+        order_date: vnDayKey(o.delivered_at),
+        total_value: Math.round(o.total_value * 1.08 * 100) / 100,
+      })),
+    ),
+    Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m))),
+    supabase
+      .from("expenses")
+      .select("branch_id, amount")
+      .gte("expense_date", `${profitMonths[0]}-01`)
+      .lt("expense_date", `${nextMonthOf(profitMonths[profitMonths.length - 1])}-01`),
+    supabase.from("recurring_expenses").select("id, branch_id, category_id, amount, frequency, start_date, end_date, note"),
+  ]);
+
+  // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
+  // hành (expenses + khoản định kỳ trải theo tháng) − quỹ lương.
+  const operatingByBranch = new Map<string, number>();
+  const periodOperatingRows = [
+    ...(periodExpensesRes.data ?? []),
+    ...expandRecurring(recurringDefsRes.data ?? [], profitMonths),
+  ];
+  for (const e of periodOperatingRows) {
+    operatingByBranch.set(e.branch_id, (operatingByBranch.get(e.branch_id) ?? 0) + Number(e.amount));
+  }
+  const payrollByBranch = new Map<string, number>();
+  for (const r of payrollByMonth.flat()) {
+    if (!r.branchId) continue;
+    payrollByBranch.set(r.branchId, (payrollByBranch.get(r.branchId) ?? 0) + r.totalIncome);
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Trang chủ</h1>
-        <p className="text-sm text-muted-foreground">
-          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
-        </p>
-      </div>
+    <BranchComparisonSection
+      branches={branchList.data ?? []}
+      orders={orders}
+      day={day}
+      month={month}
+      year={year}
+      profit={{ operatingByBranch, payrollByBranch }}
+      profitPeriod={profitPeriod}
+    />
+  );
+}
 
-      {/* CEO chốt 2026-08-08: "Thu nhập của bạn" xuống DƯỚI CÙNG trang chủ
-          cho MỌI vai trò (trước đó chỉ Giám đốc/Kế toán còn giữ nó ở đầu) —
-          đơn hàng và so sánh chi nhánh mới là thứ cần thấy ngay khi mở app. */}
-      {/* 4 thẻ bấm được (đề xuất CRM v2) — thay 2 thanh báo Đơn web / Thiếu
-          hàng cũ. Người không xem số tiền thấy "Hôm nay giao" thay "Tiền chưa thu". */}
-      <HomeKpiCards branchId={branchId} canSeeMoney={canManage || isBranchManager} />
-
-      {ordersSection}
-
-      {canViewBranchComparison && (
-        <BranchComparisonSection
-          branches={branchList.data ?? []}
-          orders={orders}
-          day={day}
-          month={month}
-          year={year}
-          profit={branchProfit ?? undefined}
-          profitPeriod={profitPeriod}
-        />
-      )}
-
-      {incomeSection}
-    </div>
+// "Thu nhập của bạn" + xu hướng 6 tháng (chỉ nhân viên — quản lý và Kỹ
+// thuật/Sales không tính xu hướng vì nặng).
+async function IncomeBlock({
+  employeeId,
+  employeeBranchId,
+  baseSalary,
+  withTrend,
+}: {
+  employeeId: string;
+  employeeBranchId: string | null;
+  baseSalary: number;
+  withTrend: boolean;
+}) {
+  const [myPerformance, myTrend] = await Promise.all([
+    computeMyPerformance(employeeId, employeeBranchId, baseSalary),
+    withTrend ? computeMyMonthlyTrend(employeeId) : Promise.resolve(null),
+  ]);
+  return (
+    <>
+      <MyPerformanceCard perf={myPerformance} />
+      {myTrend && <MyPerformanceTrendCard points={myTrend} />}
+    </>
   );
 }
