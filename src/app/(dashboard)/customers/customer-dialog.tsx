@@ -1,69 +1,30 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { createCustomer, updateCustomer } from "@/lib/actions/customers";
-import type { CustomerType } from "@/types/database";
+import { CustomerForm, type CustomerFormValues } from "./customer-form";
 
-const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
-  individual: "Cá nhân",
-  company: "Công ty",
-};
-
-const DEPOSIT_PERCENTAGE_LABELS: Record<string, string> = {
-  "100": "100% (mặc định)",
-  "50": "50%",
-  "0": "0% — khách thân thiết, miễn cọc",
-};
-
-interface CustomerDialogProps {
-  customer?: {
-    id: string;
-    name: string;
-    phone: string | null;
-    email: string | null;
-    notes: string | null;
-    customer_type: CustomerType;
-    tax_code: string | null;
-    budget_unit_code?: string | null;
-    representative_name?: string | null;
-    representative_title?: string | null;
-    bank_account_number?: string | null;
-    bank_name?: string | null;
-    address: string | null;
-    deposit_percentage: number;
-  };
+// Thêm / sửa khách (B6 — form Công ty / Cá nhân ở customer-form.tsx).
+export function CustomerDialog({
+  customer,
+  canViewIdNumber = false,
+  editTriggerVariant = "icon",
+}: {
+  customer?: CustomerFormValues;
+  canViewIdNumber?: boolean;
   // Biến thể nút "Sửa" — icon-only ở bảng danh sách (mặc định), outline có
   // chữ ở trang chi tiết.
   editTriggerVariant?: "icon" | "outline";
-}
-
-export function CustomerDialog({ customer, editTriggerVariant = "icon" }: CustomerDialogProps) {
+}) {
   const isEdit = !!customer;
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
   // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
   const trigger = !isEdit ? (
     <Button>
       <Plus className="size-4" />
-      Thêm khách hàng
+      Thêm khách
     </Button>
   ) : editTriggerVariant === "outline" ? (
     <Button variant="outline">
@@ -77,169 +38,22 @@ export function CustomerDialog({ customer, editTriggerVariant = "icon" }: Custom
     </Button>
   );
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function handleSubmit(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      const result = customer
-        ? await updateCustomer(customer.id, undefined, formData)
-        : await createCustomer(undefined, formData);
-
-      if (result && "error" in result) {
-        setError(result.error);
-      } else {
-        setOpen(false);
-      }
-    });
-  }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setError(null);
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={trigger} />
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <form action={handleSubmit} className="space-y-4">
-          <DialogHeader>
-            <DialogTitle>{customer ? "Sửa khách hàng" : "Thêm khách hàng"}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Tên khách hàng</Label>
-            <Input id="name" name="name" defaultValue={customer?.name} required />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="customer_type">Loại khách hàng</Label>
-            <Select name="customer_type" defaultValue={customer?.customer_type ?? "individual"}>
-              <SelectTrigger id="customer_type" className="w-full">
-                <SelectValue>
-                  {(value: CustomerType) => CUSTOMER_TYPE_LABELS[value]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Cá nhân</SelectItem>
-                <SelectItem value="company">Công ty</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Số điện thoại</Label>
-            <Input id="phone" name="phone" defaultValue={customer?.phone ?? ""} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue={customer?.email ?? ""} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tax_code">MST / CCCD</Label>
-            <Input
-              id="tax_code"
-              name="tax_code"
-              placeholder="Công ty: mã số thuế · Cá nhân: số CCCD"
-              defaultValue={customer?.tax_code ?? ""}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="budget_unit_code">Mã số ĐVQHNS</Label>
-            <Input
-              id="budget_unit_code"
-              name="budget_unit_code"
-              placeholder="Đơn vị có quan hệ với ngân sách — không bắt buộc"
-              defaultValue={customer?.budget_unit_code ?? ""}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Địa chỉ</Label>
-            <Input
-              id="address"
-              name="address"
-              placeholder="Địa chỉ xuất hoá đơn"
-              defaultValue={customer?.address ?? ""}
-            />
-          </div>
-
-          {/* Thông tin hợp đồng (CEO 2026-10-04) — in vào phần BÊN B của chứng từ. */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="representative_name">Người đại diện</Label>
-              <Input
-                id="representative_name"
-                name="representative_name"
-                placeholder="Ông/Bà ..."
-                defaultValue={customer?.representative_name ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="representative_title">Chức vụ</Label>
-              <Input
-                id="representative_title"
-                name="representative_title"
-                placeholder="Giám đốc, Trưởng phòng..."
-                defaultValue={customer?.representative_title ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank_account_number">Số tài khoản</Label>
-              <Input
-                id="bank_account_number"
-                name="bank_account_number"
-                inputMode="numeric"
-                defaultValue={customer?.bank_account_number ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank_name">Tại ngân hàng</Label>
-              <Input
-                id="bank_name"
-                name="bank_name"
-                placeholder="Vietcombank - CN Hà Nội..."
-                defaultValue={customer?.bank_name ?? ""}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="deposit_percentage">Tiền cọc</Label>
-            <Select
-              name="deposit_percentage"
-              defaultValue={String(customer?.deposit_percentage ?? 100)}
-            >
-              <SelectTrigger id="deposit_percentage" className="w-full">
-                <SelectValue>{(value: string) => DEPOSIT_PERCENTAGE_LABELS[value]}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="100">100% (mặc định)</SelectItem>
-                <SelectItem value="50">50%</SelectItem>
-                <SelectItem value="0">0% — khách thân thiết, miễn cọc</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Ghi chú</Label>
-            <Input id="notes" name="notes" defaultValue={customer?.notes ?? ""} />
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <DialogFooter>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Đang lưu..." : "Lưu"}
-            </Button>
-          </DialogFooter>
-        </form>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{customer ? "Sửa khách hàng" : "Thêm khách"}</DialogTitle>
+        </DialogHeader>
+        {open && (
+          <CustomerForm
+            customer={customer}
+            canViewIdNumber={canViewIdNumber}
+            onDone={() => setOpen(false)}
+            onClose={() => setOpen(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

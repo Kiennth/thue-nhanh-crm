@@ -16,6 +16,7 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import type { CustomerType } from "@/types/database";
 import { CustomerDialog } from "./customer-dialog";
+import { maskIdNumber } from "@/lib/customer-validation";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import {
   CustomerReportSection,
@@ -43,6 +44,16 @@ interface CustomerRow {
   address: string | null;
   customer_type: CustomerType;
   tax_code: string | null;
+  id_number: string | null;
+  contact_name: string | null;
+  wants_vat: boolean;
+  invoice_email: string | null;
+  needs_review: boolean;
+  budget_unit_code: string | null;
+  representative_name: string | null;
+  representative_title: string | null;
+  bank_account_number: string | null;
+  bank_name: string | null;
   deposit_percentage: number;
   created_at: string;
   orderCount: number;
@@ -60,6 +71,16 @@ interface CustomerListRpcRow {
   address: string | null;
   customer_type: CustomerType;
   tax_code: string | null;
+  id_number: string | null;
+  contact_name: string | null;
+  wants_vat: boolean;
+  invoice_email: string | null;
+  needs_review: boolean;
+  budget_unit_code: string | null;
+  representative_name: string | null;
+  representative_title: string | null;
+  bank_account_number: string | null;
+  bank_name: string | null;
   deposit_percentage: number;
   created_at: string;
   order_count: number;
@@ -76,9 +97,12 @@ export default async function CustomersPage({
     dir?: string;
     overview?: string;
     tab?: string;
+    filter?: string;
   }>;
 }) {
-  const { search, page: pageParam, sort, dir, overview, tab } = await searchParams;
+  const { search, page: pageParam, sort, dir, overview, tab, filter } = await searchParams;
+  // Chip "Khách cần bổ sung" (B6): dữ liệu MST/CCCD cũ lệch mẫu.
+  const needsReviewOnly = filter === "needs_review";
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
@@ -95,6 +119,8 @@ export default async function CustomersPage({
   const viewer = await getCurrentEmployee();
   const reportBranchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
   const isAdmin = viewer?.role === "admin";
+  // Số CCCD đủ chỉ Giám đốc / Admin / Kế toán xem; còn lại "1234xxxx" (CEO 09/10).
+  const canViewIdNumber = !!viewer && MANAGE_ROLES.includes(viewer.role);
   // 2 tab (đề xuất CRM v2 §4.7, như trang Thiết bị): "Danh sách khách" mặc
   // định — danh sách lên trước; "Báo cáo" chỉ tính khi mở đúng tab.
   const reportTab = tab === "report" && !isAdmin;
@@ -106,7 +132,7 @@ export default async function CustomersPage({
   // security definer + guard nhân viên trong hàm (xem migration
   // 20260802010000) vì mốc "khách mới với cả công ty" cần đọc đơn mọi chi
   // nhánh trong khi RLS cắt orders theo chi nhánh với role thường.
-  const [reportRes, listRes] = await Promise.all([
+  const [reportRes, listRes, needsReviewRes] = await Promise.all([
     reportTab
       ? supabase.rpc("customer_page_report", { p_branch_id: reportBranchId })
       : Promise.resolve({ data: null }),
@@ -117,8 +143,11 @@ export default async function CustomersPage({
       p_dir: activeDir,
       p_page: requestedPage,
       p_page_size: PAGE_SIZE,
+      p_filter: needsReviewOnly ? "needs_review" : null,
     }),
+    supabase.from("customers").select("id", { count: "exact", head: true }).eq("needs_review", true),
   ]);
+  const needsReviewCount = needsReviewRes.count ?? 0;
 
   const rawReport = (reportRes.data ?? {}) as Partial<CustomerReportData> & { error?: string };
   const reportData: CustomerReportData = {
@@ -142,6 +171,16 @@ export default async function CustomersPage({
     address: r.address,
     customer_type: r.customer_type,
     tax_code: r.tax_code,
+    id_number: r.id_number,
+    contact_name: r.contact_name,
+    wants_vat: r.wants_vat,
+    invoice_email: r.invoice_email,
+    needs_review: r.needs_review,
+    budget_unit_code: r.budget_unit_code,
+    representative_name: r.representative_name,
+    representative_title: r.representative_title,
+    bank_account_number: r.bank_account_number,
+    bank_name: r.bank_name,
     deposit_percentage: r.deposit_percentage,
     created_at: r.created_at,
     orderCount: Number(r.order_count),
@@ -152,7 +191,7 @@ export default async function CustomersPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Khách hàng</h1>
-        <CustomerDialog />
+        <CustomerDialog canViewIdNumber={canViewIdNumber} />
       </div>
 
       {/* Ô tìm khách to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
@@ -161,12 +200,33 @@ export default async function CustomersPage({
         <SearchInput
           key={activeSearch}
           paramName="search"
-          placeholder="Tìm khách theo tên, SĐT, MST, email, mã ĐVQHNS — gõ rồi Enter..."
+          placeholder="Tìm khách theo tên, SĐT, MST, CCCD, email, mã ĐVQHNS — gõ rồi Enter..."
           value={activeSearch}
           resetParams={["page"]}
           size="lg"
           className="w-full max-w-2xl"
         />
+      )}
+      {!reportTab && (needsReviewCount > 0 || needsReviewOnly) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={needsReviewOnly ? "/customers" : "/customers?filter=needs_review"}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+              needsReviewOnly ? "border-primary bg-primary text-primary-foreground" : "border-amber-400/60 text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950"
+            }`}
+          >
+            Khách cần bổ sung
+            <span className={`rounded-full px-1.5 text-xs tabular-nums ${needsReviewOnly ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900"}`}>
+              {needsReviewCount}
+            </span>
+            {needsReviewOnly && <span aria-hidden>×</span>}
+          </Link>
+          {needsReviewOnly && (
+            <span className="text-xs text-muted-foreground">
+              MST/CCCD cũ không khớp mẫu (cá nhân ghi dạng MST, công ty ghi CMND…) — mở khách, chọn đúng loại và lưu lại.
+            </span>
+          )}
+        </div>
       )}
 
       {/* CEO chốt 2026-08-06: Admin bỏ luôn cả "Báo cáo khách hàng" tổng
@@ -212,8 +272,8 @@ export default async function CustomersPage({
               <SortableTableHead sortKey="name" label="Tên" />
               <SortableTableHead sortKey="customer_type" label="Loại" />
               <TableHead>Điện thoại</TableHead>
-              {/* Cùng cột tax_code: công ty là MST, cá nhân là số CCCD
-                  (CEO 2026-09-02) — không tách cột DB riêng. */}
+              {/* Công ty: MST (tax_code); cá nhân: CCCD (id_number, tách cột
+                  từ B6 09/10 — che "1234xxxx" với vai trò không quản lý). */}
               <TableHead>MST / CCCD</TableHead>
               <TableHead>Địa chỉ</TableHead>
               <SortableTableHead sortKey="orderCount" label="Số lượng đơn" />
@@ -234,13 +294,28 @@ export default async function CustomersPage({
                   <Badge variant="secondary">{CUSTOMER_TYPE_LABELS[customer.customer_type]}</Badge>
                 </TableCell>
                 <TableCell>{customer.phone ?? "—"}</TableCell>
-                <TableCell className="tabular-nums">{customer.tax_code ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">
+                  {customer.customer_type === "company" ? (
+                    (customer.tax_code ?? "—")
+                  ) : customer.id_number ? (
+                    canViewIdNumber ? customer.id_number : maskIdNumber(customer.id_number)
+                  ) : (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                      Thiếu CCCD
+                    </span>
+                  )}
+                  {customer.needs_review && (
+                    <span className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+                      Cần bổ sung
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="max-w-80 truncate">{customer.address ?? "—"}</TableCell>
                 <TableCell>{customer.orderCount}</TableCell>
                 <TableCell>{currencyFormatter.format(customer.totalRevenue)}đ</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <CustomerDialog customer={customer} />
+                    <CustomerDialog customer={customer} canViewIdNumber={canViewIdNumber} />
                     <DeleteCustomerButton id={customer.id} name={customer.name} />
                   </div>
                 </TableCell>

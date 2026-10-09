@@ -70,12 +70,14 @@ export async function matchWebOrderCustomers(
     result[r.id] = null;
     const tax = digits(r.tax_code);
     if (tax.length >= 9) {
+      // Web: 1 ô — công ty nhập MST, khách lẻ nhập CCCD (từ B6 CCCD nằm ở
+      // id_number) → so cả 2 cột.
       const { data } = await supabase
         .from("customers")
-        .select("id, name, tax_code")
-        .ilike("tax_code", `%${tax.slice(0, 10)}%`)
+        .select("id, name, tax_code, id_number")
+        .or(`tax_code.ilike.%${tax.slice(0, 10)}%,id_number.eq.${tax}`)
         .limit(5);
-      const hit = (data ?? []).find((c) => digits(c.tax_code) === tax);
+      const hit = (data ?? []).find((c) => digits(c.tax_code) === tax || c.id_number === tax);
       if (hit) {
         result[r.id] = { id: hit.id, name: hit.name };
         continue;
@@ -106,6 +108,8 @@ export async function createCustomerFromWebOrder(
     .eq("id", webOrderId)
     .single();
   if (!wo) return { error: "Không tìm thấy đơn web." };
+  const company = wo.customer_type === "company";
+  const idDigits = digits(wo.tax_code);
   const { data, error } = await supabase
     .from("customers")
     .insert({
@@ -113,10 +117,14 @@ export async function createCustomerFromWebOrder(
       name: wo.company_name ?? wo.customer_name,
       phone: wo.phone,
       email: wo.email,
-      tax_code: wo.tax_code,
-      customer_type: wo.customer_type as "individual" | "company",
+      customer_type: company ? "company" : "individual",
       address: wo.address,
       notes: "Tạo từ đơn web",
+      // B6: ô mã số web — công ty = MST (lấy hoá đơn VAT, người liên hệ = người
+      // gửi); khách lẻ = CCCD → id_number (không vào ô MST).
+      ...(company
+        ? { tax_code: wo.tax_code, wants_vat: !!wo.tax_code, invoice_email: wo.email, contact_name: wo.customer_name }
+        : { id_number: /^\d{12}$/.test(idDigits) ? idDigits : null, needs_review: !!wo.tax_code && !/^\d{12}$/.test(idDigits) }),
     })
     .select("id, name")
     .single();

@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { PricingMethod, ProductType, RentalPeriodUnit } from "@/types/database";
 import { createCustomerFromWebOrder } from "@/lib/actions/website-orders";
+import { getCustomerIdStatus } from "@/lib/actions/customers";
 import { CustomerCombobox } from "./customer-combobox";
 import { DateInput } from "@/components/date-input";
 import { OrdererSuggestInput } from "@/components/orderer-suggest-input";
@@ -229,6 +230,19 @@ export function QuickOrderDialog({
 
   const [customer, setCustomer] = useState<{ id: string; name: string } | null>(prefill?.customer ?? null);
   const customerId = customer?.id ?? null;
+  // B6: khách cá nhân chưa có CCCD → cảnh báo vàng, KHÔNG chặn tạo/chốt đơn.
+  const [cccdStatus, setCccdStatus] = useState<{ id: string; missing: boolean } | null>(null);
+  useEffect(() => {
+    if (!customerId) return;
+    let alive = true;
+    void getCustomerIdStatus(customerId)
+      .then((r) => alive && setCccdStatus({ id: customerId, missing: r.missingCccd }))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [customerId]);
+  const missingCccd = !!customerId && cccdStatus?.id === customerId && cccdStatus.missing;
   const [customerKey, setCustomerKey] = useState(0);
   const [creatingCustomer, startCreatingCustomer] = useTransition();
   const [branchId, setBranchId] = useState<string>(prefill?.branchId ?? "");
@@ -585,6 +599,15 @@ export function QuickOrderDialog({
                   {creatingCustomer ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                   Tạo khách mới từ thông tin khách điền trên web
                 </Button>
+              )}
+              {missingCccd && customer && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                  Khách chưa có CCCD ·{" "}
+                  <a href={`/customers/${customer.id}`} target="_blank" rel="noopener" className="font-semibold underline">
+                    Bổ sung CCCD
+                  </a>{" "}
+                  (chỉ nhắc — vẫn tạo/chốt đơn được)
+                </p>
               )}
               {prefill?.customer && customer?.id === prefill.customer.id && (
                 <p className="text-xs text-muted-foreground">Khớp khách cũ theo MST/SĐT — đổi nếu sai.</p>

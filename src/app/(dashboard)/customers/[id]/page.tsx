@@ -17,6 +17,7 @@ import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { CustomerDialog } from "../customer-dialog";
+import { maskIdNumber } from "@/lib/customer-validation";
 import { DeleteCustomerButton } from "../delete-customer-button";
 
 const CUSTOMER_TYPE_LABELS = { individual: "Cá nhân", company: "Công ty" } as const;
@@ -57,6 +58,8 @@ export default async function CustomerDetailPage({
   // chưa từng có đơn ở đây thì coi như không tồn tại (404) — khớp với danh
   // sách khách hàng đã lọc theo chi nhánh.
   const branchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
+  // Số CCCD đủ chỉ Giám đốc / Admin / Kế toán xem (CEO 09/10: còn lại "1234xxxx").
+  const canViewIdNumber = !!viewer && MANAGE_ROLES.includes(viewer.role);
 
   const [{ data: customer }, { data: orders }] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).maybeSingle(),
@@ -99,7 +102,7 @@ export default async function CustomerDetailPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{customer.name}</h1>
         <div className="flex items-center gap-2">
-          <CustomerDialog customer={customer} editTriggerVariant="outline" />
+          <CustomerDialog customer={customer} canViewIdNumber={canViewIdNumber} editTriggerVariant="outline" />
           <DeleteCustomerButton id={customer.id} name={customer.name} />
         </div>
       </div>
@@ -123,14 +126,47 @@ export default async function CustomerDetailPage({
             <p className="text-xs text-muted-foreground">Email</p>
             <p className="font-medium">{customer.email ?? "—"}</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">MST / CCCD</p>
-            <p className="font-medium">{customer.tax_code ?? "—"}</p>
-          </div>
+          {customer.customer_type === "company" ? (
+            <>
+              <div>
+                <p className="text-xs text-muted-foreground">Người liên hệ</p>
+                <p className="font-medium">{customer.contact_name ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">MST</p>
+                <p className="font-medium">{customer.tax_code ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Hoá đơn VAT</p>
+                <p className="font-medium">
+                  {customer.wants_vat ? `Có${customer.invoice_email ? ` · ${customer.invoice_email}` : ""}` : "Không"}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div>
+              <p className="text-xs text-muted-foreground">Số CCCD</p>
+              <p className="font-medium">
+                {customer.id_number ? (
+                  canViewIdNumber ? customer.id_number : maskIdNumber(customer.id_number)
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-300">Thiếu CCCD — khách mang CCCD khi nhận máy</span>
+                )}
+              </p>
+            </div>
+          )}
+          {customer.needs_review && (
+            <div>
+              <p className="text-xs text-muted-foreground">Cần bổ sung</p>
+              <p className="text-sm font-medium text-destructive">
+                MST/CCCD cũ không khớp mẫu{customer.legacy_tax_or_id ? ` (đang ghi "${customer.legacy_tax_or_id}")` : ""} — bấm Sửa, chọn đúng loại khách và lưu lại.
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-muted-foreground">Mã số ĐVQHNS</p>
             <p className="font-medium">
-              {(customer as typeof customer & { budget_unit_code?: string | null }).budget_unit_code ?? "—"}
+              {customer.budget_unit_code ?? "—"}
             </p>
           </div>
           {(
