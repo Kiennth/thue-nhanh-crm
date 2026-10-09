@@ -296,8 +296,9 @@ export async function deleteEquipmentType(id: string) {
 }
 
 // Dừng / mở lại kinh doanh (CEO 2026-10-09) — mã dừng không hiện ở ô chọn
-// hàng khi lên đơn; đơn cũ và lịch sử giữ nguyên. Không đụng web (ẩn web ở
-// mục Website như cũ).
+// hàng khi lên đơn và tự ẩn khỏi web (view website_products_public lọc
+// discontinued_at — không đổi is_published, mở lại là web hiện lại); đơn cũ
+// và lịch sử giữ nguyên.
 export async function setEquipmentTypeDiscontinued(id: string, discontinued: boolean) {
   await requireRole([...MANAGE_ROLES]);
 
@@ -313,6 +314,8 @@ export async function setEquipmentTypeDiscontinued(id: string, discontinued: boo
 
   revalidatePath("/equipment");
   revalidatePath(`/equipment/${id}`);
+  revalidatePath("/website");
+  await pingWebsiteRevalidate();
   return { success: true as const };
 }
 

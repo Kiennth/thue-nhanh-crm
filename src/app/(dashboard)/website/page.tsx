@@ -66,7 +66,7 @@ export default async function WebsitePage({
 
   let query = supabase
     .from("website_products")
-    .select("*, equipment_types(name, price, rental_period_unit, image_url)", { count: "exact" });
+    .select("*, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)", { count: "exact" });
   // Mặc định: mới lên web trước (CEO 2026-10-01) — trước đây xếp đã đăng
   // trước rồi theo sort_order, SP mới thêm bị chìm giữa danh sách. Bấm tiêu
   // đề cột để xếp theo tên A→Z / Z→A, ngày tạo, trạng thái (ẩn/hiện) hoặc
@@ -235,6 +235,7 @@ export default async function WebsitePage({
               price: number;
               rental_period_unit: string | null;
               image_url: string | null;
+              discontinued_at: string | null;
             } | null;
             const displayName = p.name ?? et?.name ?? p.slug;
             const hasImage = p.gallery_image_urls.length > 0 || Boolean(et?.image_url);
@@ -261,9 +262,14 @@ export default async function WebsitePage({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={p.is_published ? "default" : "secondary"}>
-                    {p.is_published ? "Đang hiện" : "Ẩn"}
-                  </Badge>
+                  {/* Mã dừng kinh doanh tự ẩn khỏi web dù vẫn bật hiển thị (CEO 2026-10-09). */}
+                  {et?.discontinued_at ? (
+                    <Badge variant="destructive">Dừng KD · ẩn</Badge>
+                  ) : (
+                    <Badge variant={p.is_published ? "default" : "secondary"}>
+                      {p.is_published ? "Đang hiện" : "Ẩn"}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">

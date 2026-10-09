@@ -15,7 +15,7 @@ export function DiscontinueButton({ id, discontinued }: { id: string; discontinu
   function toggle() {
     if (
       !discontinued &&
-      !window.confirm("Dừng kinh doanh mã này? Nhân viên sẽ không tìm thấy khi lên đơn. Đơn cũ giữ nguyên, mở lại được bất cứ lúc nào.")
+      !window.confirm("Dừng kinh doanh mã này? Nhân viên sẽ không tìm thấy khi lên đơn và mã tự ẩn khỏi web. Đơn cũ giữ nguyên, mở lại được bất cứ lúc nào.")
     ) {
       return;
     }
