@@ -101,10 +101,16 @@ export function SpecFacetsEditor({
                     placeholder={code === "bo_nho_gb" ? "128, 256" : undefined}
                     onChange={(e) => setDrafts((d) => ({ ...d, [code]: e.target.value }))}
                     onBlur={(e) => {
-                      // "128, 256" → [128, 256]; "13,6" (1 số thập phân) → 13.6
+                      // "128, 256" / "128/256" → [128, 256]; "13,6" · "1,24" (dấu phẩy
+                      // liền số, không cách) → số thập phân 13.6 · 1.24.
                       const raw = e.target.value.trim();
-                      const parts = /^\d+,\d$/.test(raw) ? [raw.replace(",", ".")] : raw.split(/[,;/\s]+/).filter(Boolean);
-                      const nums = parts.map((p) => Number(p.replace(",", "."))).filter((n) => Number.isFinite(n));
+                      const parts = /^\d+,\d+$/.test(raw)
+                        ? [raw.replace(",", ".")]
+                        : raw.split(/\s*[;/]\s*|,\s+|\s+/).filter(Boolean);
+                      // "4.000" (chấm ngăn nghìn kiểu Việt) → 4000, không phải 4.
+                      const nums = parts
+                        .map((p) => Number(/^\d{1,3}(\.\d{3})+$/.test(p) ? p.replace(/\./g, "") : p.replace(",", ".")))
+                        .filter((n) => Number.isFinite(n));
                       set(code, nums.length > 1 ? nums : nums[0]);
                       setDrafts((d) => {
                         const next = { ...d };

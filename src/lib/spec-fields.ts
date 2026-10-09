@@ -145,7 +145,7 @@ export const SPEC_FIELDS: Record<string, SpecField> = {
   // B4 (Grok CRM 09/10, spec_filter_standard.csv): trường chi tiết cho khối
   // "Thông số nổi bật" trên trang sản phẩm — không phải bộ lọc.
   dong_may: { kind: "text", label: { vi: "Dòng máy", en: "Model line" }, placeholder: "MacBook Air M3, 2024" },
-  model: { kind: "text", label: { vi: "Model", en: "Model" }, placeholder: "EON One Compact" },
+  model: { kind: "text", label: { vi: "Model", en: "Model" }, placeholder: "vd: A7 IV · EON One Compact" },
   o_cung: { kind: "text", label: { vi: "Ổ cứng", en: "Storage" }, placeholder: "512GB SSD" },
   cong_ket_noi: { kind: "text", label: { vi: "Cổng kết nối", en: "Ports" }, placeholder: "HDMI ×2, USB-C" },
   khong_day: { kind: "text", label: { vi: "Kết nối không dây", en: "Wireless" }, placeholder: "Wi-Fi 6E, Bluetooth 5.3" },
@@ -271,7 +271,7 @@ const asList = (v: SpecValue | undefined): (number | string)[] =>
 // "13,6" · "4.000" — thập phân dấu phẩy, nghìn dấu chấm (chuẩn Grok); EN
 // ngược lại.
 function formatNumber(n: number, locale: "vi" | "en") {
-  return n.toLocaleString(locale === "vi" ? "vi-VN" : "en-US", { maximumFractionDigits: 1 });
+  return n.toLocaleString(locale === "vi" ? "vi-VN" : "en-US", { maximumFractionDigits: 2 });
 }
 
 const UNIT_EN: Record<string, string> = { "tay cầm": "controllers", người: "players", kênh: "channels" };
@@ -320,7 +320,9 @@ export function cleanSpecFacets(input: unknown): { ok: true; value: SpecFacets }
         const n = typeof x === "number" ? x : Number(String(x).replace(",", "."));
         if (!Number.isFinite(n) || n < f.min || n > f.max)
           return { ok: false, error: `${f.label.vi}: ${String(x)} ${f.unit} nằm ngoài khoảng ${f.min}–${f.max}` };
-        vals.push(Math.round(n * 10) / 10);
+        // Trọng lượng 1,24 kg giữ 2 số lẻ; trường khác 1 số lẻ.
+        const scale = f.step !== undefined && f.step < 0.1 ? 100 : 10;
+        vals.push(Math.round(n * scale) / scale);
       } else if (f.kind === "enum") {
         if (!(String(x) in f.options)) return { ok: false, error: `${f.label.vi}: lựa chọn "${String(x)}" không có` };
         vals.push(String(x));
