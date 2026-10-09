@@ -113,6 +113,15 @@ const SECTION_TONES = {
   },
 } as const;
 
+// Dấu * đỏ cho ô bắt buộc (đề xuất CRM v2 §4.5).
+function Req() {
+  return (
+    <span className="ml-0.5 text-destructive" aria-hidden>
+      *
+    </span>
+  );
+}
+
 function Section({
   n,
   title,
@@ -122,7 +131,7 @@ function Section({
   children,
 }: {
   n: number;
-  title: string;
+  title: React.ReactNode;
   hint?: string;
   tone: keyof typeof SECTION_TONES;
   icon: ReactElement;
@@ -364,6 +373,12 @@ export function QuickOrderDialog({
     return item ? [{ item, quantity: 1 }] : [];
   });
   const allLines = [...cart, ...transportLines];
+  const missing = [
+    !customerId && "khách hàng",
+    !branchId && "kho giao",
+    !periodValid && "thời gian trả sau thời gian nhận",
+    cart.length === 0 && "hàng thuê",
+  ].filter((x): x is string => !!x);
   const prices = allLines.map(linePrice);
   const total = prices.reduce<number>((s, p) => s + (p ?? 0), 0);
 
@@ -499,7 +514,10 @@ export function QuickOrderDialog({
           <Section n={1} title="Khách hàng & kho giao" tone="blue" icon={<UserRound />}>
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
-              <Label>Khách hàng</Label>
+              <Label>
+                Khách hàng
+                <Req />
+              </Label>
               <CustomerCombobox
                 key={customerKey}
                 name="quick_customer_id"
@@ -531,7 +549,10 @@ export function QuickOrderDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Kho giao</Label>
+              <Label>
+                Kho giao
+                <Req />
+              </Label>
               <div className="flex flex-wrap gap-1.5">
                 {branches.map((b) => (
                   <Button
@@ -597,7 +618,10 @@ export function QuickOrderDialog({
             )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-16 text-sm font-medium">Nhận</span>
+                <span className="w-16 text-sm font-medium">
+                  Nhận
+                  <Req />
+                </span>
                 <DateInput
                   id="quick_start_date"
                   value={startDate}
@@ -607,7 +631,10 @@ export function QuickOrderDialog({
                 <HourSelect value={startHour} onChange={(h) => changeStart(startDate, h)} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-16 text-sm font-medium">Trả</span>
+                <span className="w-16 text-sm font-medium">
+                  Trả
+                  <Req />
+                </span>
                 <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
                 <HourSelect value={endHour} onChange={setEndHour} />
               </div>
@@ -621,7 +648,7 @@ export function QuickOrderDialog({
           </Section>
 
           {/* Hàng */}
-          <Section n={3} title="Hàng thuê" tone="emerald" icon={<Package />} hint="Gõ tên, Enter chọn dòng đầu">
+          <Section n={3} title={<>Hàng thuê<Req /></>} tone="emerald" icon={<Package />} hint="Ít nhất 1 dòng · gõ tên, Enter chọn dòng đầu">
           <div className="space-y-2">
             {!catalog ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -938,15 +965,28 @@ export function QuickOrderDialog({
                 </option>
               ))}
             </select>
-            <div className="ml-auto flex gap-2">
-              <Button type="button" variant="outline" className="h-10" disabled={saving || !catalog} onClick={() => submit("quote")}>
-                Tạo đơn (đã báo giá)
+            <div className="ml-auto flex flex-wrap items-start gap-2">
+              <Button type="button" variant="ghost" className="h-10" disabled={saving} onClick={() => setOpen(false)}>
+                Huỷ
               </Button>
-              <Button type="button" className="h-10 px-5 text-base" disabled={saving || !catalog} onClick={() => submit("deal")}>
-                {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-                Tạo &amp; chốt đơn
-              </Button>
+              <div className="flex flex-col items-center gap-0.5">
+                <Button type="button" variant="outline" className="h-10" disabled={saving || !catalog} onClick={() => submit("quote")}>
+                  Tạo đơn (đã báo giá)
+                </Button>
+                <span className="text-[11px] text-muted-foreground">Trạng thái Đã báo giá, chưa chốt</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <Button type="button" className="h-10 px-5 text-base" disabled={saving || !catalog} onClick={() => submit("deal")}>
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Tạo &amp; chốt đơn
+                </Button>
+                <span className="text-[11px] text-muted-foreground">Trạng thái Chốt đơn, bước 1/7</span>
+              </div>
             </div>
+            {/* Còn thiếu gì để tạo đơn — hiện ngay, khỏi bấm rồi mới báo lỗi. */}
+            <p className={cn("basis-full text-xs", missing.length ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300")}>
+              {missing.length ? `Còn thiếu: ${missing.join(", ")}` : "Đủ thông tin để tạo đơn"}
+            </p>
           </div>
         </div>
       </DialogContent>
