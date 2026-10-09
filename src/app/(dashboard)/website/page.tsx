@@ -125,7 +125,7 @@ export default async function WebsitePage({
       sort === "content"
         ? query.range(0, 4999)
         : query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
-      supabase.from("website_categories").select("*").order("sort_order"),
+      supabase.from("website_categories").select("id, name, slug, parent_id, sort_order, is_published").order("sort_order"),
       supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
     ]);

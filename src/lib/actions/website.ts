@@ -282,6 +282,18 @@ const CategorySchema = z.object({
   parent_id: z.string().uuid().optional(),
 });
 
+// Đủ cột 1 danh mục web cho khung sửa — nạp lúc mở (trang Website chỉ tải
+// bản gọn, Grok CRM 09/10 §A).
+export async function getWebsiteCategoryForEdit(
+  id: string,
+): Promise<{ category: Database["public"]["Tables"]["website_categories"]["Row"] } | { error: string }> {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("website_categories").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return { error: "Không tải được danh mục: " + (error?.message ?? "không tìm thấy") };
+  return { category: data };
+}
+
 export async function upsertWebsiteCategory(
   id: string | null,
   _prevState: ActionState,

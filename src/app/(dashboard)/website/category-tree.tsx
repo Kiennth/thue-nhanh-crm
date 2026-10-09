@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { EyeOff, FolderOpen, Tag } from "lucide-react";
-import type { Database } from "@/types/database";
-import { WebsiteCategoryDialog } from "./category-dialog";
-
-type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Row"];
+import { WebsiteCategoryDialog, type WebsiteCategoryLite } from "./category-dialog";
 
 // Danh mục web dạng cây (CEO 2026-10-04): nhóm cha → các con thụt vào có
 // đường nối. Bấm tên = sửa danh mục, bấm số SP = lọc bảng sản phẩm bên dưới.
@@ -12,7 +9,7 @@ export function WebsiteCategoryTree({
   productCategoryIds,
   activeId,
 }: {
-  categories: WebsiteCategoryRow[];
+  categories: WebsiteCategoryLite[];
   productCategoryIds: (string | null)[];
   activeId: string | null;
 }) {
@@ -88,7 +85,7 @@ function Meta({
   count,
   active,
 }: {
-  category: WebsiteCategoryRow;
+  category: WebsiteCategoryLite;
   count: number;
   active: boolean;
 }) {
