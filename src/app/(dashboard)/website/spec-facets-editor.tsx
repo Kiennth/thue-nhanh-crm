@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Filter, Star, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatSpec, SPEC_FIELDS, specGroupKey, SPEC_GROUPS, specValues, type SpecFacets } from "@/lib/spec-fields";
+import { formatSpec, minSpecsFor, SPEC_FIELDS, specGroupKey, SPEC_GROUPS, specValues, type SpecFacets } from "@/lib/spec-fields";
 import { cn } from "@/lib/utils";
 
 // "Thông số lọc (web)" trong khung sửa sản phẩm web (đề xuất CRM v2 §1a):
@@ -73,10 +73,11 @@ export function SpecFacetsEditor({
           <Filter className="inline size-3" /> bộ lọc web · đã điền {filled}/{group.fields.length}
         </span>
       </div>
-      {filled < 4 && (
+      {filled < minSpecsFor(group) && (
         <p className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangle className="size-3.5 shrink-0" />
-          Mới có {filled} thông số — nên điền ít nhất 4 để trang sản phẩm có khối &quot;Thông số nổi bật&quot; đầy đủ.
+          Mới có {filled} thông số — nên điền ít nhất {minSpecsFor(group)} để trang sản phẩm có khối &quot;Thông số nổi
+          bật&quot; đầy đủ.
           Không lấy từ tên sản phẩm.
         </p>
       )}

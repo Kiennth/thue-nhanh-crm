@@ -256,6 +256,11 @@ const GROUP_BY_CATEGORY: Record<string, string> = {
   "ban-ghe": "furniture",
 };
 
+// Số thông số tối thiểu để trang sản phẩm có khối "Thông số nổi bật" (B4):
+// 4, hoặc đủ hết trường với nhóm ít trường (Thẻ game có 3).
+export const MIN_SPECS = 4;
+export const minSpecsFor = (group: SpecGroup) => Math.min(MIN_SPECS, group.fields.length);
+
 // productSlug: tai nghe silent (SSounds) nằm chung danh mục Tai nghe nhưng
 // thông số khác hẳn (số kênh, tầm phát) → nhận theo slug sản phẩm.
 export const specGroupKey = (categorySlug: string | null | undefined, productSlug?: string | null) =>

@@ -17,6 +17,7 @@ import { VN_TIME_ZONE } from "@/lib/date-format";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
+import { MIN_SPECS, minSpecsFor, specGroupOf } from "@/lib/spec-fields";
 import { WebsiteProductRowActions, RefreshWebsiteButton } from "./row-actions";
 import { WebsiteProductDialog } from "./product-dialog";
 import { WebsiteCategoryDialog } from "./category-dialog";
@@ -55,6 +56,15 @@ export default async function WebsitePage({
   const currentPage = Math.max(1, Number(page) || 1);
 
   const supabase = await createClient();
+  // B4: ngưỡng "đủ thông số" theo nhóm của danh mục (4, nhóm ít trường thì đủ hết).
+  const catSlugRows = (await supabase.from("website_categories").select("id, slug")).data ?? [];
+  const minSpecsByCat = new Map(catSlugRows.map((c) => [c.id, minSpecsFor(specGroupOf(c.slug))]));
+  const minSpecsForCategory = (id: string | null) => (id ? minSpecsByCat.get(id) : undefined) ?? MIN_SPECS;
+  const smallGroupCategoryIds = async () => {
+    const byNeed = new Map<number, string[]>();
+    for (const [id, need] of minSpecsByCat) if (need < MIN_SPECS) byNeed.set(need, [...(byNeed.get(need) ?? []), id]);
+    return byNeed;
+  };
   // Lọc theo 1 danh mục trong cây (bấm số SP) — danh mục cha gồm luôn các con.
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const activeCat = cat && UUID_RE.test(cat) ? cat : null;
@@ -88,7 +98,14 @@ export default async function WebsitePage({
   if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
   // B4: < 4 thông số → trang sản phẩm thiếu khối "Thông số nổi bật".
-  if (activeFilter === "few-specs") query = query.lt("spec_count", 4).eq("is_published", true);
+  if (activeFilter === "few-specs") {
+    query = query.lt("spec_count", MIN_SPECS).eq("is_published", true);
+    // Nhóm ít trường (Thẻ game 3 trường): điền đủ là đạt, không tính thiếu.
+    const smallGroupCats = await smallGroupCategoryIds();
+    for (const [need, ids] of smallGroupCats) {
+      query = query.or(`spec_count.lt.${need},website_category_id.not.in.(${ids.join(",")})`);
+    }
+  }
   if (activeCat) query = query.in("website_category_id", [activeCat, ...catChildIds]);
   if (activeSearch) {
     // Slug toàn chữ không dấu nên phải bỏ dấu tiếng Việt trước khi so
@@ -150,7 +167,7 @@ export default async function WebsitePage({
   const all = statsRes.data ?? [];
   const publishedCount = all.filter((p) => p.is_published).length;
   const noCategoryCount = all.filter((p) => !p.website_category_id).length;
-  const fewSpecsCount = all.filter((p) => p.is_published && p.spec_count < 4).length;
+  const fewSpecsCount = all.filter((p) => p.is_published && p.spec_count < minSpecsForCategory(p.website_category_id)).length;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
   const filterLink = (f: string, label: string) => (
@@ -258,9 +275,9 @@ export default async function WebsitePage({
                     {p.has_description && !p.has_description_en && (
                       <Badge variant="outline">Thiếu EN</Badge>
                     )}
-                    {p.is_published && p.spec_count < 4 && (
+                    {p.is_published && p.spec_count < minSpecsForCategory(p.website_category_id) && (
                       <Badge variant="outline" className="border-amber-300 text-amber-800 dark:text-amber-300">
-                        Thông số {p.spec_count}/4
+                        Thông số {p.spec_count}/{minSpecsForCategory(p.website_category_id)}
                       </Badge>
                     )}
                   </div>
