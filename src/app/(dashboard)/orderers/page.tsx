@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SearchInput } from "@/components/search-input";
+import { PaginationControls } from "@/components/pagination-controls";
 import { requireRole } from "@/lib/dal";
 import { ORDERER_VIEW_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +11,7 @@ import { vnTodayString } from "@/lib/vn-time";
 const vnd = new Intl.NumberFormat("vi-VN");
 // Quá số ngày này không đặt đơn mới → nhắc chăm sóc lại.
 const STALE_DAYS = 60;
+const PAGE_SIZE = 50;
 
 type Orderer = { id: string; name: string; phone: string | null; email: string | null; title: string | null };
 type Stat = {
@@ -31,10 +33,10 @@ function daysSince(date: string, today: string): number {
 export default async function OrderersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; page?: string }>;
 }) {
   await requireRole([...ORDERER_VIEW_ROLES]);
-  const { q, sort } = await searchParams;
+  const { q, sort, page: pageParam } = await searchParams;
   const query = q?.trim() ?? "";
   const db = (await createClient()) as unknown as SupabaseClient;
   const [{ data: orderers }, { data: stats }] = await Promise.all([
@@ -60,6 +62,10 @@ export default async function OrderersPage({
           ? (a.stat?.last_order_date ?? "").localeCompare(b.stat?.last_order_date ?? "")
           : (b.stat?.last_order_date ?? "").localeCompare(a.stat?.last_order_date ?? ""),
     );
+  // Chia trang 50 dòng (đề xuất CRM v2: danh sách dài phải có số trang).
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(totalPages, Math.max(1, Number(pageParam) || 1));
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const staleCount = rows.filter((r) => r.stat?.last_order_date && daysSince(r.stat.last_order_date, today) > STALE_DAYS).length;
 
   const sortLink = (key: string, label: string) => {
@@ -90,6 +96,7 @@ export default async function OrderersPage({
         <SearchInput
           key={query}
           paramName="q"
+          resetParams={["page"]}
           placeholder="Tìm theo tên, SĐT, email, công ty — gõ rồi Enter..."
           value={query}
           size="lg"
@@ -113,7 +120,7 @@ export default async function OrderersPage({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((o) => {
+          {pageRows.map((o) => {
             const last = o.stat?.last_order_date ?? null;
             const ago = last ? daysSince(last, today) : null;
             return (
@@ -160,6 +167,7 @@ export default async function OrderersPage({
           )}
         </TableBody>
       </Table>
+      <PaginationControls page={page} totalPages={totalPages} totalCount={rows.length} itemLabel="người đặt" />
     </div>
   );
 }

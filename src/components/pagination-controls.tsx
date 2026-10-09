@@ -39,6 +39,13 @@ export function PaginationControls({
 
   if (totalCount === 0) return null;
 
+  // Số trang (đề xuất CRM v2): 1 … trang-1 trang trang+1 … cuối.
+  const pages: (number | "gap")[] = [];
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - page) <= 1) pages.push(p);
+    else if (pages[pages.length - 1] !== "gap") pages.push("gap");
+  }
+
   return (
     <div className="flex items-center justify-between text-sm text-muted-foreground">
       <span>
@@ -55,6 +62,26 @@ export function PaginationControls({
           <ChevronLeft className="size-4" />
           Trước
         </Button>
+        {totalPages > 1 &&
+          pages.map((p, i) =>
+            p === "gap" ? (
+              <span key={`gap-${i}`} className="px-1">
+                …
+              </span>
+            ) : (
+              <Button
+                key={p}
+                type="button"
+                variant={p === page ? "default" : "outline"}
+                size="sm"
+                className="min-w-8 px-2 tabular-nums"
+                onClick={() => goToPage(p)}
+                aria-current={p === page ? "page" : undefined}
+              >
+                {p}
+              </Button>
+            ),
+          )}
         <Button
           type="button"
           variant="outline"

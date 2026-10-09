@@ -13,16 +13,27 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
+import { SearchInput } from "@/components/search-input";
+import { PaginationControls } from "@/components/pagination-controls";
 import { DebtNoteDialog, type DebtNoteRow } from "./debt-note-dialog";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const PAGE_SIZE = 50;
+const fold = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
 
 // Sổ đòi nợ theo tuổi nợ (CEO chọn làm 2026-08-09) — nợ càng già càng khó
 // đòi: 4 bucket theo order_date của từng đơn còn thiếu, khách nợ già nằm
 // trên cùng. Quy tắc công nợ toàn hệ thống: mọi đơn chưa huỷ (kể cả đã
 // hoàn tất), nền giá gồm VAT. Kèm nhật ký đòi nợ per khách.
-export default async function DebtsPage() {
+export default async function DebtsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
   await requireRole([...MANAGE_ROLES]);
+  const { q, page: pageParam } = await searchParams;
+  const query = q?.trim() ?? "";
 
   const supabase = await createClient();
   const [{ data: report, error }, { data: notes }, { data: employees }, bankRes] = await Promise.all([
@@ -59,7 +70,18 @@ export default async function DebtsPage() {
 
   // rows đã sắp sẵn trong SQL: nợ già nhất lên đầu (300 khách); totals cộng
   // trên TOÀN BỘ khách còn nợ, không chỉ 300 dòng hiển thị.
-  const debtRows = report.rows;
+  // Tìm theo tên khách (bỏ dấu) hoặc SĐT; chia trang 50 dòng (đề xuất CRM v2).
+  const needle = fold(query);
+  const digits = query.replace(/\D/g, "");
+  const matched = report.rows.filter(
+    (r) =>
+      !query ||
+      fold(r.customer_name).includes(needle) ||
+      (digits.length >= 3 && (r.phone ?? "").replace(/\D/g, "").includes(digits)),
+  );
+  const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+  const page = Math.min(totalPages, Math.max(1, Number(pageParam) || 1));
+  const debtRows = matched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totals = {
     all: report.totals.totalOwed,
     b0: report.totals.bucket0_30,
@@ -108,8 +130,8 @@ export default async function DebtsPage() {
             <p className="text-2xl font-semibold">{currencyFormatter.format(totals.all)}đ</p>
             <p className="text-xs text-muted-foreground">
               {totals.customerCount} khách còn nợ
-              {totals.customerCount > debtRows.length &&
-                ` — bảng hiện ${debtRows.length} khách nợ già nhất`}
+              {totals.customerCount > report.rows.length &&
+                ` — bảng hiện ${report.rows.length} khách nợ già nhất`}
             </p>
           </CardContent>
         </Card>
@@ -126,6 +148,15 @@ export default async function DebtsPage() {
           </Card>
         ))}
       </div>
+
+      <SearchInput
+        key={query}
+        paramName="q"
+        resetParams={["page"]}
+        placeholder="Tìm khách theo tên hoặc SĐT — gõ rồi Enter..."
+        value={query}
+        className="w-full max-w-md"
+      />
 
       <Table>
         <TableHeader>
@@ -201,12 +232,13 @@ export default async function DebtsPage() {
           {!debtRows.length && (
             <TableRow>
               <TableCell colSpan={9} className="text-center text-muted-foreground">
-                Không có khách nào còn nợ. 🎉
+                {query ? "Không tìm thấy khách nợ nào." : "Không có khách nào còn nợ. 🎉"}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+      <PaginationControls page={page} totalPages={totalPages} totalCount={matched.length} itemLabel="khách còn nợ" />
     </div>
   );
 }
