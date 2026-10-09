@@ -176,11 +176,75 @@ export async function getCustomerIdStatus(id: string): Promise<{ missingCccd: bo
   return { missingCccd: !!data && data.customer_type === "individual" && !data.tax_code };
 }
 
+// Popup Tạo đơn (Grok CRM 09/10 §C1): chọn khách → tự điền người đặt, SĐT,
+// email, địa chỉ giao từ hồ sơ; "người liên hệ khác" = người đặt các đơn gần
+// đây của khách (khách agency nhiều nhân sự đặt). Thiếu CCCD chỉ để cảnh báo.
+export interface CustomerOrderDefaults {
+  missingCccd: boolean;
+  depositPercentage: number;
+  ordererName: string;
+  ordererPhone: string;
+  ordererEmail: string;
+  deliveryAddress: string;
+  contacts: { name: string; phone: string; email: string }[];
+}
+
+export async function getCustomerOrderDefaults(id: string): Promise<CustomerOrderDefaults | null> {
+  await requireRole([...ALL_ROLES]);
+  const supabase = await createClient();
+  const [{ data: c }, { data: recent }] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("name, customer_type, tax_code, phone, email, address, contact_name, deposit_percentage")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("orders")
+      .select("orderer_name, orderer_phone, orderer_email, delivery_address")
+      .eq("customer_id", id)
+      .is("cancelled_at", null)
+      .order("created_at", { ascending: false })
+      .limit(30),
+  ]);
+  if (!c) return null;
+  const contacts: CustomerOrderDefaults["contacts"] = [];
+  const seen = new Set<string>();
+  for (const o of recent ?? []) {
+    const name = o.orderer_name?.trim();
+    if (!name) continue;
+    const key = (o.orderer_phone ?? "").replace(/\D/g, "") || name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    contacts.push({ name, phone: o.orderer_phone ?? "", email: o.orderer_email ?? "" });
+    if (contacts.length >= 6) break;
+  }
+  const individual = c.customer_type === "individual";
+  // Công ty: người liên hệ trong hồ sơ, không có thì người đặt gần nhất.
+  // Cá nhân: chính khách.
+  const primary = individual
+    ? { name: c.name, phone: c.phone ?? "", email: c.email ?? "" }
+    : c.contact_name?.trim()
+      ? { name: c.contact_name.trim(), phone: c.phone ?? "", email: c.email ?? "" }
+      : (contacts[0] ?? { name: "", phone: c.phone ?? "", email: c.email ?? "" });
+  const lastAddress = (recent ?? []).find((o) => o.delivery_address?.trim())?.delivery_address ?? "";
+  return {
+    missingCccd: individual && !c.tax_code,
+    depositPercentage: c.deposit_percentage ?? 100,
+    ordererName: primary.name,
+    ordererPhone: primary.phone || c.phone || "",
+    ordererEmail: primary.email || c.email || "",
+    deliveryAddress: c.address?.trim() || lastAddress,
+    contacts: contacts.filter((x) => x.name !== primary.name || x.phone !== primary.phone),
+  };
+}
+
 // Tìm khách hàng theo tên/SĐT/MST/email — dùng cho ô chọn khách hàng dạng
 // combobox khi tạo/sửa đơn hàng (email thêm 2026-10-01, CEO báo gõ email
 // không ra). Không dùng select("*") toàn bộ khách hàng ở đây vì Supabase giới
 // hạn 1.000 dòng mỗi query (bảng này hiện có hơn 5.800 dòng).
-export async function searchCustomers(query: string): Promise<{ id: string; name: string }[]> {
+export async function searchCustomers(
+  query: string,
+): Promise<{ id: string; name: string; phone: string | null; customer_type: string }[]> {
   await requireRole([...ALL_ROLES]);
 
   // Bỏ ký tự cú pháp của or= PostgREST (dấu phẩy, ngoặc) để chuỗi tìm không
@@ -191,7 +255,7 @@ export async function searchCustomers(query: string): Promise<{ id: string; name
   const supabase = await createClient();
   const { data } = await supabase
     .from("customers")
-    .select("id, name")
+    .select("id, name, phone, customer_type")
     .or(
       `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,email.ilike.%${trimmed}%,budget_unit_code.ilike.%${trimmed}%`,
     )

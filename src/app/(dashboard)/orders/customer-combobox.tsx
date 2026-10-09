@@ -15,6 +15,8 @@ import { QuickCustomerDialog } from "./quick-customer-dialog";
 interface CustomerOption {
   value: string;
   label: string;
+  // Dòng phụ trong gợi ý: SĐT · Công ty/Cá nhân — phân biệt khách trùng tên.
+  hint?: string;
 }
 
 // Giá trị đặc biệt cho mục "Tạo khách hàng mới" chèn vào cuối danh sách kết
@@ -50,7 +52,13 @@ export function CustomerCombobox({
     timeoutRef.current = setTimeout(() => {
       startTransition(async () => {
         const results = await searchCustomers(nextQuery);
-        setItems(results.map((c) => ({ value: c.id, label: c.name })));
+        setItems(
+          results.map((c) => ({
+            value: c.id,
+            label: c.name,
+            hint: [c.phone, c.customer_type === "individual" ? "Cá nhân" : "Công ty"].filter(Boolean).join(" · "),
+          })),
+        );
       });
     }, 300);
   }
@@ -80,7 +88,7 @@ export function CustomerCombobox({
         onInputValueChange={handleInputValueChange}
         name={name}
       >
-        <ComboboxInput placeholder="Gõ tên hoặc SĐT để tìm khách hàng..." />
+        <ComboboxInput placeholder="Gõ tên, SĐT hoặc MST để tìm khách hàng..." />
         <ComboboxContent>
           <ComboboxEmpty>{pending ? "Đang tìm..." : "Không tìm thấy khách hàng."}</ComboboxEmpty>
           {displayItems.map((item) => (
@@ -91,7 +99,10 @@ export function CustomerCombobox({
                   {item.label}
                 </span>
               ) : (
-                item.label
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate">{item.label}</span>
+                  {item.hint && <span className="shrink-0 text-xs text-muted-foreground">{item.hint}</span>}
+                </span>
               )}
             </ComboboxItem>
           ))}

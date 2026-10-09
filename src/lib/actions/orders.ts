@@ -2447,6 +2447,9 @@ export interface QuickOrderCatalogItem {
   // Số lượng tối đa chở bằng xe máy (website_products.ship_bike_max_qty):
   // null = mặc định 5; 0 = đồ cồng kềnh luôn ô tô; 999 = xe máy chở thoải mái.
   bikeMaxQty: number | null;
+  // Cọc 1 cái (hàng thuê; combo = tổng cọc món con) — chỉ để popup hiện "Cọc"
+  // ở thanh tóm tắt (Grok CRM 09/10 §C). 0 = "Không cần cọc".
+  deposit: number;
 }
 
 export interface QuickOrderCatalog {
@@ -2469,10 +2472,11 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     { data: employees },
     { data: freeRows },
     { data: webRows },
+    { data: componentRows },
   ] = await Promise.all([
     supabase
       .from("equipment_types")
-      .select("id, name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id, image_url")
+      .select("id, name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id, image_url, deposit_amount")
       // Mã đã dừng kinh doanh không hiện khi lên đơn (CEO 2026-10-09).
       .is("discontinued_at", null)
       .order("name"),
@@ -2483,7 +2487,16 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     // §A — trước kéo ~2.200 máy + ~350 dòng đơn mở về đếm ở JS, ~4 giây).
     supabase.rpc("quick_order_free_counts"),
     supabase.from("website_products").select("equipment_type_id, ship_bike_max_qty"),
+    supabase.from("equipment_type_components").select("combo_type_id, component_type_id, quantity"),
   ]);
+  const depositByType = new Map((types ?? []).map((t) => [t.id, t.deposit_amount ?? 0]));
+  const comboDeposit = new Map<string, number>();
+  for (const c of componentRows ?? []) {
+    comboDeposit.set(
+      c.combo_type_id,
+      (comboDeposit.get(c.combo_type_id) ?? 0) + (depositByType.get(c.component_type_id) ?? 0) * c.quantity,
+    );
+  }
 
   const bikeMaxByType = new Map((webRows ?? []).map((w) => [w.equipment_type_id, w.ship_bike_max_qty]));
   const freeByType = new Map<string, Record<string, number>>();
@@ -2517,6 +2530,12 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
       rentalPeriodUnit: t.rental_period_unit,
       templateId: t.pricing_method === "pricing_structure" ? t.pricing_template_id : null,
       bikeMaxQty: bikeMaxByType.get(t.id) ?? null,
+      deposit:
+        t.product_type !== "rental"
+          ? 0
+          : t.tracking_type === "combo"
+            ? (comboDeposit.get(t.id) ?? 0)
+            : (t.deposit_amount ?? 0),
     };
     const typeUnits = unitsByType.get(t.id) ?? [];
     if (t.product_type === "rental" && t.tracking_type === "individual") {
