@@ -1,9 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Eye, EyeOff, Star, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   toggleProductFeatured,
   toggleProductNew,
@@ -80,23 +81,52 @@ export function WebsiteProductRowActions({
   );
 }
 
+// Hỏi lại trước khi làm mới (đề xuất CRM v2 §4.7): nút này KHÔNG đăng gì
+// mới — thay đổi đã tự lên web khi bấm Lưu; nó xoá bộ nhớ đệm toàn site nên
+// vài phút đầu web chậm hơn. Nói rõ để khỏi bấm khi không cần.
 export function RefreshWebsiteButton() {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          const result = await refreshWebsiteNow();
-          if (result && "error" in result) toast.error(result.error);
-          else toast.success("Web đang làm mới nội dung.");
-        })
-      }
-    >
-      <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
-      Cập nhật web ngay
-    </Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" disabled={pending}>
+            <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
+            Cập nhật web ngay
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Làm mới toàn bộ web?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>Thay đổi đã lưu vốn tự lên web sau khi bấm Lưu — thường không cần nút này.</p>
+          <p>
+            Chỉ bấm khi web vẫn hiện nội dung cũ sau vài phút. Web sẽ xoá bộ nhớ đệm mọi trang, nên vài phút đầu
+            khách mở trang sẽ chậm hơn.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+            Huỷ
+          </Button>
+          <Button
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await refreshWebsiteNow();
+                if (result && "error" in result) toast.error(result.error);
+                else toast.success("Web đang làm mới nội dung.");
+                setOpen(false);
+              })
+            }
+          >
+            {pending ? "Đang làm mới..." : "Làm mới web"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
