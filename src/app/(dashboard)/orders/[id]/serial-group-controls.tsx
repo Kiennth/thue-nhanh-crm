@@ -18,6 +18,9 @@ import {
 
 export function SerialQuantityStepper({ lineIds, quantity }: { lineIds: string[]; quantity: number }) {
   const [value, setValue] = useState(String(quantity));
+  // Chỉ gửi số trong ô khi người dùng thật sự GÕ — bấm vào rồi bấm ra ngoài
+  // không được gửi lại số cũ (từng làm số máy bị đổi ngược, CEO 09/10).
+  const [typed, setTyped] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function commit(next: number) {
@@ -50,8 +53,15 @@ export function SerialQuantityStepper({ lineIds, quantity }: { lineIds: string[]
         value={value}
         inputMode="numeric"
         disabled={pending}
-        onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
-        onBlur={() => commit(Number(value))}
+        onChange={(e) => {
+          setTyped(true);
+          setValue(e.target.value.replace(/\D/g, ""));
+        }}
+        onBlur={() => {
+          if (!typed) return;
+          setTyped(false);
+          commit(Number(value));
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}

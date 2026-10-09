@@ -1227,7 +1227,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             {availabilityCell(null, false)}
                             <TableCell className="tabular-nums">
                               {linesEditable ? (
-                                <SerialQuantityStepper lineIds={memberIds} quantity={members.length} />
+                                <SerialQuantityStepper
+                                  // Đổi thành viên nhóm (Đổi SP, xoá dòng, thêm máy…) → dựng lại
+                                  // ô số lượng, không giữ số cũ (CEO 09/10: trang đơn hiện SL cũ
+                                  // trong khi báo giá đã theo SL mới).
+                                  key={memberIds.join(",")}
+                                  lineIds={memberIds}
+                                  quantity={members.length}
+                                />
                               ) : (
                                 members.length
                               )}
