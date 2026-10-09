@@ -66,6 +66,7 @@ interface EquipmentTypeDialogProps {
     rental_period_unit: RentalPeriodUnit | null;
     pricing_template_id: string | null;
     deposit_amount: number;
+    deposit_negotiable?: boolean;
     image_url: string | null;
     payout_percentage: number | null;
     category_id: string | null;
@@ -348,7 +349,19 @@ export function EquipmentTypeDialog({
                   defaultValue={equipmentType?.deposit_amount ?? 0}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Thu cùng đơn (không tính VAT), hoàn lại sau khi nghiệm thu. Để 0 nếu không thu cọc.
+                  Thu cùng đơn (không tính VAT), hoàn lại sau khi nghiệm thu. Để 0 = web hiện &quot;Không cần cọc&quot;.
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="deposit_negotiable"
+                    defaultChecked={equipmentType?.deposit_negotiable ?? false}
+                    className="size-4"
+                  />
+                  Cọc thoả thuận theo hồ sơ
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Tích khi cọc tuỳ khách (vd photobooth) — web hiện &quot;Cọc thoả thuận theo hồ sơ&quot; thay cho số tiền.
                 </p>
               </div>
 

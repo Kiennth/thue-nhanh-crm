@@ -75,6 +75,8 @@ const EquipmentTypeSchema = z
     rental_period_unit: z.enum(["hour", "day", "week", "month", "year"]).optional(),
     pricing_template_id: z.string().uuid().optional(),
     deposit_amount: z.coerce.number().min(0, { message: "Tiền cọc không được âm." }).optional(),
+    // Ô tích "Cọc thoả thuận theo hồ sơ" (checkbox gửi "on" khi tích).
+    deposit_negotiable: z.boolean().default(false),
     payout_percentage: z.coerce
       .number()
       .min(0, { message: "% trả trực tiếp phải từ 0-100." })
@@ -132,6 +134,7 @@ function normalizeEquipmentType(
         data.pricing_method === "pricing_structure" ? (data.pricing_template_id ?? null) : null,
       // Cọc của combo = cọc các món con (tính ở trang đơn) — combo không cọc riêng.
       deposit_amount: data.tracking_type === "combo" ? 0 : (data.deposit_amount ?? 0),
+      deposit_negotiable: data.tracking_type === "combo" ? false : data.deposit_negotiable,
       payout_percentage: null,
       category_id: data.category_id ?? null,
       default_extra_information: data.default_extra_information || null,
@@ -149,6 +152,7 @@ function normalizeEquipmentType(
       rental_period_unit: data.rental_period_unit ?? null,
       pricing_template_id: null,
       deposit_amount: 0,
+      deposit_negotiable: false,
       payout_percentage: data.payout_percentage ?? null,
       category_id: data.category_id ?? null,
       default_extra_information: data.default_extra_information || null,
@@ -165,6 +169,7 @@ function normalizeEquipmentType(
     rental_period_unit: null,
     pricing_template_id: null,
     deposit_amount: 0,
+    deposit_negotiable: false,
     payout_percentage: null,
     category_id: data.category_id ?? null,
     default_extra_information: data.default_extra_information || null,
@@ -181,6 +186,7 @@ function parseEquipmentTypeForm(formData: FormData) {
     rental_period_unit: formData.get("rental_period_unit") || undefined,
     pricing_template_id: formData.get("pricing_template_id") || undefined,
     deposit_amount: formData.get("deposit_amount") || undefined,
+    deposit_negotiable: formData.get("deposit_negotiable") === "on",
     payout_percentage: formData.get("payout_percentage") || undefined,
     category_id: formData.get("category_id") || undefined,
     default_extra_information: formData.get("default_extra_information") || undefined,

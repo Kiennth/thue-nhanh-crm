@@ -208,6 +208,9 @@ export interface Database {
           // Ghi chú mặc định của dòng khi thêm SP này vào đơn (vd "Kèm Remote
           // | Dây nguồn") — xem order_equipment.extra_information.
           default_extra_information: string | null;
+          // Cọc "Thoả thuận theo hồ sơ" (đề xuất CRM v2 §1d, vd photobooth) —
+          // web hiện chữ này thay cho số tiền / "Không cần cọc".
+          deposit_negotiable: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -225,6 +228,7 @@ export interface Database {
           payout_percentage?: number | null;
           category_id?: string | null;
           default_extra_information?: string | null;
+          deposit_negotiable?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];
