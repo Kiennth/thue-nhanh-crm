@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireRole } from "@/lib/dal";
-import { ALL_ROLES } from "@/lib/roles";
+import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { matchWebOrderCustomers, type WebOrderItem } from "@/lib/actions/website-orders";
 import { cn } from "@/lib/utils";
@@ -21,12 +21,17 @@ const FILTERS = [
 // Kho khách chọn trên web → chi nhánh CRM (theo tên chi nhánh).
 const BRANCH_NAME_BY_KEY: Record<string, string> = { hn: "Hà Nội", hcm: "TP HCM", dn: "Đà Nẵng" };
 
+const maskId = (v: string) => {
+  const d = v.replace(/\D/g, "");
+  return d.length > 6 ? `${d.slice(0, 4)}${"•".repeat(d.length - 6)}${d.slice(-2)}` : "••••";
+};
+
 export default async function WebOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireRole([...ALL_ROLES]);
+  const me = await requireRole([...ALL_ROLES]);
   const { status } = await searchParams;
   const filter = FILTERS.find((f) => f.key === status) ?? FILTERS[0];
 
@@ -49,6 +54,14 @@ export default async function WebOrdersPage({
   const matches = openRows.length
     ? await matchWebOrderCustomers(openRows.map((r) => ({ id: r.id, tax_code: r.tax_code, phone: r.phone })))
     : {};
+  // CCCD khách lẻ là dữ liệu cá nhân (đề xuất CRM v2 §7.5): chỉ Giám đốc /
+  // Admin / Kế toán xem đủ số; người khác thấy dạng che 0790••••••12. Che
+  // ngay ở server nên trình duyệt không nhận số đầy đủ — "Lên đơn" vẫn đọc
+  // CCCD thật từ DB (createCustomerFromWebOrder), khớp khách đã chạy ở trên.
+  const seeFullId = MANAGE_ROLES.includes(me.role);
+  const shown = seeFullId
+    ? list
+    : list.map((r) => (r.customer_type === "individual" ? { ...r, tax_code: maskId(r.tax_code) } : r));
   const branchList = branches ?? [];
   const branchIdByKey = (key: string | null) =>
     key ? (branchList.find((b) => b.name === BRANCH_NAME_BY_KEY[key])?.id ?? null) : null;
@@ -93,7 +106,7 @@ export default async function WebOrdersPage({
         </p>
       ) : (
         <div className="space-y-3">
-          {list.map((r) => (
+          {shown.map((r) => (
             <WebOrderCard
               key={r.id}
               row={r}
