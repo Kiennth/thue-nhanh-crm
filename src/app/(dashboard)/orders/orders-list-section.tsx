@@ -454,7 +454,8 @@ export async function OrdersListSection({
               {canDelete && (
                 <TableCell>
                   <ConfirmDeleteButton
-                    confirmMessage={`Xoá đơn hàng "${order.order_code}"? Hành động này không thể hoàn tác.`}
+                    inMenu
+                    confirmMessage={`Xoá đơn hàng "${order.order_code}"? Toàn bộ dữ liệu của đơn sẽ bị xoá, không thể hoàn tác.`}
                     successMessage="Đã xoá đơn hàng."
                     action={deleteOrder}
                     actionArg={order.id}

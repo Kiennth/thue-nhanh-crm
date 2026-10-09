@@ -629,6 +629,7 @@ export default async function EquipmentPage({
                           )}
                           {canManageCatalog && (
                             <ConfirmDeleteButton
+                              inMenu
                               confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
                               successMessage="Đã xoá."
                               action={deleteEquipmentType}

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,11 +27,15 @@ export function ConfirmDeleteButton<T>({
   successMessage,
   action,
   actionArg,
+  inMenu = false,
 }: {
   confirmMessage: string;
   successMessage: string;
   action: (arg: T) => Promise<void>;
   actionArg: T;
+  // Danh sách dài (đề xuất CRM v2 §4.3): không để thùng rác trên từng dòng —
+  // nút "⋯" mở menu, mục "Xoá…" chữ đỏ rồi mới tới hộp xác nhận.
+  inMenu?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -49,14 +54,33 @@ export function ConfirmDeleteButton<T>({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="ghost" size="icon-sm">
-            <Trash2 className="size-4" />
-            <span className="sr-only">Xoá</span>
-          </Button>
-        }
-      />
+      {inMenu ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="icon-sm">
+                <MoreHorizontal className="size-4" />
+                <span className="sr-only">Thao tác</span>
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem variant="destructive" onClick={() => setOpen(true)}>
+              <Trash2 />
+              Xoá…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <DialogTrigger
+          render={
+            <Button variant="ghost" size="icon-sm">
+              <Trash2 className="size-4" />
+              <span className="sr-only">Xoá</span>
+            </Button>
+          }
+        />
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Xác nhận xoá</DialogTitle>
