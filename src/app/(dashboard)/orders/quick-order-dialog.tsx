@@ -203,11 +203,15 @@ function loadCatalog(): Promise<QuickOrderCatalog> {
 }
 
 // Giờ nhận mặc định (Grok CRM 09/10 §C1): giờ tròn kế tiếp hôm nay; sau 17:00
-// thì 08:00 sáng mai.
+// thì 08:00 sáng mai, trước 07:00 (tạo đơn lúc rạng sáng) thì 08:00 hôm nay.
 function defaultQuickStart(now: Date): Date {
   const d = new Date(now);
   if (d.getHours() >= 17) {
     d.setDate(d.getDate() + 1);
+    d.setHours(8, 0, 0, 0);
+    return d;
+  }
+  if (d.getHours() < 7) {
     d.setHours(8, 0, 0, 0);
     return d;
   }
@@ -1088,13 +1092,13 @@ export function QuickOrderDialog({
                             : null;
                         return (
                           <div key={line.item.key} className="flex flex-wrap items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <p className="truncate">{line.item.label}</p>
+                            <div className="min-w-[12rem] flex-1">
+                              <p className="line-clamp-2 leading-snug">{line.item.label}</p>
                               {/* Tồn chỉ tham khảo — KHÔNG bao giờ chặn tạo đơn (§C, quy tắc chủ). */}
                               {free !== null && (
                                 <span
                                   className={cn(
-                                    "shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px]",
+                                    "mt-0.5 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px]",
                                     line.quantity > free ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
                                   )}
                                 >
@@ -1135,7 +1139,7 @@ export function QuickOrderDialog({
                               </Button>
                             </div>
                             {perDay !== null && (
-                              <span className="hidden w-40 text-right text-xs text-muted-foreground tabular-nums sm:inline">
+                              <span className="hidden w-36 text-right text-xs text-muted-foreground tabular-nums sm:inline">
                                 {perDay < line.item.price - 1 && <s className="mr-1">{vnd(line.item.price)}</s>}
                                 {vnd(perDay)}/ngày
                               </span>
