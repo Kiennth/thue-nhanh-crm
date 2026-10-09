@@ -18,9 +18,12 @@ export interface WebOrderRow {
   id: string;
   code: string;
   customer_type: "individual" | "company";
+  // Họ tên người liên hệ (form web v2, 09/10); công ty có thêm company_name.
   customer_name: string;
+  company_name: string | null;
   phone: string;
-  email: string;
+  email: string | null;
+  // Công ty: MST · khách lẻ: số CCCD (CEO: "CCCD chính là MST").
   tax_code: string;
   pickup_key: "hcm" | "hn" | "dn" | "ship";
   ship_city: "hcm" | "hn" | "dn" | null;
@@ -99,23 +102,31 @@ export function WebOrderCard({
         <div className="space-y-1 text-sm">
           <p className="flex items-center gap-1.5 font-medium">
             {row.customer_type === "company" ? <Building2 className="size-4" /> : <User className="size-4" />}
-            {row.customer_name}
+            {row.company_name ?? row.customer_name}
             <span className="font-normal text-muted-foreground">
-              · {row.customer_type === "company" ? "MST" : "MST/CCCD"} {row.tax_code}
+              · {row.customer_type === "company" ? "MST" : "CCCD"} {row.tax_code}
             </span>
           </p>
+          {row.company_name && (
+            <p className="flex items-center gap-1.5">
+              <User className="size-4 text-muted-foreground" />
+              Liên hệ: {row.customer_name}
+            </p>
+          )}
           <p className="flex items-center gap-1.5">
             <Phone className="size-4 text-muted-foreground" />
             <a href={`tel:${row.phone}`} className="hover:underline">
               {row.phone}
             </a>
           </p>
-          <p className="flex items-center gap-1.5">
-            <Mail className="size-4 text-muted-foreground" />
-            <a href={`mailto:${row.email}`} className="hover:underline">
-              {row.email}
-            </a>
-          </p>
+          {row.email && (
+            <p className="flex items-center gap-1.5">
+              <Mail className="size-4 text-muted-foreground" />
+              <a href={`mailto:${row.email}`} className="hover:underline">
+                {row.email}
+              </a>
+            </p>
+          )}
           <p className="flex items-start gap-1.5">
             <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             {row.pickup_key === "ship"
@@ -204,7 +215,7 @@ export function WebOrderCard({
                 customer: matchedCustomer,
                 ordererName: row.customer_name,
                 ordererPhone: row.phone,
-                ordererEmail: row.email,
+                ordererEmail: row.email ?? "",
                 deliveryAddress: row.pickup_key === "ship" ? row.address : null,
               }}
             />

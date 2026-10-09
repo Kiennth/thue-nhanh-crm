@@ -102,14 +102,15 @@ export async function createCustomerFromWebOrder(
   await requireRole([...ALL_ROLES]);
   const supabase = await createClient();
   const { data: wo } = await (await webOrdersTable())
-    .select("customer_type, customer_name, phone, email, tax_code, address")
+    .select("customer_type, customer_name, company_name, phone, email, tax_code, address")
     .eq("id", webOrderId)
     .single();
   if (!wo) return { error: "Không tìm thấy đơn web." };
   const { data, error } = await supabase
     .from("customers")
     .insert({
-      name: wo.customer_name,
+      // Công ty: tên pháp nhân (form web v2); khách lẻ: họ tên.
+      name: wo.company_name ?? wo.customer_name,
       phone: wo.phone,
       email: wo.email,
       tax_code: wo.tax_code,
