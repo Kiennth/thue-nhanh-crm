@@ -56,7 +56,8 @@ export function SpecTab({
         </span>
       </CardHeader>
       <CardContent className="space-y-3">
-        <fieldset disabled={!canEdit || pending} className="contents">
+        {/* fieldset KHÔNG dùng display:contents — Chrome không cho focus ô bên trong. */}
+        <fieldset disabled={!canEdit || pending} className="m-0 min-w-0 border-0 p-0">
           <SpecFacetsEditor
             categorySlug={categorySlug}
             productSlug={productSlug}
