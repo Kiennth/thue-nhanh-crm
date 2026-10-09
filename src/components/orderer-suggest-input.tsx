@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { searchOrderers, type OrdererSuggestion } from "@/lib/actions/orderers";
 
-// Ô Tên / SĐT người đặt có gợi ý (CEO 2026-10-05): gõ ≥ 2 ký tự → hiện người
-// đặt đã có trong danh bạ, chọn là điền đủ tên + SĐT + email (onPick).
+// Ô Tên / SĐT có gợi ý (CEO 2026-10-05 người đặt; 2026-10-09 dùng chung cho
+// người nhận / người trả hàng): gõ ≥ 2 ký tự → hiện người trong danh bạ (người
+// đặt + người từng nhận/trả hàng), chọn là điền (onPick).
 export function OrdererSuggestInput({
   onPick,
   onValueChange,
@@ -60,7 +61,7 @@ export function OrdererSuggestInput({
       />
       {open && items.length > 0 && (
         <ul className="absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-lg">
-          <li className="px-2 py-1 text-[11px] text-muted-foreground">Người đặt đã có — bấm để điền</li>
+          <li className="px-2 py-1 text-[11px] text-muted-foreground">Người trong danh bạ — bấm để điền</li>
           {items.map((o) => (
             <li key={o.id}>
               <button
@@ -77,6 +78,7 @@ export function OrdererSuggestInput({
                   {[o.phone, o.email].filter(Boolean).length ? ` · ${[o.phone, o.email].filter(Boolean).join(" · ")}` : ""}
                 </span>
                 {o.title && <span className="block text-xs text-muted-foreground">{o.title}</span>}
+                {o.source === "receiver" && <span className="block text-xs text-muted-foreground">Từng nhận/trả hàng</span>}
               </button>
             </li>
           ))}

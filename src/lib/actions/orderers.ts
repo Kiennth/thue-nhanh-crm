@@ -65,6 +65,8 @@ export interface OrdererSuggestion {
   phone: string | null;
   email: string | null;
   title: string | null;
+  // "receiver" = người từng NHẬN/TRẢ hàng trên đơn cũ (không có hồ sơ người đặt).
+  source?: "orderer" | "receiver";
 }
 
 // Gợi ý tự điền khi gõ tên / SĐT người đặt trên đơn (CEO 2026-10-05) — mọi
@@ -81,5 +83,45 @@ export async function searchOrderers(q: string): Promise<OrdererSuggestion[]> {
       ? query.ilike("phone_key", `%${digits}%`)
       : query.or(`name.ilike.%${text.replace(/[,()%]/g, " ")}%,email.ilike.%${text.replace(/[,()%]/g, " ")}%`);
   const { data } = await query;
-  return (data ?? []) as OrdererSuggestion[];
+  const orderers = ((data ?? []) as OrdererSuggestion[]).map((o) => ({ ...o, source: "orderer" as const }));
+
+  // Dùng chung 1 danh bạ cho người đặt / người nhận / người trả hàng (CEO
+  // 2026-10-09): thêm những người từng nhận hoặc trả hàng trên đơn cũ, trùng
+  // SĐT với người đặt thì bỏ. Không ghi họ vào bảng người đặt (giữ số liệu
+  // "ai mang khách về" sạch).
+  const safe = text.replace(/[,()%]/g, " ");
+  const byPhone = digits.length >= 3 && digits.length === text.replace(/[\s.+-]/g, "").replace(/^(84|0)/, "").length;
+  const filter = byPhone
+    ? `receiver_phone.ilike.%${digits}%,return_contact_phone.ilike.%${digits}%`
+    : `receiver_name.ilike.%${safe}%,return_contact_name.ilike.%${safe}%`;
+  const { data: past } = await db
+    .from("orders")
+    .select("receiver_name, receiver_phone, return_contact_name, return_contact_phone")
+    .or(filter)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const key = (p: string | null) => (p ?? "").replace(/\D/g, "").replace(/^(84|0)/, "");
+  const seen = new Set(orderers.map((o) => key(o.phone) || `n:${o.name.toLowerCase()}`));
+  const needle = safe.toLowerCase();
+  const extra: OrdererSuggestion[] = [];
+  for (const r of (past ?? []) as {
+    receiver_name: string | null;
+    receiver_phone: string | null;
+    return_contact_name: string | null;
+    return_contact_phone: string | null;
+  }[]) {
+    for (const [name, phone] of [
+      [r.receiver_name, r.receiver_phone],
+      [r.return_contact_name, r.return_contact_phone],
+    ] as const) {
+      if (!name?.trim()) continue;
+      const hit = byPhone ? key(phone).includes(digits) : name.toLowerCase().includes(needle);
+      if (!hit) continue;
+      const k = key(phone) || `n:${name.trim().toLowerCase()}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      extra.push({ id: `r:${k}`, name: name.trim(), phone: phone?.trim() || null, email: null, title: null, source: "receiver" });
+    }
+  }
+  return [...orderers, ...extra].slice(0, 8);
 }

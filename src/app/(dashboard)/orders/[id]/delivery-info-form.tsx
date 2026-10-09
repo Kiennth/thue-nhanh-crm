@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { OrdererSuggestInput } from "@/components/orderer-suggest-input";
 import { toast } from "sonner";
 import { PackageCheck, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -108,11 +109,22 @@ export function DeliveryInfoForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="receiver_name">Tên người nhận</Label>
-          <Input id="receiver_name" value={values.name} onChange={field(setValues, "name")} />
+          <OrdererSuggestInput
+            id="receiver_name"
+            value={values.name}
+            onChange={field(setValues, "name")}
+            onPick={(o) => setValues((v) => ({ ...v, name: o.name, phone: o.phone ?? v.phone }))}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="receiver_phone">SĐT người nhận</Label>
-          <Input id="receiver_phone" inputMode="tel" value={values.phone} onChange={field(setValues, "phone")} />
+          <OrdererSuggestInput
+            id="receiver_phone"
+            inputMode="tel"
+            value={values.phone}
+            onChange={field(setValues, "phone")}
+            onPick={(o) => setValues((v) => ({ ...v, name: o.name, phone: o.phone ?? v.phone }))}
+          />
         </div>
       </div>
 
@@ -140,15 +152,21 @@ export function DeliveryInfoForm({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="return_contact_name">Tên người trả hàng</Label>
-              <Input id="return_contact_name" value={ret.name} onChange={field(setRet, "name")} />
+              <OrdererSuggestInput
+                id="return_contact_name"
+                value={ret.name}
+                onChange={field(setRet, "name")}
+                onPick={(o) => setRet((v) => ({ ...v, name: o.name, phone: o.phone ?? v.phone }))}
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="return_contact_phone">SĐT người trả hàng</Label>
-              <Input
+              <OrdererSuggestInput
                 id="return_contact_phone"
                 inputMode="tel"
                 value={ret.phone}
                 onChange={field(setRet, "phone")}
+                onPick={(o) => setRet((v) => ({ ...v, name: o.name, phone: o.phone ?? v.phone }))}
               />
             </div>
           </div>

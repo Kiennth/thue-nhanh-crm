@@ -887,21 +887,29 @@ export function QuickOrderDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_receiver_name">Tên người nhận</Label>
-                <Input
+                <OrdererSuggestInput
                   id="quick_receiver_name"
                   value={receiverName}
                   onChange={(e) => setReceiverName(e.target.value)}
                   placeholder={ordererName || "Trống = người đặt"}
+                  onPick={(o) => {
+                    setReceiverName(o.name);
+                    setReceiverPhone(o.phone ?? "");
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quick_receiver_phone">SĐT người nhận</Label>
-                <Input
+                <OrdererSuggestInput
                   id="quick_receiver_phone"
                   inputMode="tel"
                   value={receiverPhone}
                   onChange={(e) => setReceiverPhone(e.target.value)}
                   placeholder={ordererPhone || "Trống = SĐT người đặt"}
+                  onPick={(o) => {
+                    setReceiverName(o.name);
+                    setReceiverPhone(o.phone ?? "");
+                  }}
                 />
               </div>
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
@@ -921,21 +929,29 @@ export function QuickOrderDialog({
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="quick_return_name">Tên người trả hàng</Label>
-                    <Input
+                    <OrdererSuggestInput
                       id="quick_return_name"
                       value={returnName}
                       onChange={(e) => setReturnName(e.target.value)}
                       placeholder={receiverName || ordererName || "Trống = người nhận"}
+                      onPick={(o) => {
+                        setReturnName(o.name);
+                        setReturnPhone(o.phone ?? "");
+                      }}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="quick_return_phone">SĐT người trả hàng</Label>
-                    <Input
+                    <OrdererSuggestInput
                       id="quick_return_phone"
                       inputMode="tel"
                       value={returnPhone}
                       onChange={(e) => setReturnPhone(e.target.value)}
                       placeholder={receiverPhone || ordererPhone || "Trống = SĐT người nhận"}
+                      onPick={(o) => {
+                        setReturnName(o.name);
+                        setReturnPhone(o.phone ?? "");
+                      }}
                     />
                   </div>
                 </>
