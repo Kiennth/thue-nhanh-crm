@@ -52,6 +52,15 @@
         "3300"
       ],
       "port": 3300
+    },
+    {
+      "name": "elago-web",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "cd ~/Documents/'Elago Web' && npx wrangler dev --port 8795 --local"
+      ],
+      "port": 8795
     }
   ]
 }
