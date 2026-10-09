@@ -142,6 +142,38 @@ export const SPEC_FIELDS: Record<string, SpecField> = {
   dung_luong_wh: { kind: "num", label: { vi: "Dung lượng", en: "Capacity" }, unit: "Wh", min: 10, max: 50000 },
   chat_lieu: { kind: "text", label: { vi: "Chất liệu", en: "Material" }, placeholder: "Mặt gỗ, chân inox" },
   thong_so: { kind: "text", label: { vi: "Thông số chính", en: "Key spec" }, placeholder: "768 Wh · 20.000 mAh · 5 tầng" },
+  // B4 (Grok CRM 09/10, spec_filter_standard.csv): trường chi tiết cho khối
+  // "Thông số nổi bật" trên trang sản phẩm — không phải bộ lọc.
+  dong_may: { kind: "text", label: { vi: "Dòng máy", en: "Model line" }, placeholder: "MacBook Air M3, 2024" },
+  model: { kind: "text", label: { vi: "Model", en: "Model" }, placeholder: "EON One Compact" },
+  o_cung: { kind: "text", label: { vi: "Ổ cứng", en: "Storage" }, placeholder: "512GB SSD" },
+  cong_ket_noi: { kind: "text", label: { vi: "Cổng kết nối", en: "Ports" }, placeholder: "HDMI ×2, USB-C" },
+  khong_day: { kind: "text", label: { vi: "Kết nối không dây", en: "Wireless" }, placeholder: "Wi-Fi 6E, Bluetooth 5.3" },
+  pin: { kind: "text", label: { vi: "Pin", en: "Battery" }, placeholder: "52,6 Wh · tới 18 giờ" },
+  he_dieu_hanh: { kind: "text", label: { vi: "Hệ điều hành", en: "OS" }, placeholder: "macOS · Android 13" },
+  trong_luong_kg: { kind: "num", label: { vi: "Trọng lượng", en: "Weight" }, unit: "kg", min: 0.01, max: 1000, step: 0.01 },
+  di_kem: { kind: "text", label: { vi: "Đi kèm", en: "Included" }, placeholder: "Cáp sạc, ốp" },
+  kich_thuoc_may: { kind: "text", label: { vi: "Kích thước máy", en: "Dimensions" }, placeholder: "1490 × 900 × 90 mm" },
+  kich_thuoc: { kind: "text", label: { vi: "Kích thước", en: "Size" }, placeholder: "Ø60 × 110 cm" },
+  tam_nen: { kind: "text", label: { vi: "Tấm nền", en: "Panel" }, placeholder: "IPS" },
+  do_sang_nits: { kind: "num", label: { vi: "Độ sáng", en: "Brightness" }, unit: "nits", min: 50, max: 10000 },
+  khoang_chieu: { kind: "text", label: { vi: "Khoảng chiếu", en: "Throw distance" }, placeholder: "3 m ≈ 100 inch" },
+  man_chieu: { kind: "text", label: { vi: "Màn chiếu đi kèm", en: "Screen included" }, placeholder: "100 inch chân đứng" },
+  micro_di_kem: { kind: "text", label: { vi: "Micro đi kèm", en: "Mics included" }, placeholder: "2 micro không dây" },
+  phu_hop: { kind: "text", label: { vi: "Phù hợp", en: "Suitable for" }, placeholder: "≤ 100 khách" },
+  so_kenh: { kind: "num", label: { vi: "Số kênh", en: "Channels" }, unit: "kênh", min: 1, max: 10 },
+  tam_phat_m: { kind: "num", label: { vi: "Tầm phát", en: "Range" }, unit: "m", min: 1, max: 2000 },
+  bo_phat: { kind: "text", label: { vi: "Bộ phát", en: "Transmitter" }, placeholder: "1 bộ phát / kênh" },
+  cach_dung: { kind: "text", label: { vi: "Cách dùng", en: "Use cases" }, placeholder: "Party, Talk, Tour" },
+  ong_kinh: { kind: "text", label: { vi: "Ống kính đi kèm", en: "Lens included" }, placeholder: "28–70 mm f/3.5–5.6" },
+  the_nho_pin: { kind: "text", label: { vi: "Thẻ nhớ / pin", en: "Card / batteries" }, placeholder: "2 pin, thẻ 128GB" },
+  dien_tich: { kind: "text", label: { vi: "Diện tích đặt máy", en: "Footprint" }, placeholder: "2 × 2 m" },
+  nhan_su: { kind: "text", label: { vi: "Nhân sự đi kèm", en: "Staff included" }, placeholder: "1 kỹ thuật" },
+  nguon_dien: { kind: "text", label: { vi: "Nguồn điện", en: "Power" }, placeholder: "220V, 1 ổ" },
+  game_di_kem: { kind: "text", label: { vi: "Game đi kèm", en: "Games included" }, placeholder: "5 game" },
+  man_hinh_di_kem: { kind: "text", label: { vi: "Màn hình đi kèm", en: "Display included" }, placeholder: "Không" },
+  mau: { kind: "text", label: { vi: "Màu", en: "Colour" }, placeholder: "Trắng" },
+  so_cho: { kind: "num", label: { vi: "Số chỗ", en: "Seats" }, unit: "người", min: 1, max: 200 },
 };
 
 // Nhóm hàng: các ô nhập trong CRM (fields), bộ lọc riêng trên web (filters,
@@ -154,20 +186,23 @@ export interface SpecGroup {
   card: string[];
 }
 
+// fields theo đúng thứ tự cột "order" của spec_filter_standard.csv (B4);
+// filters/card giữ như đã chạy trên web.
 export const SPEC_GROUPS: Record<string, SpecGroup> = {
-  laptop: { label: "Laptop & MacBook", fields: ["hang", "chip", "ram_gb", "man_hinh_inch", "gpu"], filters: ["hang", "chip", "ram_gb"], card: ["man_hinh_inch", "chip", "ram_gb"] },
-  pc: { label: "PC, Mac mini & Mac Studio", fields: ["hang", "chip", "ram_gb", "gpu", "man_hinh_inch"], filters: ["hang", "chip", "ram_gb"], card: ["chip", "ram_gb", "gpu"] },
-  screen: { label: "Màn hình & màn tương tác", fields: ["hang", "kich_thuoc_inch", "do_phan_giai", "cam_ung", "chan_gia"], filters: ["kich_thuoc_inch", "cam_ung", "do_phan_giai"], card: ["kich_thuoc_inch", "do_phan_giai", "cam_ung"] },
-  tv: { label: "TV & màn LED", fields: ["hang", "kich_thuoc_inch", "do_phan_giai", "chan_gia"], filters: ["kich_thuoc_inch", "do_phan_giai", "chan_gia"], card: ["kich_thuoc_inch", "do_phan_giai", "chan_gia"] },
-  projector: { label: "Máy chiếu", fields: ["hang", "do_sang_lumen", "do_phan_giai"], filters: ["do_sang_lumen", "do_phan_giai"], card: ["do_sang_lumen", "do_phan_giai", "hang"] },
-  audio: { label: "Âm thanh", fields: ["hang", "loai", "cong_suat_w", "nguon"], filters: ["loai", "hang", "nguon"], card: ["loai", "cong_suat_w", "nguon"] },
-  phone: { label: "Điện thoại & tablet", fields: ["hang", "man_hinh_inch", "bo_nho_gb", "camera_mp", "chip"], filters: ["hang", "bo_nho_gb", "man_hinh_inch"], card: ["man_hinh_inch", "bo_nho_gb", "camera_mp"] },
-  camera: { label: "Máy ảnh, máy quay & livestream", fields: ["hang", "loai", "video", "cam_bien"], filters: ["loai", "hang", "video"], card: ["loai", "video", "cam_bien"] },
-  photobooth: { label: "Photobooth", fields: ["loai", "in_anh"], filters: ["loai", "in_anh"], card: ["loai", "in_anh"] },
-  console: { label: "Máy game", fields: ["hang", "he_may", "so_tay_cam"], filters: ["he_may", "so_tay_cam"], card: ["he_may", "so_tay_cam"] },
+  laptop: { label: "Laptop & MacBook", fields: ["hang", "dong_may", "chip", "ram_gb", "o_cung", "man_hinh_inch", "gpu", "cong_ket_noi", "khong_day", "pin", "he_dieu_hanh", "trong_luong_kg"], filters: ["hang", "chip", "ram_gb"], card: ["man_hinh_inch", "chip", "ram_gb"] },
+  pc: { label: "PC, Mac mini & Mac Studio", fields: ["hang", "dong_may", "chip", "ram_gb", "o_cung", "gpu", "man_hinh_inch", "cong_ket_noi", "di_kem", "kich_thuoc_may", "trong_luong_kg"], filters: ["hang", "chip", "ram_gb"], card: ["chip", "ram_gb", "gpu"] },
+  screen: { label: "Màn hình & màn tương tác", fields: ["hang", "kich_thuoc_inch", "do_phan_giai", "cam_ung", "tam_nen", "he_dieu_hanh", "cong_ket_noi", "chan_gia", "kich_thuoc_may", "trong_luong_kg"], filters: ["kich_thuoc_inch", "cam_ung", "do_phan_giai"], card: ["kich_thuoc_inch", "do_phan_giai", "cam_ung"] },
+  tv: { label: "TV & màn LED", fields: ["hang", "kich_thuoc_inch", "do_phan_giai", "do_sang_nits", "cong_ket_noi", "chan_gia", "kich_thuoc_may", "trong_luong_kg"], filters: ["kich_thuoc_inch", "do_phan_giai", "chan_gia"], card: ["kich_thuoc_inch", "do_phan_giai", "chan_gia"] },
+  projector: { label: "Máy chiếu", fields: ["hang", "do_sang_lumen", "do_phan_giai", "khoang_chieu", "cong_ket_noi", "man_chieu", "trong_luong_kg"], filters: ["do_sang_lumen", "do_phan_giai"], card: ["do_sang_lumen", "do_phan_giai", "hang"] },
+  audio: { label: "Âm thanh", fields: ["hang", "model", "loai", "cong_suat_w", "nguon", "pin", "micro_di_kem", "cong_ket_noi", "phu_hop", "trong_luong_kg"], filters: ["loai", "hang", "nguon"], card: ["loai", "cong_suat_w", "nguon"] },
+  silent: { label: "Tai nghe silent", fields: ["hang", "so_kenh", "tam_phat_m", "pin", "bo_phat", "cach_dung"], filters: ["hang"], card: ["so_kenh", "tam_phat_m", "pin"] },
+  phone: { label: "Điện thoại & tablet", fields: ["hang", "model", "man_hinh_inch", "bo_nho_gb", "ram_gb", "camera_mp", "chip", "pin", "di_kem"], filters: ["hang", "bo_nho_gb", "man_hinh_inch"], card: ["man_hinh_inch", "bo_nho_gb", "camera_mp"] },
+  camera: { label: "Máy ảnh, máy quay & livestream", fields: ["hang", "model", "loai", "cam_bien", "video", "ong_kinh", "the_nho_pin", "trong_luong_kg"], filters: ["loai", "hang", "video"], card: ["loai", "video", "cam_bien"] },
+  photobooth: { label: "Photobooth", fields: ["loai", "in_anh", "dien_tich", "nhan_su", "nguon_dien"], filters: ["loai", "in_anh"], card: ["loai", "in_anh", "dien_tich"] },
+  console: { label: "Máy game", fields: ["hang", "model", "he_may", "so_tay_cam", "game_di_kem", "man_hinh_di_kem", "di_kem"], filters: ["he_may", "so_tay_cam"], card: ["he_may", "so_tay_cam"] },
   game: { label: "Thẻ game", fields: ["he_may", "the_loai", "so_nguoi"], filters: ["he_may", "the_loai", "so_nguoi"], card: ["he_may", "the_loai", "so_nguoi"] },
-  furniture: { label: "Bàn ghế sự kiện", fields: ["loai", "chat_lieu", "thong_so"], filters: ["loai"], card: ["loai", "thong_so", "chat_lieu"] },
-  other: { label: "Nhóm khác", fields: ["hang", "thong_so", "dung_luong_wh", "cong_suat_w"], filters: ["hang"], card: ["hang", "thong_so"] },
+  furniture: { label: "Bàn ghế sự kiện", fields: ["loai", "kich_thuoc", "chat_lieu", "mau", "so_cho", "thong_so"], filters: ["loai"], card: ["loai", "thong_so", "chat_lieu"] },
+  other: { label: "Nhóm khác", fields: ["hang", "model", "thong_so", "di_kem", "dung_luong_wh", "cong_suat_w"], filters: ["hang"], card: ["hang", "thong_so"] },
 };
 
 // Danh mục web (slug danh mục con) → nhóm. Danh mục không có trong bảng →
@@ -221,9 +256,14 @@ const GROUP_BY_CATEGORY: Record<string, string> = {
   "ban-ghe": "furniture",
 };
 
-export const specGroupKey = (categorySlug: string | null | undefined) =>
-  (categorySlug && GROUP_BY_CATEGORY[categorySlug]) || "other";
-export const specGroupOf = (categorySlug: string | null | undefined) => SPEC_GROUPS[specGroupKey(categorySlug)];
+// productSlug: tai nghe silent (SSounds) nằm chung danh mục Tai nghe nhưng
+// thông số khác hẳn (số kênh, tầm phát) → nhận theo slug sản phẩm.
+export const specGroupKey = (categorySlug: string | null | undefined, productSlug?: string | null) =>
+  (productSlug && /silent/.test(productSlug) ? "silent" : null) ||
+  (categorySlug && GROUP_BY_CATEGORY[categorySlug]) ||
+  "other";
+export const specGroupOf = (categorySlug: string | null | undefined, productSlug?: string | null) =>
+  SPEC_GROUPS[specGroupKey(categorySlug, productSlug)];
 
 const asList = (v: SpecValue | undefined): (number | string)[] =>
   v == null || v === "" ? [] : Array.isArray(v) ? v : [v];
@@ -234,7 +274,7 @@ function formatNumber(n: number, locale: "vi" | "en") {
   return n.toLocaleString(locale === "vi" ? "vi-VN" : "en-US", { maximumFractionDigits: 1 });
 }
 
-const UNIT_EN: Record<string, string> = { "tay cầm": "controllers", người: "players" };
+const UNIT_EN: Record<string, string> = { "tay cầm": "controllers", người: "players", kênh: "channels" };
 
 // 1 giá trị (đã tách khỏi mảng) → chữ hiển thị.
 export function formatSpecValue(code: string, v: number | string, locale: "vi" | "en" = "vi"): string {
@@ -245,6 +285,7 @@ export function formatSpecValue(code: string, v: number | string, locale: "vi" |
     if (!Number.isFinite(n)) return String(v);
     const unit = locale === "en" ? (UNIT_EN[f.unit] ?? f.unit) : f.unit;
     if (code === "bo_nho_gb" && n >= 1024 && n % 1024 === 0) return `${n / 1024}TB`;
+    if (code === "so_cho" && locale === "en") return `${formatNumber(n, locale)} ${n === 1 ? "seat" : "seats"}`;
     if (code === "so_nguoi") return locale === "en" ? `${n === 1 ? "1 player" : `1–${n} players`}` : n === 1 ? "1 người" : `1–${n} người`;
     return f.tight ? `${formatNumber(n, locale)}${unit}` : `${formatNumber(n, locale)} ${unit}`;
   }

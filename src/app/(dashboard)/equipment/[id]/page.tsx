@@ -41,6 +41,8 @@ import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { ProductActionBar } from "./product-action-bar";
 import { DepositReviewBox } from "./deposit-review-box";
 import { PriceTierEditor } from "./price-tier-editor";
+import { SpecTab } from "./spec-tab";
+import type { SpecFacets } from "@/lib/spec-fields";
 import type { PricingTierInput } from "@/lib/rental-pricing";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
@@ -101,6 +103,8 @@ const TABS = [
   { value: "stock", label: "Tồn kho" },
   // B3: thang giá thuê nhiều ngày (chỉ hàng cho thuê theo ngày).
   { value: "pricing", label: "Bảng giá" },
+  // B4: thông số có cấu trúc — cùng dữ liệu với khung sửa Website.
+  { value: "specs", label: "Thông số & web" },
   { value: "revenue", label: "Doanh thu" },
   { value: "rentals", label: "Lịch sử thuê" },
   { value: "history", label: "Lịch sử chuyển kho" },
@@ -142,7 +146,9 @@ export default async function EquipmentDetailPage({
           ? "revenue"
           : tab === "pricing"
             ? "pricing"
-            : "stock";
+            : tab === "specs"
+              ? "specs"
+              : "stock";
   const requestedRentalPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
@@ -162,13 +168,18 @@ export default async function EquipmentDetailPage({
   if (!type) notFound();
   // Nhãn web + người bấm Ngừng kinh doanh cho thanh thao tác (B8).
   const [{ data: webRow }, { data: stoppedBy }] = await Promise.all([
-    supabase.from("website_products").select("is_featured, is_new").eq("equipment_type_id", id).maybeSingle(),
+    supabase
+      .from("website_products")
+      .select("is_featured, is_new, slug, spec_facets, website_categories(slug, name)")
+      .eq("equipment_type_id", id)
+      .maybeSingle(),
     type.discontinued_by
       ? supabase.from("employees_public").select("name").eq("id", type.discontinued_by).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
   const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
+  const webCategory = webRow?.website_categories as unknown as { slug: string; name: string } | null;
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
   // Doanh thu là số liệu điều hành nhạy cảm — cùng luật ẩn với Admin đã có ở
   // trang danh sách /equipment (canViewEquipmentReports): Admin quản trị
@@ -176,7 +187,9 @@ export default async function EquipmentDetailPage({
   const canViewRevenue = canManageCatalog && employee?.role !== "admin";
   const hasPricingTab = type.product_type === "rental" && type.rental_period_unit === "day" && type.tracking_type !== "combo";
   const activeTab: Tab =
-    (requestedTab === "revenue" && !canViewRevenue) || (requestedTab === "pricing" && !hasPricingTab)
+    (requestedTab === "revenue" && !canViewRevenue) ||
+    (requestedTab === "pricing" && !hasPricingTab) ||
+    (requestedTab === "specs" && !webRow)
       ? "stock"
       : requestedTab;
 
@@ -708,7 +721,12 @@ export default async function EquipmentDetailPage({
       </Card>
 
       <div className="flex items-center gap-1 border-b">
-        {TABS.filter((t) => (t.value !== "revenue" || canViewRevenue) && (t.value !== "pricing" || hasPricingTab)).map((t) => (
+        {TABS.filter(
+          (t) =>
+            (t.value !== "revenue" || canViewRevenue) &&
+            (t.value !== "pricing" || hasPricingTab) &&
+            (t.value !== "specs" || !!webRow),
+        ).map((t) => (
           <Link
             key={t.value}
             href={`/equipment/${id}?tab=${t.value}`}
@@ -1232,6 +1250,17 @@ export default async function EquipmentDetailPage({
             </>
           )}
         </div>
+      )}
+
+      {activeTab === "specs" && webRow && (
+        <SpecTab
+          equipmentTypeId={type.id}
+          categorySlug={webCategory?.slug ?? null}
+          categoryName={webCategory?.name ?? null}
+          productSlug={webRow.slug}
+          initial={(webRow.spec_facets ?? {}) as SpecFacets}
+          canEdit={canManageCatalog}
+        />
       )}
 
       {activeTab === "pricing" && hasPricingTab && (

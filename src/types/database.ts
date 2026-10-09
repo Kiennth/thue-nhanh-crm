@@ -1048,6 +1048,8 @@ export interface Database {
           ship_bike_max_qty: number | null;
           // Thông số lọc web { mã_trường: giá trị } — xem lib/spec-fields.ts.
           spec_facets: Record<string, number | string | (number | string)[]>;
+          // B4: số mã thông số đã điền (cột tự tính từ spec_facets).
+          spec_count: number;
           created_at: string;
           updated_at: string;
           has_description: boolean;

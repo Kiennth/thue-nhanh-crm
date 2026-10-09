@@ -287,6 +287,7 @@ function ProductEditForm({
       <SpecFacetsEditor
         key={product.id}
         categorySlug={categorySlug}
+        productSlug={product.slug}
         initial={(product.spec_facets ?? {}) as SpecFacets}
       />
 

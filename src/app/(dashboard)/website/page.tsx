@@ -69,7 +69,7 @@ export default async function WebsitePage({
     // Chỉ cột bảng cần (Grok CRM 09/10 §A: trước select * kèm mô tả HTML VI+EN
     // của cả trang → ~790KB). Khung "Sửa nội dung" tự nạp đủ khi mở.
     .select(
-      "id, slug, name, created_at, website_category_id, gallery_image_urls, is_published, is_featured, is_new, has_description, has_description_en, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)",
+      "id, slug, name, created_at, website_category_id, gallery_image_urls, is_published, is_featured, is_new, has_description, has_description_en, spec_count, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)",
       { count: "exact" },
     );
   // Mặc định: mới lên web trước (CEO 2026-10-01) — trước đây xếp đã đăng
@@ -87,6 +87,8 @@ export default async function WebsitePage({
   if (activeFilter === "featured") query = query.eq("is_featured", true);
   if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
+  // B4: < 4 thông số → trang sản phẩm thiếu khối "Thông số nổi bật".
+  if (activeFilter === "few-specs") query = query.lt("spec_count", 4).eq("is_published", true);
   if (activeCat) query = query.in("website_category_id", [activeCat, ...catChildIds]);
   if (activeSearch) {
     // Slug toàn chữ không dấu nên phải bỏ dấu tiếng Việt trước khi so
@@ -126,7 +128,7 @@ export default async function WebsitePage({
         ? query.range(0, 4999)
         : query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
       supabase.from("website_categories").select("id, name, slug, parent_id, sort_order, is_published").order("sort_order"),
-      supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id"),
+      supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id, spec_count"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
     ]);
 
@@ -148,6 +150,7 @@ export default async function WebsitePage({
   const all = statsRes.data ?? [];
   const publishedCount = all.filter((p) => p.is_published).length;
   const noCategoryCount = all.filter((p) => !p.website_category_id).length;
+  const fewSpecsCount = all.filter((p) => p.is_published && p.spec_count < 4).length;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
   const filterLink = (f: string, label: string) => (
@@ -202,6 +205,7 @@ export default async function WebsitePage({
         {filterLink("featured", "Thuê nhiều nhất")}
         {filterLink("new", "Sản phẩm mới")}
         {filterLink("no-category", "Chưa có danh mục")}
+        {filterLink("few-specs", `Thiếu thông số (${fewSpecsCount})`)}
         {activeCat && (
           <Link
             href="/website"
@@ -253,6 +257,11 @@ export default async function WebsitePage({
                     {!p.has_description && <Badge variant="outline">Thiếu mô tả</Badge>}
                     {p.has_description && !p.has_description_en && (
                       <Badge variant="outline">Thiếu EN</Badge>
+                    )}
+                    {p.is_published && p.spec_count < 4 && (
+                      <Badge variant="outline" className="border-amber-300 text-amber-800 dark:text-amber-300">
+                        Thông số {p.spec_count}/4
+                      </Badge>
                     )}
                   </div>
                 </TableCell>

@@ -262,6 +262,29 @@ export async function updateWebsiteProduct(
   return { success: true };
 }
 
+// B4: tab "Thông số & web" ở trang mã hàng lưu thẳng vào cùng cột
+// website_products.spec_facets với khung sửa Website (1 nguồn, 2 nơi sửa).
+export async function saveEquipmentSpecFacets(
+  equipmentTypeId: string,
+  facets: SpecFacets,
+): Promise<{ error: string } | { success: true }> {
+  await requireRole([...MANAGE_ROLES]);
+  const cleaned = cleanSpecFacets(facets);
+  if (!cleaned.ok) return { error: cleaned.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("website_products")
+    .update({ spec_facets: cleaned.value })
+    .eq("equipment_type_id", equipmentTypeId)
+    .select("id");
+  if (error) return { error: "Không lưu được thông số: " + error.message };
+  if (!data?.length) return { error: "Mã này chưa có trang web." };
+  revalidatePath("/website");
+  revalidatePath(`/equipment/${equipmentTypeId}`);
+  await pingWebsiteRevalidate();
+  return { success: true };
+}
+
 const CategorySchema = z.object({
   name: z.string().trim().min(1, { message: "Tên danh mục không được trống." }).max(200),
   name_en: z.string().trim().max(200).optional(),
