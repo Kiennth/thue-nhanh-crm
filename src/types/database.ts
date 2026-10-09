@@ -214,6 +214,11 @@ export interface Database {
           // Dừng kinh doanh (CEO 2026-10-09) — null = đang kinh doanh; có giá
           // trị thì ẩn khỏi ô chọn hàng khi lên đơn.
           discontinued_at: string | null;
+          // Sắp ra mắt (B8, 2026-10-09) — nguồn duy nhất của nhãn "Đặt trước"
+          // trên web; ngày dự kiến tuỳ chọn, đến ngày CRM chỉ nhắc.
+          is_unreleased: boolean;
+          expected_launch_date: string | null;
+          discontinued_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -233,6 +238,9 @@ export interface Database {
           default_extra_information?: string | null;
           deposit_negotiable?: boolean;
           discontinued_at?: string | null;
+          is_unreleased?: boolean;
+          expected_launch_date?: string | null;
+          discontinued_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];

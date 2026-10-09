@@ -97,6 +97,7 @@ export default async function EquipmentPage({
     tab?: string;
     noprice?: string;
     stopped?: string;
+    flag?: string;
   }>;
 }) {
   const {
@@ -111,10 +112,17 @@ export default async function EquipmentPage({
     tab,
     noprice,
     stopped,
+    flag: flagParam,
   } = await searchParams;
   // Chip "Dừng kinh doanh" (CEO 2026-10-09): mặc định ẩn mã đã dừng, bấm chip
   // để xem riêng (và mở lại).
-  const stoppedOnly = stopped === "1";
+  // B8 (Grok CRM 09/10): chip lọc Sắp ra mắt / Thuê nhiều / Hàng mới / Ngừng
+  // kinh doanh (?flag=…; ?stopped=1 cũ vẫn hiểu).
+  const FLAGS = ["unreleased", "featured", "new", "stopped"] as const;
+  type Flag = (typeof FLAGS)[number];
+  const activeFlag: Flag | null =
+    stopped === "1" ? "stopped" : (FLAGS as readonly string[]).includes(flagParam ?? "") ? (flagParam as Flag) : null;
+  const stoppedOnly = activeFlag === "stopped";
   // Chip "Chưa có giá" (đề xuất CRM v2 §4.7): hàng thuê/bán đang để giá 0.
   const noPriceOnly = noprice === "1";
   const activeSearch = search?.trim() ?? "";
@@ -181,6 +189,7 @@ export default async function EquipmentPage({
     equipmentValueOverview,
     { data: reportTypes },
     { data: reportRowsRaw },
+    { data: webFlagRows },
   ] = await Promise.all([
     // Sắp xếp theo Loại/Tồn kho không thể đẩy hết xuống Postgres (Loại là
     // nhãn ghép từ 2 cột, Tồn kho lấy từ reportByTypeId) — lấy TOÀN BỘ loại
@@ -205,7 +214,9 @@ export default async function EquipmentPage({
       p_start: isReportTab ? (reportDateRange?.start ?? null) : nowIso,
       p_end: isReportTab ? (reportDateRange?.end ?? null) : nowIso,
     }),
+    supabase.from("website_products").select("equipment_type_id, is_featured, is_new"),
   ]);
+  const webFlagsByType = new Map((webFlagRows ?? []).map((w) => [w.equipment_type_id, w] as const));
 
   const reportByTypeId = new Map(
     (reportRowsRaw ?? []).map((r) => [r.equipment_type_id, r] as const),
@@ -241,7 +252,26 @@ export default async function EquipmentPage({
   const dirMult = activeDir === "asc" ? 1 : -1;
   const isNoPrice = (t: EquipmentTypeRow) => t.product_type !== "service" && !(t.price > 0);
   const stoppedCount = allTypes.filter((t) => t.discontinued_at).length;
-  const visibleTypes = allTypes.filter((t) => !!t.discontinued_at === stoppedOnly);
+  const activeTypes = allTypes.filter((t) => !t.discontinued_at);
+  const flagTest: Record<Exclude<Flag, "stopped">, (t: EquipmentTypeRow) => boolean> = {
+    unreleased: (t) => t.is_unreleased,
+    featured: (t) => !!webFlagsByType.get(t.id)?.is_featured,
+    new: (t) => !!webFlagsByType.get(t.id)?.is_new,
+  };
+  const flagCounts: Record<Flag, number> = {
+    unreleased: activeTypes.filter(flagTest.unreleased).length,
+    featured: activeTypes.filter(flagTest.featured).length,
+    new: activeTypes.filter(flagTest.new).length,
+    stopped: stoppedCount,
+  };
+  const visibleTypes = stoppedOnly
+    ? allTypes.filter((t) => t.discontinued_at)
+    : activeFlag
+      ? activeTypes.filter(flagTest[activeFlag])
+      : activeTypes;
+  // Đến / quá ngày dự kiến ra mắt mà vẫn bật Sắp ra mắt → CRM chỉ nhắc (không tự tắt).
+  const todayVn = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+  const launchDue = activeTypes.filter((t) => t.is_unreleased && t.expected_launch_date && t.expected_launch_date <= todayVn);
   const noPriceCount = visibleTypes.filter(isNoPrice).length;
   const sortedTypes = (noPriceOnly ? visibleTypes.filter(isNoPrice) : [...visibleTypes]).sort((a, b) => {
     switch (activeSort) {
@@ -415,34 +445,61 @@ export default async function EquipmentPage({
           className="w-full max-w-2xl"
         />
       )}
-      {!isReportTab && (noPriceCount > 0 || noPriceOnly || stoppedCount > 0 || stoppedOnly) && (
+      {!isReportTab && launchDue.length > 0 && (
+        <div className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-100">
+          Đã đến ngày ra mắt:{" "}
+          {launchDue.map((t, i) => (
+            <span key={t.id}>
+              {i > 0 && ", "}
+              <Link href={`/equipment/${t.id}`} className="font-semibold underline">
+                {t.name}
+              </Link>
+            </span>
+          ))}{" "}
+          — mở mã hàng để tắt Sắp ra mắt hoặc dời ngày (CRM không tự tắt).
+        </div>
+      )}
+      {!isReportTab && (noPriceCount > 0 || noPriceOnly || Object.values(flagCounts).some((n) => n > 0) || activeFlag) && (
         <div className="flex flex-wrap items-center gap-2">
-          {(stoppedCount > 0 || stoppedOnly) && (
-            <Link
-              href={(() => {
-                const p = new URLSearchParams();
-                if (activeSearch) p.set("search", activeSearch);
-                if (activeCategory) p.set("category", activeCategory);
-                if (!stoppedOnly) p.set("stopped", "1");
-                const qs = p.toString();
-                return qs ? `/equipment?${qs}` : "/equipment";
-              })()}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
-                stoppedOnly ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              Dừng kinh doanh
-              <span className={`rounded-full px-1.5 text-xs tabular-nums ${stoppedOnly ? "bg-white/20" : "bg-muted"}`}>{stoppedCount}</span>
-              {stoppedOnly && <span aria-hidden>×</span>}
-            </Link>
-          )}
+          {(
+            [
+              { key: "unreleased", label: "Sắp ra mắt" },
+              { key: "featured", label: "Thuê nhiều" },
+              { key: "new", label: "Hàng mới" },
+              { key: "stopped", label: "Ngừng kinh doanh" },
+            ] as const
+          )
+            .filter((c) => flagCounts[c.key] > 0 || activeFlag === c.key)
+            .map((c) => {
+              const on = activeFlag === c.key;
+              const p = new URLSearchParams();
+              if (activeSearch) p.set("search", activeSearch);
+              if (activeCategory) p.set("category", activeCategory);
+              if (!on) p.set("flag", c.key);
+              const qs = p.toString();
+              return (
+                <Link
+                  key={c.key}
+                  href={qs ? `/equipment?${qs}` : "/equipment"}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+                    on ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {c.label}
+                  <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/20" : "bg-muted"}`}>
+                    {flagCounts[c.key]}
+                  </span>
+                  {on && <span aria-hidden>×</span>}
+                </Link>
+              );
+            })}
           {(noPriceCount > 0 || noPriceOnly) && (
           <Link
             href={(() => {
               const p = new URLSearchParams();
               if (activeSearch) p.set("search", activeSearch);
               if (activeCategory) p.set("category", activeCategory);
-              if (stoppedOnly) p.set("stopped", "1");
+              if (activeFlag) p.set("flag", activeFlag);
               if (!noPriceOnly) p.set("noprice", "1");
               const qs = p.toString();
               return qs ? `/equipment?${qs}` : "/equipment";

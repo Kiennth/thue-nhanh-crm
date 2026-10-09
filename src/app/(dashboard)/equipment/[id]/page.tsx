@@ -25,7 +25,6 @@ import { StatCard } from "@/components/stat-card";
 import { PeriodStatCards } from "../../orders/period-stat-cards";
 import { OrdersTrendChart } from "../../orders/orders-trend-chart";
 import {
-  deleteEquipmentType,
   deleteEquipmentUnit,
   deleteEquipmentStock,
   deleteEquipmentInstance,
@@ -39,7 +38,7 @@ import {
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
-import { DiscontinueButton } from "./discontinue-button";
+import { ProductActionBar } from "./product-action-bar";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
 import { TransferStockDialog } from "../transfer-stock-dialog";
@@ -146,6 +145,13 @@ export default async function EquipmentDetailPage({
       getCurrentEmployee(),
     ]);
   if (!type) notFound();
+  // Nhãn web + người bấm Ngừng kinh doanh cho thanh thao tác (B8).
+  const [{ data: webRow }, { data: stoppedBy }] = await Promise.all([
+    supabase.from("website_products").select("is_featured, is_new").eq("equipment_type_id", id).maybeSingle(),
+    type.discontinued_by
+      ? supabase.from("employees_public").select("name").eq("id", type.discontinued_by).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   const canManageCatalog = !!employee && MANAGE_ROLES.includes(employee.role);
   const canManageStock = !!employee && EQUIPMENT_WRITE_ROLES.includes(employee.role);
@@ -596,7 +602,25 @@ export default async function EquipmentDetailPage({
                 {type.tracking_type && (
                   <Badge variant="outline">{TRACKING_TYPE_LABELS[type.tracking_type]}</Badge>
                 )}
-                {type.discontinued_at && <Badge variant="destructive">Dừng kinh doanh</Badge>}
+                {/* Huy hiệu trạng thái (B8): Ngừng → Sắp ra mắt → Đang kinh doanh. */}
+                {type.discontinued_at ? (
+                  <Badge variant="secondary">Ngừng kinh doanh</Badge>
+                ) : type.is_unreleased ? (
+                  <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                    Sắp ra mắt
+                    {type.expected_launch_date
+                      ? ` · ${new Date(type.expected_launch_date + "T00:00:00").toLocaleDateString("vi-VN")}`
+                      : ""}
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Đang kinh doanh</Badge>
+                )}
+                {!type.discontinued_at && webRow?.is_featured && (
+                  <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200">🔥 Thuê nhiều</Badge>
+                )}
+                {!type.discontinued_at && webRow?.is_new && (
+                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200">Mới</Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">{priceLine}</p>
               {/* Phụ kiện đi kèm (CEO 2026-10-06, học Booqable) — chip từng món, tách bằng "|". */}
@@ -616,24 +640,28 @@ export default async function EquipmentDetailPage({
               )}
             </div>
           </div>
-          {canManageCatalog && (
-            <div className="flex items-center gap-1">
-              <DiscontinueButton id={type.id} discontinued={!!type.discontinued_at} />
-              <EquipmentTypeDialog
-                templates={templateList}
-                categories={categoryList}
-                equipmentType={type}
-                editTriggerVariant="outline"
-              />
-              <ConfirmDeleteButton
-                confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
-                successMessage="Đã xoá."
-                action={deleteEquipmentType}
-                actionArg={type.id}
-              />
-            </div>
-          )}
         </CardHeader>
+        {canManageCatalog && (
+          <CardContent>
+            <ProductActionBar
+              id={type.id}
+              name={type.name}
+              discontinuedAt={type.discontinued_at}
+              discontinuedByName={stoppedBy?.name ?? null}
+              isUnreleased={type.is_unreleased}
+              launchDate={type.expected_launch_date}
+              web={webRow ? { featured: webRow.is_featured, isNew: webRow.is_new } : null}
+              editButton={
+                <EquipmentTypeDialog
+                  templates={templateList}
+                  categories={categoryList}
+                  equipmentType={type}
+                  editTriggerVariant="outline"
+                />
+              }
+            />
+          </CardContent>
+        )}
       </Card>
 
       <div className="flex items-center gap-1 border-b">

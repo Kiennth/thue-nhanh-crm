@@ -285,6 +285,16 @@ export async function removeEquipmentTypeImage(id: string) {
 export async function deleteEquipmentType(id: string) {
   await requireRole([...MANAGE_ROLES]);
 
+  // B8: kiểm tra lại ở máy chủ — có đơn / còn máy thì không xoá.
+  const check = await getEquipmentTypeDeleteCheck(id);
+  if (!check.canDelete) {
+    throw new Error(
+      check.orderCount
+        ? `Không thể xoá: mã đã có ${check.orderCount} đơn — dùng Ngừng kinh doanh.`
+        : `Không thể xoá: còn ${check.machineCount} máy thuộc mã này — dùng Ngừng kinh doanh.`,
+    );
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("equipment_types").delete().eq("id", id);
 
@@ -300,12 +310,18 @@ export async function deleteEquipmentType(id: string) {
 // discontinued_at — không đổi is_published, mở lại là web hiện lại); đơn cũ
 // và lịch sử giữ nguyên.
 export async function setEquipmentTypeDiscontinued(id: string, discontinued: boolean) {
-  await requireRole([...MANAGE_ROLES]);
+  const employee = await requireRole([...MANAGE_ROLES]);
 
   const supabase = await createClient();
+  // B8: Ngừng kinh doanh tự tắt "Sắp ra mắt"; 2 nhãn web giữ nguyên giá trị
+  // (khoá trên giao diện), "Kinh doanh lại" mở khoá với giá trị cũ.
   const { error } = await supabase
     .from("equipment_types")
-    .update({ discontinued_at: discontinued ? new Date().toISOString() : null })
+    .update(
+      discontinued
+        ? { discontinued_at: new Date().toISOString(), discontinued_by: employee.id, is_unreleased: false }
+        : { discontinued_at: null, discontinued_by: null },
+    )
     .eq("id", id);
 
   if (error) {
@@ -317,6 +333,69 @@ export async function setEquipmentTypeDiscontinued(id: string, discontinued: boo
   revalidatePath("/website");
   await pingWebsiteRevalidate();
   return { success: true as const };
+}
+
+// B8 "Sắp ra mắt" (Grok CRM 09/10): bật/tắt nhãn "Đặt trước" trên web + ngày
+// dự kiến (tuỳ chọn). Mã đang Ngừng kinh doanh thì không bật được.
+export async function setEquipmentTypeUnreleased(id: string, unreleased: boolean, launchDate: string | null) {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data: row } = await supabase.from("equipment_types").select("discontinued_at").eq("id", id).maybeSingle();
+  if (!row) return { error: "Không tìm thấy mã hàng." };
+  if (unreleased && row.discontinued_at) return { error: "Mã đã ngừng kinh doanh — bấm Kinh doanh lại trước." };
+  const date = unreleased && launchDate && /^\d{4}-\d{2}-\d{2}$/.test(launchDate) ? launchDate : null;
+  const { error } = await supabase
+    .from("equipment_types")
+    .update({ is_unreleased: unreleased, expected_launch_date: unreleased ? date : null })
+    .eq("id", id);
+  if (error) return { error: "Không thể cập nhật: " + error.message };
+  revalidatePath(`/equipment/${id}`);
+  revalidatePath("/equipment");
+  await pingWebsiteRevalidate();
+  return { success: true as const };
+}
+
+// B8 nhãn web "Thuê nhiều" / "Hàng mới" = 2 cờ đang có của website_products
+// (is_featured / is_new). Mã đang Ngừng kinh doanh thì khoá.
+export async function setEquipmentWebFlags(
+  typeId: string,
+  flags: { featured?: boolean; isNew?: boolean },
+) {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data: row } = await supabase.from("equipment_types").select("discontinued_at").eq("id", typeId).maybeSingle();
+  if (!row) return { error: "Không tìm thấy mã hàng." };
+  if (row.discontinued_at) return { error: "Sản phẩm đã ngừng kinh doanh." };
+  const patch: { is_featured?: boolean; is_new?: boolean } = {};
+  if (flags.featured !== undefined) patch.is_featured = flags.featured;
+  if (flags.isNew !== undefined) patch.is_new = flags.isNew;
+  const { data, error } = await supabase
+    .from("website_products")
+    .update(patch)
+    .eq("equipment_type_id", typeId)
+    .select("id");
+  if (error) return { error: "Không thể cập nhật: " + error.message };
+  if (!data?.length) return { error: "Mã này chưa có trang trên web." };
+  revalidatePath(`/equipment/${typeId}`);
+  revalidatePath("/website");
+  await pingWebsiteRevalidate(["/", "/san-pham-moi", "/en", "/en/san-pham-moi"]);
+  return { success: true as const };
+}
+
+// B8 Xoá: chỉ cho xoá khi mã CHƯA có dòng đơn nào và không còn máy/biến thể
+// tồn (xoá loại hàng xoá dây chuyền cả máy). Có thì gợi ý Ngừng kinh doanh.
+export async function getEquipmentTypeDeleteCheck(id: string) {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const [{ count: orderLines }, { count: machines }] = await Promise.all([
+    supabase.from("order_equipment").select("id", { count: "exact", head: true }).eq("equipment_type_id", id),
+    supabase.from("equipment_instances").select("id", { count: "exact", head: true }).eq("equipment_type_id", id),
+  ]);
+  const { data: orderRows } = orderLines
+    ? await supabase.from("order_equipment").select("order_id").eq("equipment_type_id", id).limit(5000)
+    : { data: [] as { order_id: string }[] };
+  const orderCount = new Set((orderRows ?? []).map((r) => r.order_id)).size;
+  return { canDelete: !orderLines && !machines, orderCount, machineCount: machines ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
