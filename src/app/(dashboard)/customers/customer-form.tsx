@@ -23,7 +23,6 @@ export interface CustomerFormValues {
   notes: string | null;
   customer_type: CustomerKind;
   tax_code: string | null;
-  id_number?: string | null;
   contact_name?: string | null;
   wants_vat?: boolean;
   invoice_email?: string | null;
@@ -62,11 +61,12 @@ export function CustomerForm({
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [email, setEmail] = useState(customer?.email ?? "");
   const [contactName, setContactName] = useState(customer?.contact_name ?? "");
-  const [taxCode, setTaxCode] = useState(customer?.tax_code ?? "");
+  // 1 ô tax_code (CEO 09/10): công ty = MST; cá nhân = CCCD (= MST cá nhân).
+  // Cá nhân mà người sửa không được xem số đủ → ô trống, để trống = giữ số cũ.
+  const hideIndividualId = customer?.customer_type === "individual" && !!customer?.tax_code && !canViewIdNumber;
+  const [taxCode, setTaxCode] = useState(hideIndividualId ? "" : (customer?.tax_code ?? ""));
   const [wantsVat, setWantsVat] = useState(customer?.wants_vat ?? false);
   const [invoiceEmail, setInvoiceEmail] = useState(customer?.invoice_email ?? "");
-  const hasExistingId = !!customer?.id_number;
-  const [idNumber, setIdNumber] = useState(canViewIdNumber ? (customer?.id_number ?? "") : "");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showAll, setShowAll] = useState(false);
   const [dup, setDup] = useState<{ field: string; id: string; name: string } | null>(null);
@@ -84,16 +84,15 @@ export function CustomerForm({
         tax_code: taxCode,
         wants_vat: wantsVat,
         invoice_email: invoiceEmail,
-        id_number: idNumber,
-        has_existing_id_number: hasExistingId && !canViewIdNumber,
+        has_existing_tax_code: hideIndividualId && kind === "individual",
       }),
-    [kind, name, phone, email, contactName, taxCode, wantsVat, invoiceEmail, idNumber, hasExistingId, canViewIdNumber],
+    [kind, name, phone, email, contactName, taxCode, wantsVat, invoiceEmail, hideIndividualId],
   );
   const errorCount = Object.keys(errors).length;
   const shown = (field: string) => (showAll || touched[field] ? errors[field] : undefined);
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
-  const checkDup = (field: "phone" | "tax_code" | "id_number", value: string) => {
+  const checkDup = (field: "phone" | "tax_code", value: string) => {
     touch(field);
     if (!value.trim() || errors[field]) return;
     void findDuplicateCustomer(field, value, customer?.id).then((hit) => {
@@ -276,27 +275,25 @@ export function CustomerForm({
         </div>
       ) : (
         field(
-          "id_number",
+          "tax_code",
           <>
-            Số CCCD <Req />
+            Số CCCD <span className="font-normal text-muted-foreground">(= MST cá nhân)</span> <Req />
           </>,
           <Input
-            id="id_number"
-            name="id_number"
+            id="tax_code"
+            name="tax_code"
             inputMode="numeric"
             maxLength={14}
             placeholder={
-              hasExistingId && !canViewIdNumber
-                ? `Đã có: ${maskIdNumber(customer?.id_number)} — để trống giữ nguyên`
-                : "12 chữ số"
+              hideIndividualId ? `Đã có: ${maskIdNumber(customer?.tax_code)} — để trống giữ nguyên` : "12 chữ số"
             }
-            value={idNumber}
-            onChange={(e) => setIdNumber(e.target.value)}
-            onBlur={() => checkDup("id_number", idNumber)}
-            className={invalid("id_number")}
+            value={taxCode}
+            onChange={(e) => setTaxCode(e.target.value)}
+            onBlur={() => checkDup("tax_code", taxCode)}
+            className={invalid("tax_code")}
           />,
-          cccdProvinceWarning(idNumber) && (
-            <p className="text-xs text-amber-600">{cccdProvinceWarning(idNumber)}</p>
+          cccdProvinceWarning(taxCode) && (
+            <p className="text-xs text-amber-600">{cccdProvinceWarning(taxCode)}</p>
           ),
         )
       )}

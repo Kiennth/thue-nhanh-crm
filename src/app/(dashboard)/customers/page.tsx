@@ -44,7 +44,6 @@ interface CustomerRow {
   address: string | null;
   customer_type: CustomerType;
   tax_code: string | null;
-  id_number: string | null;
   contact_name: string | null;
   wants_vat: boolean;
   invoice_email: string | null;
@@ -71,7 +70,6 @@ interface CustomerListRpcRow {
   address: string | null;
   customer_type: CustomerType;
   tax_code: string | null;
-  id_number: string | null;
   contact_name: string | null;
   wants_vat: boolean;
   invoice_email: string | null;
@@ -171,7 +169,6 @@ export default async function CustomersPage({
     address: r.address,
     customer_type: r.customer_type,
     tax_code: r.tax_code,
-    id_number: r.id_number,
     contact_name: r.contact_name,
     wants_vat: r.wants_vat,
     invoice_email: r.invoice_email,
@@ -272,8 +269,8 @@ export default async function CustomersPage({
               <SortableTableHead sortKey="name" label="Tên" />
               <SortableTableHead sortKey="customer_type" label="Loại" />
               <TableHead>Điện thoại</TableHead>
-              {/* Công ty: MST (tax_code); cá nhân: CCCD (id_number, tách cột
-                  từ B6 09/10 — che "1234xxxx" với vai trò không quản lý). */}
+              {/* 1 cột tax_code: công ty = MST, cá nhân = CCCD (= MST cá nhân,
+                  CEO 09/10) — CCCD che "1234xxxx" với vai trò không quản lý. */}
               <TableHead>MST / CCCD</TableHead>
               <TableHead>Địa chỉ</TableHead>
               <SortableTableHead sortKey="orderCount" label="Số lượng đơn" />
@@ -297,8 +294,8 @@ export default async function CustomersPage({
                 <TableCell className="tabular-nums">
                   {customer.customer_type === "company" ? (
                     (customer.tax_code ?? "—")
-                  ) : customer.id_number ? (
-                    canViewIdNumber ? customer.id_number : maskIdNumber(customer.id_number)
+                  ) : customer.tax_code ? (
+                    canViewIdNumber ? customer.tax_code : maskIdNumber(customer.tax_code)
                   ) : (
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
                       Thiếu CCCD

@@ -145,10 +145,10 @@ export default async function CustomerDetailPage({
             </>
           ) : (
             <div>
-              <p className="text-xs text-muted-foreground">Số CCCD</p>
+              <p className="text-xs text-muted-foreground">Số CCCD (= MST cá nhân)</p>
               <p className="font-medium">
-                {customer.id_number ? (
-                  canViewIdNumber ? customer.id_number : maskIdNumber(customer.id_number)
+                {customer.tax_code ? (
+                  canViewIdNumber ? customer.tax_code : maskIdNumber(customer.tax_code)
                 ) : (
                   <span className="text-amber-700 dark:text-amber-300">Thiếu CCCD — khách mang CCCD khi nhận máy</span>
                 )}

@@ -192,7 +192,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ data: orderCustomer }, { data: reservationRows }] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, email, phone, deposit_percentage, customer_type, id_number")
+      .select("id, name, email, phone, deposit_percentage, customer_type, tax_code")
       .eq("id", order.customer_id)
       .maybeSingle(),
     relevantUnitIds.length > 0
@@ -831,7 +831,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               ordererEmail={order.orderer_email}
             />
             {/* B6: khách cá nhân chưa có CCCD — CHỈ nhắc, không chặn tạo/chốt đơn. */}
-            {orderCustomer?.customer_type === "individual" && !orderCustomer.id_number && (
+            {orderCustomer?.customer_type === "individual" && !orderCustomer.tax_code && (
               <p className="col-span-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
                 Khách chưa có CCCD · khách mang CCCD khi nhận máy ·{" "}
                 <Link href={`/customers/${orderCustomer.id}`} className="font-semibold underline">

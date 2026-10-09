@@ -1,5 +1,7 @@
 // Kiểm tra form khách Công ty / Cá nhân (B6, Grok CRM 09/10) — dùng chung cho
 // form (báo lỗi ngay khi rời ô) và server action (chặn thật). Hàm thuần.
+// CEO 09/10: CCCD và MST là MỘT ô (customers.tax_code) — công ty là MST, cá
+// nhân thì CCCD chính là MST cá nhân.
 
 export type CustomerKind = "company" | "individual";
 
@@ -12,10 +14,9 @@ export interface CustomerFormInput {
   tax_code: string;
   wants_vat: boolean;
   invoice_email: string;
-  id_number: string;
-  // Sửa khách đã có CCCD mà người sửa không được xem số đủ: ô để trống nghĩa
-  // là giữ nguyên số cũ.
-  has_existing_id_number?: boolean;
+  // Sửa khách cá nhân đã có CCCD mà người sửa không được xem số đủ: ô để
+  // trống nghĩa là giữ nguyên số cũ.
+  has_existing_tax_code?: boolean;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -70,9 +71,9 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
       else if (!EMAIL_RE.test(input.invoice_email.trim())) e.invoice_email = "Email nhận hoá đơn không hợp lệ.";
     }
   } else {
-    const id = input.id_number.trim();
-    if (!id && !input.has_existing_id_number) e.id_number = "Nhập số CCCD (12 số).";
-    else if (id && !isValidCccd(id)) e.id_number = "Số CCCD phải đủ 12 chữ số.";
+    const id = input.tax_code.trim();
+    if (!id && !input.has_existing_tax_code) e.tax_code = "Nhập số CCCD (12 số).";
+    else if (id && !isValidCccd(id)) e.tax_code = "Số CCCD phải đủ 12 chữ số.";
   }
   return e;
 }

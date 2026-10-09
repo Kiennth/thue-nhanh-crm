@@ -133,7 +133,7 @@ export interface Database {
           email: string | null;
           notes: string | null;
           customer_type: CustomerType;
-          // MST (công ty). Số CCCD cá nhân nằm ở id_number (B6, 2026-10-09).
+          // MST công ty / CCCD cá nhân — MỘT ô (CEO 09/10: CCCD = MST cá nhân).
           tax_code: string | null;
           address: string | null;
           deposit_percentage: number;
@@ -142,9 +142,6 @@ export interface Database {
           representative_title: string | null;
           bank_account_number: string | null;
           bank_name: string | null;
-          // B6 (Grok CRM 09/10): CCCD 12 số cá nhân — che "1234xxxx" với vai
-          // trò không quản lý, không in báo giá, không trả ra web.
-          id_number: string | null;
           // Người liên hệ của công ty (khác người đại diện ký hợp đồng).
           contact_name: string | null;
           wants_vat: boolean;
@@ -169,7 +166,6 @@ export interface Database {
           representative_title?: string | null;
           bank_account_number?: string | null;
           bank_name?: string | null;
-          id_number?: string | null;
           contact_name?: string | null;
           wants_vat?: boolean;
           invoice_email?: string | null;

@@ -42,13 +42,13 @@ function readInput(formData: FormData, hasExistingId: boolean): CustomerFormInpu
     tax_code: str(formData, "tax_code"),
     wants_vat: formData.get("wants_vat") === "on" || formData.get("wants_vat") === "true",
     invoice_email: str(formData, "invoice_email"),
-    id_number: str(formData, "id_number"),
-    has_existing_id_number: hasExistingId,
+    has_existing_tax_code: hasExistingId,
   };
 }
 
-// Dựng bản ghi lưu DB từ form đã hợp lệ. Cá nhân: không đụng tax_code (một
-// số khách cá nhân là hộ kinh doanh có MST); công ty: không đụng id_number.
+// Dựng bản ghi lưu DB từ form đã hợp lệ. tax_code = MST công ty / CCCD cá
+// nhân (CEO 09/10: 1 ô); cá nhân để trống (người sửa không xem được số đủ) =
+// giữ số cũ.
 function buildRow(input: CustomerFormInput, extra: z.infer<typeof ExtraSchema>) {
   const company = input.customer_type === "company";
   const row: Record<string, unknown> = {
@@ -72,8 +72,8 @@ function buildRow(input: CustomerFormInput, extra: z.infer<typeof ExtraSchema>) 
     row.budget_unit_code = extra.budget_unit_code || null;
     row.bank_account_number = extra.bank_account_number || null;
     row.bank_name = extra.bank_name || null;
-  } else if (input.id_number) {
-    row.id_number = normalizeDigits(input.id_number);
+  } else if (input.tax_code) {
+    row.tax_code = normalizeDigits(input.tax_code);
   }
   return row;
 }
@@ -129,8 +129,8 @@ export async function updateCustomer(
   await requireRole([...ALL_ROLES]);
 
   const supabase = await createClient();
-  const { data: current } = await supabase.from("customers").select("id_number").eq("id", id).maybeSingle();
-  const input = readInput(formData, !!current?.id_number);
+  const { data: current } = await supabase.from("customers").select("customer_type, tax_code").eq("id", id).maybeSingle();
+  const input = readInput(formData, current?.customer_type === "individual" && !!current?.tax_code);
   const errors = validateCustomer(input);
   const first = Object.values(errors)[0];
   if (first) return { error: first };
@@ -153,7 +153,7 @@ export async function updateCustomer(
 
 // Báo trùng khi rời ô SĐT / MST / CCCD (B6): trả khách đầu tiên trùng.
 export async function findDuplicateCustomer(
-  field: "phone" | "tax_code" | "id_number",
+  field: "phone" | "tax_code",
   value: string,
   excludeId?: string | null,
 ): Promise<{ id: string; name: string } | null> {
@@ -172,8 +172,8 @@ export async function findDuplicateCustomer(
 export async function getCustomerIdStatus(id: string): Promise<{ missingCccd: boolean }> {
   await requireRole([...ALL_ROLES]);
   const supabase = await createClient();
-  const { data } = await supabase.from("customers").select("customer_type, id_number").eq("id", id).maybeSingle();
-  return { missingCccd: !!data && data.customer_type === "individual" && !data.id_number };
+  const { data } = await supabase.from("customers").select("customer_type, tax_code").eq("id", id).maybeSingle();
+  return { missingCccd: !!data && data.customer_type === "individual" && !data.tax_code };
 }
 
 // Tìm khách hàng theo tên/SĐT/MST/email — dùng cho ô chọn khách hàng dạng
@@ -193,7 +193,7 @@ export async function searchCustomers(query: string): Promise<{ id: string; name
     .from("customers")
     .select("id, name")
     .or(
-      `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,id_number.ilike.%${trimmed}%,email.ilike.%${trimmed}%,budget_unit_code.ilike.%${trimmed}%`,
+      `name.ilike.%${trimmed}%,phone.ilike.%${trimmed}%,tax_code.ilike.%${trimmed}%,email.ilike.%${trimmed}%,budget_unit_code.ilike.%${trimmed}%`,
     )
     .order("name")
     .limit(20);
