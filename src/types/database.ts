@@ -1387,6 +1387,11 @@ export interface Database {
         Args: { p_attempt_id: string; p_answers: Record<string, string[]> };
         Returns: void;
       };
+      // Số máy rảnh theo loại × biến thể × kho (modal Tạo đơn, 2026-10-09).
+      quick_order_free_counts: {
+        Args: Record<string, never>;
+        Returns: { equipment_type_id: string; equipment_unit_id: string | null; branch_id: string; n: number }[];
+      };
     };
   };
 }

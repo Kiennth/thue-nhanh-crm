@@ -184,7 +184,10 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        render={<Link href={href} />}
+        // Không tải trước (Grok CRM 09/10 §A): ~30 mục menu cùng tải trước mỗi
+        // trang làm Worker quá tải (503) và trang "chậm" tới 10–13 giây khi đo
+        // tới lúc mạng rảnh. Bấm mới tải; (dashboard)/loading.tsx hiện khung chờ.
+        render={<Link href={href} prefetch={false} />}
         isActive={active}
         className={`h-11 gap-3 px-2 text-[16px] font-semibold text-sidebar-foreground/90 data-active:font-bold ${style.active}`}
       >

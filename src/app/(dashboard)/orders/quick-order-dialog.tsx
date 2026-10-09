@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarClock, ClipboardList, Loader2, Minus, Package, Plus, Search, Truck, UserRound, X } from "lucide-react";
@@ -180,6 +180,26 @@ function HourSelect({ value, onChange, id }: { value: string; onChange: (v: stri
   );
 }
 
+// Bộ nhớ đệm danh mục dùng chung mọi popup Tạo đơn (nút nổi, trang Đơn hàng,
+// Đơn web) — Grok CRM 09/10 §A.3-4: tải sẵn khi trình duyệt rảnh, mở popup là
+// có ngay; cũ hơn 5 phút thì vẫn hiện bản cũ và làm mới ở nền. Tạo đơn xong
+// thì xoá cache (số máy rảnh đã đổi).
+const CATALOG_TTL_MS = 5 * 60_000;
+let catalogCache: { at: number; data: QuickOrderCatalog } | null = null;
+let catalogInflight: Promise<QuickOrderCatalog> | null = null;
+
+function loadCatalog(): Promise<QuickOrderCatalog> {
+  catalogInflight ??= getQuickOrderCatalog()
+    .then((data) => {
+      catalogCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      catalogInflight = null;
+    });
+  return catalogInflight;
+}
+
 export function QuickOrderDialog({
   branches,
   prefill,
@@ -192,6 +212,17 @@ export function QuickOrderDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<QuickOrderCatalog | null>(null);
+  // Tải sẵn danh mục khi trình duyệt rảnh (1 lần / 5 phút cho cả phiên).
+  useEffect(() => {
+    if (catalogCache || catalogInflight) return;
+    const run = () => void loadCatalog().catch(() => {});
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(run, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(run, 1500);
+    return () => window.clearTimeout(t);
+  }, []);
   const [, startLoading] = useTransition();
   const [saving, startSaving] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -301,16 +332,10 @@ export function QuickOrderDialog({
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next && !prefill) setResumedDraft(cart.length > 0 || !!customer || !!ordererName.trim());
-    if (!next || catalog) return;
-    startLoading(async () => {
-      let c: QuickOrderCatalog;
-      try {
-        c = await getQuickOrderCatalog();
-      } catch {
-        setError("Không tải được danh mục hàng — đóng popup rồi mở lại.");
-        return;
-      }
+    if (!next) return;
+    const applyCatalog = (c: QuickOrderCatalog, first: boolean) => {
       setCatalog(c);
+      if (!first) return;
       setEmployeeId((v) => v || c.currentEmployeeId);
       setBranchId((v) => v || c.defaultBranchId || branches[0]?.id || "");
       if (prefill) {
@@ -323,6 +348,22 @@ export function QuickOrderDialog({
         }
         setCart(lines);
       }
+    };
+    const first = !catalog;
+    const cached = catalogCache;
+    // Có bản đệm: hiện ngay; còn mới thì thôi, cũ thì làm mới ở nền.
+    if (cached && first) applyCatalog(cached.data, true);
+    if (cached && Date.now() - cached.at < CATALOG_TTL_MS) return;
+    if (!first && !cached) return;
+    startLoading(async () => {
+      let c: QuickOrderCatalog;
+      try {
+        c = await loadCatalog();
+      } catch {
+        if (!cached && first) setError("Không tải được danh mục hàng — đóng popup rồi mở lại.");
+        return;
+      }
+      applyCatalog(c, first && !cached);
     });
   }
 
@@ -470,6 +511,7 @@ export function QuickOrderDialog({
       toast.success(stage === "deal" ? "Đã tạo và chốt đơn" : "Đã tạo đơn");
       setOpen(false);
       // Đơn sau bắt đầu trắng + nạp lại danh mục (số máy trống đã đổi).
+      catalogCache = null;
       if (!prefill) {
         resetForm();
         setCatalog(null);

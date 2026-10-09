@@ -11,7 +11,6 @@ import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } f
 import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
 import { splitTotalByWeights } from "@/lib/combo";
-import { fetchAllRows, fetchAllRowsFast } from "@/lib/supabase/fetch-all";
 import type { RentalPeriodUnit, TaskType } from "@/types/database";
 import type { SupabaseClient as UntypedSupabaseClient } from "@supabase/supabase-js";
 
@@ -2468,8 +2467,7 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     { data: units },
     { data: tierRows },
     { data: employees },
-    instances,
-    busyRows,
+    { data: freeRows },
     { data: webRows },
   ] = await Promise.all([
     supabase
@@ -2481,41 +2479,23 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model, price"),
     supabase.from("pricing_template_tiers").select("template_id, min_duration, duration_unit, discount_percentage"),
     supabase.from("employees_public").select("id, name, branch_id, is_active").eq("is_active", true).order("name"),
-    fetchAllRowsFast<{ id: string; equipment_type_id: string; equipment_unit_id: string | null; branch_id: string | null }>(
-      (from, to) =>
-        supabase
-          .from("equipment_instances")
-          .select("id, equipment_type_id, equipment_unit_id, branch_id")
-          .eq("status", "available")
-          .order("id")
-          .range(from, to),
-      () => supabase.from("equipment_instances").select("id", { count: "exact", head: true }).eq("status", "available"),
-    ),
-    fetchAllRows<{ equipment_instance_id: string | null }>((from, to) =>
-      supabase
-        .from("order_equipment")
-        .select("equipment_instance_id, orders!inner(completed_at, cancelled_at)")
-        .not("equipment_instance_id", "is", null)
-        .is("orders.completed_at", null)
-        .is("orders.cancelled_at", null)
-        .range(from, to),
-    ),
+    // Số máy rảnh theo loại × biến thể × kho, đếm trong Postgres (Grok CRM 09/10
+    // §A — trước kéo ~2.200 máy + ~350 dòng đơn mở về đếm ở JS, ~4 giây).
+    supabase.rpc("quick_order_free_counts"),
     supabase.from("website_products").select("equipment_type_id, ship_bike_max_qty"),
   ]);
 
   const bikeMaxByType = new Map((webRows ?? []).map((w) => [w.equipment_type_id, w.ship_bike_max_qty]));
-  const busy = new Set(busyRows.map((r) => r.equipment_instance_id));
   const freeByType = new Map<string, Record<string, number>>();
   const freeByUnit = new Map<string, Record<string, number>>();
-  for (const i of instances) {
-    if (busy.has(i.id) || !i.branch_id) continue;
-    const m = freeByType.get(i.equipment_type_id) ?? {};
-    m[i.branch_id] = (m[i.branch_id] ?? 0) + 1;
-    freeByType.set(i.equipment_type_id, m);
-    if (i.equipment_unit_id) {
-      const u = freeByUnit.get(i.equipment_unit_id) ?? {};
-      u[i.branch_id] = (u[i.branch_id] ?? 0) + 1;
-      freeByUnit.set(i.equipment_unit_id, u);
+  for (const r of freeRows ?? []) {
+    const m = freeByType.get(r.equipment_type_id) ?? {};
+    m[r.branch_id] = (m[r.branch_id] ?? 0) + r.n;
+    freeByType.set(r.equipment_type_id, m);
+    if (r.equipment_unit_id) {
+      const u = freeByUnit.get(r.equipment_unit_id) ?? {};
+      u[r.branch_id] = (u[r.branch_id] ?? 0) + r.n;
+      freeByUnit.set(r.equipment_unit_id, u);
     }
   }
 
