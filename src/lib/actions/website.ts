@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
+import { cleanSpecFacets, type SpecFacets } from "@/lib/spec-fields";
 
 // Quản trị nội dung web công khai (new.thuenhanh.vn) — bảng website_*.
 // RLS đã gate ghi đúng bộ giam_doc/admin/ke_toan từ migration
@@ -190,6 +191,21 @@ export async function updateWebsiteProduct(
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
+  // Thông số lọc web (spec-fields.ts): kiểm khoảng hợp lệ — chặn "00 inch".
+  let specFacets: SpecFacets | undefined;
+  const specRaw = formData.get("spec_facets_json");
+  if (typeof specRaw === "string" && specRaw) {
+    let json: unknown;
+    try {
+      json = JSON.parse(specRaw);
+    } catch {
+      return { error: "Thông số lọc không hợp lệ." };
+    }
+    const cleaned = cleanSpecFacets(json);
+    if (!cleaned.ok) return { error: cleaned.error };
+    specFacets = cleaned.value;
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("website_products")
@@ -207,6 +223,7 @@ export async function updateWebsiteProduct(
       ...(parsed.data.related_json ? { related_product_ids: parsed.data.related_json } : {}),
       ...(parsed.data.ship_fee !== undefined ? { ship_fee: parsed.data.ship_fee } : {}),
       ...(parsed.data.ship_bike_max_qty !== undefined ? { ship_bike_max_qty: parsed.data.ship_bike_max_qty } : {}),
+      ...(specFacets !== undefined ? { spec_facets: specFacets } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };

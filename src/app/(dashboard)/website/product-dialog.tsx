@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { GalleryEditor } from "./gallery-editor";
 import { RelatedPicker, type RelatedOption } from "./related-picker";
+import { SpecFacetsEditor } from "./spec-facets-editor";
+import type { SpecFacets } from "@/lib/spec-fields";
 import { updateWebsiteProduct } from "@/lib/actions/website";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
@@ -69,6 +71,9 @@ export function WebsiteProductDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [fullscreen, setFullscreen] = useState(false);
+  // Danh mục đang chọn quyết định nhóm ô "Thông số lọc".
+  const [categoryId, setCategoryId] = useState(product.website_category_id ?? "");
+  const categorySlug = categories.find((c) => c.id === categoryId)?.slug ?? null;
 
   function toggleFullscreen() {
     const next = !fullscreen;
@@ -156,7 +161,8 @@ export function WebsiteProductDialog({
             <select
               id="website_category_id"
               name="website_category_id"
-              defaultValue={product.website_category_id ?? ""}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             >
               <option value="">— Chưa phân loại —</option>
@@ -228,6 +234,12 @@ export function WebsiteProductDialog({
               Bỏ qua nếu đã đặt phí giao cố định ở trên. 0 = đồ cồng kềnh luôn cần ô tô; số lớn (vd 999) = nhẹ, xe máy chở bao nhiêu cũng được (như điện thoại).
             </p>
           </div>
+
+          <SpecFacetsEditor
+            key={product.id}
+            categorySlug={categorySlug}
+            initial={(product.spec_facets ?? {}) as SpecFacets}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="tags_csv">Tags tìm chéo (phân tách bằng dấu phẩy)</Label>

@@ -998,6 +998,8 @@ export interface Database {
           related_product_ids: string[];
           ship_fee: number | null;
           ship_bike_max_qty: number | null;
+          // Thông số lọc web { mã_trường: giá trị } — xem lib/spec-fields.ts.
+          spec_facets: Record<string, number | string | (number | string)[]>;
           created_at: string;
           updated_at: string;
         };
@@ -1026,6 +1028,7 @@ export interface Database {
           related_product_ids?: string[];
           ship_fee?: number | null;
           ship_bike_max_qty?: number | null;
+          spec_facets?: Record<string, number | string | (number | string)[]>;
         };
         Update: Partial<Database["public"]["Tables"]["website_products"]["Insert"]>;
         Relationships: [];
