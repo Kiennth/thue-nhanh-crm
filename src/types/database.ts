@@ -1010,6 +1010,8 @@ export interface Database {
           spec_facets: Record<string, number | string | (number | string)[]>;
           created_at: string;
           updated_at: string;
+          has_description: boolean;
+          has_description_en: boolean;
         };
         Insert: {
           id?: string;

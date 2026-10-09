@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
 import { cleanSpecFacets, type SpecFacets } from "@/lib/spec-fields";
+import type { Database } from "@/types/database";
 
 // Quản trị nội dung web công khai (new.thuenhanh.vn) — bảng website_*.
 // RLS đã gate ghi đúng bộ giam_doc/admin/ke_toan từ migration
@@ -164,6 +165,18 @@ const ProductSchema = z.object({
     })
     .optional(),
 });
+
+// Đủ cột của 1 sản phẩm web cho khung "Sửa nội dung web" — nạp lúc mở khung
+// (danh sách Website chỉ tải cột nhẹ, Grok CRM 09/10 §A).
+export async function getWebsiteProductForEdit(
+  id: string,
+): Promise<{ product: Database["public"]["Tables"]["website_products"]["Row"] } | { error: string }> {
+  await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("website_products").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return { error: "Không tải được sản phẩm: " + (error?.message ?? "không tìm thấy") };
+  return { product: data };
+}
 
 export async function updateWebsiteProduct(
   id: string,

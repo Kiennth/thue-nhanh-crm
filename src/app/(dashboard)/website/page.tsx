@@ -66,7 +66,12 @@ export default async function WebsitePage({
 
   let query = supabase
     .from("website_products")
-    .select("*, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)", { count: "exact" });
+    // Chỉ cột bảng cần (Grok CRM 09/10 §A: trước select * kèm mô tả HTML VI+EN
+    // của cả trang → ~790KB). Khung "Sửa nội dung" tự nạp đủ khi mở.
+    .select(
+      "id, slug, name, created_at, website_category_id, gallery_image_urls, is_published, is_featured, is_new, has_description, has_description_en, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)",
+      { count: "exact" },
+    );
   // Mặc định: mới lên web trước (CEO 2026-10-01) — trước đây xếp đã đăng
   // trước rồi theo sort_order, SP mới thêm bị chìm giữa danh sách. Bấm tiêu
   // đề cột để xếp theo tên A→Z / Z→A, ngày tạo, trạng thái (ẩn/hiện) hoặc
@@ -137,7 +142,7 @@ export default async function WebsitePage({
     const et = p.equipment_types as unknown as { image_url: string | null } | null;
     const hasImage = p.gallery_image_urls.length > 0 || Boolean(et?.image_url);
     // Thiếu mô tả nặng hơn thiếu bản EN (phải viết từ đầu) → tính 2.
-    return (hasImage ? 0 : 1) + (p.description_html ? (p.description_html_en ? 0 : 1) : 2);
+    return (hasImage ? 0 : 1) + (p.has_description ? (p.has_description_en ? 0 : 1) : 2);
   };
   const rows =
     sort === "content"
@@ -255,8 +260,8 @@ export default async function WebsitePage({
                 <TableCell>
                   <div className="flex gap-1">
                     {!hasImage && <Badge variant="destructive">Thiếu ảnh</Badge>}
-                    {!p.description_html && <Badge variant="outline">Thiếu mô tả</Badge>}
-                    {p.description_html && !p.description_html_en && (
+                    {!p.has_description && <Badge variant="outline">Thiếu mô tả</Badge>}
+                    {p.has_description && !p.has_description_en && (
                       <Badge variant="outline">Thiếu EN</Badge>
                     )}
                   </div>
@@ -274,7 +279,7 @@ export default async function WebsitePage({
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
                     <WebsiteProductDialog
-                      product={p}
+                      productId={p.id}
                       categories={categoryList}
                       relatedOptions={relatedOptions}
                     />
