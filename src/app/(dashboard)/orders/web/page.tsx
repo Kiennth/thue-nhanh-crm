@@ -23,7 +23,8 @@ const BRANCH_NAME_BY_KEY: Record<string, string> = { hn: "Hà Nội", hcm: "TP H
 
 const maskId = (v: string) => {
   const d = v.replace(/\D/g, "");
-  return d.length > 6 ? `${d.slice(0, 4)}${"•".repeat(d.length - 6)}${d.slice(-2)}` : "••••";
+  // CEO 09/10: nhân viên thấy 4 số đầu + x (0790xxxxxxxx).
+  return d.length > 4 ? `${d.slice(0, 4)}${"x".repeat(d.length - 4)}` : "xxxx";
 };
 
 export default async function WebOrdersPage({
@@ -55,7 +56,7 @@ export default async function WebOrdersPage({
     ? await matchWebOrderCustomers(openRows.map((r) => ({ id: r.id, tax_code: r.tax_code, phone: r.phone })))
     : {};
   // CCCD khách lẻ là dữ liệu cá nhân (đề xuất CRM v2 §7.5): chỉ Giám đốc /
-  // Admin / Kế toán xem đủ số; người khác thấy dạng che 0790••••••12. Che
+  // Admin / Kế toán xem đủ số; người khác thấy dạng che 0790xxxxxxxx. Che
   // ngay ở server nên trình duyệt không nhận số đầy đủ — "Lên đơn" vẫn đọc
   // CCCD thật từ DB (createCustomerFromWebOrder), khớp khách đã chạy ở trên.
   const seeFullId = MANAGE_ROLES.includes(me.role);
