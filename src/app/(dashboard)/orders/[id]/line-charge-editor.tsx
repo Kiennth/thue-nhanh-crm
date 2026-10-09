@@ -5,6 +5,7 @@ import { ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useUnsavedSection } from "@/components/unsaved-changes";
 import {
   updateComboLinePrice,
   updateOrderEquipmentLinePrice,
@@ -36,6 +37,7 @@ export function LineChargeEditor({
   isPriceCustom,
   defaultUnitPrice,
   canEdit,
+  itemLabel,
 }: {
   durationLineIds: string[];
   priceTarget: LinePriceTarget;
@@ -50,12 +52,40 @@ export function LineChargeEditor({
   isPriceCustom?: boolean;
   defaultUnitPrice?: number | null;
   canEdit: boolean;
+  itemLabel?: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const hasDuration = duration != null && unitLabel != null;
+  // B1: ô sửa không còn nút "Lưu" riêng — gõ xong lưu bằng thanh "Lưu thay
+  // đổi" chung. Trang tải lại sau khi lưu → ô theo số mới.
+  const savedKey = `${duration ?? ""}|${unitPrice}`;
+  const [durationInput, setDurationInput] = useState(String(duration ?? ""));
+  const [priceInput, setPriceInput] = useState(String(unitPrice));
+  const [prevSavedKey, setPrevSavedKey] = useState(savedKey);
+  if (prevSavedKey !== savedKey) {
+    setPrevSavedKey(savedKey);
+    setDurationInput(String(duration ?? ""));
+    setPriceInput(String(unitPrice));
+  }
+  const durationChanged = hasDuration && durationInput.trim() !== "" && Number(durationInput) !== duration;
+  const priceChanged = priceInput.trim() !== "" && Number(priceInput) !== unitPrice;
+  const dirty = canEdit && (durationChanged || priceChanged);
+  useUnsavedSection(
+    `charge:${durationLineIds.join(",") || JSON.stringify(priceTarget)}`,
+    `Đơn giá${itemLabel ? ` · ${itemLabel}` : ""}`,
+    dirty,
+    save,
+  );
+
+  function discard() {
+    setDurationInput(String(duration ?? ""));
+    setPriceInput(String(unitPrice));
+    setError(null);
+    setEditing(false);
+  }
   const summary = (
     <>
       {hasDuration && (
@@ -80,23 +110,23 @@ export function LineChargeEditor({
     return updateComboLinePrice(priceTarget.parentLineId, undefined, formData);
   }
 
-  function handleSubmit(formData: FormData) {
+  function save() {
     setError(null);
-    const nextDuration = String(formData.get("charge_duration") ?? "");
-    const nextPrice = String(formData.get("unit_price") ?? "");
-    const durationChanged = hasDuration && nextDuration !== String(duration);
-    const priceChanged = nextPrice !== "" && Number(nextPrice) !== unitPrice;
+    const nextDuration = durationInput.trim();
+    const nextPrice = priceInput.trim();
+    const changeDuration = durationChanged;
+    const changePrice = priceChanged;
 
     startTransition(async () => {
       // Đổi số kỳ trước (giá tự tính lại theo giá gốc); nếu người dùng còn gõ
       // giá khác thì áp giá tay sau cùng.
-      if (durationChanged) {
+      if (changeDuration) {
         const fd = new FormData();
         fd.set("charge_duration", nextDuration);
         const result = await updateOrderLineChargeDuration(durationLineIds, undefined, fd);
         if (result && "error" in result) return setError(result.error);
       }
-      if (priceChanged) {
+      if (changePrice) {
         const fd = new FormData();
         fd.set("unit_price", nextPrice);
         const result = await savePrice(fd);
@@ -149,7 +179,7 @@ export function LineChargeEditor({
     );
   }
 
-  if (!editing) {
+  if (!editing && !dirty) {
     return (
       <div>
         <button
@@ -167,7 +197,7 @@ export function LineChargeEditor({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-1.5 rounded-lg border bg-background p-2">
+    <div className="space-y-1.5 rounded-lg border border-amber-300 bg-[#FFFBEB] p-2 dark:border-amber-700 dark:bg-amber-950/30">
       <div className="flex flex-wrap items-center gap-1.5">
         {hasDuration && (
           <>
@@ -176,8 +206,10 @@ export function LineChargeEditor({
               type="number"
               min={0.5}
               step={0.5}
-              defaultValue={duration}
-              className="h-8 w-16"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              disabled={pending}
+              className="h-8 w-16 bg-background"
               aria-label={`Số ${unitLabel} tính tiền`}
               autoFocus
             />
@@ -189,26 +221,26 @@ export function LineChargeEditor({
           type="number"
           min={0}
           step="any"
-          defaultValue={unitPrice}
-          className="h-8 w-28"
+          value={priceInput}
+          onChange={(e) => setPriceInput(e.target.value)}
+          disabled={pending}
+          className="h-8 w-28 bg-background"
           aria-label="Đơn giá"
           autoFocus={!hasDuration}
         />
         <span className="text-xs text-muted-foreground">đ{priceSuffix}</span>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        <Button type="submit" size="sm" className="h-7 px-2.5 text-xs" disabled={pending}>
-          {pending ? "Đang lưu..." : "Lưu"}
-        </Button>
+        {pending && <span className="px-1 text-xs text-muted-foreground">Đang lưu…</span>}
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-xs"
-          onClick={() => setEditing(false)}
+          onClick={discard}
           disabled={pending}
         >
-          Huỷ
+          {dirty ? "Bỏ sửa" : "Đóng"}
         </Button>
         {isDurationCustom && autoDuration != null && (
           <Button
@@ -227,10 +259,10 @@ export function LineChargeEditor({
       </div>
       {hasDuration && (
         <p className="text-xs text-muted-foreground">
-          Đổi số {unitLabel} thì giá tự tính lại; chỉ sửa giá thì giữ giá tay.
+          Đổi số {unitLabel} thì giá tự tính lại; chỉ sửa giá thì giữ giá tay. Lưu bằng thanh “Lưu thay đổi”.
         </p>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-    </form>
+    </div>
   );
 }

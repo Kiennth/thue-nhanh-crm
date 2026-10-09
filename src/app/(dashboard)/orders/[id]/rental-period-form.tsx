@@ -247,9 +247,7 @@ export function RentalPeriodForm({
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" variant="outline" size="sm" disabled={pending}>
-        {pending ? "Đang lưu..." : "Lưu thời gian thuê"}
-      </Button>
+      {pending && <p className="text-sm text-muted-foreground">Đang lưu…</p>}
     </form>
   );
 }

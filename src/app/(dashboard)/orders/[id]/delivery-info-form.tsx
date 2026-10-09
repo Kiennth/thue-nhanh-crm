@@ -93,7 +93,7 @@ export function DeliveryInfoForm({
         Giao hàng
         {isSuggestion && (
           <span className="text-xs font-normal text-amber-700 dark:text-amber-300">
-            · gợi ý từ dòng phí giao/người đặt — bấm Lưu để chốt
+            · gợi ý từ dòng phí giao/người đặt — chưa lưu
           </span>
         )}
       </p>
@@ -172,15 +172,18 @@ export function DeliveryInfoForm({
           </div>
         </>
       )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={pending || (!dirty && !isSuggestion)}
-        onClick={save}
-      >
-        {pending ? "Đang lưu..." : "Lưu"}
-      </Button>
+      {/* B1: sửa thì lưu bằng thanh "Lưu thay đổi" chung. Riêng địa chỉ GỢI Ý
+          chưa sửa gì (không tính là thay đổi) thì vẫn cần 1 nút để chốt. */}
+      {pending ? (
+        <p className="text-sm text-muted-foreground">Đang lưu…</p>
+      ) : (
+        isSuggestion &&
+        !editedSinceOpen && (
+          <Button type="button" variant="outline" size="sm" onClick={save}>
+            Chốt địa chỉ gợi ý
+          </Button>
+        )
+      )}
     </div>
   );
 }

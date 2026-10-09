@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -11,6 +10,8 @@ import {
 } from "@/components/ui/select";
 import { assignOrderLineEmployee } from "@/lib/actions/orders";
 import type { DeliveryMethod } from "@/types/database";
+import { useUnsavedSection } from "@/components/unsaved-changes";
+import { cn } from "@/lib/utils";
 
 interface EmployeeOption {
   id: string;
@@ -24,43 +25,55 @@ const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
   external_service: "Đặt xe dịch vụ",
 };
 
+// Người thực hiện (+ phương thức giao) của dòng — đổi xong lưu bằng thanh
+// "Lưu thay đổi" chung (B1).
 export function OrderLineEmployeeForm({
   lineId,
   employeeId,
   employees,
   isTransportLine,
   deliveryMethod,
+  itemLabel,
 }: {
   lineId: string;
   employeeId: string | null;
   employees: EmployeeOption[];
   isTransportLine?: boolean;
   deliveryMethod?: DeliveryMethod | null;
+  itemLabel?: string | null;
 }) {
+  const savedEmployee = employeeId ?? UNASSIGNED;
+  const savedMethod = deliveryMethod ?? "";
+  const [employee, setEmployee] = useState(savedEmployee);
+  const [method, setMethod] = useState<string>(savedMethod);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Trang tải lại sau khi lưu → theo giá trị mới.
+  const [prevSaved, setPrevSaved] = useState(`${savedEmployee}|${savedMethod}`);
+  if (prevSaved !== `${savedEmployee}|${savedMethod}`) {
+    setPrevSaved(`${savedEmployee}|${savedMethod}`);
+    setEmployee(savedEmployee);
+    setMethod(savedMethod);
+  }
+  const dirty = employee !== savedEmployee || method !== savedMethod;
+  useUnsavedSection(`employee:${lineId}`, `Người thực hiện${itemLabel ? ` · ${itemLabel}` : ""}`, dirty, save);
 
-  function handleSubmit(formData: FormData) {
+  function save() {
     setError(null);
-    if (formData.get("employee_id") === UNASSIGNED) {
-      formData.delete("employee_id");
-    }
+    const fd = new FormData();
+    if (employee !== UNASSIGNED) fd.set("employee_id", employee);
+    if (isTransportLine && method) fd.set("delivery_method", method);
     startTransition(async () => {
-      const result = await assignOrderLineEmployee(lineId, undefined, formData);
-      if (result && "error" in result) {
-        setError(result.error);
-      }
+      const result = await assignOrderLineEmployee(lineId, undefined, fd);
+      if (result && "error" in result) setError(result.error);
     });
   }
 
+  const ring = dirty && "border-amber-400 bg-[#FFFBEB] dark:bg-amber-950/30";
   return (
-    <form
-      key={`${employeeId ?? ""}-${deliveryMethod ?? ""}`}
-      action={handleSubmit}
-      className="flex flex-wrap items-center gap-1"
-    >
-      <Select name="employee_id" defaultValue={employeeId ?? UNASSIGNED}>
-        <SelectTrigger className="h-8 w-40">
+    <div className="flex flex-wrap items-center gap-1">
+      <Select value={employee} onValueChange={(v) => setEmployee((v as string | null) ?? UNASSIGNED)} disabled={pending}>
+        <SelectTrigger className={cn("h-8 w-40", employee !== savedEmployee && ring)}>
           <SelectValue placeholder="Người thực hiện">
             {(value: string) =>
               value === UNASSIGNED ? "— Chưa gán —" : (employees.find((e) => e.id === value)?.name ?? "—")
@@ -77,8 +90,8 @@ export function OrderLineEmployeeForm({
         </SelectContent>
       </Select>
       {isTransportLine && (
-        <Select name="delivery_method" defaultValue={deliveryMethod ?? undefined}>
-          <SelectTrigger className="h-8 w-40">
+        <Select value={method || null} onValueChange={(v) => setMethod((v as string | null) ?? "")} disabled={pending}>
+          <SelectTrigger className={cn("h-8 w-40", method !== savedMethod && ring)}>
             <SelectValue placeholder="Phương thức">
               {(value: DeliveryMethod) => DELIVERY_METHOD_LABELS[value]}
             </SelectValue>
@@ -92,10 +105,7 @@ export function OrderLineEmployeeForm({
           </SelectContent>
         </Select>
       )}
-      <Button type="submit" variant="ghost" size="sm" disabled={pending}>
-        {pending ? "..." : "Lưu"}
-      </Button>
       {error && <p className="text-xs text-destructive">{error}</p>}
-    </form>
+    </div>
   );
 }

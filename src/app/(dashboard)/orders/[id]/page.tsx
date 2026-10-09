@@ -767,7 +767,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
         {/* flex-wrap: mobile 375px không đủ chỗ 5 nút hành động 1 hàng —
             không wrap là cả trang bị scroll ngang. */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* data-requires-saved (B1): còn thay đổi chưa lưu mà bấm hành động
+            → thanh lưu hỏi "Lưu N thay đổi trước?". */}
+        <div data-requires-saved className="flex flex-wrap items-center gap-2">
           <PrintMenu orderId={order.id} />
           {!order.cancelled_at && <QuoteShareButton orderId={order.id} />}
           <SendDocumentEmailDialog orderId={order.id} customerEmail={orderCustomer?.email ?? null} />
@@ -1019,6 +1021,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             isPriceCustom={c?.isCustom ?? false}
                             defaultUnitPrice={c?.defaultUnitPrice ?? null}
                             canEdit={canManage}
+                            itemLabel={type?.name ?? null}
                           />
                         </TableCell>
                       );
@@ -1080,6 +1083,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                         employees={employeeOptionsFor(line.employee_id)}
                                         isTransportLine={isTransportLine}
                                         deliveryMethod={line.delivery_method}
+                                        itemLabel={type?.name ?? line.custom_name}
                                       />
                                     ) : (
                                       <span>{employeeNameById.get(line.employee_id ?? "") ?? "—"}</span>
@@ -1109,7 +1113,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             )}
                             <TableCell>
                               {canManage && !line.equipment_instance_id ? (
-                                <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} />
+                                <OrderLineQuantityForm lineId={line.id} quantity={line.quantity} itemLabel={type?.name ?? line.custom_name} />
                               ) : (
                                 <span className="tabular-nums">{line.quantity}</span>
                               )}
@@ -1485,14 +1489,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     />
                   </div>
                   {!order.cancelled_at && !order.completed_at && !taskByType.get("chot_don")?.completed_date && (
-                    <CloseDealButton
-                      orderId={order.id}
-                      employees={taskEmployeeOptions("chot_don", employee?.id).employees}
-                      defaultEmployeeId={employee?.id ?? null}
-                    />
+                    <span data-requires-saved className="contents">
+                      <CloseDealButton
+                        orderId={order.id}
+                        employees={taskEmployeeOptions("chot_don", employee?.id).employees}
+                        defaultEmployeeId={employee?.id ?? null}
+                      />
+                    </span>
                   )}
                   {canManage && !order.cancelled_at && !order.completed_at && doneCount < TASK_TYPE_SEQUENCE.length && (
-                    <CompleteAllTasksButton orderId={order.id} remaining={TASK_TYPE_SEQUENCE.length - doneCount} />
+                    <span data-requires-saved className="contents">
+                      <CompleteAllTasksButton orderId={order.id} remaining={TASK_TYPE_SEQUENCE.length - doneCount} />
+                    </span>
                   )}
                 </CardHeader>
                 <CardContent>
@@ -1677,7 +1685,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <CardTitle className="text-base">
                   <AccentTitle accent="emerald" icon={Wallet}>Thanh toán</AccentTitle>
                 </CardTitle>
-                <div className="flex flex-wrap gap-1">
+                <div data-requires-saved className="flex flex-wrap gap-1">
                   {!order.cancelled_at && (
                     <CollectAllButton
                       orderId={order.id}

@@ -5,6 +5,7 @@ import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { updateOrderLineExtraInfo } from "@/lib/actions/orders";
+import { useUnsavedSection } from "@/components/unsaved-changes";
 
 // Ghi chú hiển thị của dòng, nằm ngay dưới tên sản phẩm — học Booqable
 // "extra information" (CEO 2026-09-30): phụ kiện đi kèm, địa chỉ + SĐT giao/
@@ -24,11 +25,23 @@ export function LineNoteEditor({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // B1: sửa ghi chú xong lưu bằng thanh "Lưu thay đổi" chung (Cmd/Ctrl+Enter
+  // cũng lưu). Trang tải lại sau khi lưu → ô theo ghi chú mới.
+  const [text, setText] = useState(note ?? "");
+  const [prevNote, setPrevNote] = useState(note);
+  if (prevNote !== note) {
+    setPrevNote(note);
+    setText(note ?? "");
+  }
+  const dirty = canEdit && text !== (note ?? "");
+  useUnsavedSection(`note:${lineIds.join(",")}`, "Ghi chú dòng", dirty, save);
 
-  function handleSubmit(formData: FormData) {
+  function save() {
     setError(null);
+    const fd = new FormData();
+    fd.set("extra_information", text);
     startTransition(async () => {
-      const result = await updateOrderLineExtraInfo(lineIds, undefined, formData);
+      const result = await updateOrderLineExtraInfo(lineIds, undefined, fd);
       if (result && "error" in result) {
         setError(result.error);
       } else {
@@ -37,13 +50,19 @@ export function LineNoteEditor({
     });
   }
 
+  function discard() {
+    setText(note ?? "");
+    setError(null);
+    setEditing(false);
+  }
+
   if (!canEdit) {
     return note ? (
       <p className="text-xs font-normal whitespace-pre-wrap text-muted-foreground">{note}</p>
     ) : null;
   }
 
-  if (!editing) {
+  if (!editing && !dirty) {
     return note ? (
       <button
         type="button"
@@ -67,38 +86,38 @@ export function LineNoteEditor({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-1 font-normal">
+    <div className="space-y-1 font-normal">
       <Textarea
         name="extra_information"
-        defaultValue={note ?? ""}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         placeholder={placeholder}
-        className="min-h-16 text-xs"
+        className={dirty ? "min-h-16 border-amber-400 bg-[#FFFBEB] text-xs dark:bg-amber-950/30" : "min-h-16 text-xs"}
         maxLength={1000}
+        disabled={pending}
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            e.currentTarget.form?.requestSubmit();
+            if (dirty) save();
           }
-          if (e.key === "Escape") setEditing(false);
+          if (e.key === "Escape") discard();
         }}
       />
       <div className="flex items-center gap-1">
-        <Button type="submit" size="sm" className="h-7 px-2.5 text-xs" disabled={pending}>
-          {pending ? "Đang lưu..." : "Lưu ghi chú"}
-        </Button>
+        {pending && <span className="px-1 text-xs text-muted-foreground">Đang lưu…</span>}
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-xs"
-          onClick={() => setEditing(false)}
+          onClick={discard}
           disabled={pending}
         >
-          Huỷ
+          {dirty ? "Bỏ sửa" : "Đóng"}
         </Button>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-    </form>
+    </div>
   );
 }

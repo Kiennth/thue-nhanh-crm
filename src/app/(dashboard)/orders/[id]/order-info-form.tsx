@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateOrderContactInfo } from "@/lib/actions/orders";
@@ -128,11 +127,8 @@ export function OrderInfoForm({
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {success && <p className="text-sm text-primary">Đã lưu.</p>}
-
-      <Button type="submit" variant="outline" size="sm" disabled={pending}>
-        {pending ? "Đang lưu..." : "Lưu"}
-      </Button>
+      {pending && <p className="text-sm text-muted-foreground">Đang lưu…</p>}
+      {success && !dirty && !pending && <p className="text-sm text-primary">Đã lưu.</p>}
     </form>
   );
 }

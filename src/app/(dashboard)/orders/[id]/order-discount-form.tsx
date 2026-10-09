@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -46,7 +45,7 @@ export function OrderDiscountForm({
   const remaining = totalValue - discount;
   const tooLarge = discount > rentalSubtotal;
 
-  useUnsavedSection("discount", "Giảm giá", amount.trim() !== "", () => handleSubmit());
+  useUnsavedSection("discount", "Giảm giá", amount.trim() !== "", handleSubmit);
 
   function handleSubmit() {
     setError(null);
@@ -99,15 +98,7 @@ export function OrderDiscountForm({
             </Select>
           </div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleSubmit}
-          disabled={pending || !valid || tooLarge}
-        >
-          {pending ? "..." : "Áp dụng"}
-        </Button>
+        {pending && <span className="pb-2 text-xs text-muted-foreground">Đang lưu…</span>}
       </div>
 
       {/* Xem trước ngay khi gõ: đỡ phải bấm rồi mới biết mình giảm nhầm. */}
