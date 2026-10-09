@@ -145,8 +145,6 @@ export default async function WebsitePage({
           .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
       : (products ?? []);
   const categoryList = categories ?? [];
-  // Bản gọn cho khung Sửa nội dung (không kèm giới thiệu HTML của danh mục).
-  const categoryOptionsLite = categoryList.map(({ id, name, slug, parent_id }) => ({ id, name, slug, parent_id }));
   const all = statsRes.data ?? [];
   const publishedCount = all.filter((p) => p.is_published).length;
   const noCategoryCount = all.filter((p) => !p.website_category_id).length;
@@ -270,10 +268,7 @@ export default async function WebsitePage({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
-                    <WebsiteProductDialog
-                      productId={p.id}
-                      categories={categoryOptionsLite}
-                    />
+                    <WebsiteProductDialog productId={p.id} />
                     <WebsiteProductRowActions
                       id={p.id}
                       slug={p.slug}

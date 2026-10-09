@@ -60,13 +60,7 @@ function categoryOptions(categories: WebsiteCategoryRow[]) {
 // Sửa nội dung 1 sản phẩm web — song ngữ đặt cạnh nhau để đối chiếu nhanh.
 // Mô tả nhập HTML thô (mang từ Haravan sang) — người quen sửa chữ thường chỉ
 // đổi text giữa các thẻ; làm editor xịn là việc sau nếu cần.
-export function WebsiteProductDialog({
-  productId,
-  categories,
-}: {
-  productId: string;
-  categories: WebsiteCategoryRow[];
-}) {
+export function WebsiteProductDialog({ productId }: { productId: string }) {
   const [open, setOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   // Nạp đủ sản phẩm (mô tả HTML VI + EN…) lúc MỞ khung sửa — danh sách
@@ -74,6 +68,7 @@ export function WebsiteProductDialog({
   const [product, setProduct] = useState<WebsiteProductRow | null>(null);
   // Danh sách nhẹ mọi sản phẩm web (id + tên) cho bộ chọn "liên quan" — nạp cùng lúc.
   const [relatedOptions, setRelatedOptions] = useState<RelatedOption[]>([]);
+  const [categories, setCategories] = useState<WebsiteCategoryRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   function toggleFullscreen() {
@@ -97,6 +92,7 @@ export function WebsiteProductDialog({
             .then((r) => {
               if ("error" in r) return setLoadError(r.error);
               setRelatedOptions(r.relatedOptions);
+              setCategories(r.categories);
               setProduct(r.product);
             })
             .catch(() => setLoadError("Không tải được sản phẩm — đóng rồi mở lại."));

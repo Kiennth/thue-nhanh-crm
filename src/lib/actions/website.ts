@@ -171,22 +171,27 @@ const ProductSchema = z.object({
 export async function getWebsiteProductForEdit(
   id: string,
 ): Promise<
-  | { product: Database["public"]["Tables"]["website_products"]["Row"]; relatedOptions: { id: string; label: string }[] }
+  | {
+      product: Database["public"]["Tables"]["website_products"]["Row"];
+      relatedOptions: { id: string; label: string }[];
+      categories: { id: string; name: string; slug: string; parent_id: string | null }[];
+    }
   | { error: string }
 > {
   await requireRole([...MANAGE_ROLES]);
   const supabase = await createClient();
-  const [{ data, error }, { data: lite }] = await Promise.all([
+  const [{ data, error }, { data: lite }, { data: categories }] = await Promise.all([
     supabase.from("website_products").select("*").eq("id", id).maybeSingle(),
     // Bộ chọn "sản phẩm liên quan": tên marketing, trống thì tên CRM.
     supabase.from("website_products").select("id, name, slug, equipment_types(name)").order("slug"),
+    supabase.from("website_categories").select("id, name, slug, parent_id").order("sort_order"),
   ]);
   if (error || !data) return { error: "Không tải được sản phẩm: " + (error?.message ?? "không tìm thấy") };
   const relatedOptions = (lite ?? []).map((p) => ({
     id: p.id,
     label: p.name ?? (p.equipment_types as unknown as { name: string } | null)?.name ?? p.slug,
   }));
-  return { product: data, relatedOptions };
+  return { product: data, relatedOptions, categories: categories ?? [] };
 }
 
 export async function updateWebsiteProduct(
