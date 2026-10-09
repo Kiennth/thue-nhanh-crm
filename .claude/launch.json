@@ -61,6 +61,20 @@
         "cd ~/Documents/'Elago Web' && npx wrangler dev --port 8795 --local"
       ],
       "port": 8795
+    },
+    {
+      "name": "dilien-web-dev",
+      "runtimeExecutable": "/opt/homebrew/bin/npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/nguyentrungkien/Documents/Di Lien Web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3011"
+      ],
+      "port": 3011
     }
   ]
 }
