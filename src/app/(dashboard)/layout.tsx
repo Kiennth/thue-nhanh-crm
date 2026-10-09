@@ -59,7 +59,7 @@ export default async function DashboardLayout({
           <HeaderClock location={location} />
         </header>
         {/* pb-24: chừa chỗ cho nút nổi Tạo đơn nhanh không che nội dung cuối trang. */}
-        <main className="flex-1 p-6 pb-24">{children}</main>
+        <main className="flex-1 p-4 pb-24 sm:p-6 sm:pb-24">{children}</main>
         <QuickOrderFab branches={branches ?? []} />
       </SidebarInset>
     </SidebarProvider>

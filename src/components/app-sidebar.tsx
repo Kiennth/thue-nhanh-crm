@@ -328,7 +328,7 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         </Link>
         {/* Đổi mật khẩu (CEO 2026-10-03) — dùng lại trang đặt mật khẩu của
             luồng mời nhân viên, đang đăng nhập là đổi được ngay. */}
-        <Button variant="outline" size="sm" className="w-full justify-start" render={<Link href="/me" />}>
+        <Button variant="outline" size="sm" className="w-full justify-start" nativeButton={false} render={<Link href="/me" />}>
           <UserRound className="size-4" />
           Hồ sơ của tôi
         </Button>
@@ -336,6 +336,7 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
           variant="outline"
           size="sm"
           className="w-full justify-start"
+          nativeButton={false}
           render={<Link href="/set-password" />}
         >
           <KeyRound className="size-4" />

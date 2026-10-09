@@ -442,7 +442,45 @@ export async function OrdersListSection({
         )}
       </div>
 
-      <Table>
+      {/* Điện thoại (< md): mỗi đơn 1 thẻ thay bảng 1.174px phải vuốt ngang
+          (đề xuất CRM v2 §4.6). Máy tính vẫn là bảng như cũ. */}
+      <div className="space-y-2 md:hidden">
+        {orders.map((order) => {
+          const name = customerNameById.get(order.customer_id) ?? "—";
+          return (
+            <Link
+              key={order.id}
+              href={`/orders/${order.id}`}
+              className="block rounded-lg border bg-card p-3 text-sm active:bg-muted"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{order.order_code}</span>
+                <BranchBadge name={branchNameById.get(order.pickup_branch_id) ?? "—"} />
+                <span className="ml-auto">
+                  {order.cancelled_at ? (
+                    <Badge variant="destructive">Đã huỷ</Badge>
+                  ) : order.completed_at ? (
+                    <Badge>Hoàn tất</Badge>
+                  ) : (
+                    <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+                  )}
+                </span>
+              </div>
+              <p className="mt-1 truncate">{name}</p>
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  {order.rental_start_at ? dateTimeFormatter.format(new Date(order.rental_start_at)) : "—"} →{" "}
+                  {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
+                </span>
+                <span className="font-semibold text-foreground tabular-nums">{currencyFormatter.format(order.total_value)}đ</span>
+              </div>
+            </Link>
+          );
+        })}
+        {!orders.length && <p className="py-6 text-center text-sm text-muted-foreground">Không có đơn hàng nào.</p>}
+      </div>
+
+      <Table className="hidden md:table">
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">Mã đơn</TableHead>
