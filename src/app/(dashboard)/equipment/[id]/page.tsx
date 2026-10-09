@@ -40,6 +40,8 @@ import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { ProductActionBar } from "./product-action-bar";
 import { DepositReviewBox } from "./deposit-review-box";
+import { PriceTierEditor } from "./price-tier-editor";
+import type { PricingTierInput } from "@/lib/rental-pricing";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
 import { TransferStockDialog } from "../transfer-stock-dialog";
@@ -97,6 +99,8 @@ const INSTANCE_BRANCH_COLOR: Record<string, string> = {
 
 const TABS = [
   { value: "stock", label: "Tồn kho" },
+  // B3: thang giá thuê nhiều ngày (chỉ hàng cho thuê theo ngày).
+  { value: "pricing", label: "Bảng giá" },
   { value: "revenue", label: "Doanh thu" },
   { value: "rentals", label: "Lịch sử thuê" },
   { value: "history", label: "Lịch sử chuyển kho" },
@@ -130,20 +134,30 @@ export default async function EquipmentDetailPage({
   const { id } = await params;
   const { tab, sort, dir, page: pageParam } = await searchParams;
   const requestedTab: Tab =
-    tab === "history" ? "history" : tab === "rentals" ? "rentals" : tab === "revenue" ? "revenue" : "stock";
+    tab === "history"
+      ? "history"
+      : tab === "rentals"
+        ? "rentals"
+        : tab === "revenue"
+          ? "revenue"
+          : tab === "pricing"
+            ? "pricing"
+            : "stock";
   const requestedRentalPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
   const activeDir: "asc" | "desc" = dir === "desc" ? "desc" : "asc";
 
   const supabase = await createClient();
 
-  const [{ data: type }, { data: templates }, { data: categories }, { data: branches }, employee] =
+  const [{ data: type }, { data: templates }, { data: categories }, { data: branches }, employee, { data: tierRows }] =
     await Promise.all([
       supabase.from("equipment_types").select("*").eq("id", id).maybeSingle(),
       supabase.from("pricing_templates").select("*").order("name"),
       supabase.from("equipment_categories").select("id, name").eq("is_active", true).order("sort_order"),
       supabase.from("branches").select("id, name, position").order("position"),
       getCurrentEmployee(),
+      // Bậc giá của mẫu chung + thang riêng mã này — cho tab Bảng giá (ít dòng).
+      supabase.from("pricing_template_tiers").select("template_id, min_duration, duration_unit, discount_percentage"),
     ]);
   if (!type) notFound();
   // Nhãn web + người bấm Ngừng kinh doanh cho thanh thao tác (B8).
@@ -160,7 +174,11 @@ export default async function EquipmentDetailPage({
   // trang danh sách /equipment (canViewEquipmentReports): Admin quản trị
   // được danh mục nhưng không xem doanh thu.
   const canViewRevenue = canManageCatalog && employee?.role !== "admin";
-  const activeTab: Tab = requestedTab === "revenue" && !canViewRevenue ? "stock" : requestedTab;
+  const hasPricingTab = type.product_type === "rental" && type.rental_period_unit === "day" && type.tracking_type !== "combo";
+  const activeTab: Tab =
+    (requestedTab === "revenue" && !canViewRevenue) || (requestedTab === "pricing" && !hasPricingTab)
+      ? "stock"
+      : requestedTab;
 
   const isRentalQuantity = type.product_type === "rental" && type.tracking_type === "quantity";
   const isRentalIndividual = type.product_type === "rental" && type.tracking_type === "individual";
@@ -384,6 +402,18 @@ export default async function EquipmentDetailPage({
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
   const branchPositionById = new Map(branchList.map((b, idx) => [b.id, b.position ?? idx]));
   const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
+  // B3: bảng giá mẫu chung + thang riêng của chính mã này (thang riêng mã khác ẩn).
+  const sharedTemplates = templateList.filter((t) => !t.owner_equipment_type_id);
+  const ownTemplate = templateList.find((t) => t.owner_equipment_type_id === type.id) ?? null;
+  const dialogTemplates = templateList
+    .filter((t) => !t.owner_equipment_type_id || t.owner_equipment_type_id === type.id)
+    .map((t) => (t.owner_equipment_type_id ? { ...t, name: "Thang giá riêng (mã này)" } : t));
+  const tiersByTemplate = new Map<string, PricingTierInput[]>();
+  for (const t of tierRows ?? []) {
+    const list = tiersByTemplate.get(t.template_id) ?? [];
+    list.push({ min_duration: t.min_duration, duration_unit: t.duration_unit, discount_percentage: Number(t.discount_percentage) });
+    tiersByTemplate.set(t.template_id, list);
+  }
 
   const stockByUnit = new Map<string, NonNullable<typeof stock>>();
   for (const row of stock ?? []) {
@@ -578,7 +608,9 @@ export default async function EquipmentDetailPage({
     type.product_type === "rental"
       ? `${currencyFormatter.format(type.price)}đ/${RENTAL_PERIOD_UNIT_LABELS[type.rental_period_unit!]}` +
         (type.pricing_method === "pricing_structure"
-          ? ` · bảng giá: ${templateNameById.get(type.pricing_template_id ?? "") ?? "—"}`
+          ? ownTemplate && type.pricing_template_id === ownTemplate.id
+            ? " · thang giá riêng"
+            : ` · bảng giá: ${templateNameById.get(type.pricing_template_id ?? "") ?? "—"}`
           : "") +
         // B7: cọc 0 = "Không cần cọc" (không bao giờ "0đ"); combo = tổng món con.
         (type.tracking_type === "combo"
@@ -661,7 +693,7 @@ export default async function EquipmentDetailPage({
               web={webRow ? { featured: webRow.is_featured, isNew: webRow.is_new } : null}
               editButton={
                 <EquipmentTypeDialog
-                  templates={templateList}
+                  templates={dialogTemplates}
                   categories={categoryList}
                   equipmentType={type}
                   editTriggerVariant="outline"
@@ -676,7 +708,7 @@ export default async function EquipmentDetailPage({
       </Card>
 
       <div className="flex items-center gap-1 border-b">
-        {TABS.filter((t) => t.value !== "revenue" || canViewRevenue).map((t) => (
+        {TABS.filter((t) => (t.value !== "revenue" || canViewRevenue) && (t.value !== "pricing" || hasPricingTab)).map((t) => (
           <Link
             key={t.value}
             href={`/equipment/${id}?tab=${t.value}`}
@@ -1200,6 +1232,22 @@ export default async function EquipmentDetailPage({
             </>
           )}
         </div>
+      )}
+
+      {activeTab === "pricing" && hasPricingTab && (
+        <PriceTierEditor
+          typeId={type.id}
+          basePrice={type.price}
+          canEdit={employee?.role === "giam_doc"}
+          sharedTemplates={sharedTemplates.map((t) => ({ id: t.id, name: t.name, tiers: tiersByTemplate.get(t.id) ?? [] }))}
+          currentTemplateId={type.pricing_method === "pricing_structure" ? type.pricing_template_id : null}
+          customTiers={
+            ownTemplate && type.pricing_template_id === ownTemplate.id ? (tiersByTemplate.get(ownTemplate.id) ?? []) : null
+          }
+          variants={unitList
+            .filter((u) => u.price != null && u.price !== type.price)
+            .map((u) => ({ label: u.brand_model, price: u.price! }))}
+        />
       )}
 
       {activeTab === "revenue" && canViewRevenue && revenueOverview && (

@@ -1433,3 +1433,145 @@ export async function removeComboAlternative(alternativeId: string) {
     ?.combo_type_id;
   if (comboTypeId) revalidatePath(`/equipment/${comboTypeId}`);
 }
+
+// ---------------------------------------------------------------------------
+// B3 (Grok CRM 09/10): thang giá riêng theo mã. Thang riêng = 1 bảng giá mẫu
+// ẩn có owner_equipment_type_id = mã; mã trỏ pricing_template_id vào nó. Máy
+// tính giá (tieredPrice), đơn đã tạo và web không đổi gì. Chỉ Giám đốc sửa.
+// ---------------------------------------------------------------------------
+
+const CustomTiersSchema = z
+  .array(
+    z.object({
+      min_duration: z.number().int().min(1, { message: "Số ngày/tháng của bậc phải từ 1 trở lên." }),
+      duration_unit: z.enum(["day", "month"]),
+      discount_percentage: z
+        .number()
+        .gt(0, { message: "% giảm phải lớn hơn 0." })
+        .lt(100, { message: "% giảm phải nhỏ hơn 100." }),
+    }),
+  )
+  .min(1, { message: "Thang giá cần ít nhất 1 bậc." })
+  .max(30);
+
+export type CustomTierInput = z.infer<typeof CustomTiersSchema>[number];
+
+export async function saveEquipmentCustomTiers(
+  typeId: string,
+  tiers: CustomTierInput[],
+): Promise<{ error: string } | { success: true; savedAt: string }> {
+  await requireRole([...DIRECTOR_ONLY]);
+  const parsed = CustomTiersSchema.safeParse(tiers);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Thang giá không hợp lệ." };
+  const rows = parsed.data.map((t) => ({ ...t, discount_percentage: Math.round(t.discount_percentage * 100) / 100 }));
+  const seen = new Map<string, number>();
+  for (const [i, t] of rows.entries()) {
+    const key = `${t.duration_unit}:${t.min_duration}`;
+    if (seen.has(key)) {
+      return {
+        error: `Bậc ${i + 1} trùng mốc với bậc ${seen.get(key)! + 1} (${t.min_duration} ${t.duration_unit === "month" ? "tháng" : "ngày"}).`,
+      };
+    }
+    seen.set(key, i);
+  }
+
+  const supabase = await createClient();
+  const { data: type } = await supabase
+    .from("equipment_types")
+    .select("id, name, product_type")
+    .eq("id", typeId)
+    .maybeSingle();
+  if (!type) return { error: "Không tìm thấy mã hàng." };
+  if (type.product_type !== "rental") return { error: "Chỉ hàng cho thuê mới có thang giá theo ngày." };
+
+  let { data: own } = await supabase
+    .from("pricing_templates")
+    .select("id")
+    .eq("owner_equipment_type_id", typeId)
+    .maybeSingle();
+  if (!own) {
+    const { data: created, error } = await supabase
+      .from("pricing_templates")
+      .insert({ name: `Riêng · ${type.name}`, owner_equipment_type_id: typeId })
+      .select("id")
+      .single();
+    if (error || !created) return { error: "Không tạo được thang giá riêng: " + (error?.message ?? "") };
+    own = created;
+  }
+  // Thay toàn bộ bậc (xoá rồi thêm) — trigger nhật ký ghi lại cũ → mới.
+  const { error: delError } = await supabase.from("pricing_template_tiers").delete().eq("template_id", own.id);
+  if (delError) return { error: "Không lưu được thang giá: " + delError.message };
+  const { error: insError } = await supabase
+    .from("pricing_template_tiers")
+    .insert(rows.map((t) => ({ ...t, template_id: own.id })));
+  if (insError) return { error: "Không lưu được thang giá: " + insError.message };
+  const { error: typeError } = await supabase
+    .from("equipment_types")
+    .update({ pricing_method: "pricing_structure", pricing_template_id: own.id })
+    .eq("id", typeId);
+  if (typeError) return { error: "Không gắn được thang giá vào mã: " + typeError.message };
+
+  revalidatePath(`/equipment/${typeId}`);
+  revalidatePath("/equipment");
+  await pingWebsiteRevalidate();
+  return { success: true, savedAt: new Date().toISOString() };
+}
+
+// "Dùng lại Bảng giá mẫu": trỏ mã về 1 bảng giá mẫu chung, xoá thang riêng.
+export async function applySharedPricingTemplate(
+  typeId: string,
+  templateId: string,
+): Promise<{ error: string } | { success: true; savedAt: string }> {
+  await requireRole([...DIRECTOR_ONLY]);
+  const supabase = await createClient();
+  const { data: tpl } = await supabase
+    .from("pricing_templates")
+    .select("id, owner_equipment_type_id")
+    .eq("id", templateId)
+    .maybeSingle();
+  if (!tpl || tpl.owner_equipment_type_id) return { error: "Chọn 1 bảng giá mẫu dùng chung." };
+  const { error } = await supabase
+    .from("equipment_types")
+    .update({ pricing_method: "pricing_structure", pricing_template_id: templateId })
+    .eq("id", typeId);
+  if (error) return { error: "Không đổi được bảng giá: " + error.message };
+  await supabase.from("pricing_templates").delete().eq("owner_equipment_type_id", typeId);
+
+  revalidatePath(`/equipment/${typeId}`);
+  revalidatePath("/equipment");
+  await pingWebsiteRevalidate();
+  return { success: true, savedAt: new Date().toISOString() };
+}
+
+// Gán 1 bảng giá mẫu cho cả danh mục (mã tính theo bậc, chưa có thang riêng).
+export async function assignPricingTemplateToCategory(
+  templateId: string,
+  categoryId: string,
+): Promise<{ error: string } | { success: true; count: number }> {
+  await requireRole([...DIRECTOR_ONLY]);
+  const supabase = await createClient();
+  const [{ data: tpl }, { data: privateTemplates }, { data: types }] = await Promise.all([
+    supabase.from("pricing_templates").select("id, owner_equipment_type_id").eq("id", templateId).maybeSingle(),
+    supabase.from("pricing_templates").select("id").not("owner_equipment_type_id", "is", null),
+    supabase
+      .from("equipment_types")
+      .select("id, pricing_template_id")
+      .eq("category_id", categoryId)
+      .eq("product_type", "rental")
+      .eq("pricing_method", "pricing_structure"),
+  ]);
+  if (!tpl || tpl.owner_equipment_type_id) return { error: "Chọn 1 bảng giá mẫu dùng chung." };
+  const privateIds = new Set((privateTemplates ?? []).map((t) => t.id));
+  const ids = (types ?? [])
+    .filter((t) => t.pricing_template_id !== templateId && !privateIds.has(t.pricing_template_id ?? ""))
+    .map((t) => t.id);
+  if (ids.length) {
+    const { error } = await supabase.from("equipment_types").update({ pricing_template_id: templateId }).in("id", ids);
+    if (error) return { error: "Không gán được bảng giá: " + error.message };
+  }
+  revalidatePath("/pricing-templates");
+  revalidatePath("/equipment");
+  await pingWebsiteRevalidate();
+  return { success: true, count: ids.length };
+}
+

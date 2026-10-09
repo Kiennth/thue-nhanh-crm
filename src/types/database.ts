@@ -278,12 +278,15 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          // B3: thang giá riêng của 1 mã (null = bảng giá mẫu dùng chung).
+          owner_equipment_type_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           name: string;
+          owner_equipment_type_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["pricing_templates"]["Insert"]>;
         Relationships: [];

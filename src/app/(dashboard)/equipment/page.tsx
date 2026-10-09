@@ -224,7 +224,16 @@ export default async function EquipmentPage({
   );
 
   const templateList = templates ?? [];
-  const templateNameById = new Map(templateList.map((t) => [t.id, t.name]));
+  // B3: thang giá riêng (owner_equipment_type_id) không hiện như 1 bảng giá mẫu
+  // — form sửa mã chỉ thấy mẫu chung + thang riêng của chính mã đó.
+  const sharedTemplateList = templateList.filter((t) => !t.owner_equipment_type_id);
+  const templatesFor = (typeId: string) =>
+    templateList
+      .filter((t) => !t.owner_equipment_type_id || t.owner_equipment_type_id === typeId)
+      .map((t) => (t.owner_equipment_type_id ? { ...t, name: "Thang giá riêng (mã này)" } : t));
+  const templateNameById = new Map(
+    templateList.map((t) => [t.id, t.owner_equipment_type_id ? "Thang giá riêng" : t.name]),
+  );
   const categoryList = categories ?? [];
   const categoryNameById = new Map(categoryList.map((c) => [c.id, c.name]));
 
@@ -456,7 +465,7 @@ export default async function EquipmentPage({
             </Link>
             <EquipmentCategoryFilter categories={categoryList} value={activeCategory} />
             {canManageCatalog && (
-              <EquipmentTypeDialog templates={templateList} categories={categoryList} />
+              <EquipmentTypeDialog templates={sharedTemplateList} categories={categoryList} />
             )}
           </div>
         )}
@@ -780,7 +789,7 @@ export default async function EquipmentPage({
                         <div className="flex items-center gap-1">
                           {canManageCatalog && (
                             <EquipmentTypeDialog
-                              templates={templateList}
+                              templates={templatesFor(type.id)}
                               categories={categoryList}
                               equipmentType={type}
                             />
