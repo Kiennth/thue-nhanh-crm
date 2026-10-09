@@ -211,6 +211,9 @@ export interface Database {
           // Cọc "Thoả thuận theo hồ sơ" (đề xuất CRM v2 §1d, vd photobooth) —
           // web hiện chữ này thay cho số tiền / "Không cần cọc".
           deposit_negotiable: boolean;
+          // Dừng kinh doanh (CEO 2026-10-09) — null = đang kinh doanh; có giá
+          // trị thì ẩn khỏi ô chọn hàng khi lên đơn.
+          discontinued_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -229,6 +232,7 @@ export interface Database {
           category_id?: string | null;
           default_extra_information?: string | null;
           deposit_negotiable?: boolean;
+          discontinued_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];

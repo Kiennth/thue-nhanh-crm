@@ -39,6 +39,7 @@ import {
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
+import { DiscontinueButton } from "./discontinue-button";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
 import { TransferStockDialog } from "../transfer-stock-dialog";
@@ -595,6 +596,7 @@ export default async function EquipmentDetailPage({
                 {type.tracking_type && (
                   <Badge variant="outline">{TRACKING_TYPE_LABELS[type.tracking_type]}</Badge>
                 )}
+                {type.discontinued_at && <Badge variant="destructive">Dừng kinh doanh</Badge>}
               </div>
               <p className="text-sm text-muted-foreground">{priceLine}</p>
               {/* Phụ kiện đi kèm (CEO 2026-10-06, học Booqable) — chip từng món, tách bằng "|". */}
@@ -616,6 +618,7 @@ export default async function EquipmentDetailPage({
           </div>
           {canManageCatalog && (
             <div className="flex items-center gap-1">
+              <DiscontinueButton id={type.id} discontinued={!!type.discontinued_at} />
               <EquipmentTypeDialog
                 templates={templateList}
                 categories={categoryList}

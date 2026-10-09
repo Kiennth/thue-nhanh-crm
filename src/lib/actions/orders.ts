@@ -2475,6 +2475,8 @@ export async function getQuickOrderCatalog(): Promise<QuickOrderCatalog> {
     supabase
       .from("equipment_types")
       .select("id, name, product_type, tracking_type, pricing_method, price, rental_period_unit, pricing_template_id, image_url")
+      // Mã đã dừng kinh doanh không hiện khi lên đơn (CEO 2026-10-09).
+      .is("discontinued_at", null)
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model, price"),
     supabase.from("pricing_template_tiers").select("template_id, min_duration, duration_unit, discount_percentage"),

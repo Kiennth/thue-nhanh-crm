@@ -134,7 +134,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     supabase
       .from("equipment_types")
       .select(
-        "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url",
+        "id, name, product_type, tracking_type, pricing_method, price, deposit_amount, payout_percentage, rental_period_unit, pricing_template_id, image_url, discontinued_at",
       )
       .order("name"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model, image_url"),
@@ -610,7 +610,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       0,
     );
   };
-  const quickAddOptions = (equipmentTypes ?? []).flatMap((t) => {
+  // Ô chọn hàng (tìm nhanh + Thêm dòng) bỏ mã đã dừng kinh doanh (CEO
+  // 2026-10-09); bảng dòng hàng vẫn dùng danh sách đầy đủ để hiện tên dòng cũ.
+  const sellableTypes = (equipmentTypes ?? []).filter((t) => !t.discontinued_at);
+  const quickAddOptions = sellableTypes.flatMap((t) => {
     if (t.tracking_type === "combo") {
       const components = componentsByCombo.get(t.id) ?? [];
       // Món có máy thay thế: sẵn có = cộng dồn món chính + các máy thay thế.
@@ -882,7 +885,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </CardTitle>
               <AddOrderLineDialog
                 orderId={order.id}
-                equipmentTypes={equipmentTypes ?? []}
+                equipmentTypes={sellableTypes}
                 equipmentUnits={equipmentUnits ?? []}
                 // Dialog chỉ cho chọn máy sẵn có — lọc trước khi truyền,
                 // đỡ serialize cả nghìn máy đang thuê/bảo trì vào payload

@@ -96,6 +96,7 @@ export default async function EquipmentPage({
     to?: string;
     tab?: string;
     noprice?: string;
+    stopped?: string;
   }>;
 }) {
   const {
@@ -109,7 +110,11 @@ export default async function EquipmentPage({
     to: rangeTo,
     tab,
     noprice,
+    stopped,
   } = await searchParams;
+  // Chip "Dừng kinh doanh" (CEO 2026-10-09): mặc định ẩn mã đã dừng, bấm chip
+  // để xem riêng (và mở lại).
+  const stoppedOnly = stopped === "1";
   // Chip "Chưa có giá" (đề xuất CRM v2 §4.7): hàng thuê/bán đang để giá 0.
   const noPriceOnly = noprice === "1";
   const activeSearch = search?.trim() ?? "";
@@ -235,8 +240,10 @@ export default async function EquipmentPage({
 
   const dirMult = activeDir === "asc" ? 1 : -1;
   const isNoPrice = (t: EquipmentTypeRow) => t.product_type !== "service" && !(t.price > 0);
-  const noPriceCount = allTypes.filter(isNoPrice).length;
-  const sortedTypes = (noPriceOnly ? allTypes.filter(isNoPrice) : [...allTypes]).sort((a, b) => {
+  const stoppedCount = allTypes.filter((t) => t.discontinued_at).length;
+  const visibleTypes = allTypes.filter((t) => !!t.discontinued_at === stoppedOnly);
+  const noPriceCount = visibleTypes.filter(isNoPrice).length;
+  const sortedTypes = (noPriceOnly ? visibleTypes.filter(isNoPrice) : [...visibleTypes]).sort((a, b) => {
     switch (activeSort) {
       case "productType":
         return dirMult * PRODUCT_TYPE_LABELS[a.product_type].localeCompare(PRODUCT_TYPE_LABELS[b.product_type], "vi");
@@ -408,13 +415,34 @@ export default async function EquipmentPage({
           className="w-full max-w-2xl"
         />
       )}
-      {!isReportTab && (noPriceCount > 0 || noPriceOnly) && (
+      {!isReportTab && (noPriceCount > 0 || noPriceOnly || stoppedCount > 0 || stoppedOnly) && (
         <div className="flex flex-wrap items-center gap-2">
+          {(stoppedCount > 0 || stoppedOnly) && (
+            <Link
+              href={(() => {
+                const p = new URLSearchParams();
+                if (activeSearch) p.set("search", activeSearch);
+                if (activeCategory) p.set("category", activeCategory);
+                if (!stoppedOnly) p.set("stopped", "1");
+                const qs = p.toString();
+                return qs ? `/equipment?${qs}` : "/equipment";
+              })()}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+                stoppedOnly ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              Dừng kinh doanh
+              <span className={`rounded-full px-1.5 text-xs tabular-nums ${stoppedOnly ? "bg-white/20" : "bg-muted"}`}>{stoppedCount}</span>
+              {stoppedOnly && <span aria-hidden>×</span>}
+            </Link>
+          )}
+          {(noPriceCount > 0 || noPriceOnly) && (
           <Link
             href={(() => {
               const p = new URLSearchParams();
               if (activeSearch) p.set("search", activeSearch);
               if (activeCategory) p.set("category", activeCategory);
+              if (stoppedOnly) p.set("stopped", "1");
               if (!noPriceOnly) p.set("noprice", "1");
               const qs = p.toString();
               return qs ? `/equipment?${qs}` : "/equipment";
@@ -427,6 +455,7 @@ export default async function EquipmentPage({
             <span className={`rounded-full px-1.5 text-xs tabular-nums ${noPriceOnly ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900"}`}>{noPriceCount}</span>
             {noPriceOnly && <span aria-hidden>×</span>}
           </Link>
+          )}
           {noPriceOnly && (
             <span className="text-xs text-muted-foreground">Bổ sung giá — mã không cho thuê nữa thì ẩn khỏi web ở mục Website.</span>
           )}
@@ -633,6 +662,11 @@ export default async function EquipmentPage({
                         )}
                         <span>
                           {type.name}
+                          {type.discontinued_at && (
+                            <span className="ml-1.5 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+                              Dừng kinh doanh
+                            </span>
+                          )}
                           <span className="block text-xs font-normal text-muted-foreground">
                             {categoryNameById.get(type.category_id ?? "") ?? "Chưa phân loại"}
                           </span>

@@ -295,6 +295,27 @@ export async function deleteEquipmentType(id: string) {
   revalidatePath("/equipment");
 }
 
+// Dừng / mở lại kinh doanh (CEO 2026-10-09) — mã dừng không hiện ở ô chọn
+// hàng khi lên đơn; đơn cũ và lịch sử giữ nguyên. Không đụng web (ẩn web ở
+// mục Website như cũ).
+export async function setEquipmentTypeDiscontinued(id: string, discontinued: boolean) {
+  await requireRole([...MANAGE_ROLES]);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("equipment_types")
+    .update({ discontinued_at: discontinued ? new Date().toISOString() : null })
+    .eq("id", id);
+
+  if (error) {
+    return { error: "Không thể cập nhật: " + error.message };
+  }
+
+  revalidatePath("/equipment");
+  revalidatePath(`/equipment/${id}`);
+  return { success: true as const };
+}
+
 // ---------------------------------------------------------------------------
 // equipment_units — biến thể theo hãng/model. Dùng cho hàng bán và hàng cho
 // thuê theo dõi số lượng (không dùng cho hàng theo dõi riêng lẻ hay dịch vụ).
