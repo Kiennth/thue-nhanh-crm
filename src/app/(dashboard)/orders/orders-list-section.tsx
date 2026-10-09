@@ -48,6 +48,11 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeZone: VN_TIME_ZONE,
 });
 const PAGE_SIZE = 20;
+const QUICK_VIEWS = [
+  { key: "deliver_today", label: "Hôm nay giao" },
+  { key: "return_today", label: "Hôm nay thu hồi" },
+  { key: "overdue", label: "Quá hạn trả" },
+] as const;
 
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
@@ -128,6 +133,7 @@ export async function OrdersListSection({
   search,
   overview,
   paid,
+  view,
   branchId,
   canDelete,
   showStats = true,
@@ -148,6 +154,8 @@ export async function OrdersListSection({
   // "unpaid" = đang lọc bảng chỉ còn đơn chưa thanh toán hết (bấm từ thẻ
   // "Chưa thanh toán hết" trong khối tổng quan).
   paid?: string;
+  // Chế độ xem nhanh (đề xuất CRM v2 §4.3): deliver_today | return_today | overdue.
+  view?: string;
   branchId: string | null;
   canDelete: boolean;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp — ẩn cả dãy thẻ thống kê
@@ -169,6 +177,7 @@ export async function OrdersListSection({
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(page) || 1);
   const unpaidOnly = paid === "unpaid";
+  const activeView = QUICK_VIEWS.some((v) => v.key === view) ? view! : null;
   const overviewPeriod: OrdersOverviewPeriod =
     overview && isOverviewPeriod(overview) ? overview : "this_month";
   const overviewDateRange = computeDateRange(overviewPeriod, vnNow());
@@ -189,6 +198,14 @@ export async function OrdersListSection({
   // hoàn toàn với mọi bộ lọc của bảng (trạng thái/tìm kiếm/chưa thanh toán),
   // chỉ khác nhau ở khoảng ngày (kỳ tổng quan) — page_size=1 vì chỉ cần
   // .stats/.totalCount, không cần rows.
+  // Đếm sẵn cho 3 chip xem nhanh (theo kho đang xem, bỏ qua bộ lọc khác).
+  const quickCountsPromise = Promise.all(
+    QUICK_VIEWS.map((v) =>
+      supabase
+        .rpc("orders_page_list", { p_branch_id: branchId, p_page: 1, p_page_size: 1, p_view: v.key })
+        .then((r) => (r.data as OrdersPageListResult | null)?.totalCount ?? 0),
+    ),
+  );
   const [rpcRes, overviewRes, { data: branches }, invoicePendingRes] = await Promise.all([
     supabase.rpc("orders_page_list", {
       p_branch_id: branchId,
@@ -201,6 +218,7 @@ export async function OrdersListSection({
       p_page: requestedPage,
       p_page_size: PAGE_SIZE,
       p_unpaid_only: unpaidOnly,
+      p_view: activeView,
     }),
     showStats
       ? supabase.rpc("orders_page_list", {
@@ -231,6 +249,7 @@ export async function OrdersListSection({
       : Promise.resolve({ count: null }),
   ]);
 
+  const quickCounts = await quickCountsPromise;
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
@@ -252,6 +271,7 @@ export async function OrdersListSection({
       p_page: currentPage,
       p_page_size: PAGE_SIZE,
       p_unpaid_only: unpaidOnly,
+      p_view: activeView,
     });
     if (refetched) result = refetched as OrdersPageListResult;
   }
@@ -321,6 +341,31 @@ export async function OrdersListSection({
         size="lg"
         className="w-full max-w-2xl"
       />
+
+      {/* Xem nhanh: bấm chip → bảng chỉ còn đơn đó (bỏ các lọc khác trừ kho). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Xem nhanh</span>
+        {QUICK_VIEWS.map((v, i) => {
+          const on = activeView === v.key;
+          const p = new URLSearchParams();
+          if (!on) p.set("view", v.key);
+          if (branchToggle?.selectedId) p.set("branch", branchToggle.selectedId);
+          const qs = p.toString();
+          return (
+            <Link
+              key={v.key}
+              href={qs ? `?${qs}` : "?"}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+                on ? "border-primary bg-primary text-primary-foreground" : `hover:bg-muted ${quickCounts[i] && v.key === "overdue" ? "border-destructive/50 text-destructive" : ""}`
+              }`}
+            >
+              {v.label}
+              <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/20" : "bg-muted"}`}>{quickCounts[i]}</span>
+              {on && <span aria-hidden>×</span>}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Đang tìm đơn thì ẩn khối thống kê — kết quả hiện ngay dưới ô tìm. */}
       {showStats && !activeSearch && (

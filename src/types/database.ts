@@ -1310,6 +1310,7 @@ export interface Database {
           p_page?: number;
           p_page_size?: number;
           p_unpaid_only?: boolean;
+          p_view?: string | null;
         };
         Returns: unknown;
       };

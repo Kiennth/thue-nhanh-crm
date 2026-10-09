@@ -18,10 +18,11 @@ export default async function OrdersPage({
     scope?: string;
     overview?: string;
     paid?: string;
+    view?: string;
     branch?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir, search, scope, overview, paid, branch } =
+  const { status, range, from, to, page, sort, dir, search, scope, overview, paid, view, branch } =
     await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
@@ -74,6 +75,7 @@ export default async function OrdersPage({
         search={search}
         overview={overview}
         paid={paid}
+        view={view}
         branchId={listBranchId}
         canDelete={canManage}
         // Mở rộng ra toàn hệ thống thì ẩn dãy thẻ thống kê: cửa hàng trưởng
