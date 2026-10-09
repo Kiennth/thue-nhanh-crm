@@ -223,6 +223,9 @@ function TrackRow({
 }) {
   const placed = assignLanes(bars);
   const lanes = Math.max(1, ...placed.map((p) => p.lane + 1));
+  // Khung thông tin khi rê chuột lên thanh đơn (đề xuất CRM v2 §4.7) — hiện
+  // ngay, thay chú thích mặc định của trình duyệt (chờ ~1s, chữ nhỏ).
+  const [tip, setTip] = useState<{ bar: CalendarBar; x: number; y: number } | null>(null);
   const height = lanes * LANE_H + ROW_PAD * 2;
 
   return (
@@ -282,9 +285,10 @@ function TrackRow({
             <Link
               key={`${bar.orderId}-${lane}`}
               href={`/orders/${bar.orderId}`}
-              title={`${label}\n${timeFmt.format(startMs)} → ${timeFmt.format(endMs)}\n${STATUS_LABEL[bar.status]}${
-                bar.placeholder ? "\nCó máy CHỜ MUA (thiếu hàng)" : ""
-              }`}
+              aria-label={`${label}, ${timeFmt.format(startMs)} → ${timeFmt.format(endMs)}, ${STATUS_LABEL[bar.status]}`}
+              onMouseEnter={(e) => setTip({ bar, x: e.clientX, y: e.clientY })}
+              onMouseMove={(e) => setTip({ bar, x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setTip(null)}
               className={`absolute z-[6] flex items-center overflow-hidden px-1.5 text-[11px] font-semibold whitespace-nowrap shadow-sm transition-colors ${
                 STATUS_CLASS[bar.status]
               } ${cutLeft ? "" : "rounded-l-md"} ${cutRight ? "" : "rounded-r-md"} ${
@@ -298,6 +302,28 @@ function TrackRow({
           );
         })}
       </div>
+      {tip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-50 w-64 rounded-lg border bg-popover p-2.5 text-xs text-popover-foreground shadow-lg"
+          style={{
+            left: Math.min(tip.x + 14, (typeof window === "undefined" ? 1e4 : window.innerWidth) - 272),
+            top: tip.y + 16,
+          }}
+        >
+          <p className="text-sm font-semibold">
+            {tip.bar.orderCode}
+            {tip.bar.quantity > 1 && <span className="ml-1 font-normal text-muted-foreground">×{tip.bar.quantity} máy</span>}
+          </p>
+          <p className="truncate">{tip.bar.customer}</p>
+          <p className="mt-1 tabular-nums text-muted-foreground">
+            {timeFmt.format(Date.parse(tip.bar.start))} → {timeFmt.format(Date.parse(tip.bar.end))}
+          </p>
+          <p className="mt-1 font-medium">{STATUS_LABEL[tip.bar.status]}</p>
+          {tip.bar.placeholder && <p className="mt-1 font-medium text-red-600">Có máy CHỜ MUA (thiếu hàng)</p>}
+          <p className="mt-1 text-muted-foreground">Bấm để mở đơn</p>
+        </div>
+      )}
     </div>
   );
 }
