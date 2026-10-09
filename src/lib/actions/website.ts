@@ -235,6 +235,27 @@ export async function updateWebsiteProduct(
     specFacets = cleaned.value;
   }
 
+  // B5: alt từng ảnh { url: { alt, auto } } — chỉ giữ ảnh còn trong gallery,
+  // cắt 125 ký tự (image_standard.md).
+  let imageAlts: Record<string, { alt: string; auto: boolean }> | undefined;
+  const altsRaw = formData.get("image_alts_json");
+  if (typeof altsRaw === "string" && altsRaw) {
+    let json: unknown;
+    try {
+      json = JSON.parse(altsRaw);
+    } catch {
+      return { error: "Alt ảnh không hợp lệ." };
+    }
+    if (!json || typeof json !== "object" || Array.isArray(json)) return { error: "Alt ảnh không hợp lệ." };
+    const keep = parsed.data.gallery_json ? new Set(parsed.data.gallery_json) : null;
+    imageAlts = {};
+    for (const [url, v] of Object.entries(json as Record<string, { alt?: unknown; auto?: unknown }>)) {
+      const alt = typeof v?.alt === "string" ? v.alt.trim().slice(0, 125) : "";
+      if (!alt || (keep && !keep.has(url))) continue;
+      imageAlts[url] = { alt, auto: v?.auto === true };
+    }
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("website_products")
@@ -253,6 +274,7 @@ export async function updateWebsiteProduct(
       ...(parsed.data.ship_fee !== undefined ? { ship_fee: parsed.data.ship_fee } : {}),
       ...(parsed.data.ship_bike_max_qty !== undefined ? { ship_bike_max_qty: parsed.data.ship_bike_max_qty } : {}),
       ...(specFacets !== undefined ? { spec_facets: specFacets } : {}),
+      ...(imageAlts !== undefined ? { image_alts: imageAlts } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };

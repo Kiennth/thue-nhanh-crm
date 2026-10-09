@@ -79,7 +79,7 @@ export default async function WebsitePage({
     // Chỉ cột bảng cần (Grok CRM 09/10 §A: trước select * kèm mô tả HTML VI+EN
     // của cả trang → ~790KB). Khung "Sửa nội dung" tự nạp đủ khi mở.
     .select(
-      "id, slug, name, created_at, website_category_id, gallery_image_urls, is_published, is_featured, is_new, has_description, has_description_en, spec_count, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)",
+      "id, slug, name, created_at, website_category_id, gallery_image_urls, is_published, is_featured, is_new, has_description, has_description_en, spec_count, alt_missing, equipment_types(name, price, rental_period_unit, image_url, discontinued_at)",
       { count: "exact" },
     );
   // Mặc định: mới lên web trước (CEO 2026-10-01) — trước đây xếp đã đăng
@@ -98,6 +98,8 @@ export default async function WebsitePage({
   if (activeFilter === "new") query = query.eq("is_new", true);
   if (activeFilter === "no-category") query = query.is("website_category_id", null);
   // B4: < 4 thông số → trang sản phẩm thiếu khối "Thông số nổi bật".
+  // B5: còn ảnh gallery chưa có alt.
+  if (activeFilter === "no-alt") query = query.eq("alt_missing", true).eq("is_published", true);
   if (activeFilter === "few-specs") {
     query = query.lt("spec_count", MIN_SPECS).eq("is_published", true);
     // Nhóm ít trường (Thẻ game 3 trường): điền đủ là đạt, không tính thiếu.
@@ -145,7 +147,7 @@ export default async function WebsitePage({
         ? query.range(0, 4999)
         : query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1),
       supabase.from("website_categories").select("id, name, slug, parent_id, sort_order, is_published").order("sort_order"),
-      supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id, spec_count"),
+      supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id, spec_count, alt_missing"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
     ]);
 
@@ -223,6 +225,7 @@ export default async function WebsitePage({
         {filterLink("new", "Sản phẩm mới")}
         {filterLink("no-category", "Chưa có danh mục")}
         {filterLink("few-specs", `Thiếu thông số (${fewSpecsCount})`)}
+        {filterLink("no-alt", `Thiếu alt ảnh (${all.filter((p) => p.is_published && p.alt_missing).length})`)}
         {activeCat && (
           <Link
             href="/website"
@@ -274,6 +277,11 @@ export default async function WebsitePage({
                     {!p.has_description && <Badge variant="outline">Thiếu mô tả</Badge>}
                     {p.has_description && !p.has_description_en && (
                       <Badge variant="outline">Thiếu EN</Badge>
+                    )}
+                    {p.is_published && p.alt_missing && (
+                      <Badge variant="outline" className="border-violet-300 text-violet-800 dark:text-violet-300">
+                        Thiếu alt ảnh
+                      </Badge>
                     )}
                     {p.is_published && p.spec_count < minSpecsForCategory(p.website_category_id) && (
                       <Badge variant="outline" className="border-amber-300 text-amber-800 dark:text-amber-300">

@@ -18,7 +18,7 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { GalleryEditor } from "./gallery-editor";
 import { RelatedPicker, type RelatedOption } from "./related-picker";
 import { SpecFacetsEditor } from "./spec-facets-editor";
-import type { SpecFacets } from "@/lib/spec-fields";
+import { formatSpec, specGroupOf, type SpecFacets } from "@/lib/spec-fields";
 import { getWebsiteProductForEdit, updateWebsiteProduct } from "@/lib/actions/website";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
@@ -157,6 +157,14 @@ function ProductEditForm({
   // Danh mục đang chọn quyết định nhóm ô "Thông số lọc".
   const [categoryId, setCategoryId] = useState(product.website_category_id ?? "");
   const categorySlug = categories.find((c) => c.id === categoryId)?.slug ?? null;
+  // B5: gốc gợi ý alt = tên hiển thị + thông số chính đầu tiên có giá trị
+  // (bỏ qua nếu tên đã chứa sẵn), vd "MacBook Air M3 16GB".
+  const productName =
+    product.name?.trim() || relatedOptions.find((o) => o.id === product.id)?.label || product.slug;
+  const firstSpec = specGroupOf(categorySlug, product.slug)
+    .card.map((c) => formatSpec(c, (product.spec_facets ?? {})[c]))
+    .find((v) => v && !productName.toLowerCase().includes(v.toLowerCase()));
+  const altBase = [productName, firstSpec].filter(Boolean).join(" ");
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -191,7 +199,12 @@ function ProductEditForm({
 
       <div className="space-y-2">
         <Label>Ảnh sản phẩm</Label>
-        <GalleryEditor slug={product.slug} initialUrls={product.gallery_image_urls} />
+        <GalleryEditor
+          slug={product.slug}
+          initialUrls={product.gallery_image_urls}
+          initialAlts={product.image_alts ?? {}}
+          altBase={altBase}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

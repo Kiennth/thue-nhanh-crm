@@ -1035,6 +1035,9 @@ export interface Database {
           seo_description_en: string | null;
           brand: string | null;
           gallery_image_urls: string[];
+          // B5: alt từng ảnh gallery theo URL; alt_missing tự tính.
+          image_alts: Record<string, { alt: string; auto?: boolean }>;
+          alt_missing: boolean;
           website_category_id: string | null;
           sort_order: number;
           is_featured: boolean;
@@ -1071,6 +1074,7 @@ export interface Database {
           seo_description_en?: string | null;
           brand?: string | null;
           gallery_image_urls?: string[];
+          image_alts?: Record<string, { alt: string; auto?: boolean }>;
           website_category_id?: string | null;
           sort_order?: number;
           is_featured?: boolean;
