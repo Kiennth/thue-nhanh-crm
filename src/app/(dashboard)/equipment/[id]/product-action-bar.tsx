@@ -23,9 +23,9 @@ import {
 } from "@/lib/actions/equipment";
 
 // Thanh thao tác ngay dưới tên mã hàng (B8, Grok CRM 09/10 — CEO duyệt):
-// Sửa · Xoá · Ngừng kinh doanh ↔ Kinh doanh lại · Sắp ra mắt (+ ngày dự kiến),
-// và nhóm "NHÃN WEB" riêng bên phải: Thuê nhiều (website_products.is_featured)
-// · Hàng mới (is_new). Ngừng kinh doanh: ẩn khỏi web + ô chọn hàng, tắt Sắp ra
+// Sửa · Xoá · Ngừng kinh doanh ↔ Kinh doanh lại · Sắp ra mắt (+ ngày dự kiến)
+// · Thuê nhiều (website_products.is_featured) · Hàng mới (is_new) — 2 nhãn web
+// nằm ngay cạnh Sắp ra mắt (CEO 09/10, không tách nhóm riêng). Ngừng kinh doanh: ẩn khỏi web + ô chọn hàng, tắt Sắp ra
 // mắt, khoá 2 nhãn (giữ giá trị). "Đặt trước" trên web CHỈ đến từ Sắp ra mắt.
 export function ProductActionBar({
   id,
@@ -207,9 +207,8 @@ export function ProductActionBar({
           )}
         </span>
 
-        {/* Nhãn web — tách riêng bên phải. */}
-        <span className="ml-auto flex flex-wrap items-center gap-2 border-l pl-3">
-          <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Nhãn web</span>
+        {/* Nhãn web Thuê nhiều · Hàng mới — ngay cạnh Sắp ra mắt (CEO 09/10). */}
+        <span className="flex flex-wrap items-center gap-2.5">
           {(
             [
               { key: "featured", label: "Thuê nhiều", on: !!web?.featured, icon: Flame, onCls: "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300" },
