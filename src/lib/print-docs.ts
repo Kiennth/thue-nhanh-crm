@@ -135,8 +135,10 @@ export const PRINT_DOC_TERMS: Record<PrintDocType, TermsSection[]> = {
       heading: "Điều khoản",
       items: [
         "Báo giá trên chưa bao gồm các chi phí phát sinh ngoài phạm vi (nếu có) và có thể thay đổi tuỳ thời điểm chốt đơn.",
-        "Báo giá có hiệu lực trong vòng 03 ngày kể từ ngày phát hành, trừ khi có thoả thuận khác.",
-        "Đơn hàng được xác nhận sau khi khách hàng phản hồi chốt đơn và/hoặc thanh toán cọc giữ chỗ.",
+        // CEO 2026-10-09: báo giá hiệu lực 1 tuần; thanh toán tiền thuê để giữ chỗ; huỷ miễn phí.
+        "Báo giá có hiệu lực trong vòng 01 tuần kể từ ngày phát hành, trừ khi có thoả thuận khác.",
+        "Đơn hàng được xác nhận sau khi khách hàng phản hồi chốt đơn và thanh toán tiền thuê để giữ chỗ.",
+        "Huỷ đơn miễn phí, hoàn lại tiền thuê đã thanh toán. Chỉ trừ chi phí thực tế phát sinh (nếu có, ví dụ xe đã đi giao).",
       ],
     },
   ],
