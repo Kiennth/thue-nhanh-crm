@@ -56,6 +56,7 @@ const SORT_KEYS = [
   "trackingType",
   "pricingMethod",
   "price",
+  "deposit",
   "stock",
   "stockValue",
 ] as const;
@@ -118,7 +119,7 @@ export default async function EquipmentPage({
   // để xem riêng (và mở lại).
   // B8 (Grok CRM 09/10): chip lọc Sắp ra mắt / Thuê nhiều / Hàng mới / Ngừng
   // kinh doanh (?flag=…; ?stopped=1 cũ vẫn hiểu).
-  const FLAGS = ["unreleased", "featured", "new", "stopped"] as const;
+  const FLAGS = ["deposit", "unreleased", "featured", "new", "stopped"] as const;
   type Flag = (typeof FLAGS)[number];
   const activeFlag: Flag | null =
     stopped === "1" ? "stopped" : (FLAGS as readonly string[]).includes(flagParam ?? "") ? (flagParam as Flag) : null;
@@ -249,16 +250,43 @@ export default async function EquipmentPage({
     return reportByTypeId.get(t.id)?.current_stock_qty ?? 0;
   }
 
+  // Cột "Cọc" (B7): 0 = "Không cần cọc" (pill xanh), thoả thuận, số tiền;
+  // combo = tổng món con, dịch vụ/hàng bán không có cọc.
+  function depositSortValue(t: EquipmentTypeRow): number {
+    if (t.product_type !== "rental" || t.tracking_type === "combo") return -2;
+    if (t.deposit_negotiable) return -1;
+    return t.deposit_amount;
+  }
+  function depositCell(t: EquipmentTypeRow) {
+    if (t.product_type !== "rental") return <span className="text-muted-foreground">—</span>;
+    if (t.tracking_type === "combo") return <span className="text-xs text-muted-foreground">Theo món con</span>;
+    if (t.deposit_negotiable) return <span className="text-xs">Thoả thuận theo hồ sơ</span>;
+    if (t.deposit_amount > 0) return <span className="tabular-nums">{currencyFormatter.format(t.deposit_amount)}đ</span>;
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+          Không cần cọc
+        </span>
+        {t.deposit_review_status === "needs_review" && !t.discontinued_at && (
+          <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">cần xem</span>
+        )}
+      </span>
+    );
+  }
+
   const dirMult = activeDir === "asc" ? 1 : -1;
   const isNoPrice = (t: EquipmentTypeRow) => t.product_type !== "service" && !(t.price > 0);
   const stoppedCount = allTypes.filter((t) => t.discontinued_at).length;
   const activeTypes = allTypes.filter((t) => !t.discontinued_at);
   const flagTest: Record<Exclude<Flag, "stopped">, (t: EquipmentTypeRow) => boolean> = {
+    // B7: cọc 0đ ở mã đắt / nhóm giá trị cao — trigger DB gắn cờ.
+    deposit: (t) => t.deposit_review_status === "needs_review",
     unreleased: (t) => t.is_unreleased,
     featured: (t) => !!webFlagsByType.get(t.id)?.is_featured,
     new: (t) => !!webFlagsByType.get(t.id)?.is_new,
   };
   const flagCounts: Record<Flag, number> = {
+    deposit: activeTypes.filter(flagTest.deposit).length,
     unreleased: activeTypes.filter(flagTest.unreleased).length,
     featured: activeTypes.filter(flagTest.featured).length,
     new: activeTypes.filter(flagTest.new).length,
@@ -283,6 +311,8 @@ export default async function EquipmentPage({
         return dirMult * pricingMethodLabel(a).localeCompare(pricingMethodLabel(b), "vi");
       case "price":
         return dirMult * (a.price - b.price);
+      case "deposit":
+        return dirMult * (depositSortValue(a) - depositSortValue(b));
       case "stock":
         return dirMult * (stockValue(a) - stockValue(b));
       case "stockValue":
@@ -463,6 +493,7 @@ export default async function EquipmentPage({
         <div className="flex flex-wrap items-center gap-2">
           {(
             [
+              { key: "deposit", label: "Cọc 0đ – cần xem" },
               { key: "unreleased", label: "Sắp ra mắt" },
               { key: "featured", label: "Thuê nhiều" },
               { key: "new", label: "Hàng mới" },
@@ -675,6 +706,7 @@ export default async function EquipmentPage({
                 <SortableTableHead sortKey="trackingType" label="Kiểu theo dõi tồn kho" />
                 <SortableTableHead sortKey="pricingMethod" label="Cách tính giá" />
                 <SortableTableHead sortKey="price" label="Giá" />
+                <SortableTableHead sortKey="deposit" label="Cọc" />
                 <SortableTableHead sortKey="stock" label="Tồn kho" />
                 <SortableTableHead sortKey="stockValue" label="Tổng giá trị tồn kho" />
                 <TableHead className="w-16"></TableHead>
@@ -702,7 +734,11 @@ export default async function EquipmentPage({
                     : `${currencyFormatter.format(inventoryValueByTypeId.get(type.id) ?? 0)}đ`;
 
                 return (
-                  <ClickableTableRow key={type.id} href={`/equipment/${type.id}`}>
+                  <ClickableTableRow
+                    key={type.id}
+                    href={`/equipment/${type.id}`}
+                    className={type.deposit_review_status === "needs_review" && !type.discontinued_at ? "bg-amber-50/70 dark:bg-amber-950/30" : undefined}
+                  >
                     <TableCell className="font-medium">
                       <Link href={`/equipment/${type.id}`} className="flex items-center gap-3 hover:underline">
                         {type.image_url ? (
@@ -736,6 +772,7 @@ export default async function EquipmentPage({
                     <TableCell className="text-muted-foreground">{trackingTypeLabel(type)}</TableCell>
                     <TableCell className="text-muted-foreground">{pricingMethodLabel(type)}</TableCell>
                     <TableCell className="text-muted-foreground">{priceLine}</TableCell>
+                    <TableCell>{depositCell(type)}</TableCell>
                     <TableCell>{stockDisplay}</TableCell>
                     <TableCell>{stockValueDisplay}</TableCell>
                     <TableCell>
@@ -751,7 +788,7 @@ export default async function EquipmentPage({
                           {canManageCatalog && (
                             <ConfirmDeleteButton
                               inMenu
-                              confirmMessage={`Xoá "${type.name}" và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
+                              confirmMessage={`Xoá "${type.name}"? Chỉ xoá được khi mã chưa có đơn và không còn máy — nếu có, dùng Ngừng kinh doanh ở trang mã hàng.`}
                               successMessage="Đã xoá."
                               action={deleteEquipmentType}
                               actionArg={type.id}
@@ -765,7 +802,7 @@ export default async function EquipmentPage({
               })}
               {!typeList.length && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     {activeSearch ? "Không tìm thấy hàng hoá nào." : "Chưa có hàng hoá nào."}
                   </TableCell>
                 </TableRow>

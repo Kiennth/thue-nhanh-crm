@@ -1784,7 +1784,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           )}
                         </div>
                         <p className="font-medium">
-                          {totalDeposit <= 0 ? "Miễn cọc" : `${currencyFormatter.format(totalDeposit)}đ`}
+                          {totalDeposit <= 0 ? "Không cần cọc" : `${currencyFormatter.format(totalDeposit)}đ`}
                         </p>
                         {depositOverridden && (
                           <p className="text-xs text-amber-600">

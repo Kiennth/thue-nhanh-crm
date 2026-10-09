@@ -91,7 +91,7 @@ export function DepositOverrideDialog({
         <div className="flex flex-wrap gap-1.5">
           {[0, 1_000_000, 2_000_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000].map((n) => (
             <Button key={n} type="button" size="sm" variant="outline" onClick={() => setValue(vnd.format(n))}>
-              {n === 0 ? "Miễn cọc" : `${n / 1_000_000}tr`}
+              {n === 0 ? "Không cần cọc" : `${n / 1_000_000}tr`}
             </Button>
           ))}
         </div>

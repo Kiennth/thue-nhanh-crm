@@ -335,6 +335,30 @@ export async function setEquipmentTypeDiscontinued(id: string, discontinued: boo
   return { success: true as const };
 }
 
+// B7 cọc 0đ "cần xem" (Grok CRM 09/10): "Giữ 0đ · đã xem" giữ Không cần cọc
+// và bỏ cờ (ghi ai/lúc nào — nhật ký tự ghi qua trigger equipment_types);
+// "Nhập số cọc" lưu số tiền (trigger tự bỏ cờ khi cọc > 0).
+export async function reviewEquipmentDeposit(id: string, amount: number | null) {
+  const employee = await requireRole([...MANAGE_ROLES]);
+  const supabase = await createClient();
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000)) {
+    return { error: "Số cọc không hợp lệ." };
+  }
+  const { error } = await supabase
+    .from("equipment_types")
+    .update(
+      amount === null || amount === 0
+        ? { deposit_review_status: "reviewed", deposit_reviewed_by: employee.id, deposit_reviewed_at: new Date().toISOString() }
+        : { deposit_amount: amount, deposit_reviewed_by: employee.id, deposit_reviewed_at: new Date().toISOString() },
+    )
+    .eq("id", id);
+  if (error) return { error: "Không thể cập nhật: " + error.message };
+  revalidatePath(`/equipment/${id}`);
+  revalidatePath("/equipment");
+  if (amount) await pingWebsiteRevalidate();
+  return { success: true as const };
+}
+
 // B8 "Sắp ra mắt" (Grok CRM 09/10): bật/tắt nhãn "Đặt trước" trên web + ngày
 // dự kiến (tuỳ chọn). Mã đang Ngừng kinh doanh thì không bật được.
 export async function setEquipmentTypeUnreleased(id: string, unreleased: boolean, launchDate: string | null) {

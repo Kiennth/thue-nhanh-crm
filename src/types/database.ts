@@ -219,6 +219,11 @@ export interface Database {
           is_unreleased: boolean;
           expected_launch_date: string | null;
           discontinued_by: string | null;
+          // Cờ "Cọc 0đ – cần xem" (B7, 2026-10-09) — trigger tự gắn khi cọc 0
+          // mà giá ≥ 300k hoặc nhóm giá trị cao; "Giữ 0đ · đã xem" = reviewed.
+          deposit_review_status: "none" | "needs_review" | "reviewed";
+          deposit_reviewed_by: string | null;
+          deposit_reviewed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -241,6 +246,9 @@ export interface Database {
           is_unreleased?: boolean;
           expected_launch_date?: string | null;
           discontinued_by?: string | null;
+          deposit_review_status?: "none" | "needs_review" | "reviewed";
+          deposit_reviewed_by?: string | null;
+          deposit_reviewed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["equipment_types"]["Insert"]>;
         Relationships: [];

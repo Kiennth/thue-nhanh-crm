@@ -39,6 +39,7 @@ import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { ProductActionBar } from "./product-action-bar";
+import { DepositReviewBox } from "./deposit-review-box";
 import { EquipmentUnitDialog } from "../equipment-unit-dialog";
 import { EquipmentStockDialog } from "../equipment-stock-dialog";
 import { TransferStockDialog } from "../transfer-stock-dialog";
@@ -579,7 +580,14 @@ export default async function EquipmentDetailPage({
         (type.pricing_method === "pricing_structure"
           ? ` · bảng giá: ${templateNameById.get(type.pricing_template_id ?? "") ?? "—"}`
           : "") +
-        (type.deposit_amount > 0 ? ` · cọc: ${currencyFormatter.format(type.deposit_amount)}đ` : "")
+        // B7: cọc 0 = "Không cần cọc" (không bao giờ "0đ"); combo = tổng món con.
+        (type.tracking_type === "combo"
+          ? ""
+          : type.deposit_negotiable
+            ? " · cọc: thoả thuận theo hồ sơ"
+            : type.deposit_amount > 0
+              ? ` · cọc: ${currencyFormatter.format(type.deposit_amount)}đ`
+              : " · Không cần cọc")
       : `${currencyFormatter.format(type.price)}đ`;
 
   return (
@@ -660,6 +668,9 @@ export default async function EquipmentDetailPage({
                 />
               }
             />
+            {type.deposit_review_status === "needs_review" && !type.discontinued_at && (
+              <DepositReviewBox id={type.id} pricePerDay={type.price} />
+            )}
           </CardContent>
         )}
       </Card>
