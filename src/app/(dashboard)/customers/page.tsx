@@ -75,9 +75,10 @@ export default async function CustomersPage({
     sort?: string;
     dir?: string;
     overview?: string;
+    tab?: string;
   }>;
 }) {
-  const { search, page: pageParam, sort, dir, overview } = await searchParams;
+  const { search, page: pageParam, sort, dir, overview, tab } = await searchParams;
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
   const activeSort: SortKey | null = sort && isSortKey(sort) ? sort : null;
@@ -94,6 +95,9 @@ export default async function CustomersPage({
   const viewer = await getCurrentEmployee();
   const reportBranchId = viewer && !MANAGE_ROLES.includes(viewer.role) ? viewer.branch_id : null;
   const isAdmin = viewer?.role === "admin";
+  // 2 tab (đề xuất CRM v2 §4.7, như trang Thiết bị): "Danh sách khách" mặc
+  // định — danh sách lên trước; "Báo cáo" chỉ tính khi mở đúng tab.
+  const reportTab = tab === "report" && !isAdmin;
 
   // Toàn bộ tổng hợp (thống kê, biểu đồ, xếp hạng, công nợ) + danh sách phân
   // trang đều tính trong Postgres qua 2 RPC — trước đây trang này kéo ~21.000
@@ -103,7 +107,9 @@ export default async function CustomersPage({
   // 20260802010000) vì mốc "khách mới với cả công ty" cần đọc đơn mọi chi
   // nhánh trong khi RLS cắt orders theo chi nhánh với role thường.
   const [reportRes, listRes] = await Promise.all([
-    supabase.rpc("customer_page_report", { p_branch_id: reportBranchId }),
+    reportTab
+      ? supabase.rpc("customer_page_report", { p_branch_id: reportBranchId })
+      : Promise.resolve({ data: null }),
     supabase.rpc("customer_page_list", {
       p_branch_id: null,
       p_search: activeSearch || null,
@@ -151,21 +157,44 @@ export default async function CustomersPage({
 
       {/* Ô tìm khách to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
           nhỏ dưới khối báo cáo, phải cuộn mới thấy. */}
-      <SearchInput
-        key={activeSearch}
-        paramName="search"
-        placeholder="Tìm khách theo tên, SĐT, MST, email, mã ĐVQHNS — gõ rồi Enter..."
-        value={activeSearch}
-        resetParams={["page"]}
-        size="lg"
-        className="w-full max-w-2xl"
-      />
+      {!reportTab && (
+        <SearchInput
+          key={activeSearch}
+          paramName="search"
+          placeholder="Tìm khách theo tên, SĐT, MST, email, mã ĐVQHNS — gõ rồi Enter..."
+          value={activeSearch}
+          resetParams={["page"]}
+          size="lg"
+          className="w-full max-w-2xl"
+        />
+      )}
 
       {/* CEO chốt 2026-08-06: Admin bỏ luôn cả "Báo cáo khách hàng" tổng
           (trước đây vẫn giữ riêng công nợ để đôn đốc thu tiền — nay bỏ hết,
           không chỉ xếp hạng/khách nguội). */}
       {/* Đang tìm khách thì ẩn báo cáo — kết quả hiện ngay dưới ô tìm. */}
-      {!isAdmin && !activeSearch && (
+      {!isAdmin && (
+        <div className="flex items-center gap-1 border-b">
+          {(
+            [
+              { value: false, label: "Danh sách khách", href: "/customers" },
+              { value: true, label: "Báo cáo", href: "/customers?tab=report" },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.label}
+              href={t.href}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+                reportTab === t.value ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {reportTab && (
         <CustomerReportSection
           data={reportData}
           overview={overview}
@@ -175,6 +204,7 @@ export default async function CustomersPage({
         />
       )}
 
+      {!reportTab && (
       <div className="space-y-3">
         <Table>
           <TableHeader>
@@ -228,6 +258,7 @@ export default async function CustomersPage({
 
         <PaginationControls page={page} totalPages={totalPages} totalCount={safeTotalCount} itemLabel="khách hàng" />
       </div>
+      )}
     </div>
   );
 }
