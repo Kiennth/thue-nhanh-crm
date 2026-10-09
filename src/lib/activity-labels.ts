@@ -15,6 +15,7 @@ export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   equipment_instances: "Sản phẩm (theo dõi riêng lẻ)",
   equipment_stock: "Tồn kho",
   pricing_templates: "Bảng giá mẫu",
+  pricing_template_tiers: "Bậc bảng giá",
   commission_tiers: "Bậc hoa hồng",
   bonus_tiers: "Bậc thưởng",
   task_weights: "Trọng số khâu",
