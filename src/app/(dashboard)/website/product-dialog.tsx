@@ -24,7 +24,10 @@ import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
 type WebsiteProductRow = Database["public"]["Tables"]["website_products"]["Row"];
-type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Row"];
+type WebsiteCategoryRow = Pick<
+  Database["public"]["Tables"]["website_categories"]["Row"],
+  "id" | "name" | "slug" | "parent_id"
+>;
 
 // Nhớ lựa chọn "toàn màn hình" giữa các lần mở (CEO 2026-10-01 muốn khung
 // sửa to, thậm chí full screen).
@@ -60,18 +63,17 @@ function categoryOptions(categories: WebsiteCategoryRow[]) {
 export function WebsiteProductDialog({
   productId,
   categories,
-  relatedOptions = [],
 }: {
   productId: string;
   categories: WebsiteCategoryRow[];
-  // Danh sách nhẹ mọi sản phẩm web (id + tên) cho bộ chọn "liên quan".
-  relatedOptions?: RelatedOption[];
 }) {
   const [open, setOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   // Nạp đủ sản phẩm (mô tả HTML VI + EN…) lúc MỞ khung sửa — danh sách
   // Website chỉ tải cột nhẹ (Grok CRM 09/10 §A: trang từng nặng ~790KB).
   const [product, setProduct] = useState<WebsiteProductRow | null>(null);
+  // Danh sách nhẹ mọi sản phẩm web (id + tên) cho bộ chọn "liên quan" — nạp cùng lúc.
+  const [relatedOptions, setRelatedOptions] = useState<RelatedOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   function toggleFullscreen() {
@@ -92,7 +94,11 @@ export function WebsiteProductDialog({
           setProduct(null);
           setLoadError(null);
           getWebsiteProductForEdit(productId)
-            .then((r) => ("error" in r ? setLoadError(r.error) : setProduct(r.product)))
+            .then((r) => {
+              if ("error" in r) return setLoadError(r.error);
+              setRelatedOptions(r.relatedOptions);
+              setProduct(r.product);
+            })
             .catch(() => setLoadError("Không tải được sản phẩm — đóng rồi mở lại."));
         }
       }}

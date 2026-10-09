@@ -170,12 +170,23 @@ const ProductSchema = z.object({
 // (danh sách Website chỉ tải cột nhẹ, Grok CRM 09/10 §A).
 export async function getWebsiteProductForEdit(
   id: string,
-): Promise<{ product: Database["public"]["Tables"]["website_products"]["Row"] } | { error: string }> {
+): Promise<
+  | { product: Database["public"]["Tables"]["website_products"]["Row"]; relatedOptions: { id: string; label: string }[] }
+  | { error: string }
+> {
   await requireRole([...MANAGE_ROLES]);
   const supabase = await createClient();
-  const { data, error } = await supabase.from("website_products").select("*").eq("id", id).maybeSingle();
+  const [{ data, error }, { data: lite }] = await Promise.all([
+    supabase.from("website_products").select("*").eq("id", id).maybeSingle(),
+    // Bộ chọn "sản phẩm liên quan": tên marketing, trống thì tên CRM.
+    supabase.from("website_products").select("id, name, slug, equipment_types(name)").order("slug"),
+  ]);
   if (error || !data) return { error: "Không tải được sản phẩm: " + (error?.message ?? "không tìm thấy") };
-  return { product: data };
+  const relatedOptions = (lite ?? []).map((p) => ({
+    id: p.id,
+    label: p.name ?? (p.equipment_types as unknown as { name: string } | null)?.name ?? p.slug,
+  }));
+  return { product: data, relatedOptions };
 }
 
 export async function updateWebsiteProduct(

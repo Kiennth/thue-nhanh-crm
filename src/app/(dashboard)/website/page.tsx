@@ -118,7 +118,7 @@ export default async function WebsitePage({
     );
   }
 
-  const [{ data: products, count }, { data: categories }, statsRes, leadRes, allLiteRes] =
+  const [{ data: products, count }, { data: categories }, statsRes, leadRes] =
     await Promise.all([
       // "Nội dung" không phải 1 cột DB (ảnh/mô tả/EN) → lấy hết rồi xếp +
       // cắt trang bên dưới; các kiểu xếp khác để DB phân trang.
@@ -128,12 +128,6 @@ export default async function WebsitePage({
       supabase.from("website_categories").select("*").order("sort_order"),
       supabase.from("website_products").select("is_published, is_featured, is_new, website_category_id"),
       supabase.from("website_leads").select("id", { count: "exact", head: true }),
-      // Danh sách nhẹ cho bộ chọn "sản phẩm liên quan" trong dialog (tên
-      // hiển thị = tên marketing, trống thì tên CRM).
-      supabase
-        .from("website_products")
-        .select("id, name, slug, equipment_types(name)")
-        .order("slug"),
     ]);
 
   // Số mục thiếu: ảnh, mô tả, bản EN. Tăng dần = thiếu nhiều nhất lên đầu
@@ -151,10 +145,8 @@ export default async function WebsitePage({
           .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
       : (products ?? []);
   const categoryList = categories ?? [];
-  const relatedOptions = (allLiteRes.data ?? []).map((p) => ({
-    id: p.id,
-    label: p.name ?? (p.equipment_types as unknown as { name: string } | null)?.name ?? p.slug,
-  }));
+  // Bản gọn cho khung Sửa nội dung (không kèm giới thiệu HTML của danh mục).
+  const categoryOptionsLite = categoryList.map(({ id, name, slug, parent_id }) => ({ id, name, slug, parent_id }));
   const all = statsRes.data ?? [];
   const publishedCount = all.filter((p) => p.is_published).length;
   const noCategoryCount = all.filter((p) => !p.website_category_id).length;
@@ -280,8 +272,7 @@ export default async function WebsitePage({
                   <div className="flex items-center justify-end gap-1">
                     <WebsiteProductDialog
                       productId={p.id}
-                      categories={categoryList}
-                      relatedOptions={relatedOptions}
+                      categories={categoryOptionsLite}
                     />
                     <WebsiteProductRowActions
                       id={p.id}
