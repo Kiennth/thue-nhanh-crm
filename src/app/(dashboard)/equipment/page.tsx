@@ -95,6 +95,7 @@ export default async function EquipmentPage({
     from?: string;
     to?: string;
     tab?: string;
+    noprice?: string;
   }>;
 }) {
   const {
@@ -107,7 +108,10 @@ export default async function EquipmentPage({
     from: rangeFrom,
     to: rangeTo,
     tab,
+    noprice,
   } = await searchParams;
+  // Chip "Chưa có giá" (đề xuất CRM v2 §4.7): hàng thuê/bán đang để giá 0.
+  const noPriceOnly = noprice === "1";
   const activeSearch = search?.trim() ?? "";
   const activeCategory = category?.trim() || null;
   const requestedPage = Math.max(1, Number(pageParam) || 1);
@@ -230,7 +234,9 @@ export default async function EquipmentPage({
   }
 
   const dirMult = activeDir === "asc" ? 1 : -1;
-  const sortedTypes = [...allTypes].sort((a, b) => {
+  const isNoPrice = (t: EquipmentTypeRow) => t.product_type !== "service" && !(t.price > 0);
+  const noPriceCount = allTypes.filter(isNoPrice).length;
+  const sortedTypes = (noPriceOnly ? allTypes.filter(isNoPrice) : [...allTypes]).sort((a, b) => {
     switch (activeSort) {
       case "productType":
         return dirMult * PRODUCT_TYPE_LABELS[a.product_type].localeCompare(PRODUCT_TYPE_LABELS[b.product_type], "vi");
@@ -401,6 +407,30 @@ export default async function EquipmentPage({
           size="lg"
           className="w-full max-w-2xl"
         />
+      )}
+      {!isReportTab && (noPriceCount > 0 || noPriceOnly) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={(() => {
+              const p = new URLSearchParams();
+              if (activeSearch) p.set("search", activeSearch);
+              if (activeCategory) p.set("category", activeCategory);
+              if (!noPriceOnly) p.set("noprice", "1");
+              const qs = p.toString();
+              return qs ? `/equipment?${qs}` : "/equipment";
+            })()}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+              noPriceOnly ? "border-primary bg-primary text-primary-foreground" : "border-amber-400/60 text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950"
+            }`}
+          >
+            Chưa có giá
+            <span className={`rounded-full px-1.5 text-xs tabular-nums ${noPriceOnly ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900"}`}>{noPriceCount}</span>
+            {noPriceOnly && <span aria-hidden>×</span>}
+          </Link>
+          {noPriceOnly && (
+            <span className="text-xs text-muted-foreground">Bổ sung giá — mã không cho thuê nữa thì ẩn khỏi web ở mục Website.</span>
+          )}
+        </div>
       )}
 
       {canViewEquipmentReports && (
