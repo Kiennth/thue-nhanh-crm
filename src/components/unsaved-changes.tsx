@@ -25,6 +25,8 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
   const [leaveHref, setLeaveHref] = useState<string | null>(null);
   // Nút hành động đang chờ lưu xong để bấm tiếp.
   const pendingAction = useRef<HTMLElement | null>(null);
+  // Bấm "Bỏ thay đổi" → tải lại trang mà không bị trình duyệt hỏi "Rời trang?".
+  const discarding = useRef(false);
   const [askAction, setAskAction] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const count = Object.keys(sections).length;
@@ -72,6 +74,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (e: BeforeUnloadEvent) => {
+      if (discarding.current) return;
       e.preventDefault();
     };
     // Bắt link trong app + nút hành động ở pha capture của window — chạy
@@ -83,6 +86,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
       if (guarded) {
         e.preventDefault();
         e.stopPropagation();
+        setLeaveHref(null);
         setAskAction(guarded);
         return;
       }
@@ -92,6 +96,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
       if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search)) return;
       e.preventDefault();
       e.stopPropagation();
+      setAskAction(null);
       setLeaveHref(url.pathname + url.search + url.hash);
     };
     // Menu/nút mở theo pointerdown (vd. menu In chứng từ) — chặn luôn để chỉ
@@ -192,7 +197,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
                 className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
                 disabled={saving}
                 onClick={() => {
-                  setSections({});
+                  discarding.current = true;
                   location.reload();
                 }}
               >
