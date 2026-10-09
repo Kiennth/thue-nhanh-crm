@@ -9,6 +9,7 @@ import { createBlogPost } from "@/lib/actions/blog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { SearchInput } from "@/components/search-input";
 
 const WEB = process.env.WEBSITE_PUBLIC_URL ?? "https://thuenhanh.vn";
 
@@ -22,8 +23,23 @@ function isFuture(iso: string | null) {
 }
 
 // Danh sách bài blog web (CEO 2026-10-08).
-export default async function BlogListPage() {
+const fold = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+const STATUS_FILTERS = [
+  { key: "", label: "Tất cả" },
+  { key: "draft", label: "Nháp" },
+  { key: "published", label: "Đã đăng" },
+] as const;
+
+export default async function BlogListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string }>;
+}) {
   await requireRole([...BLOG_ROLES]);
+  const { q, status } = await searchParams;
+  const query = q?.trim() ?? "";
+  const activeStatus = status === "draft" || status === "published" ? status : "";
   const db = (await createClient()) as unknown as SupabaseClient;
   const { data } = await db
     .from("blog_posts")
@@ -34,6 +50,12 @@ export default async function BlogListPage() {
     "id" | "slug" | "title" | "category" | "status" | "published_at" | "updated_at" | "cover_image_url"
   >[];
   const catName = (s: string) => BLOG_CATEGORIES.find((c) => c.slug === s)?.name ?? s;
+  // Tìm theo tiêu đề (bỏ dấu) + lọc trạng thái (đề xuất CRM v2 §4.7).
+  const needle = fold(query);
+  const count = (st: string) => posts.filter((p) => !st || p.status === st).length;
+  const shown = posts.filter(
+    (p) => (!activeStatus || p.status === activeStatus) && (!query || fold(`${p.title} ${p.slug}`).includes(needle)),
+  );
 
   return (
     <div className="space-y-5">
@@ -51,11 +73,35 @@ export default async function BlogListPage() {
         </Button>
       </form>
 
-      {posts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Chưa có bài nào.</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput key={query} paramName="q" placeholder="Tìm bài theo tiêu đề — gõ rồi Enter..." value={query} className="w-full max-w-md" />
+        <div className="inline-flex rounded-lg border p-1">
+          {STATUS_FILTERS.map((f) => {
+            const p = new URLSearchParams();
+            if (query) p.set("q", query);
+            if (f.key) p.set("status", f.key);
+            const qs = p.toString();
+            return (
+              <Link
+                key={f.key}
+                href={`/website/blog${qs ? `?${qs}` : ""}`}
+                className={cn(
+                  "rounded-md px-3 py-1 text-sm font-medium",
+                  activeStatus === f.key ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                )}
+              >
+                {f.label} <span className="opacity-70">{count(f.key)}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{posts.length ? "Không có bài nào khớp." : "Chưa có bài nào."}</p>
       ) : (
         <div className="divide-y rounded-lg border">
-          {posts.map((p) => {
+          {shown.map((p) => {
             const scheduled = p.status === "published" && isFuture(p.published_at);
             return (
               <div key={p.id} className="flex items-center gap-3 p-3">
