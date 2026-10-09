@@ -46,6 +46,10 @@ export function PrintMenu({ orderId }: { orderId: string }) {
             {PRINT_DOC_MENU_LABELS[docType]}
           </DropdownMenuItem>
         ))}
+        {/* Báo giá tiếng Anh cho khách nước ngoài (CEO 2026-10-09). */}
+        <DropdownMenuItem onClick={() => openInNewTab(`/orders/${orderId}/print?type=quote&lang=en`)}>
+          Tạo báo giá (English)
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

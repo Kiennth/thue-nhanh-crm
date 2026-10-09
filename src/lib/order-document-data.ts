@@ -34,6 +34,8 @@ export interface DocEquipmentType {
 
 export interface DocRow {
   key: string;
+  // Mã hàng của dòng (null với dòng tự do) — báo giá theo tháng tra giá lẻ.
+  equipmentTypeId: string | null;
   description: string;
   // Biến thể / các món trong combo — in dòng nhỏ dưới mô tả.
   details: string[];
@@ -113,6 +115,7 @@ export function buildDocRows({
       const days = durationOf(type, line.charge_duration);
       pending.push({
         key: line.id,
+        equipmentTypeId: line.equipment_type_id,
         description: type?.name ?? line.custom_name ?? "—",
         details: children.map((c) => {
           const childType = c.equipment_type_id ? typeById.get(c.equipment_type_id) : undefined;
@@ -156,6 +159,7 @@ export function buildDocRows({
       }
       const row: Omit<DocRow, "vat" | "total"> = {
         key: line.id,
+        equipmentTypeId: line.equipment_type_id,
         description: type?.name ?? "—",
         details: [],
         note: line.extra_information,
@@ -180,6 +184,7 @@ export function buildDocRows({
         : null;
     pending.push({
       key: line.id,
+      equipmentTypeId: line.equipment_type_id,
       description: type?.name ?? line.custom_name ?? "—",
       details: variant && variant !== type?.name ? [variant] : [],
       note: line.extra_information,
@@ -227,4 +232,126 @@ export function computeDocTotals(rows: DocRow[], deposit: number): DocTotals {
   const rental = rows.reduce((sum, r) => sum + r.amount, 0);
   const vat = round0(rental * VAT_RATE);
   return { rental, vat, rentalWithVat: rental + vat, deposit, grand: rental + vat + deposit };
+}
+
+// ---------------------------------------------------------------------------
+// Báo giá THEO THÁNG cho đơn thuê dài (CEO 2026-10-09: "khách thuê 5 máy tính
+// 10 màn hình 3 tháng mà tiền thuê cả 100tr" — khách trả từng tháng, báo giá
+// phải ghi tiền MỖI THÁNG + tổng hợp đồng + lịch thanh toán đầu mỗi kỳ).
+// Áp cho đơn ≥ 30 ngày. Kỳ = 30 ngày tính từ giờ nhận; kỳ cuối có thể lẻ ngày
+// (tiền chia theo ngày). Phí giao/thu hồi & dịch vụ thu ở kỳ 1. Giá KHÔNG đổi
+// — chỉ trình bày lại; ưu đãi cam kết (3 tháng −10%, 6 −20%, 12 −40% so với
+// thuê lẻ 1 tháng) đã nằm sẵn trong bảng giá mẫu, ở đây chỉ ghi ra cho khách
+// thấy.
+// ---------------------------------------------------------------------------
+
+export const MONTH_DAYS = 30;
+
+export interface MonthlyQuoteRow {
+  key: string;
+  description: string;
+  details: string[];
+  note: string | null;
+  unit: string;
+  quantity: number;
+  isService: boolean;
+  // Thuê: đơn giá & thành tiền MỖI THÁNG; dịch vụ: null (thu 1 lần ở kỳ 1).
+  monthlyUnit: number | null;
+  monthlyAmount: number | null;
+  // Giá thuê lẻ 1 tháng (chưa cam kết) / máy và % ưu đãi so với giá đó.
+  refMonthlyUnit: number | null;
+  discountPct: number | null;
+  contractAmount: number;
+}
+
+export interface BillingPeriod {
+  index: number; // 1-based
+  start: Date;
+  end: Date;
+  days: number;
+  rental: number;
+  vat: number;
+  total: number;
+}
+
+export interface MonthlyQuote {
+  months: number; // số tháng (1 chữ số thập phân, vd 3 hoặc 2,5)
+  rows: MonthlyQuoteRow[];
+  monthlyRental: number;
+  monthlyVat: number;
+  monthlyTotal: number;
+  periods: BillingPeriod[];
+}
+
+export function buildMonthlyQuote({
+  rows,
+  rentalStartAt,
+  rentalDays,
+  refByRowKey,
+}: {
+  rows: DocRow[];
+  rentalStartAt: string | null;
+  rentalDays: number | null;
+  // Giá lẻ 1 tháng / máy theo bảng giá (đã suy ở trang in) — vắng thì không ghi ưu đãi.
+  refByRowKey?: Map<string, number>;
+}): MonthlyQuote | null {
+  if (!rentalStartAt || !rentalDays || rentalDays < MONTH_DAYS) return null;
+  const months = rentalDays / MONTH_DAYS;
+  const qRows: MonthlyQuoteRow[] = rows.map((row) => {
+    const rentalLike = row.isRental && !row.isService;
+    const monthlyAmount = rentalLike ? round0(row.amount / months) : null;
+    const monthlyUnit = monthlyAmount != null ? round0(monthlyAmount / Math.max(1, row.quantity)) : null;
+    const ref = rentalLike ? (refByRowKey?.get(row.key) ?? null) : null;
+    const discountPct =
+      ref && monthlyUnit != null && ref > monthlyUnit ? Math.round((1 - monthlyUnit / ref) * 100) : null;
+    return {
+      key: row.key,
+      description: row.description,
+      details: row.details,
+      note: row.note,
+      unit: row.unit,
+      quantity: row.quantity,
+      isService: !rentalLike,
+      monthlyUnit,
+      monthlyAmount,
+      refMonthlyUnit: discountPct ? ref : null,
+      discountPct: discountPct && discountPct > 0 ? discountPct : null,
+      contractAmount: row.amount,
+    };
+  });
+  const rentalTotal = qRows.filter((r) => !r.isService).reduce((s, r) => s + r.contractAmount, 0);
+  const serviceTotal = qRows.filter((r) => r.isService).reduce((s, r) => s + r.contractAmount, 0);
+  const monthlyRental = qRows.reduce((s, r) => s + (r.monthlyAmount ?? 0), 0);
+  const monthlyVat = round0(monthlyRental * VAT_RATE);
+
+  const start = new Date(rentalStartAt);
+  const count = Math.ceil(rentalDays / MONTH_DAYS - 1e-9);
+  const periods: BillingPeriod[] = [];
+  let allocated = 0;
+  for (let i = 0; i < count; i++) {
+    const days = Math.min(MONTH_DAYS, rentalDays - i * MONTH_DAYS);
+    const isLast = i === count - 1;
+    const share = isLast ? rentalTotal - allocated : round0((rentalTotal * days) / rentalDays);
+    allocated += share;
+    const rental = share + (i === 0 ? serviceTotal : 0);
+    const vat = round0(rental * VAT_RATE);
+    const pStart = new Date(start.getTime() + i * MONTH_DAYS * 86_400_000);
+    periods.push({
+      index: i + 1,
+      start: pStart,
+      end: new Date(pStart.getTime() + days * 86_400_000),
+      days,
+      rental,
+      vat,
+      total: rental + vat,
+    });
+  }
+  return {
+    months: Math.round(months * 10) / 10,
+    rows: qRows,
+    monthlyRental,
+    monthlyVat,
+    monthlyTotal: monthlyRental + monthlyVat,
+    periods,
+  };
 }

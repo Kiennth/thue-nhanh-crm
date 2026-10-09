@@ -22,8 +22,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!order) return new Response("Không tìm thấy đơn hàng.", { status: 404 });
 
   try {
-    const pdf = await renderOrderDocumentPdf(id, docType);
-    const fileName = `${printDocFileName(docType, order.order_code)}.pdf`;
+    const lang = request.nextUrl.searchParams.get("lang") === "en" ? "en" : "vi";
+    const pdf = await renderOrderDocumentPdf(id, docType, lang);
+    const fileName = `${lang === "en" && docType === "quote" ? `QUOTATION ${order.order_code}` : printDocFileName(docType, order.order_code)}.pdf`;
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

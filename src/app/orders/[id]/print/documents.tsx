@@ -4,7 +4,7 @@ import { transferRef } from "@/lib/vietqr";
 import { COMPANY_INFO } from "@/lib/company-info";
 import { VAT_RATE } from "@/lib/order-labels";
 import { vndToWords } from "@/lib/vnd-words";
-import type { DocRow, DocTotals } from "@/lib/order-document-data";
+import type { DocRow, DocTotals, MonthlyQuote } from "@/lib/order-document-data";
 
 // Các mẫu chứng từ theo đúng file mẫu CEO gửi 2026-09-30 (Báo giá — Google
 // Sheets; Đề nghị thanh toán, Biên bản bàn giao, Biên bản nghiệm thu — Google
@@ -48,6 +48,8 @@ export interface DocContext {
   receiverPhone: string | null;
   paid: number;
   depositHeld: number;
+  // Đơn ≥ 30 ngày: báo giá in theo tháng + lịch thanh toán (CEO 2026-10-09).
+  monthly?: MonthlyQuote | null;
 }
 
 const money = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -55,6 +57,7 @@ const fmt = (n: number) => money.format(n);
 const DOTS = "……………………………………";
 const SHORT_DOTS = "………";
 const vatLabel = `VAT (${Math.round(VAT_RATE * 100)}%)`;
+const MONTH_DAYS_DOC = 30;
 
 const cell = "border border-black px-1.5 py-1 align-top";
 const Th = ({ children, className = "" }: { children?: ReactNode; className?: string }) => (
@@ -118,7 +121,16 @@ function AccessoryChecklist({ note }: { note: string | null }) {
 
 // Bảng giá 9 cột dùng chung cho Báo giá (có thêm cột "Đơn giá/gói") và Biên
 // bản nghiệm thu.
-function PriceRows({ rows, withPackageColumn }: { rows: DocRow[]; withPackageColumn: boolean }) {
+function PriceRows({
+  rows,
+  withPackageColumn,
+  format = fmt,
+}: {
+  rows: DocRow[];
+  withPackageColumn: boolean;
+  format?: (n: number) => string;
+}) {
+  const fmt = format;
   return (
     <>
       {rows.map((row, index) => (
@@ -150,34 +162,238 @@ function PriceRows({ rows, withPackageColumn }: { rows: DocRow[]; withPackageCol
 // ---------------------------------------------------------------------------
 // BÁO GIÁ
 // ---------------------------------------------------------------------------
-export function QuoteDocument({ ctx }: { ctx: DocContext }) {
+// Chữ song ngữ của báo giá (CEO 2026-10-09: "cả hai" — báo giá theo tháng có
+// bản tiếng Anh cho khách nước ngoài). ?lang=en ở trang in.
+const QUOTE_TEXT = {
+  vi: {
+    title: "BÁO GIÁ",
+    titleMonthly: "BÁO GIÁ THUÊ THEO THÁNG",
+    no: "Số",
+    partyA: "BÊN A",
+    partyB: "BÊN B",
+    address: "Địa chỉ",
+    taxCode: "Mã số thuế",
+    taxCodeB: "MST",
+    budgetCode: "Mã số ĐVQHNS",
+    rep: "Người đại diện",
+    repTitle: "Chức vụ",
+    phone: "SĐT",
+    email: "Email",
+    date: "Ngày",
+    seq: "Số thứ tự",
+    account: "Số tài khoản",
+    at: "tại",
+    intro: "Bên A đáp ứng đủ tiêu chuẩn để cung cấp dịch vụ cho thuê thiết bị theo yêu cầu của Bên B, cụ thể như sau:",
+    no_: "STT",
+    desc: "Mô tả",
+    unit: "ĐVT",
+    qty: "Số lượng",
+    days: "Số ngày",
+    perDay: "Đơn giá/ ngày (VNĐ)",
+    perPackage: "Đơn giá/ gói (VNĐ)",
+    amount: "Thành tiền (VNĐ)",
+    total: "Tổng số tiền (VNĐ)",
+    rental: "Tiền thuê",
+    deposit: "Tiền ký quỹ (đặt cọc thiết bị)",
+    rentalAndDeposit: "Tiền thuê và tiền ký quỹ",
+    perMonth: "Đơn giá/ tháng (VNĐ)",
+    amountMonth: "Thành tiền/ tháng (VNĐ)",
+    months: "Số tháng",
+    contractAmount: "Thành tiền cả hợp đồng (VNĐ)",
+    oneMonthRef: (ref: string, pct: number) => `Giá thuê lẻ 1 tháng ${ref} — ưu đãi cam kết −${pct}%`,
+    oneOff: "Thu 1 lần ở kỳ 1",
+    monthlyRental: "Tiền thuê mỗi tháng",
+    monthlyPay: "Thanh toán mỗi tháng (gồm VAT)",
+    contractTotal: (m: string) => `Tổng giá trị hợp đồng ${m} tháng (gồm VAT)`,
+    schedule: "Lịch thanh toán",
+    period: "Kỳ",
+    time: "Thời gian",
+    dueDate: "Hạn thanh toán",
+    vatCol: "VAT",
+    payTotal: "Tổng thanh toán (VNĐ)",
+    inWords: "Bằng chữ",
+    rentalLine: "Tiền thuê",
+    depositLine: "Tiền ký quỹ",
+    depositNote:
+      "(Để tránh nhầm lẫn, khoản tiền ký quỹ (đặt cọc thiết bị) này mang tính đảm bảo chất lượng của thiết bị thuê trong suốt quá trình diễn ra sự kiện đến khi Bên B trả lại thiết bị thì Bên A phải hoàn trả cho Bên B)",
+    pickup: "Ngày nhận",
+    return: "Ngày trả",
+    duration: "Thời gian thuê",
+    durationText: (d: string) =>
+      `${d} ngày. (24 giờ từ giờ nhận đến giờ trả thiết bị được tính là 01 ngày thuê). Số lượng thiết bị thuê, thời gian thuê có thể gia hạn nhưng không thể rút bớt.`,
+    place: "Địa điểm nhận & trả",
+    pay1: (a: string, w: string) =>
+      `Bên B chuyển khoản 100% số tiền thuê: ${a} VNĐ (Bằng chữ: ${w}) ngay sau khi nhận báo giá để báo giá có hiệu lực.`,
+    pay2: (a: string, w: string) =>
+      `Bên B chuyển khoản 100% số tiền ký quỹ: ${a} VNĐ (Bằng chữ: ${w}) trong vòng 24 giờ trước ngày nhận để Bên A làm thủ tục xuất kho đóng gói vận chuyển tới địa điểm do Bên B yêu cầu.`,
+    pay1Label: "Thanh toán đợt 1",
+    pay2Label: "Thanh toán đợt 2",
+    payMonthly: (first: string) =>
+      `Kỳ 1 (${first} VNĐ, gồm phí giao/thu hồi nếu có) thanh toán ngay sau khi nhận báo giá để giữ chỗ; tiền ký quỹ thanh toán trong vòng 24 giờ trước ngày nhận. Các kỳ sau thanh toán vào ĐẦU mỗi kỳ, trước ngày ghi trong lịch thanh toán.`,
+    payMonthlyLabel: "Thanh toán",
+    accName: "Tên tài khoản",
+    accNo: "Số tài khoản",
+    qr1: "Đợt 1 — tiền thuê",
+    qr1Monthly: "Kỳ 1 — tiền thuê",
+    qr2: "Đợt 2 — ký quỹ",
+    refund: "Hoàn cọc",
+    refundText:
+      "Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có) sau khi bên B trả lại thiết bị cho bên A, tối đa 24h làm việc.",
+    terms: "Điều khoản",
+  },
+  en: {
+    title: "QUOTATION",
+    titleMonthly: "MONTHLY RENTAL QUOTATION",
+    no: "No.",
+    partyA: "PARTY A (LESSOR)",
+    partyB: "PARTY B (LESSEE)",
+    address: "Address",
+    taxCode: "Tax code",
+    taxCodeB: "Tax code",
+    budgetCode: "Budget unit code",
+    rep: "Represented by",
+    repTitle: "Title",
+    phone: "Phone",
+    email: "Email",
+    date: "Date",
+    seq: "No.",
+    account: "Bank account",
+    at: "at",
+    intro: "Party A meets the requirements to provide equipment rental services as requested by Party B, as follows:",
+    no_: "No.",
+    desc: "Description",
+    unit: "Unit",
+    qty: "Qty",
+    days: "Days",
+    perDay: "Price/day (VND)",
+    perPackage: "Price/package (VND)",
+    amount: "Amount (VND)",
+    total: "Total (VND)",
+    rental: "Rental",
+    deposit: "Security deposit",
+    rentalAndDeposit: "Rental and deposit",
+    perMonth: "Price/month (VND)",
+    amountMonth: "Amount/month (VND)",
+    months: "Months",
+    contractAmount: "Contract amount (VND)",
+    oneMonthRef: (ref: string, pct: number) => `Standard 1-month price ${ref} — commitment discount −${pct}%`,
+    oneOff: "One-off, billed in period 1",
+    monthlyRental: "Rental per month",
+    monthlyPay: "Monthly payment (incl. VAT)",
+    contractTotal: (m: string) => `Total contract value, ${m} months (incl. VAT)`,
+    schedule: "Payment schedule",
+    period: "Period",
+    time: "Dates",
+    dueDate: "Due date",
+    vatCol: "VAT",
+    payTotal: "Amount due (VND)",
+    inWords: "",
+    rentalLine: "Rental",
+    depositLine: "Security deposit",
+    depositNote:
+      "(This refundable deposit secures the rented equipment for the whole rental period; Party A refunds it to Party B after the equipment is returned.)",
+    pickup: "Pickup",
+    return: "Return",
+    duration: "Rental period",
+    durationText: (d: string) =>
+      `${d} days (24 hours from pickup to return count as 1 rental day). Quantities and rental period can be extended but not reduced.`,
+    place: "Pickup & return location",
+    pay1: (a: string) => `Party B transfers 100% of the rental, ${a} VND, upon receiving this quotation to confirm it.`,
+    pay2: (a: string) =>
+      `Party B transfers 100% of the deposit, ${a} VND, at least 24 hours before pickup so Party A can prepare and ship the equipment to the requested location.`,
+    pay1Label: "Payment 1",
+    pay2Label: "Payment 2",
+    payMonthly: (first: string) =>
+      `Period 1 (${first} VND, including delivery/collection fees if any) is paid upon receiving this quotation to reserve the equipment; the deposit is paid at least 24 hours before pickup. Later periods are paid at the START of each period, by the due date in the schedule.`,
+    payMonthlyLabel: "Payment",
+    accName: "Account name",
+    accNo: "Account number",
+    qr1: "Payment 1 — rental",
+    qr1Monthly: "Period 1 — rental",
+    qr2: "Payment 2 — deposit",
+    refund: "Deposit refund",
+    refundText:
+      "Party A refunds the deposit by bank transfer (less any incurred costs) within 24 working hours after Party B returns the equipment.",
+    terms: "Terms",
+  },
+} as const;
+
+const QUOTE_TERMS = {
+  vi: [
+    "Báo giá trên chưa bao gồm các chi phí phát sinh ngoài phạm vi (nếu có) và có thể thay đổi tuỳ thời điểm chốt đơn.",
+    "Báo giá có hiệu lực trong vòng 01 tuần kể từ ngày phát hành, trừ khi có thoả thuận khác.",
+    "Đơn hàng được xác nhận sau khi khách hàng phản hồi chốt đơn và thanh toán tiền thuê để giữ chỗ.",
+    "Huỷ đơn miễn phí, hoàn lại tiền thuê đã thanh toán. Chỉ trừ chi phí thực tế phát sinh (nếu có, ví dụ xe đã đi giao).",
+  ],
+  en: [
+    "This quotation excludes any costs outside its scope (if any) and may change depending on when the order is confirmed.",
+    "This quotation is valid for 01 week from the date of issue, unless otherwise agreed.",
+    "The order is confirmed once the customer confirms it and pays the rental to reserve the equipment.",
+    "Free cancellation with a refund of the rental paid; only costs actually incurred are deducted (if any, e.g. a delivery already on its way).",
+  ],
+};
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Ho_Chi_Minh",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+const fmtEn = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
+
+export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "vi" | "en" }) {
   const { totals } = ctx;
+  const T = QUOTE_TEXT[lang];
+  const en = lang === "en";
+  const f = en ? fmtEn : fmt;
+  const m = ctx.monthly ?? null;
+  const months = m ? (en ? String(m.months) : String(m.months).replace(".", ",")) : "";
+  const words = (n: number) => (en ? "" : ` (${T.inWords}: ${vndToWords(n)})`);
+  const pickupText = en ? ctx.pickupText.replace(" ngày ", ", ") : ctx.pickupText;
+  const returnText = en ? ctx.returnText.replace(" ngày ", ", ") : ctx.returnText;
+  const placeText = en ? ctx.placeText.replace(/^Kho Thuê Nhanh /, "Thuê Nhanh store, ") : ctx.placeText;
+  const firstPeriod = m?.periods[0]?.total ?? 0;
+  const cur = en ? "VND" : "VNĐ";
+
   return (
     <div className="space-y-3">
       <div className="text-center">
-        <h1 className="text-xl font-bold">BÁO GIÁ</h1>
-        <p>Số: {ctx.docNumber}</p>
+        <h1 className="text-xl font-bold">{m ? T.titleMonthly : T.title}</h1>
+        <p>
+          {T.no}: {ctx.docNumber}
+        </p>
       </div>
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-bold">BÊN A: {COMPANY_INFO.legalName}</p>
-          <p>Địa chỉ: {COMPANY_INFO.legalAddress}</p>
-          <p>Mã số thuế: {COMPANY_INFO.taxCode}</p>
-          <p>
-            Người đại diện: {COMPANY_INFO.representative}. Chức vụ: {COMPANY_INFO.representativeTitle}
+          <p className="font-bold">
+            {T.partyA}: {COMPANY_INFO.legalName}
           </p>
-          <p>SĐT: {COMPANY_INFO.phone}</p>
-          <p>Email: {COMPANY_INFO.email}</p>
+          <p>
+            {T.address}: {COMPANY_INFO.legalAddress}
+          </p>
+          <p>
+            {T.taxCode}: {COMPANY_INFO.taxCode}
+          </p>
+          <p>
+            {T.rep}: {en ? COMPANY_INFO.representativeName : COMPANY_INFO.representative}. {T.repTitle}:{" "}
+            {en ? "Director" : COMPANY_INFO.representativeTitle}
+          </p>
+          <p>
+            {T.phone}: {COMPANY_INFO.phone}
+          </p>
+          <p>
+            {T.email}: {COMPANY_INFO.email}
+          </p>
         </div>
         <table className="shrink-0 border-collapse">
           <tbody>
             <tr>
-              <Td className="font-bold">Ngày</Td>
+              <Td className="font-bold">{T.date}</Td>
               <Td className="min-w-24 text-center">{ctx.orderDate}</Td>
             </tr>
             <tr>
-              <Td className="font-bold">Số thứ tự</Td>
+              <Td className="font-bold">{T.seq}</Td>
               <Td className="text-center">1</Td>
             </tr>
             <tr>
@@ -189,124 +405,256 @@ export function QuoteDocument({ ctx }: { ctx: DocContext }) {
       </div>
 
       <div>
-        <p className="font-bold">BÊN B: {ctx.customer.name}</p>
-        <p>Địa chỉ: {ctx.customer.address ?? ""}</p>
-        <p>MST: {ctx.customer.taxCode ?? ""}</p>
-        {ctx.customer.budgetUnitCode && <p>Mã số ĐVQHNS: {ctx.customer.budgetUnitCode}</p>}
+        <p className="font-bold">
+          {T.partyB}: {ctx.customer.name}
+        </p>
         <p>
-          Người đại diện: {ctx.customer.representativeName ?? `Ông/ Bà ${SHORT_DOTS}`} Chức vụ:{" "}
+          {T.address}: {ctx.customer.address ?? ""}
+        </p>
+        <p>
+          {T.taxCodeB}: {ctx.customer.taxCode ?? ""}
+        </p>
+        {ctx.customer.budgetUnitCode && (
+          <p>
+            {T.budgetCode}: {ctx.customer.budgetUnitCode}
+          </p>
+        )}
+        <p>
+          {T.rep}: {ctx.customer.representativeName ?? (en ? SHORT_DOTS : `Ông/ Bà ${SHORT_DOTS}`)} {T.repTitle}:{" "}
           {ctx.customer.representativeTitle ?? SHORT_DOTS}
         </p>
         {ctx.customer.bankAccountNumber && (
           <p>
-            Số tài khoản: {ctx.customer.bankAccountNumber}
-            {ctx.customer.bankName ? ` tại ${ctx.customer.bankName}` : ""}
+            {T.account}: {ctx.customer.bankAccountNumber}
+            {ctx.customer.bankName ? ` ${T.at} ${ctx.customer.bankName}` : ""}
           </p>
         )}
-        <p>SĐT: {ctx.customer.phone ?? ""}</p>
-        <p>Email: {ctx.customer.email ?? ""}</p>
+        <p>
+          {T.phone}: {ctx.customer.phone ?? ""}
+        </p>
+        <p>
+          {T.email}: {ctx.customer.email ?? ""}
+        </p>
       </div>
 
-      <p>
-        Bên A đáp ứng đủ tiêu chuẩn để cung cấp dịch vụ cho thuê thiết bị theo yêu cầu của Bên B, cụ
-        thể như sau:
-      </p>
+      <p>{T.intro}</p>
 
-      <table className="w-full border-collapse text-[12px]">
-        <thead>
-          <tr>
-            <Th className="w-8">STT</Th>
-            <Th>Mô tả</Th>
-            <Th className="w-10">ĐVT</Th>
-            <Th className="w-12">Số lượng</Th>
-            <Th className="w-12">Số ngày</Th>
-            <Th>Đơn giá/ ngày (VNĐ)</Th>
-            <Th>Đơn giá/ gói (VNĐ)</Th>
-            <Th>Thành tiền (VNĐ)</Th>
-            <Th>{vatLabel}</Th>
-            <Th>Tổng số tiền (VNĐ)</Th>
-          </tr>
-        </thead>
-        <tbody>
-          <PriceRows rows={ctx.rows} withPackageColumn />
-          <tr className="font-bold">
-            <Td />
-            <Td colSpan={6}>Tiền thuê</Td>
-            <Td className="text-right">{fmt(totals.rental)}</Td>
-            <Td className="text-right">{fmt(totals.vat)}</Td>
-            <Td className="text-right">{fmt(totals.rentalWithVat)}</Td>
-          </tr>
-          <tr className="font-bold">
-            <Td />
-            <Td colSpan={8}>Tiền ký quỹ (đặt cọc thiết bị)</Td>
-            <Td className="text-right">{fmt(totals.deposit)}</Td>
-          </tr>
-          <tr className="font-bold">
-            <Td />
-            <Td colSpan={8}>Tiền thuê và tiền ký quỹ</Td>
-            <Td className="text-right">{fmt(totals.grand)}</Td>
-          </tr>
-        </tbody>
-      </table>
+      {m ? (
+        <>
+          {/* Đơn ≥ 30 ngày: bảng theo tháng + tổng hợp đồng (CEO 2026-10-09 "cả 2"). */}
+          <table className="w-full border-collapse text-[12px]">
+            <thead>
+              <tr>
+                <Th className="w-8">{T.no_}</Th>
+                <Th>{T.desc}</Th>
+                <Th className="w-10">{T.unit}</Th>
+                <Th className="w-12">{T.qty}</Th>
+                <Th>{T.perMonth}</Th>
+                <Th>{T.amountMonth}</Th>
+                <Th className="w-12">{T.months}</Th>
+                <Th>{T.contractAmount}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {m.rows.map((r, idx) => (
+                <tr key={r.key}>
+                  <Td className="text-center">{idx + 1}</Td>
+                  <Td>
+                    {r.description}
+                    {r.details.map((d) => (
+                      <span key={d} className="block text-[11px] leading-4">
+                        - {d}
+                      </span>
+                    ))}
+                    {r.refMonthlyUnit && r.discountPct && (
+                      <span className="block text-[11px] leading-4 italic">
+                        {T.oneMonthRef(f(r.refMonthlyUnit), r.discountPct)}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="text-center">{r.unit}</Td>
+                  <Td className="text-center">{r.quantity}</Td>
+                  {r.isService ? (
+                    <Td colSpan={3} className="text-center text-[11px] italic">
+                      {T.oneOff}
+                    </Td>
+                  ) : (
+                    <>
+                      <Td className="text-right">{f(r.monthlyUnit ?? 0)}</Td>
+                      <Td className="text-right">{f(r.monthlyAmount ?? 0)}</Td>
+                      <Td className="text-center">{months}</Td>
+                    </>
+                  )}
+                  <Td className="text-right">{f(r.contractAmount)}</Td>
+                </tr>
+              ))}
+              <tr className="font-bold">
+                <Td />
+                <Td colSpan={4}>{T.monthlyRental}</Td>
+                <Td className="text-right">{f(m.monthlyRental)}</Td>
+                <Td colSpan={2} />
+              </tr>
+              <tr>
+                <Td />
+                <Td colSpan={4}>{vatLabel}</Td>
+                <Td className="text-right">{f(m.monthlyVat)}</Td>
+                <Td colSpan={2} />
+              </tr>
+              <tr className="font-bold">
+                <Td />
+                <Td colSpan={4}>{T.monthlyPay}</Td>
+                <Td className="text-right">{f(m.monthlyTotal)}</Td>
+                <Td colSpan={2} />
+              </tr>
+              <tr className="font-bold">
+                <Td />
+                <Td colSpan={6}>{T.contractTotal(months)}</Td>
+                <Td className="text-right">{f(totals.rentalWithVat)}</Td>
+              </tr>
+              <tr className="font-bold">
+                <Td />
+                <Td colSpan={6}>{T.deposit}</Td>
+                <Td className="text-right">{f(totals.deposit)}</Td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p className="pt-1 font-bold">{T.schedule}</p>
+          <table className="w-full border-collapse text-[12px]">
+            <thead>
+              <tr>
+                <Th className="w-10">{T.period}</Th>
+                <Th>{T.time}</Th>
+                <Th>{T.dueDate}</Th>
+                <Th>{T.rental} ({en ? "VND" : "VNĐ"})</Th>
+                <Th>{T.vatCol}</Th>
+                <Th>{T.payTotal}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {m.periods.map((p) => (
+                <tr key={p.index}>
+                  <Td className="text-center">{p.index}</Td>
+                  <Td className="text-center">
+                    {dateFmt.format(p.start)} – {dateFmt.format(p.end)}
+                    {p.days < MONTH_DAYS_DOC ? ` (${p.days} ${en ? "days" : "ngày"})` : ""}
+                  </Td>
+                  <Td className="text-center">{dateFmt.format(p.start)}</Td>
+                  <Td className="text-right">{f(p.rental)}</Td>
+                  <Td className="text-right">{f(p.vat)}</Td>
+                  <Td className="text-right font-bold">{f(p.total)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <table className="w-full border-collapse text-[12px]">
+          <thead>
+            <tr>
+              <Th className="w-8">{T.no_}</Th>
+              <Th>{T.desc}</Th>
+              <Th className="w-10">{T.unit}</Th>
+              <Th className="w-12">{T.qty}</Th>
+              <Th className="w-12">{T.days}</Th>
+              <Th>{T.perDay}</Th>
+              <Th>{T.perPackage}</Th>
+              <Th>{T.amount}</Th>
+              <Th>{vatLabel}</Th>
+              <Th>{T.total}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            <PriceRows rows={ctx.rows} withPackageColumn format={f} />
+            <tr className="font-bold">
+              <Td />
+              <Td colSpan={6}>{T.rental}</Td>
+              <Td className="text-right">{f(totals.rental)}</Td>
+              <Td className="text-right">{f(totals.vat)}</Td>
+              <Td className="text-right">{f(totals.rentalWithVat)}</Td>
+            </tr>
+            <tr className="font-bold">
+              <Td />
+              <Td colSpan={8}>{T.deposit}</Td>
+              <Td className="text-right">{f(totals.deposit)}</Td>
+            </tr>
+            <tr className="font-bold">
+              <Td />
+              <Td colSpan={8}>{T.rentalAndDeposit}</Td>
+              <Td className="text-right">{f(totals.grand)}</Td>
+            </tr>
+          </tbody>
+        </table>
+      )}
 
       <div className="space-y-1">
         <p>
-          <b>Tiền thuê:</b> {fmt(totals.rentalWithVat)} VNĐ (Bằng chữ: {vndToWords(totals.rentalWithVat)}).
+          <b>{m ? T.contractTotal(months) : T.rentalLine}:</b> {f(totals.rentalWithVat)} {cur}{words(totals.rentalWithVat)}.
         </p>
         <p>
-          <b>Tiền ký quỹ:</b> {fmt(totals.deposit)} VNĐ (Bằng chữ: {vndToWords(totals.deposit)})./.(Để
-          tránh nhầm lẫn, khoản tiền ký quỹ (đặt cọc thiết bị) này mang tính đảm bảo chất lượng của
-          thiết bị thuê trong suốt quá trình diễn ra sự kiện đến khi Bên B trả lại thiết bị thì Bên A
-          phải hoàn trả cho Bên B)
+          <b>{T.depositLine}:</b> {f(totals.deposit)} {cur}{words(totals.deposit)}./.{T.depositNote}
         </p>
         <p>
-          <b>Ngày nhận:</b> {ctx.pickupText}
+          <b>{T.pickup}:</b> {pickupText}
         </p>
         <p>
-          <b>Ngày trả:</b> {ctx.returnText}
+          <b>{T.return}:</b> {returnText}
         </p>
         <p>
-          <b>Thời gian thuê:</b> {ctx.rentalDays ?? SHORT_DOTS} ngày. (24 giờ từ giờ nhận đến giờ trả
-          thiết bị được tính là 01 ngày thuê). Số lượng thiết bị thuê, thời gian thuê có thể gia hạn
-          nhưng không thể rút bớt.
+          <b>{T.duration}:</b> {T.durationText(String(ctx.rentalDays ?? SHORT_DOTS))}
         </p>
         <p>
-          <b>Địa điểm nhận &amp; trả:</b> {ctx.placeText}
+          <b>{T.place}:</b> {placeText}
         </p>
+        {m ? (
+          <p>
+            <b>{T.payMonthlyLabel}:</b> {T.payMonthly(f(firstPeriod))}
+          </p>
+        ) : (
+          <>
+            <p>
+              <b>{T.pay1Label}:</b> {T.pay1(f(totals.rentalWithVat), vndToWords(totals.rentalWithVat))}
+            </p>
+            <p>
+              <b>{T.pay2Label}:</b> {T.pay2(f(totals.deposit), vndToWords(totals.deposit))}
+            </p>
+          </>
+        )}
         <p>
-          <b>Thanh toán đợt 1:</b> Bên B chuyển khoản 100% số tiền thuê: {fmt(totals.rentalWithVat)} VNĐ
-          (Bằng chữ: {vndToWords(totals.rentalWithVat)}) ngay sau khi nhận báo giá để báo giá có hiệu
-          lực.
-        </p>
-        <p>
-          <b>Thanh toán đợt 2:</b> Bên B chuyển khoản 100% số tiền ký quỹ: {fmt(totals.deposit)} VNĐ
-          (Bằng chữ: {vndToWords(totals.deposit)}) trong vòng 24 giờ trước ngày nhận để Bên A làm thủ
-          tục xuất kho đóng gói vận chuyển tới địa điểm do Bên B yêu cầu.
-        </p>
-        <p>
-          <b>Tên tài khoản:</b> {COMPANY_INFO.documentBank.accountName}
+          <b>{T.accName}:</b> {COMPANY_INFO.documentBank.accountName}
           <br />
-          <b>Số tài khoản:</b> {COMPANY_INFO.documentBank.accountNumber} tại {COMPANY_INFO.documentBank.bankName}.
+          <b>{T.accNo}:</b> {COMPANY_INFO.documentBank.accountNumber} {T.at} {COMPANY_INFO.documentBank.bankName}.
         </p>
         {/* QR chuyển khoản (CEO 2026-10-04) — đúng nội dung thì CRM tự ghi nhận. */}
         <div className="grid grid-cols-2 gap-4 py-1">
-          {totals.rentalWithVat > 0 && (
-            <PaymentQr orderCode={ctx.orderCode} amount={totals.rentalWithVat} label="Đợt 1 — tiền thuê" size={120} />
+          {(m ? firstPeriod : totals.rentalWithVat) > 0 && (
+            <PaymentQr
+              orderCode={ctx.orderCode}
+              amount={m ? firstPeriod : totals.rentalWithVat}
+              label={m ? T.qr1Monthly : T.qr1}
+              size={120}
+              lang={lang}
+            />
           )}
           {totals.deposit > 0 && (
-            <PaymentQr orderCode={ctx.orderCode} amount={totals.deposit} deposit label="Đợt 2 — ký quỹ" size={120} />
+            <PaymentQr orderCode={ctx.orderCode} amount={totals.deposit} deposit label={m ? T.depositLine : T.qr2} size={120} lang={lang} />
           )}
         </div>
         <p>
-          <b>Hoàn cọc:</b> Bên A chuyển khoản hoàn tiền ký quỹ (sau khi trừ chi phí phát sinh nếu có)
-          sau khi bên B trả lại thiết bị cho bên A, tối đa 24h làm việc.
+          <b>{T.refund}:</b> {T.refundText}
         </p>
+        <p className="pt-1 font-bold">{T.terms}</p>
+        <ul className="list-disc pl-5">
+          {QUOTE_TERMS[lang].map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
       </div>
 
       <div className="flex justify-end pt-2">
         <div className="w-64 text-center">
           <p className="font-bold">{COMPANY_INFO.name}</p>
-          <p className="font-bold">{COMPANY_INFO.representativeTitle}</p>
+          <p className="font-bold">{en ? "Director" : COMPANY_INFO.representativeTitle}</p>
           <div className="h-20" />
           <p className="font-bold">{COMPANY_INFO.representativeName}</p>
         </div>

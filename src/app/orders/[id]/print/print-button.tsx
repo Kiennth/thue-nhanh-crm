@@ -31,10 +31,12 @@ export function PrintButton({
   orderId,
   docType,
   google,
+  lang = "vi",
 }: {
   orderId?: string;
   docType?: string;
   google?: GoogleDocsState;
+  lang?: "vi" | "en";
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function PrintButton({
           </>
         )}
         {google?.canConnect && google.configured && !google.connected && (
-          <Button variant="outline" render={<a href={google.connectHref} />}>
+          <Button variant="outline" nativeButton={false} render={<a href={google.connectHref} />}>
             <FileEdit className="size-4" />
             Kết nối Google Drive
           </Button>
@@ -106,7 +108,7 @@ export function PrintButton({
         {/* Tải PDF và In tách 2 nút (CEO 2026-10-04): PDF dựng ở server, tải
             thẳng về máy đúng tên file; In chỉ mở hộp thoại in. */}
         {orderId && docType && (
-          <Button variant="outline" render={<a href={`/api/orders/${orderId}/pdf?type=${docType}`} />}>
+          <Button variant="outline" nativeButton={false} render={<a href={`/api/orders/${orderId}/pdf?type=${docType}${lang === "en" ? "&lang=en" : ""}`} />}>
             <FileText className="size-4" />
             Tải PDF
           </Button>

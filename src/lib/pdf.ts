@@ -72,9 +72,11 @@ export async function launchBrowser(): Promise<Browser> {
 export async function renderOrderDocumentPdf(
   orderId: string,
   docType: PrintDocType,
+  // Báo giá tiếng Anh (CEO 2026-10-09).
+  lang: "vi" | "en" = "vi",
 ): Promise<Buffer> {
   const baseUrl = await getSiteUrl();
-  const url = `${baseUrl}/orders/${orderId}/print?type=${docType}`;
+  const url = `${baseUrl}/orders/${orderId}/print?type=${docType}${lang === "en" ? "&lang=en" : ""}`;
   const cookieStore = await cookies();
   const targetUrl = new URL(url);
 

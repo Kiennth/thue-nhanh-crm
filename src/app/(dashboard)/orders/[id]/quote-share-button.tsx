@@ -70,9 +70,26 @@ export function QuoteShareButton({ orderId }: { orderId: string }) {
           </Button>
         </div>
         {url && (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
-            <ExternalLink className="size-3.5" /> Mở thử như khách thấy
-          </a>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <ExternalLink className="size-3.5" /> Mở thử như khách thấy
+            </a>
+            {/* Khách nước ngoài: cùng link, thêm ?lang=en (CEO 2026-10-09). */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(`${url}?lang=en`);
+                  toast.success("Đã chép link báo giá tiếng Anh");
+                } catch {
+                  toast.error("Không chép được — thêm ?lang=en vào cuối link");
+                }
+              }}
+            >
+              <Copy className="size-3.5" /> Chép link tiếng Anh
+            </button>
+          </div>
         )}
       </DialogContent>
     </Dialog>

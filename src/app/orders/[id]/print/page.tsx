@@ -20,9 +20,12 @@ import { DELIVERY_NOTE_TYPE_IDS } from "@/lib/commission";
 import { computeRentalDurationInUnit } from "@/lib/rental-pricing";
 import {
   buildDocRows,
+  buildMonthlyQuote,
   computeDocTotals,
   computeOrderDeposit,
+  MONTH_DAYS,
   type DocEquipmentType,
+  type MonthlyQuote,
 } from "@/lib/order-document-data";
 import {
   AcceptanceDocument,
@@ -84,7 +87,7 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string; google?: string; share?: string }>;
+  searchParams: Promise<{ type?: string; google?: string; share?: string; lang?: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
   const { type, share } = await searchParams;
@@ -100,10 +103,12 @@ export default async function OrderPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string; google?: string; share?: string }>;
+  searchParams: Promise<{ type?: string; google?: string; share?: string; lang?: string }>;
 }) {
   const { id } = await params;
-  const { type, google: googleNotice, share } = await searchParams;
+  const { type, google: googleNotice, share, lang: langParam } = await searchParams;
+  // Báo giá tiếng Anh (CEO 2026-10-09): ?lang=en — chỉ áp cho báo giá.
+  const lang: "vi" | "en" = langParam === "en" ? "en" : "vi";
   // Chế độ khách (CEO 2026-10-04): link báo giá có mã ký đúng đơn → không
   // cần đăng nhập, chỉ xem báo giá + nút Đồng ý (đọc dữ liệu bằng admin
   // client vì khách không có quyền RLS).
@@ -140,7 +145,7 @@ export default async function OrderPrintPage({
     supabase.from("branches").select("id, name"),
     supabase
       .from("equipment_types")
-      .select("id, name, rental_period_unit, product_type, tracking_type, deposit_amount"),
+      .select("id, name, rental_period_unit, product_type, tracking_type, deposit_amount, price, pricing_method, pricing_template_id"),
     supabase.from("equipment_units").select("id, equipment_type_id, brand_model"),
   ]);
 
@@ -158,7 +163,7 @@ export default async function OrderPrintPage({
       cancelled={!!order.cancelled_at}
     />
   ) : (
-    <PrintButton orderId={id} docType={docType} google={google} />
+    <PrintButton orderId={id} docType={docType} google={google} lang={lang} />
   );
 
   // equipment_instances đã hơn 1.700 dòng — Supabase/PostgREST chặn CỨNG ở
@@ -234,6 +239,60 @@ export default async function OrderPrintPage({
       rentalStartAt: order.rental_start_at,
       rentalEndAt: order.rental_end_at,
     });
+    // Bản tiếng Anh: tên hàng lấy tên EN của sản phẩm web (cùng mã hàng),
+    // đơn vị tính dịch sang tiếng Anh.
+    if (docType === "quote" && lang === "en") {
+      const typeIds = [...new Set(rows.map((r) => r.equipmentTypeId).filter((v): v is string => !!v))];
+      const { data: webNames } = typeIds.length
+        ? await supabase.from("website_products").select("equipment_type_id, name_en").in("equipment_type_id", typeIds)
+        : { data: [] };
+      const nameEn = new Map(
+        (webNames ?? []).filter((w) => w.name_en).map((w) => [w.equipment_type_id, w.name_en as string]),
+      );
+      const UNIT_EN: Record<string, string> = { bộ: "set", cái: "pc", gói: "pkg", giờ: "hour", ngày: "day", tháng: "month" };
+      for (const r of rows) {
+        const en = r.equipmentTypeId ? nameEn.get(r.equipmentTypeId) : undefined;
+        // Không có tên EN trên web: tên CRM kiểu "Phí giao hàng ô tô | Car Delivery"
+        // → lấy phần tiếng Anh sau "|"; còn lại đổi "|" thành dấu phẩy.
+        const parts = r.description.split(" | ");
+        const asciiTail = parts.length > 1 && /^[\x20-\x7E]+$/.test(parts[parts.length - 1]) && /[ăâđêôơưàáạảãèéẹẻẽìíịỉĩòóọỏõùúụủũỳýỵỷỹ]/i.test(parts[0]);
+        r.description = en ? en.split(" | ").join(", ") : asciiTail ? parts[parts.length - 1] : parts.join(", ");
+        r.unit = UNIT_EN[r.unit] ?? r.unit;
+      }
+    }
+
+    // Báo giá theo tháng (đơn ≥ 30 ngày, CEO 2026-10-09): giá lẻ 1 tháng / máy
+    // = giá ngày × 30 × (1 − % bậc 1 tháng của bảng giá mẫu) — để ghi ưu đãi
+    // cam kết dài ("giá 1 tháng 4.800.000 → 4.320.000, −10%").
+    const rentalDaysForMonthly =
+      order.rental_start_at && order.rental_end_at
+        ? computeRentalDurationInUnit(order.rental_start_at, order.rental_end_at, "day")
+        : null;
+    let monthly: MonthlyQuote | null = null;
+    if (docType === "quote" && rentalDaysForMonthly && rentalDaysForMonthly >= MONTH_DAYS) {
+      const templateIds = [
+        ...new Set((equipmentTypes ?? []).map((t) => t.pricing_template_id).filter((v): v is string => !!v)),
+      ];
+      const { data: monthTiers } = templateIds.length
+        ? await supabase
+            .from("pricing_template_tiers")
+            .select("template_id, min_duration, duration_unit, discount_percentage")
+            .in("template_id", templateIds)
+            .eq("duration_unit", "month")
+            .eq("min_duration", 1)
+        : { data: [] };
+      const oneMonthOff = new Map((monthTiers ?? []).map((t) => [t.template_id, Number(t.discount_percentage)]));
+      const refByRowKey = new Map<string, number>();
+      for (const row of rows) {
+        const t = row.equipmentTypeId ? equipmentTypeById.get(row.equipmentTypeId) : undefined;
+        if (!t || t.pricing_method !== "pricing_structure" || t.rental_period_unit !== "day") continue;
+        const off = t.pricing_template_id ? oneMonthOff.get(t.pricing_template_id) : undefined;
+        if (off == null) continue;
+        refByRowKey.set(row.key, Math.round((t.price * MONTH_DAYS * (1 - off / 100)) / 1000) * 1000);
+      }
+      monthly = buildMonthlyQuote({ rows, rentalStartAt: order.rental_start_at, rentalDays: rentalDaysForMonthly, refByRowKey });
+    }
+
     const deposit = computeOrderDeposit({
       lines: lines ?? [],
       typeById,
@@ -324,6 +383,7 @@ export default async function OrderPrintPage({
       deliveryAddress: delivery.address ?? `Nhận tại kho Thuê Nhanh ${branchName}`.trim(),
       receiverName: delivery.name,
       receiverPhone: delivery.phone,
+      monthly,
       paid: sumPayments("invoice"),
       depositHeld: sumPayments("deposit_collect") - sumPayments("deposit_refund"),
     };
@@ -338,7 +398,7 @@ export default async function OrderPrintPage({
         >
           {printButton}
           {docType === "contract" && <ContractDocument ctx={ctx} />}
-          {docType === "quote" && <QuoteDocument ctx={ctx} />}
+          {docType === "quote" && <QuoteDocument ctx={ctx} lang={lang} />}
           {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} />}
           {docType === "handover" && <HandoverDocument ctx={ctx} />}
           {docType === "acceptance" && <AcceptanceDocument ctx={ctx} />}

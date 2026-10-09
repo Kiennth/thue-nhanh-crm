@@ -11,13 +11,17 @@ export function PaymentQr({
   deposit = false,
   label,
   size = 148,
+  lang = "vi",
 }: {
   orderCode: string;
   amount: number;
   deposit?: boolean;
   label?: string;
   size?: number;
+  // Báo giá tiếng Anh (CEO 2026-10-09).
+  lang?: "vi" | "en";
 }) {
+  const en = lang === "en";
   const ref = transferRef(orderCode, deposit);
   return (
     <div className="flex items-start gap-3">
@@ -32,10 +36,10 @@ export function PaymentQr({
       <div className="space-y-0.5 text-xs leading-5">
         {label && <p className="text-sm font-semibold">{label}</p>}
         <p>
-          Số tiền: <b>{vnd.format(Math.round(amount))}đ</b>
+          {en ? "Amount" : "Số tiền"}: <b>{en ? `${Math.round(amount).toLocaleString("en-US")} VND` : `${vnd.format(Math.round(amount))}đ`}</b>
         </p>
         <p>
-          Nội dung: <b className="font-mono">{ref}</b>
+          {en ? "Transfer note" : "Nội dung"}: <b className="font-mono">{ref}</b>
         </p>
         <p>
           {COMPANY_INFO.documentBank.accountNumber} · {COMPANY_INFO.documentBank.shortName}
