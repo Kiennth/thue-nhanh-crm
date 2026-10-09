@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -118,12 +118,15 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
     };
   }, [dirty, saveAll]);
 
+  // Giữ nguyên object context giữa các lần render — không thì mọi khối đăng
+  // ký lại liên tục (vòng lặp render).
+  const registry = useMemo(() => ({ set }), [set]);
   const labels = Object.values(sections).map((s) => s.label);
   const summary =
     labels.slice(0, 3).join(" · ") + (labels.length > 3 ? ` · +${labels.length - 3} thay đổi khác` : "");
 
   return (
-    <UnsavedCtx.Provider value={{ set }}>
+    <UnsavedCtx.Provider value={registry}>
       {children}
       {dirty && (
         <div
