@@ -988,6 +988,8 @@ export interface Database {
           intro_html_en: string | null;
           h1: string | null;
           h1_en: string | null;
+          // B9: FAQ chung của danh mục (≤ 3) — web dùng khi SP chưa có FAQ riêng.
+          faqs: { q: string; a: string }[];
           hero_image_url: string | null;
           sort_order: number;
           is_published: boolean;
@@ -1009,6 +1011,7 @@ export interface Database {
           intro_html_en?: string | null;
           h1?: string | null;
           h1_en?: string | null;
+          faqs?: { q: string; a: string }[];
           hero_image_url?: string | null;
           sort_order?: number;
           is_published?: boolean;
@@ -1038,6 +1041,9 @@ export interface Database {
           // B5: alt từng ảnh gallery theo URL; alt_missing tự tính.
           image_alts: Record<string, { alt: string; auto?: boolean }>;
           alt_missing: boolean;
+          // B9: "Đã gồm gì" (≤ 5 dòng) + FAQ riêng (≤ 3 câu).
+          included_items: string[];
+          faqs: { q: string; a: string }[];
           website_category_id: string | null;
           sort_order: number;
           is_featured: boolean;
@@ -1075,6 +1081,8 @@ export interface Database {
           brand?: string | null;
           gallery_image_urls?: string[];
           image_alts?: Record<string, { alt: string; auto?: boolean }>;
+          included_items?: string[];
+          faqs?: { q: string; a: string }[];
           website_category_id?: string | null;
           sort_order?: number;
           is_featured?: boolean;

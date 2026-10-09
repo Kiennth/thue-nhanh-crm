@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getWebsiteCategoryForEdit, upsertWebsiteCategory } from "@/lib/actions/website";
+import { FaqListEditor } from "./included-faq-editor";
 import type { Database } from "@/types/database";
 
 type WebsiteCategoryRow = Database["public"]["Tables"]["website_categories"]["Row"];
@@ -193,6 +194,14 @@ export function WebsiteCategoryDialog({
               defaultValue={full?.intro_html_en ?? ""}
             />
           </div>
+
+          {/* B9: FAQ chung của danh mục — sản phẩm chưa có FAQ riêng thì web dùng. */}
+          <FaqListEditor
+            key={full?.id ?? "new"}
+            initial={full?.faqs ?? []}
+            title="FAQ chung của danh mục"
+            emptyHint="Chưa có — sản phẩm trong danh mục không có FAQ riêng thì web dùng FAQ của nhóm cha, rồi 3 câu chung."
+          />
 
           <label className="flex items-center gap-2 text-sm">
             <input

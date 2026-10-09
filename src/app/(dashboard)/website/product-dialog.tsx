@@ -18,6 +18,7 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { GalleryEditor } from "./gallery-editor";
 import { RelatedPicker, type RelatedOption } from "./related-picker";
 import { SpecFacetsEditor } from "./spec-facets-editor";
+import { FaqListEditor, IncludedItemsEditor } from "./included-faq-editor";
 import { formatSpec, specGroupOf, type SpecFacets } from "@/lib/spec-fields";
 import { getWebsiteProductForEdit, updateWebsiteProduct } from "@/lib/actions/website";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,7 @@ export function WebsiteProductDialog({ productId }: { productId: string }) {
   // Danh sách nhẹ mọi sản phẩm web (id + tên) cho bộ chọn "liên quan" — nạp cùng lúc.
   const [relatedOptions, setRelatedOptions] = useState<RelatedOption[]>([]);
   const [categories, setCategories] = useState<WebsiteCategoryRow[]>([]);
+  const [accessories, setAccessories] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   function toggleFullscreen() {
@@ -93,6 +95,7 @@ export function WebsiteProductDialog({ productId }: { productId: string }) {
               if ("error" in r) return setLoadError(r.error);
               setRelatedOptions(r.relatedOptions);
               setCategories(r.categories);
+              setAccessories(r.accessories);
               setProduct(r.product);
             })
             .catch(() => setLoadError("Không tải được sản phẩm — đóng rồi mở lại."));
@@ -120,6 +123,7 @@ export function WebsiteProductDialog({ productId }: { productId: string }) {
             product={product}
             categories={categories}
             relatedOptions={relatedOptions}
+            accessories={accessories}
             fullscreen={fullscreen}
             onToggleFullscreen={toggleFullscreen}
             onSaved={() => setOpen(false)}
@@ -141,6 +145,7 @@ function ProductEditForm({
   product,
   categories,
   relatedOptions,
+  accessories,
   fullscreen,
   onToggleFullscreen,
   onSaved,
@@ -148,6 +153,7 @@ function ProductEditForm({
   product: WebsiteProductRow;
   categories: WebsiteCategoryRow[];
   relatedOptions: RelatedOption[];
+  accessories: string | null;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
   onSaved: () => void;
@@ -303,6 +309,22 @@ function ProductEditForm({
         productSlug={product.slug}
         initial={(product.spec_facets ?? {}) as SpecFacets}
       />
+
+      {/* B9: khối "Đã gồm gì" + FAQ của trang sản phẩm web. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <IncludedItemsEditor
+          key={`inc-${product.id}`}
+          initial={product.included_items ?? []}
+          productName={productName}
+          accessories={accessories}
+        />
+        <FaqListEditor
+          key={`faq-${product.id}`}
+          initial={product.faqs ?? []}
+          title="FAQ riêng của sản phẩm"
+          emptyHint="Chưa có — web dùng FAQ của danh mục, không có thì 3 câu chung (cách tính ngày, VAT, giao nhận)."
+        />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="tags_csv">Tags tìm chéo (phân tách bằng dấu phẩy)</Label>

@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/dal";
 import { MANAGE_ROLES } from "@/lib/roles";
 import { pingWebsiteRevalidate } from "@/lib/website-revalidate";
 import { cleanSpecFacets, type SpecFacets } from "@/lib/spec-fields";
+import { cleanFaqs, cleanIncludedItems, type Faq } from "@/lib/product-extras";
 import type { Database } from "@/types/database";
 
 // Quản trị nội dung web công khai (new.thuenhanh.vn) — bảng website_*.
@@ -175,6 +176,8 @@ export async function getWebsiteProductForEdit(
       product: Database["public"]["Tables"]["website_products"]["Row"];
       relatedOptions: { id: string; label: string }[];
       categories: { id: string; name: string; slug: string; parent_id: string | null }[];
+      // B9: phụ kiện đi kèm của mã ("Sạc | Cable") — gợi ý "Đã gồm gì".
+      accessories: string | null;
     }
   | { error: string }
 > {
@@ -191,7 +194,12 @@ export async function getWebsiteProductForEdit(
     id: p.id,
     label: p.name ?? (p.equipment_types as unknown as { name: string } | null)?.name ?? p.slug,
   }));
-  return { product: data, relatedOptions, categories: categories ?? [] };
+  const { data: et } = await supabase
+    .from("equipment_types")
+    .select("default_extra_information")
+    .eq("id", data.equipment_type_id)
+    .maybeSingle();
+  return { product: data, relatedOptions, categories: categories ?? [], accessories: et?.default_extra_information ?? null };
 }
 
 export async function updateWebsiteProduct(
@@ -235,6 +243,35 @@ export async function updateWebsiteProduct(
     specFacets = cleaned.value;
   }
 
+  // B9: "Đã gồm gì" + FAQ riêng — chặn > 5 dòng / > 3 câu (DB cũng chặn).
+  const parseJson = (key: string): { ok: true; value: unknown } | { ok: false } => {
+    const raw = formData.get(key);
+    if (typeof raw !== "string" || !raw) return { ok: true, value: undefined };
+    try {
+      return { ok: true, value: JSON.parse(raw) };
+    } catch {
+      return { ok: false };
+    }
+  };
+  let includedItems: string[] | undefined;
+  let faqs: Faq[] | undefined;
+  {
+    const inc = parseJson("included_items_json");
+    if (!inc.ok) return { error: "Danh sách 'Đã gồm gì' không hợp lệ." };
+    if (inc.value !== undefined) {
+      const c = cleanIncludedItems(inc.value);
+      if (!c.ok) return { error: c.error };
+      includedItems = c.value;
+    }
+    const fq = parseJson("faqs_json");
+    if (!fq.ok) return { error: "FAQ không hợp lệ." };
+    if (fq.value !== undefined) {
+      const c = cleanFaqs(fq.value);
+      if (!c.ok) return { error: c.error };
+      faqs = c.value;
+    }
+  }
+
   // B5: alt từng ảnh { url: { alt, auto } } — chỉ giữ ảnh còn trong gallery,
   // cắt 125 ký tự (image_standard.md).
   let imageAlts: Record<string, { alt: string; auto: boolean }> | undefined;
@@ -275,6 +312,8 @@ export async function updateWebsiteProduct(
       ...(parsed.data.ship_bike_max_qty !== undefined ? { ship_bike_max_qty: parsed.data.ship_bike_max_qty } : {}),
       ...(specFacets !== undefined ? { spec_facets: specFacets } : {}),
       ...(imageAlts !== undefined ? { image_alts: imageAlts } : {}),
+      ...(includedItems !== undefined ? { included_items: includedItems } : {}),
+      ...(faqs !== undefined ? { faqs } : {}),
     })
     .eq("id", id);
   if (error) return { error: "Không lưu được: " + error.message };
@@ -363,8 +402,24 @@ export async function upsertWebsiteCategory(
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
+  // B9: FAQ chung của danh mục (≤ 3).
+  let categoryFaqs: Faq[] | undefined;
+  const faqsRaw = formData.get("faqs_json");
+  if (typeof faqsRaw === "string" && faqsRaw) {
+    let json: unknown;
+    try {
+      json = JSON.parse(faqsRaw);
+    } catch {
+      return { error: "FAQ không hợp lệ." };
+    }
+    const c = cleanFaqs(json);
+    if (!c.ok) return { error: c.error };
+    categoryFaqs = c.value;
+  }
+
   const supabase = await createClient();
   const values = {
+    ...(categoryFaqs !== undefined ? { faqs: categoryFaqs } : {}),
     name: parsed.data.name,
     name_en: parsed.data.name_en ?? null,
     slug: parsed.data.slug,
