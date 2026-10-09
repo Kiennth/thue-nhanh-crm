@@ -1,4 +1,5 @@
 import "server-only";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 // Báo web công khai (thuenhanh.vn) làm mới trang tĩnh ngay — không cần
 // deploy. Web lấy giá/cọc/bảng giá LIVE từ equipment_types nhưng giữ bản
@@ -10,9 +11,20 @@ export async function pingWebsiteRevalidate(paths?: string[]) {
   const base = process.env.WEBSITE_PUBLIC_URL;
   const secret = process.env.WEBSITE_REVALIDATE_SECRET;
   if (!base || !secret) return;
-  await fetch(`${base}/api/revalidate?secret=${secret}`, {
+  const ping = fetch(`${base}/api/revalidate?secret=${secret}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(paths?.length ? { paths } : {}),
-  }).catch(() => {});
+  })
+    .then(() => {})
+    .catch(() => {});
+  // Chạy NỀN trên Cloudflare (waitUntil) — web xoá ~800 khoá cache mất 1–2
+  // giây, không bắt nút trong CRM chờ (Grok CRM 09/10 §A). Ngoài Worker
+  // (next dev) thì chờ như cũ.
+  try {
+    const { ctx } = await getCloudflareContext({ async: true });
+    ctx.waitUntil(ping);
+  } catch {
+    await ping;
+  }
 }
