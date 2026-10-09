@@ -5,6 +5,7 @@ import type { PaymentMethod, TaskType } from "@/types/database";
 // 20260725000000_activity_log.sql) — dùng cho dropdown lọc theo đối tượng.
 export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   orders: "Đơn hàng",
+  order_equipment: "Dòng hàng của đơn",
   order_tasks: "Khâu xử lý đơn",
   order_payments: "Thanh toán",
   customers: "Khách hàng",
@@ -52,6 +53,16 @@ export function getActivityRecordLabel(
       return typeof data.amount === "number" ? currencyFormatter.format(data.amount) + "đ" : "";
     case "orders":
       return typeof data.order_code === "string" ? data.order_code : "";
+    case "order_equipment": {
+      // Trigger log_order_line_activity gắn sẵn _order_code/_type_name/_serial (2026-10-09).
+      const code = typeof data._order_code === "string" ? data._order_code : "";
+      const name =
+        typeof data._type_name === "string" ? data._type_name : typeof data.custom_name === "string" ? data.custom_name : "";
+      const qty = typeof data.quantity === "number" && data.quantity > 1 ? ` × ${data.quantity}` : "";
+      const serial = typeof data._serial === "string" ? ` (${data._serial})` : "";
+      const price = typeof data.unit_price === "number" ? ` · ${currencyFormatter.format(data.unit_price)}đ` : "";
+      return [code, `${name}${qty}${serial}${price}`].filter(Boolean).join(" · ");
+    }
     case "order_tasks": {
       const taskType = data.task_type as TaskType | undefined;
       return taskType ? (TASK_TYPE_LABELS[taskType] ?? String(taskType)) : "";
