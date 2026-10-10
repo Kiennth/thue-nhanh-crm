@@ -163,22 +163,52 @@ notify pgrst, 'reload schema';
 -- CEO 2026-10-11: "khách thanh toán (VietQR) là đơn tự nhảy từ Đã báo giá →
 -- Chốt đơn". Mọi khoản THU (tiền thuê / tiền cọc) — QR tự ghi nhận, đối soát
 -- ngân hàng, nhân viên ghi tay — đều chốt đơn đang "Đã báo giá". Hoàn cọc
--- không tính. Khâu khoán "Chốt đơn" không tự tick (ghi khoán sau).
+-- không tính. Khoán 3 khâu đầu (Tiếp nhận → Báo giá → Chốt đơn) tự ghi cho
+-- người làm báo giá (khâu Báo giá; chưa có thì người tạo đơn) — CEO 11/10,
+-- giống khách bấm Đồng ý ở link báo giá. Khâu đã xong giữ nguyên; khâu đã có
+-- người nhận thì ghi cho người đó.
 create or replace function public.order_payments_confirm_order()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_created_by uuid;
+  v_quoter uuid;
+  v_today date := (now() at time zone 'Asia/Ho_Chi_Minh')::date;
 begin
-  if new.payment_type in ('invoice', 'deposit_collect') then
-    update public.orders
-    set confirmed_at = now()
-    where id = new.order_id
-      and confirmed_at is null
-      and cancelled_at is null
-      and completed_at is null;
+  if new.payment_type not in ('invoice', 'deposit_collect') then
+    return new;
   end if;
+
+  update public.orders
+  set confirmed_at = now()
+  where id = new.order_id
+    and confirmed_at is null
+    and cancelled_at is null
+    and completed_at is null
+  returning created_by into v_created_by;
+  if not found then
+    return new;
+  end if;
+
+  select employee_id into v_quoter
+  from public.order_tasks
+  where order_id = new.order_id and task_type = 'bao_gia';
+  v_quoter := coalesce(v_quoter, v_created_by);
+  if v_quoter is null then
+    return new;
+  end if;
+
+  insert into public.order_tasks (order_id, task_type, employee_id, completed_date, note)
+  select new.order_id, t, v_quoter, v_today, 'Tự chốt khi khách thanh toán'
+  from unnest(array['tiep_nhan_yeu_cau', 'bao_gia', 'chot_don']::public.task_type[]) as t
+  on conflict (order_id, task_type) do update
+    set employee_id = coalesce(public.order_tasks.employee_id, excluded.employee_id),
+        completed_date = excluded.completed_date,
+        note = coalesce(public.order_tasks.note, excluded.note)
+    where public.order_tasks.completed_date is null;
   return new;
 end;
 $$;
