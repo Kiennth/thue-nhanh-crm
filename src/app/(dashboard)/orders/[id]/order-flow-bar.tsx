@@ -97,6 +97,8 @@ export function OrderFlowBar({
   }
 
   const undoLabel = returned ? "Nhận lại máy" : delivered ? "Giao máy" : "Chốt đơn";
+  // Bước Chốt đơn: ghi rõ "Huỷ chốt đơn" (CEO 2026-10-11), nút có viền dễ thấy.
+  const undoText = !delivered && !returned ? "Huỷ chốt đơn" : `Hoàn tác ${undoLabel.toLowerCase()}`;
 
   return (
     <div className="rounded-xl border bg-card p-3 sm:p-4">
@@ -160,9 +162,14 @@ export function OrderFlowBar({
         )}
         {next === 5 && <span className="text-sm font-medium text-primary">Đơn đã hoàn tất — máy đã về kho.</span>}
         {canUndo && next > 2 && (
-          <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setDialog("undo")}>
+          <Button
+            variant={next === 3 ? "outline" : "ghost"}
+            size={next === 3 ? "default" : "sm"}
+            className={next === 3 ? undefined : "ml-auto text-muted-foreground"}
+            onClick={() => setDialog("undo")}
+          >
             <Undo2 className="size-4" />
-            Hoàn tác {undoLabel.toLowerCase()}
+            {undoText}
           </Button>
         )}
       </div>
@@ -211,7 +218,7 @@ export function OrderFlowBar({
       <Dialog open={dialog === "undo"} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hoàn tác “{undoLabel}”?</DialogTitle>
+            <DialogTitle>{undoText}?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {returned
@@ -231,12 +238,12 @@ export function OrderFlowBar({
               onClick={() =>
                 run(
                   () => (returned ? undoReturn(orderId) : delivered ? undoPickup(orderId) : undoConfirm(orderId)),
-                  `Đã hoàn tác ${undoLabel.toLowerCase()}`,
+                  !delivered && !returned ? "Đã huỷ chốt đơn" : `Đã hoàn tác ${undoLabel.toLowerCase()}`,
                 )
               }
             >
               {pending && <Loader2 className="size-4 animate-spin" />}
-              Hoàn tác
+              {undoText}
             </Button>
           </DialogFooter>
         </DialogContent>
