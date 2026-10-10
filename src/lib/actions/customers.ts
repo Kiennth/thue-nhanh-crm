@@ -54,7 +54,7 @@ function buildRow(input: CustomerFormInput, extra: z.infer<typeof ExtraSchema>) 
   const row: Record<string, unknown> = {
     customer_type: input.customer_type,
     name: input.name,
-    phone: normalizePhone(input.phone),
+    phone: input.phone.trim() ? normalizePhone(input.phone) : null,
     email: input.email || null,
     notes: extra.notes || null,
     address: extra.address || null,

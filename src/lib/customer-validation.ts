@@ -58,12 +58,14 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
   const company = input.customer_type === "company";
   if (input.name.trim().length < 2) e.name = company ? "Nhập tên công ty (ít nhất 2 ký tự)." : "Nhập họ tên khách.";
   else if (input.name.trim().length > 200) e.name = "Tên dài quá 200 ký tự.";
-  if (!input.phone.trim()) e.phone = "Nhập số điện thoại.";
-  else if (/[a-zA-Z]/.test(input.phone) || !isValidPhone(input.phone))
+  // Công ty: SĐT + người liên hệ KHÔNG bắt buộc (CEO 10/10 — chỉ nhắc, xem
+  // customerWarnings); cá nhân vẫn bắt buộc SĐT. Có nhập thì kiểm đúng mẫu.
+  if (!input.phone.trim()) {
+    if (!company) e.phone = "Nhập số điện thoại.";
+  } else if (/[a-zA-Z]/.test(input.phone) || !isValidPhone(input.phone))
     e.phone = "SĐT phải đủ 10 số, bắt đầu bằng 0 (nhập +84 cũng được).";
   if (input.email.trim() && !EMAIL_RE.test(input.email.trim())) e.email = "Email không hợp lệ.";
   if (company) {
-    if (!input.contact_name.trim()) e.contact_name = "Nhập người liên hệ.";
     if (input.wants_vat) {
       if (!input.tax_code.trim()) e.tax_code = "Khách lấy hoá đơn VAT thì phải có MST.";
       else if (!isValidMst(input.tax_code)) e.tax_code = "MST phải là 10 số hoặc 10 số-3 số.";
@@ -77,4 +79,14 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
     if (id && !isValidCccd(id)) e.tax_code = "Số CCCD phải đủ 12 chữ số.";
   }
   return e;
+}
+
+// Nhắc (không chặn lưu) — khách Công ty thiếu người liên hệ / SĐT.
+export function customerWarnings(input: CustomerFormInput): Record<string, string> {
+  const w: Record<string, string> = {};
+  if (input.customer_type === "company") {
+    if (!input.contact_name.trim()) w.contact_name = "Chưa có người liên hệ — nên bổ sung (vẫn lưu được).";
+    if (!input.phone.trim()) w.phone = "Chưa có SĐT — nên bổ sung (vẫn lưu được).";
+  }
+  return w;
 }

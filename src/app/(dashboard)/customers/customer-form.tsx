@@ -12,6 +12,7 @@ import {
   cccdProvinceWarning,
   maskIdNumber,
   validateCustomer,
+  customerWarnings,
   type CustomerKind,
 } from "@/lib/customer-validation";
 
@@ -88,6 +89,16 @@ export function CustomerForm({
       }),
     [kind, name, phone, email, contactName, taxCode, wantsVat, invoiceEmail, hideIndividualId],
   );
+  const warnings = customerWarnings({
+    customer_type: kind,
+    name,
+    phone,
+    email,
+    contact_name: contactName,
+    tax_code: taxCode,
+    wants_vat: wantsVat,
+    invoice_email: invoiceEmail,
+  });
   const errorCount = Object.keys(errors).length;
   const shown = (field: string) => (showAll || touched[field] ? errors[field] : undefined);
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
@@ -125,7 +136,13 @@ export function CustomerForm({
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
       {input}
-      {shown(id) ? <p className="text-xs text-destructive">{shown(id)}</p> : extra}
+      {shown(id) ? (
+        <p className="text-xs text-destructive">{shown(id)}</p>
+      ) : (showAll || touched[id]) && warnings[id] ? (
+        <p className="text-xs text-amber-600">{warnings[id]}</p>
+      ) : (
+        extra
+      )}
     </div>
   );
   const invalid = (id: string) => (shown(id) ? "border-destructive aria-invalid:border-destructive" : undefined);
@@ -181,9 +198,7 @@ export function CustomerForm({
       {company &&
         field(
           "contact_name",
-          <>
-            Người liên hệ <Req />
-          </>,
+          "Người liên hệ",
           <Input
             id="contact_name"
             name="contact_name"
@@ -199,7 +214,7 @@ export function CustomerForm({
         {field(
           "phone",
           <>
-            Số điện thoại <Req />
+            Số điện thoại {!company && <Req />}
           </>,
           <Input
             id="phone"
