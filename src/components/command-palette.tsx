@@ -60,22 +60,22 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
 
   return (
     <>
-      {/* CEO 10/10: "to thật là to để ai cũng biết mà ấn vô, màu sắc rực rỡ" —
-          nút chiếm giữa thanh trên cùng, nền chuyển màu cam → hồng → tím,
+      {/* CEO 10/10: nút Tìm nhanh dễ thấy hơn (bản đầu nền chuyển màu "hơi quá"
+          → dịu lại): nằm giữa thanh trên, nền nhạt màu chủ đạo, viền + icon màu,
           hiện cả trên điện thoại. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mx-auto flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-3 text-left text-white shadow-lg shadow-rose-500/30 ring-2 ring-white/40 transition hover:brightness-110 hover:shadow-xl focus-visible:ring-4 focus-visible:ring-rose-300 focus-visible:outline-none sm:h-12 sm:max-w-2xl sm:px-4"
+        className="mx-auto flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-primary/40 bg-primary/[0.06] px-3 text-left text-sm text-foreground transition hover:border-primary/70 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none sm:max-w-md"
       >
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/25 sm:size-8">
-          <Search className="size-4 sm:size-5" strokeWidth={2.75} />
+        <Search className="size-4 shrink-0 text-primary" strokeWidth={2.5} />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-semibold text-primary">Tìm nhanh</span>
+          <span className="hidden text-muted-foreground sm:inline"> — mã đơn, khách, hàng hoá…</span>
         </span>
-        <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide sm:text-base">
-          TÌM NHANH
-          <span className="hidden font-medium opacity-90 md:inline"> — mã đơn, tên khách, hàng hoá, trang…</span>
-        </span>
-        <kbd className="hidden shrink-0 rounded-md bg-white/25 px-2 py-0.5 font-mono text-xs font-semibold sm:block">Ctrl K</kbd>
+        <kbd className="hidden shrink-0 rounded border bg-background px-1.5 font-mono text-[11px] text-muted-foreground sm:block">
+          Ctrl K
+        </kbd>
       </button>
       <Dialog
         open={open}

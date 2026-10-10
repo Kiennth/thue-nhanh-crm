@@ -47,7 +47,7 @@ export default async function DashboardLayout({
       <SidebarProvider>
         <AppSidebar employee={employee} />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
             <span className="hidden shrink-0 text-sm text-muted-foreground lg:inline">
