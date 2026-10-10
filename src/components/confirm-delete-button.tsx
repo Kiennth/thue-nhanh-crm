@@ -28,6 +28,7 @@ export function ConfirmDeleteButton<T>({
   action,
   actionArg,
   inMenu = false,
+  requireText,
 }: {
   confirmMessage: string;
   successMessage: string;
@@ -36,8 +37,13 @@ export function ConfirmDeleteButton<T>({
   // Danh sách dài (đề xuất CRM v2 §4.3): không để thùng rác trên từng dòng —
   // nút "⋯" mở menu, mục "Xoá…" chữ đỏ rồi mới tới hộp xác nhận.
   inMenu?: boolean;
+  // Xoá thứ quan trọng (đơn hàng — Grok tách gọn CRM 10/10): phải gõ đúng
+  // chuỗi này (vd mã đơn) thì nút Xoá mới bấm được.
+  requireText?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const typedOk = !requireText || typed.trim().toUpperCase() === requireText.trim().toUpperCase();
   const [pending, startTransition] = useTransition();
 
   function handleConfirm() {
@@ -53,7 +59,13 @@ export function ConfirmDeleteButton<T>({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setTyped("");
+      }}
+    >
       {inMenu ? (
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -86,11 +98,25 @@ export function ConfirmDeleteButton<T>({
           <DialogTitle>Xác nhận xoá</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">{confirmMessage}</p>
+        {requireText && (
+          <label className="space-y-1.5 text-sm">
+            <span>
+              Gõ <b className="font-mono">{requireText}</b> để xác nhận
+            </span>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoFocus
+              className="h-9 w-full rounded-md border bg-background px-3 font-mono"
+              aria-label="Gõ lại để xác nhận xoá"
+            />
+          </label>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
             Đóng
           </Button>
-          <Button variant="destructive" onClick={handleConfirm} disabled={pending}>
+          <Button variant="destructive" onClick={handleConfirm} disabled={pending || !typedOk}>
             {pending ? "Đang xoá..." : "Xoá"}
           </Button>
         </DialogFooter>

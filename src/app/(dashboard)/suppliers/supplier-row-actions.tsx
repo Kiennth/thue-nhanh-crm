@@ -24,6 +24,7 @@ export function CopyBankButton({ text }: { text: string }) {
 export function DeleteSupplierButton({ id, name }: { id: string; name: string }) {
   return (
     <ConfirmDeleteButton
+      inMenu
       confirmMessage={`Xoá nhà cung cấp "${name}"? Muốn giữ lịch sử thì bỏ tick "Đang hợp tác" thay vì xoá.`}
       successMessage="Đã xoá nhà cung cấp."
       action={deleteSupplier}

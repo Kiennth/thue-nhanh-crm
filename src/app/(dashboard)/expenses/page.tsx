@@ -392,6 +392,7 @@ export default async function ExpensesPage({
                             recurring={recurringById.get(row.recurringId)}
                           />
                           <ConfirmDeleteButton
+                            inMenu
                             confirmMessage="Xoá chi phí định kỳ này? MỌI kỳ (các tháng) của nó sẽ biến mất — nếu chỉ muốn dừng từ nay về sau, hãy đặt ngày kết thúc."
                             successMessage="Đã xoá chi phí định kỳ."
                             action={deleteRecurringExpense}
@@ -414,6 +415,7 @@ export default async function ExpensesPage({
                             }}
                           />
                           <ConfirmDeleteButton
+                            inMenu
                             confirmMessage="Xoá khoản chi này?"
                             successMessage="Đã xoá khoản chi."
                             action={deleteExpense}

@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_ROLES, MANAGE_ROLES, TECH_SALES_ROLES } from "@/lib/roles";
@@ -20,9 +21,10 @@ export default async function OrdersPage({
     paid?: string;
     view?: string;
     branch?: string;
+    charts?: string;
   }>;
 }) {
-  const { status, range, from, to, page, sort, dir, search, scope, overview, paid, view, branch } =
+  const { status, range, from, to, page, sort, dir, search, scope, overview, paid, view, branch, charts } =
     await searchParams;
   const employee = await requireRole([...ALL_ROLES]);
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
@@ -55,6 +57,14 @@ export default async function OrdersPage({
 
   // Tên kho để ghi thẳng vào ô chọn phạm vi ("Kho Hà Nội") thay vì chữ chung
   // chung — chỉ cần khi có ô chọn đó.
+  // View riêng đã lưu của người đang xem (Grok tách gọn CRM 10/10 giai đoạn 2).
+  const viewsClient = (await createClient()) as unknown as SupabaseClient;
+  const { data: savedViews } = await viewsClient
+    .from("saved_views")
+    .select("id, name, query")
+    .eq("page", "orders")
+    .order("created_at");
+
   let branchName: string | null = null;
   if (isBranchManager && branchId) {
     const supabase = await createClient();
@@ -76,6 +86,8 @@ export default async function OrdersPage({
         overview={overview}
         paid={paid}
         view={view}
+        charts={charts}
+        savedViews={(savedViews ?? []) as { id: string; name: string; query: string }[]}
         branchId={listBranchId}
         canDelete={canManage}
         // Mở rộng ra toàn hệ thống thì ẩn dãy thẻ thống kê: cửa hàng trưởng

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/stat-card";
 import {
   Table,
   TableBody,
@@ -27,8 +26,9 @@ import {
 } from "@/lib/date-range-presets";
 import type { TaskType } from "@/types/database";
 import { QuickOrderDialog } from "./quick-order-dialog";
-import { WebOrdersAlert } from "@/components/web-orders-alert";
-import { Globe } from "lucide-react";
+import { BarChart3, ChevronDown } from "lucide-react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { SaveViewButton, DeleteSavedViewButton } from "./saved-view-controls";
 import { OrderStatusFilter } from "./order-status-filter";
 import { OrderDateRangeFilter } from "./order-date-range-filter";
 import { OrderBranchScopeFilter } from "./order-branch-scope-filter";
@@ -47,12 +47,23 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeStyle: "short",
   timeZone: VN_TIME_ZONE,
 });
-const PAGE_SIZE = 20;
-const QUICK_VIEWS = [
-  { key: "deliver_today", label: "Hôm nay giao" },
-  { key: "return_today", label: "Hôm nay thu hồi" },
-  { key: "overdue", label: "Quá hạn trả" },
+const PAGE_SIZE = 25;
+// View lưu sẵn (Grok tách gọn CRM 10/10 giai đoạn 2) thay 12 nút trạng thái —
+// 12 trạng thái vẫn còn trong "Bộ lọc nâng cao". Đơn web mới là 1 tab dẫn sang
+// /orders/web (số đơn web chỉ hiện 1 lần ở đây).
+const SYSTEM_VIEWS = [
+  { key: "processing", label: "Đang xử lý" },
+  { key: "deliver_soon", label: "Giao hôm nay & mai" },
+  { key: "return_soon", label: "Thu hồi hôm nay & mai" },
+  { key: "overdue", label: "Quá hạn trả", alert: true },
+  { key: "owing", label: "Còn nợ" },
+  { key: "invoice_pending", label: "Chờ xuất HĐ" },
+  { key: "completed", label: "Hoàn tất" },
+  { key: "all", label: "Tất cả" },
 ] as const;
+// Link cũ (Trang chủ / Hôm nay trước 10/10) vẫn mở được.
+const LEGACY_VIEWS = ["deliver_today", "return_today"];
+type ViewCounts = Record<string, number>;
 
 function isDateRangePreset(value: string): value is DateRangePreset {
   return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
@@ -81,6 +92,13 @@ interface OrderRow {
   order_date: string;
   completed_at: string | null;
   cancelled_at: string | null;
+  delivered_at: string | null;
+  paid_amount: number;
+  remaining: number;
+  owner_name: string | null;
+  no_serial: boolean;
+  no_driver: boolean;
+  invoice_pending: boolean;
 }
 
 interface OrdersPageListStats {
@@ -134,6 +152,8 @@ export async function OrdersListSection({
   overview,
   paid,
   view,
+  charts,
+  savedViews = [],
   branchId,
   canDelete,
   showStats = true,
@@ -154,8 +174,13 @@ export async function OrdersListSection({
   // "unpaid" = đang lọc bảng chỉ còn đơn chưa thanh toán hết (bấm từ thẻ
   // "Chưa thanh toán hết" trong khối tổng quan).
   paid?: string;
-  // Chế độ xem nhanh (đề xuất CRM v2 §4.3): deliver_today | return_today | overdue.
+  // View lưu sẵn (SYSTEM_VIEWS) — trống = Đang xử lý (hoặc Tất cả khi đang
+  // tìm / lọc trạng thái).
   view?: string;
+  // "1" = mở khối biểu đồ (mặc định gập để bảng lên đầu trang).
+  charts?: string;
+  // View riêng của người đang xem (bảng saved_views).
+  savedViews?: { id: string; name: string; query: string }[];
   branchId: string | null;
   canDelete: boolean;
   // Kỹ thuật/Sales không được xem số liệu tổng hợp — ẩn cả dãy thẻ thống kê
@@ -177,7 +202,11 @@ export async function OrdersListSection({
   const activeSearch = search?.trim() ?? "";
   const requestedPage = Math.max(1, Number(page) || 1);
   const unpaidOnly = paid === "unpaid";
-  const activeView = QUICK_VIEWS.some((v) => v.key === view) ? view! : null;
+  const explicitView =
+    view && (SYSTEM_VIEWS.some((v) => v.key === view) || LEGACY_VIEWS.includes(view)) ? view : null;
+  // Đang tìm hoặc lọc trạng thái mà không chọn view → tìm trong Tất cả.
+  const activeView = explicitView ?? (activeSearch || status || unpaidOnly ? "all" : "processing");
+  const showCharts = charts === "1";
   const overviewPeriod: OrdersOverviewPeriod =
     overview && isOverviewPeriod(overview) ? overview : "this_month";
   const overviewDateRange = computeDateRange(overviewPeriod, vnNow());
@@ -198,14 +227,11 @@ export async function OrdersListSection({
   // hoàn toàn với mọi bộ lọc của bảng (trạng thái/tìm kiếm/chưa thanh toán),
   // chỉ khác nhau ở khoảng ngày (kỳ tổng quan) — page_size=1 vì chỉ cần
   // .stats/.totalCount, không cần rows.
-  // Đếm sẵn cho 3 chip xem nhanh (theo kho đang xem, bỏ qua bộ lọc khác).
-  const quickCountsPromise = Promise.all(
-    QUICK_VIEWS.map((v) =>
-      supabase
-        .rpc("orders_page_list", { p_branch_id: branchId, p_page: 1, p_page_size: 1, p_view: v.key })
-        .then((r) => (r.data as OrdersPageListResult | null)?.totalCount ?? 0),
-    ),
-  );
+  // Số đơn từng view (1 lần quét) + số đơn web mới (hiện 1 lần ở tab).
+  const viewCountsPromise = Promise.all([
+    supabase.rpc("orders_view_counts" as never, { p_branch_id: branchId } as never),
+    (supabase as unknown as SupabaseClient).from("website_orders").select("id", { count: "exact", head: true }).eq("status", "new"),
+  ]);
   const [rpcRes, overviewRes, { data: branches }, invoicePendingRes] = await Promise.all([
     supabase.rpc("orders_page_list", {
       p_branch_id: branchId,
@@ -249,7 +275,32 @@ export async function OrdersListSection({
       : Promise.resolve({ count: null }),
   ]);
 
-  const quickCounts = await quickCountsPromise;
+  const [viewCountsRes, webNewRes] = await viewCountsPromise;
+  const viewCounts = (viewCountsRes.data ?? {}) as unknown as ViewCounts;
+  const webNew = webNewRes.count ?? 0;
+  // Tab view riêng đang sáng khi bộ lọc trên URL khớp đúng view đã lưu.
+  const currentQuery = (() => {
+    const p = new URLSearchParams();
+    const add = (k: string, v?: string) => v && p.set(k, v);
+    add("status", status);
+    add("range", range);
+    add("from", from);
+    add("to", to);
+    add("sort", sort);
+    add("dir", dir);
+    add("search", search);
+    add("paid", paid);
+    add("view", view);
+    add("branch", branchToggle?.selectedId ?? undefined);
+    return [...p.entries()].map(([k, v]) => `${k}=${v}`).sort().join("&");
+  })();
+  const normalize = (q: string) => [...new URLSearchParams(q).entries()].map(([k, v]) => `${k}=${v}`).sort().join("&");
+  const viewHref = (key: string) => {
+    const p = new URLSearchParams();
+    p.set("view", key);
+    if (branchToggle?.selectedId) p.set("branch", branchToggle.selectedId);
+    return `?${p.toString()}`;
+  };
   const branchList = branches ?? [];
   const branchNameById = new Map(branchList.map((b) => [b.id, b.name]));
 
@@ -312,26 +363,45 @@ export async function OrdersListSection({
   const clearUnpaidQuery = clearUnpaidParams.toString();
   const clearUnpaidHref = clearUnpaidQuery ? `?${clearUnpaidQuery}` : "?";
 
+  const chartsHref = (() => {
+    const p = new URLSearchParams(currentQuery);
+    if (showCharts) p.delete("charts");
+    else p.set("charts", "1");
+    const q = p.toString();
+    return q ? `?${q}` : "?";
+  })();
+  const vatTotal = (o: OrderRow) => Math.round(o.total_value * 1.08);
+  const attention = (o: OrderRow) => {
+    const out: { label: string; tone: string }[] = [];
+    if (o.cancelled_at) return out;
+    if (o.no_serial) out.push({ label: "Chưa gán serial", tone: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" });
+    if (o.no_driver) out.push({ label: "Chưa người giao", tone: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" });
+    if (o.delivered_at && o.remaining >= 1000)
+      out.push({ label: `Còn nợ ${currencyFormatter.format(Math.round(o.remaining))}đ`, tone: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200" });
+    if (o.invoice_pending) out.push({ label: "Chờ HĐ", tone: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200" });
+    return out;
+  };
+  const statusBadge = (order: OrderRow) =>
+    order.cancelled_at ? (
+      <Badge variant="destructive">Đã huỷ</Badge>
+    ) : order.completed_at ? (
+      <Badge>Hoàn tất</Badge>
+    ) : (
+      <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+    );
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-semibold">Đơn hàng</h2>
         <div className="flex items-center gap-2">
-          <Link
-            href="/orders/web"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium hover:bg-muted"
-          >
-            <Globe className="size-4" />
-            Đơn web
-          </Link>
+          {branchToggle && <OrdersBranchToggle branches={branchList} value={branchToggle.selectedId} />}
           <QuickOrderDialog branches={branchList} />
         </div>
       </div>
 
-      <WebOrdersAlert />
-
-      {/* Ô tìm đơn to, đặt ngay dưới tiêu đề (CEO 2026-10-03) — trước nằm
-          nhỏ dưới khối biểu đồ, phải cuộn mới thấy. */}
+      {/* Ô tìm đơn to ngay dưới tiêu đề (CEO 2026-10-03). Đang tìm thì tìm
+          trong Tất cả đơn, bỏ qua view. */}
       <SearchInput
         key={activeSearch}
         paramName="search"
@@ -342,129 +412,149 @@ export async function OrdersListSection({
         className="w-full max-w-2xl"
       />
 
-      {/* Xem nhanh: bấm chip → bảng chỉ còn đơn đó (bỏ các lọc khác trừ kho). */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Xem nhanh</span>
-        {QUICK_VIEWS.map((v, i) => {
-          const on = activeView === v.key;
-          const p = new URLSearchParams();
-          if (!on) p.set("view", v.key);
-          if (branchToggle?.selectedId) p.set("branch", branchToggle.selectedId);
-          const qs = p.toString();
+      {/* View lưu sẵn (Grok tách gọn CRM 10/10 giai đoạn 2) + view riêng của mình. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {SYSTEM_VIEWS.map((v) => {
+          const on = activeView === v.key && !activeSearch;
+          const count = viewCounts[v.key] ?? 0;
           return (
             <Link
               key={v.key}
-              href={qs ? `?${qs}` : "?"}
+              href={viewHref(v.key)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
-                on ? "border-primary bg-primary text-primary-foreground" : `hover:bg-muted ${quickCounts[i] && v.key === "overdue" ? "border-destructive/50 text-destructive" : ""}`
+                on
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : `hover:bg-muted ${"alert" in v && count ? "border-destructive/50 text-destructive" : ""}`
               }`}
             >
               {v.label}
-              <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/20" : "bg-muted"}`}>{quickCounts[i]}</span>
-              {on && <span aria-hidden>×</span>}
+              <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/20" : "bg-muted"}`}>
+                {currencyFormatter.format(count)}
+              </span>
             </Link>
           );
         })}
+        <Link
+          href="/orders/web"
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium hover:bg-muted ${
+            webNew ? "border-violet-400 text-violet-700 dark:text-violet-300" : ""
+          }`}
+        >
+          Đơn web mới
+          <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{webNew}</span>
+        </Link>
+        {savedViews.map((sv) => {
+          const on = normalize(sv.query) === currentQuery;
+          return (
+            <Link
+              key={sv.id}
+              href={sv.query ? `?${sv.query}` : "?"}
+              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium ${
+                on ? "border-sky-600 bg-sky-600 text-white" : "border-sky-300 text-sky-800 hover:bg-sky-50 dark:text-sky-200 dark:hover:bg-sky-950"
+              }`}
+            >
+              {sv.name}
+              <DeleteSavedViewButton id={sv.id} name={sv.name} />
+            </Link>
+          );
+        })}
+        <SaveViewButton />
       </div>
 
-      {/* Đang tìm đơn thì ẩn khối thống kê — kết quả hiện ngay dưới ô tìm. */}
+      {/* 1 dải số liệu gọn theo kỳ — biểu đồ gập sau "Mở biểu đồ". */}
       {showStats && !activeSearch && (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Tổng quan đơn hàng</h3>
-            <div className="flex flex-wrap items-center gap-2">
-              {branchToggle && (
-                <OrdersBranchToggle branches={branchList} value={branchToggle.selectedId} />
-              )}
-              <OrdersOverviewPeriodToggle value={overviewPeriod} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <StatCard label="Tổng đơn" value={overviewTotalCount} />
-            <StatCard label="Đang xử lý" value={overviewProcessingCount} />
-            <StatCard label="Hoàn tất" value={overviewStats.completedCount} />
-            <StatCard label="Đã huỷ" value={overviewStats.cancelledCount} />
-            <StatCard
-              label="Tổng doanh số"
-              value={`${currencyFormatter.format(Math.round(overviewStats.totalRevenue))}đ`}
-            />
-            <Link href={unpaidHref} className="block">
-              <StatCard
-                className="transition hover:border-destructive/50 hover:ring-1 hover:ring-destructive/30"
-                label="Chưa thanh toán hết"
-                value={overviewStats.unpaidCount}
-              >
-                <p className="text-xs text-muted-foreground">
-                  {currencyFormatter.format(Math.round(overviewStats.unpaidAmount))}đ còn thiếu
-                </p>
-              </StatCard>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border bg-card px-4 py-2.5 text-sm">
+            <span>
+              <span className="text-muted-foreground">Tổng đơn</span>{" "}
+              <b className="tabular-nums">{currencyFormatter.format(overviewTotalCount)}</b>
+            </span>
+            <span>
+              <span className="text-muted-foreground">Đang xử lý</span>{" "}
+              <b className="tabular-nums">{currencyFormatter.format(overviewProcessingCount)}</b>
+            </span>
+            <span>
+              <span className="text-muted-foreground">Hoàn tất</span>{" "}
+              <b className="tabular-nums">{currencyFormatter.format(overviewStats.completedCount)}</b>
+            </span>
+            <span>
+              <span className="text-muted-foreground">Huỷ</span>{" "}
+              <b className="tabular-nums">{currencyFormatter.format(overviewStats.cancelledCount)}</b>
+            </span>
+            <span>
+              <span className="text-muted-foreground">Doanh số</span>{" "}
+              <b className="tabular-nums">{currencyFormatter.format(Math.round(overviewStats.totalRevenue))}đ</b>
+            </span>
+            <Link href={unpaidHref} className="hover:underline">
+              <span className="text-muted-foreground">Chưa thu đủ</span>{" "}
+              <b className="tabular-nums text-destructive">
+                {currencyFormatter.format(overviewStats.unpaidCount)} · {currencyFormatter.format(Math.round(overviewStats.unpaidAmount))}đ
+              </b>
             </Link>
             {invoicePendingRes.count !== null && (
-              <Link href="/invoices" className="block">
-                <StatCard
-                  className="transition hover:border-primary/50 hover:ring-1 hover:ring-primary/30"
-                  label="Chờ xuất hoá đơn"
-                  value={invoicePendingRes.count ?? 0}
-                >
-                  <p className="text-xs text-muted-foreground">Mở sổ hoá đơn →</p>
-                </StatCard>
+              <Link href="/invoices" className="hover:underline">
+                <span className="text-muted-foreground">Chờ HĐ</span>{" "}
+                <b className="tabular-nums">{invoicePendingRes.count ?? 0}</b>
               </Link>
             )}
+            <span className="ml-auto flex items-center gap-2">
+              <OrdersOverviewPeriodToggle value={overviewPeriod} />
+              <Link
+                href={chartsHref}
+                className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                aria-expanded={showCharts}
+              >
+                <BarChart3 className="size-3.5" />
+                {showCharts ? "Gập biểu đồ" : "Mở biểu đồ"}
+                <ChevronDown className={`size-3.5 transition-transform ${showCharts ? "rotate-180" : ""}`} />
+              </Link>
+            </span>
           </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <OrdersStatusDonutChart
-              processingCount={overviewProcessingCount}
-              completedCount={overviewStats.completedCount}
-              cancelledCount={overviewStats.cancelledCount}
-            />
-            <OrdersCollectionProgress
-              vatRevenue={overviewStats.totalRevenue}
-              unpaidAmount={overviewStats.deliveredUnpaidAmount}
-            />
-          </div>
+          {showCharts && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <OrdersStatusDonutChart
+                processingCount={overviewProcessingCount}
+                completedCount={overviewStats.completedCount}
+                cancelledCount={overviewStats.cancelledCount}
+              />
+              <OrdersCollectionProgress vatRevenue={overviewStats.totalRevenue} unpaidAmount={overviewStats.deliveredUnpaidAmount} />
+            </div>
+          )}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OrderStatusFilter value={activeStatus} />
-        <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
-        {unpaidOnly && (
-          <Link
-            href={clearUnpaidHref}
-            className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
-          >
-            Chỉ hiện đơn chưa thanh toán hết ×
-          </Link>
-        )}
-        {branchScope && (
-          <OrderBranchScopeFilter value={branchScope.value} branchName={branchScope.branchName} />
-        )}
-      </div>
+      {/* Bộ lọc nâng cao: 12 trạng thái, khoảng ngày, chưa thu đủ, phạm vi kho. */}
+      <details className="group" open={!!(status || range || unpaidOnly)}>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <ChevronDown className="size-4 -rotate-90 transition-transform group-open:rotate-0" />
+          Bộ lọc nâng cao
+          {(status || range || unpaidOnly) && <span className="text-xs text-primary">· đang lọc</span>}
+        </summary>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <OrderStatusFilter value={activeStatus} />
+          <OrderDateRangeFilter preset={activeRange} from={from ?? ""} to={to ?? ""} />
+          {unpaidOnly && (
+            <Link
+              href={clearUnpaidHref}
+              className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
+            >
+              Chỉ hiện đơn chưa thu đủ ×
+            </Link>
+          )}
+          {branchScope && <OrderBranchScopeFilter value={branchScope.value} branchName={branchScope.branchName} />}
+        </div>
+      </details>
 
-      {/* Điện thoại (< md): mỗi đơn 1 thẻ thay bảng 1.174px phải vuốt ngang
-          (đề xuất CRM v2 §4.6). Máy tính vẫn là bảng như cũ. */}
+      {/* Điện thoại (< md): mỗi đơn 1 thẻ (đề xuất CRM v2 §4.6). */}
       <div className="space-y-2 md:hidden">
         {orders.map((order) => {
           const name = customerNameById.get(order.customer_id) ?? "—";
           return (
-            <Link
-              key={order.id}
-              href={`/orders/${order.id}`}
-              className="block rounded-lg border bg-card p-3 text-sm active:bg-muted"
-            >
+            <Link key={order.id} href={`/orders/${order.id}`} className="block rounded-lg border bg-card p-3 text-sm active:bg-muted">
               <div className="flex items-center gap-2">
                 <span className="font-semibold">{order.order_code}</span>
                 <BranchBadge name={branchNameById.get(order.pickup_branch_id) ?? "—"} />
-                <span className="ml-auto">
-                  {order.cancelled_at ? (
-                    <Badge variant="destructive">Đã huỷ</Badge>
-                  ) : order.completed_at ? (
-                    <Badge>Hoàn tất</Badge>
-                  ) : (
-                    <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
-                  )}
-                </span>
+                <span className="ml-auto">{statusBadge(order)}</span>
               </div>
               <p className="mt-1 truncate">{name}</p>
               <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -472,8 +562,17 @@ export async function OrdersListSection({
                   {order.rental_start_at ? dateTimeFormatter.format(new Date(order.rental_start_at)) : "—"} →{" "}
                   {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
                 </span>
-                <span className="font-semibold text-foreground tabular-nums">{currencyFormatter.format(order.total_value)}đ</span>
+                <span className="font-semibold text-foreground tabular-nums">{currencyFormatter.format(vatTotal(order))}đ</span>
               </div>
+              {attention(order).length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {attention(order).map((a) => (
+                    <span key={a.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.tone}`}>
+                      {a.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </Link>
           );
         })}
@@ -483,25 +582,33 @@ export async function OrdersListSection({
       <Table className="hidden md:table">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-28">Mã đơn</TableHead>
-            <TableHead className="w-28">Kho</TableHead>
+            <TableHead className="w-24">Mã đơn</TableHead>
             <SortableTableHead sortKey="customer" label="Khách hàng" />
-            <SortableTableHead sortKey="rental_start_at" label="Nhận" />
-            <SortableTableHead sortKey="rental_end_at" label="Trả" />
-            <SortableTableHead sortKey="total_value" label="Doanh số" />
-            <SortableTableHead sortKey="status" label="Trạng thái" />
-            {canDelete && <TableHead className="w-16"></TableHead>}
+            <TableHead className="w-24">Kho</TableHead>
+            <SortableTableHead sortKey="rental_start_at" label="Nhận → Trả" />
+            <SortableTableHead sortKey="status" label="Khâu hiện tại" />
+            <TableHead>Phụ trách</TableHead>
+            <SortableTableHead sortKey="total_value" label="Tổng (VAT)" />
+            <TableHead className="text-right">Đã thu</TableHead>
+            <TableHead>Cần chú ý</TableHead>
+            {canDelete && <TableHead className="w-10"></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
             <ClickableTableRow key={order.id} href={`/orders/${order.id}`}>
-              <TableCell className="max-w-28 truncate font-medium">
+              <TableCell className="font-medium whitespace-nowrap">
                 <Link href={`/orders/${order.id}`} className="hover:underline">
                   {order.order_code}
                 </Link>
               </TableCell>
-              <TableCell className="max-w-28 truncate">
+              <TableCell className="max-w-64">
+                <div className="flex items-center gap-2">
+                  <CustomerAvatar id={order.customer_id} name={customerNameById.get(order.customer_id) ?? "—"} />
+                  <span className="truncate">{customerNameById.get(order.customer_id) ?? "—"}</span>
+                </div>
+              </TableCell>
+              <TableCell>
                 <div className="flex items-center gap-1">
                   <BranchBadge name={branchNameById.get(order.pickup_branch_id) ?? "—"} />
                   {order.return_branch_id !== order.pickup_branch_id && (
@@ -512,32 +619,33 @@ export async function OrdersListSection({
                   )}
                 </div>
               </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <CustomerAvatar id={order.customer_id} name={customerNameById.get(order.customer_id) ?? "—"} />
-                  {customerNameById.get(order.customer_id) ?? "—"}
-                </div>
-              </TableCell>
-              <TableCell>
+              <TableCell className="text-xs whitespace-nowrap tabular-nums">
                 {order.rental_start_at ? dateTimeFormatter.format(new Date(order.rental_start_at)) : "—"}
+                <span className="block text-muted-foreground">
+                  → {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
+                </span>
+              </TableCell>
+              <TableCell>{statusBadge(order)}</TableCell>
+              <TableCell className="max-w-32 truncate text-sm text-muted-foreground">{order.owner_name ?? "—"}</TableCell>
+              <TableCell className="whitespace-nowrap tabular-nums">{currencyFormatter.format(vatTotal(order))}đ</TableCell>
+              <TableCell className="text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                {order.paid_amount ? `${currencyFormatter.format(Math.round(order.paid_amount))}đ` : "—"}
               </TableCell>
               <TableCell>
-                {order.rental_end_at ? dateTimeFormatter.format(new Date(order.rental_end_at)) : "—"}
-              </TableCell>
-              <TableCell>{currencyFormatter.format(order.total_value)}đ</TableCell>
-              <TableCell>
-                {order.cancelled_at ? (
-                  <Badge variant="destructive">Đã huỷ</Badge>
-                ) : order.completed_at ? (
-                  <Badge>Hoàn tất</Badge>
-                ) : (
-                  <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
-                )}
+                <div className="flex max-w-56 flex-wrap gap-1">
+                  {attention(order).map((a) => (
+                    <span key={a.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${a.tone}`}>
+                      {a.label}
+                    </span>
+                  ))}
+                </div>
               </TableCell>
               {canDelete && (
                 <TableCell>
+                  {/* Xoá chỉ trong menu ⋯, phải gõ đúng mã đơn (giai đoạn 2). */}
                   <ConfirmDeleteButton
                     inMenu
+                    requireText={order.order_code}
                     confirmMessage={`Xoá đơn hàng "${order.order_code}"? Toàn bộ dữ liệu của đơn sẽ bị xoá, không thể hoàn tác.`}
                     successMessage="Đã xoá đơn hàng."
                     action={deleteOrder}
@@ -549,7 +657,7 @@ export async function OrdersListSection({
           ))}
           {!orders.length && (
             <TableRow>
-              <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-muted-foreground">
+              <TableCell colSpan={canDelete ? 10 : 9} className="text-center text-muted-foreground">
                 Không có đơn hàng nào khớp bộ lọc.
               </TableCell>
             </TableRow>
@@ -557,12 +665,7 @@ export async function OrdersListSection({
         </TableBody>
       </Table>
 
-      <PaginationControls
-        page={currentPage}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        itemLabel="đơn hàng"
-      />
+      <PaginationControls page={currentPage} totalPages={totalPages} totalCount={totalCount} itemLabel="đơn hàng" />
     </div>
   );
 }

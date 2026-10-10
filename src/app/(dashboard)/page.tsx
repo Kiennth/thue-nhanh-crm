@@ -245,7 +245,7 @@ async function TodayBoard({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <Kpi
-          href="/orders?view=deliver_today"
+          href="/orders?view=deliver_soon"
           label="Giao hôm nay / mai"
           value={`${c.deliverToday} / ${c.deliverTomorrow}`}
           sub={c.deliverNoDriver ? `${c.deliverNoDriver} chưa có người giao` : "Đã có người giao"}
@@ -253,7 +253,7 @@ async function TodayBoard({
           tone={c.deliverNoDriver ? "amber" : "calm"}
         />
         <Kpi
-          href="/orders?view=return_today"
+          href="/orders?view=return_soon"
           label="Thu hồi hôm nay / mai"
           value={`${c.returnToday} / ${c.returnTomorrow}`}
           sub={c.returnNoCollector ? `${c.returnNoCollector} chưa phân công` : "Đã phân công"}
@@ -304,7 +304,7 @@ async function TodayBoard({
       <div className="grid gap-4 lg:grid-cols-2">
         <ListCard
           title="Giao hàng · hôm nay & mai"
-          href="/orders?view=deliver_today"
+          href="/orders?view=deliver_soon"
           total={c.deliverToday + c.deliverTomorrow}
           empty="Không có đơn giao hôm nay và ngày mai."
           rows={b.deliveries}
@@ -331,7 +331,7 @@ async function TodayBoard({
         />
         <ListCard
           title="Thu hồi · hôm nay & mai"
-          href="/orders?view=return_today"
+          href="/orders?view=return_soon"
           total={c.returnToday + c.returnTomorrow}
           empty="Không có đơn trả hôm nay và ngày mai."
           rows={b.returns}
