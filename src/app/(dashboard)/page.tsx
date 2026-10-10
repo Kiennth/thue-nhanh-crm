@@ -5,9 +5,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { MANAGE_ROLES } from "@/lib/employee-performance-charts";
-import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { loadShortages } from "@/lib/shortage";
 import { formatVND } from "@/lib/money";
+import { vnNow } from "@/lib/vn-time";
+import { getOrdersToHandle } from "@/lib/orders-to-handle";
+import { computeDateRange, DATE_RANGE_PRESET_OPTIONS, type DateRangePreset } from "@/lib/date-range-presets";
+import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
+import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
+import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
 import { cn } from "@/lib/utils";
 import type { TaskType } from "@/types/database";
 
@@ -59,13 +64,6 @@ const BRANCH_TONE: Record<string, string> = {
   HCM: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
   ĐN: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
 };
-const timeFmt = new Intl.DateTimeFormat("vi-VN", {
-  timeZone: "Asia/Ho_Chi_Minh",
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 const weekdayFmt = new Intl.DateTimeFormat("vi-VN", {
   timeZone: "Asia/Ho_Chi_Minh",
   weekday: "long",
@@ -76,9 +74,22 @@ const weekdayFmt = new Intl.DateTimeFormat("vi-VN", {
 export default async function TodayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ branch?: string; mine?: string }>;
+  searchParams: Promise<{
+    branch?: string;
+    mine?: string;
+    upcomingRange?: string;
+    returningRange?: string;
+    upcomingLate?: string;
+    returningLate?: string;
+  }>;
 }) {
   const params = await searchParams;
+  const upcomingRange: DateRangePreset =
+    params.upcomingRange && isDateRangePreset(params.upcomingRange) ? params.upcomingRange : "all";
+  const returningRange: DateRangePreset =
+    params.returningRange && isDateRangePreset(params.returningRange) ? params.returningRange : "all";
+  const upcomingLate = params.upcomingLate === "1";
+  const returningLate = params.returningLate === "1";
   const employee = await getCurrentEmployee();
   if (!employee) return null;
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
@@ -94,7 +105,15 @@ export default async function TodayPage({
 
   const qs = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams();
-    const merged = { branch: branchId, mine: mine ? "1" : null, ...patch };
+    const merged = {
+      branch: branchId,
+      mine: mine ? "1" : null,
+      upcomingRange: upcomingRange === "all" ? null : upcomingRange,
+      returningRange: returningRange === "all" ? null : returningRange,
+      upcomingLate: upcomingLate ? "1" : null,
+      returningLate: returningLate ? "1" : null,
+      ...patch,
+    };
     for (const [k, v] of Object.entries(merged)) if (v) next.set(k, v);
     const s = next.toString();
     return s ? `/?${s}` : "/";
@@ -142,6 +161,17 @@ export default async function TodayPage({
           canSeeMoney={canSeeMoney}
           canSeeInvoices={canManage}
           shortOf={Object.fromEntries(shortOf)}
+          handleSlot={
+            <Suspense fallback={<div className="grid gap-4 lg:grid-cols-2"><div className="h-80 animate-pulse rounded-xl border bg-muted/40" /><div className="h-80 animate-pulse rounded-xl border bg-muted/40" /></div>}>
+              <OrdersToHandleBlock
+                branchId={branchId}
+                upcomingRange={upcomingRange}
+                returningRange={returningRange}
+                upcomingLate={upcomingLate}
+                returningLate={returningLate}
+              />
+            </Suspense>
+          }
         />
       </Suspense>
 
@@ -208,7 +238,9 @@ async function TodayBoard({
   canSeeMoney,
   canSeeInvoices,
   shortOf,
+  handleSlot,
 }: {
+  handleSlot: React.ReactNode;
   branchId: string | null;
   employeeId: string | null;
   canSeeMoney: boolean;
@@ -291,55 +323,11 @@ async function TodayBoard({
         </Suspense>
       </div>
 
+      {/* "Đơn hàng sắp tới" / "sắp về" kiểu cũ (CEO 10/10: danh sách giao /
+          thu hồi "hôm nay & mai" không hợp lý → trả về như cũ). */}
+      {handleSlot}
+
       <div className="grid gap-4 lg:grid-cols-2">
-        <ListCard
-          title="Giao hàng · hôm nay & mai"
-          href="/orders?view=deliver_soon"
-          total={c.deliverToday + c.deliverTomorrow}
-          empty="Không có đơn giao hôm nay và ngày mai."
-          rows={b.deliveries}
-          render={(r) => (
-            <>
-              <Cell className="w-28 whitespace-nowrap tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
-              <OrderCell r={r} />
-              <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
-              <Cell className="w-44 text-right">
-                {r.done ? (
-                  <Chip tone="emerald">Đã giao</Chip>
-                ) : r.no_serial ? (
-                  <Chip tone="amber">Chưa gán serial</Chip>
-                ) : r.no_driver ? (
-                  <Chip tone="amber">Chưa người giao</Chip>
-                ) : r.self_pickup ? (
-                  <Chip tone="calm">Khách tự lấy</Chip>
-                ) : (
-                  <Chip tone="calm">{r.status ? TASK_TYPE_LABELS[r.status] : "—"}</Chip>
-                )}
-              </Cell>
-            </>
-          )}
-        />
-        <ListCard
-          title="Thu hồi · hôm nay & mai"
-          href="/orders?view=return_soon"
-          total={c.returnToday + c.returnTomorrow}
-          empty="Không có đơn trả hôm nay và ngày mai."
-          rows={b.returns}
-          render={(r) => (
-            <>
-              <Cell className="w-28 whitespace-nowrap tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
-              <OrderCell r={r} />
-              <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
-              <Cell className="w-44 text-right">
-                {r.no_collector ? (
-                  <Chip tone="amber">Chưa phân công</Chip>
-                ) : (
-                  <Chip tone="calm">{r.status ? TASK_TYPE_LABELS[r.status] : "—"}</Chip>
-                )}
-              </Cell>
-            </>
-          )}
-        />
         <ListCard
           title="Quá hạn trả"
           href="/orders?view=overdue"
@@ -476,3 +464,54 @@ function ListCard({
   );
 }
 
+
+function isDateRangePreset(value: string): value is DateRangePreset {
+  return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
+}
+
+// "Đơn hàng sắp tới" (giao) / "Đơn hàng sắp về" (thu hồi) — khối của Trang chủ
+// cũ, khôi phục 10/10 theo CEO: lọc khoảng ngày (Tất cả / Hôm nay / Ngày mai /
+// 7 ngày tới / Tuần sau / Tháng sau) + nút đơn trễ, đếm ngược, không cắt số
+// dòng (khối tự cuộn). Lọc theo chip kho đang chọn (Tất cả = toàn hệ thống).
+async function OrdersToHandleBlock({
+  branchId,
+  upcomingRange,
+  returningRange,
+  upcomingLate,
+  returningLate,
+}: {
+  branchId: string | null;
+  upcomingRange: DateRangePreset;
+  returningRange: DateRangePreset;
+  upcomingLate: boolean;
+  returningLate: boolean;
+}) {
+  const now = vnNow();
+  const data = await getOrdersToHandle(branchId, undefined, {
+    delivery: computeDateRange(upcomingRange, now),
+    collection: computeDateRange(returningRange, now),
+    lateOnly: { delivery: upcomingLate, collection: returningLate },
+  });
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <UpcomingDeliveriesCard
+        orders={data.upcomingDeliveries}
+        now={now}
+        hideViewAllLink
+        rangeFilter={!upcomingLate && <OrdersToHandleRangeFilter paramName="upcomingRange" value={upcomingRange} />}
+        lateToggle={
+          <OrdersToHandleLateToggle paramName="upcomingLate" count={data.lateDeliveriesCount} active={upcomingLate} />
+        }
+      />
+      <PendingCollectionsCard
+        orders={data.pendingCollections}
+        now={now}
+        hideViewAllLink
+        rangeFilter={!returningLate && <OrdersToHandleRangeFilter paramName="returningRange" value={returningRange} />}
+        lateToggle={
+          <OrdersToHandleLateToggle paramName="returningLate" count={data.lateCollectionsCount} active={returningLate} />
+        }
+      />
+    </div>
+  );
+}
