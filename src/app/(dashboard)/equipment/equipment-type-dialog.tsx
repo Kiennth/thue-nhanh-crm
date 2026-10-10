@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,10 +98,7 @@ export function EquipmentTypeDialog({
   // Base UI merge props vào. Dựng nội bộ như ConfirmDeleteButton (không bao
   // giờ lỗi này) thì tránh được.
   const trigger = !isEdit ? (
-    <Button>
-      <Plus className="size-4" />
-      Thêm hàng hoá
-    </Button>
+    <CreateButton label="Thêm hàng hoá" />
   ) : editTriggerVariant === "outline" ? (
     <Button variant="outline" size="sm">
       <Pencil className="size-4" />

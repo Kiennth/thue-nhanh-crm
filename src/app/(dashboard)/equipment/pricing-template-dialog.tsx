@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createPricingTemplate } from "@/lib/actions/equipment";
@@ -19,10 +20,7 @@ export function PricingTemplateDialog() {
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
   // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
   const trigger = (
-    <Button>
-      <Plus className="size-4" />
-      Thêm bảng giá
-    </Button>
+    <CreateButton label="Thêm bảng giá" />
   );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarClock, Check, ChevronRight, FileText, Loader2, Minus, Package, Plus, Search, Truck, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -658,12 +659,7 @@ export function QuickOrderDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          trigger ?? (
-            <Button>
-              <Plus className="size-4" />
-              Tạo đơn
-            </Button>
-          )
+          trigger ?? <CreateButton label="Tạo đơn" />
         }
       />
       <DialogContent

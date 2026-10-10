@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { createExpense, updateExpense, type ActionState } from "@/lib/actions/expenses";
 import { DateInput } from "@/components/date-input";
 
@@ -86,9 +87,7 @@ export function ExpenseDialog({
               <Pencil className="size-4" />
             </Button>
           ) : (
-            <Button>
-              <Plus className="size-4" /> Thêm khoản chi
-            </Button>
+            <CreateButton label="Thêm khoản chi" />
           )
         }
       />

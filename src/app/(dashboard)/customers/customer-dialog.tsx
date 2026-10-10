@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { CustomerForm, type CustomerFormValues } from "./customer-form";
 
 // Thêm / sửa khách (B6 — form Công ty / Cá nhân ở customer-form.tsx).
@@ -22,10 +23,7 @@ export function CustomerDialog({
   // Trigger dựng ngay trong component này (không nhận qua prop từ Server
   // Component) — xem ghi chú tương tự ở equipment-type-dialog.tsx.
   const trigger = !isEdit ? (
-    <Button>
-      <Plus className="size-4" />
-      Thêm khách
-    </Button>
+    <CreateButton label="Thêm khách" />
   ) : editTriggerVariant === "outline" ? (
     <Button variant="outline">
       <Pencil className="size-4" />

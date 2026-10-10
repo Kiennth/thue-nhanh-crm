@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,10 +59,7 @@ export function TrainingCourseDialog({ course }: { course?: CourseRow }) {
               Cài đặt khoá
             </Button>
           ) : (
-            <Button size="sm">
-              <Plus className="size-4" />
-              Thêm khoá học
-            </Button>
+            <CreateButton label="Thêm khoá học" />
           )
         }
       />

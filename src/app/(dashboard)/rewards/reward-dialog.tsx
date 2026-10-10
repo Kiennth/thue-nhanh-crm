@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Gift } from "lucide-react";
+
 import { toast } from "sonner";
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,12 +41,7 @@ function todayStr() {
 // Lý do BẮT BUỘC — đây là sổ ghi chép thu nhập đột biến. Thưởng theo khoán
 // KHÔNG trao ở đây (tự động theo Bậc thưởng trong Chính sách khoán).
 export function RewardDialog({ employees }: { employees: EmployeeOption[] }) {
-  const trigger = (
-    <Button size="sm">
-      <Gift className="size-4" />
-      Trao thưởng
-    </Button>
-  );
+  const trigger = <CreateButton label="Trao thưởng" />;
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

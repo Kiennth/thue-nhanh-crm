@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createEquipmentCategory, updateEquipmentCategory } from "@/lib/actions/equipment";
@@ -33,10 +34,7 @@ export function EquipmentCategoryDialog({ category }: EquipmentCategoryDialogPro
       <span className="sr-only">Sửa</span>
     </Button>
   ) : (
-    <Button>
-      <Plus className="size-4" />
-      Thêm danh mục
-    </Button>
+    <CreateButton label="Thêm danh mục" />
   );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

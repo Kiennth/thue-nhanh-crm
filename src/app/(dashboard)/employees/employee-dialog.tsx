@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -54,10 +55,7 @@ export function EmployeeDialog({ branches, employee }: EmployeeDialogProps) {
       <span className="sr-only">Sửa</span>
     </Button>
   ) : (
-    <Button>
-      <Plus className="size-4" />
-      Thêm nhân viên
-    </Button>
+    <CreateButton label="Thêm nhân viên" />
   );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

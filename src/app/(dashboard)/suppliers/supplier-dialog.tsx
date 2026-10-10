@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CreateButton } from "@/components/create-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,10 +91,7 @@ export function SupplierDialog({ supplier }: { supplier?: Supplier }) {
       <span className="sr-only">Sửa</span>
     </Button>
   ) : (
-    <Button>
-      <Plus className="size-4" />
-      Thêm nhà cung cấp
-    </Button>
+    <CreateButton label="Thêm nhà cung cấp" />
   );
 
   return (
