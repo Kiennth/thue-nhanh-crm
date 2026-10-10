@@ -9,7 +9,7 @@ import { VN_TIME_ZONE } from "@/lib/date-format";
 import { parseTransferContent } from "@/lib/vietqr";
 import { BankRowActions } from "./row-actions";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const timeFmt = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
   month: "2-digit",

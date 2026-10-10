@@ -8,7 +8,7 @@ import { ORDERER_VIEW_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { vnTodayString } from "@/lib/vn-time";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 // Quá số ngày này không đặt đơn mới → nhắc chăm sóc lại.
 const STALE_DAYS = 60;
 const PAGE_SIZE = 50;

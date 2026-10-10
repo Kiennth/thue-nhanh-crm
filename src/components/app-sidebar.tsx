@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -33,6 +33,10 @@ import {
   type LucideIcon,
   Newspaper,
   ChevronDown,
+  BarChart3,
+  Package,
+  Wallet,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -40,14 +44,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { NAV_ITEMS, NAV_SECTIONS, ROLE_LABELS, SETTINGS_ITEMS } from "@/lib/roles";
+import { NAV_ITEMS, NAV_SECTIONS, REPORT_ROLES, ROLE_LABELS, SETTINGS_ITEMS, type NavSectionKey } from "@/lib/roles";
 import { logout } from "@/lib/actions/auth";
 import type { CurrentEmployee } from "@/lib/dal";
 
@@ -59,6 +62,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: House,
     tile: "bg-slate-500/12 text-slate-600 dark:text-slate-300",
     active: "data-active:bg-slate-500/12 data-active:text-slate-800 dark:data-active:text-slate-100",
+  },
+  "/reports": {
+    icon: BarChart3,
+    tile: "bg-indigo-500/12 text-indigo-600 dark:text-indigo-400",
+    active: "data-active:bg-indigo-500/12 data-active:text-indigo-700 dark:data-active:text-indigo-300",
   },
   "/orders": {
     icon: ClipboardList,
@@ -202,46 +210,22 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   );
 }
 
-// Nhóm menu thu gọn được (đề xuất CRM v2 §4.1): bấm tên nhóm để gập/mở, máy
-// nhớ lựa chọn (localStorage). Mặc định MỞ HẾT như cũ (CEO 2026-10-05).
-const COLLAPSED_KEY = "sidebar-collapsed-sections";
-const collapsedEvent = "sidebar-collapsed-change";
-function readCollapsed(): string {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-function useCollapsedSections() {
-  const raw = useSyncExternalStore(
-    (cb) => {
-      window.addEventListener(collapsedEvent, cb);
-      window.addEventListener("storage", cb);
-      return () => {
-        window.removeEventListener(collapsedEvent, cb);
-        window.removeEventListener("storage", cb);
-      };
-    },
-    readCollapsed,
-    () => "",
-  );
-  const collapsed = new Set(raw.split(",").filter(Boolean));
-  const toggle = (key: string) => {
-    const next = new Set(collapsed);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    try {
-      localStorage.setItem(COLLAPSED_KEY, [...next].join(","));
-    } catch {}
-    window.dispatchEvent(new Event(collapsedEvent));
-  };
-  return { collapsed, toggle };
-}
+// Biểu tượng nhóm (menu gọn Grok 10/10).
+const SECTION_ICON: Record<NavSectionKey, { icon: LucideIcon; tile: string }> = {
+  hang_hoa: { icon: Package, tile: "bg-blue-500/12 text-blue-600 dark:text-blue-400" },
+  khach_hang: { icon: Users, tile: "bg-violet-500/12 text-violet-600 dark:text-violet-400" },
+  tai_chinh: { icon: Wallet, tile: "bg-rose-500/12 text-rose-600 dark:text-rose-400" },
+  noi_dung_web: { icon: Globe, tile: "bg-sky-500/12 text-sky-600 dark:text-sky-400" },
+  nhan_su: { icon: UsersRound, tile: "bg-teal-500/12 text-teal-600 dark:text-teal-400" },
+  cai_dat: { icon: Settings, tile: "bg-stone-500/12 text-stone-600 dark:text-stone-300" },
+  khac: { icon: BadgeDollarSign, tile: "bg-gray-500/12 text-gray-600 dark:text-gray-300" },
+};
 
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
-  const { collapsed, toggle } = useCollapsedSections();
+  // Accordion (Grok tách gọn CRM 10/10): chỉ mở 1 nhóm; mặc định mở nhóm của
+  // trang đang xem, đổi trang thì tự mở theo. Bấm nhóm khác để mở/gập.
+  const [manual, setManual] = useState<{ key: string | null; forPath: string } | null>(null);
   // Mục quản trị (Chi nhánh, Nhân viên, Chính sách khoán…) lên nav chính luôn
   // (CEO 2026-10-05); menu Cài đặt ở footer vẫn giữ làm lối tắt.
   const items = [...NAV_ITEMS, ...SETTINGS_ITEMS].filter((item) => item.roles.includes(employee.role));
@@ -256,6 +240,12 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
       ...(section.key === "khac" ? items.filter((i) => !placed.has(i.href)) : []),
     ],
   })).filter((section) => section.items.length > 0);
+  // Khớp tiền tố DÀI nhất: ở /website/blog chỉ sáng "Blog", không sáng "Website".
+  const isActive = (href: string) =>
+    pathname.startsWith(href) &&
+    !items.some((o) => o.href.length > href.length && o.href.startsWith(href) && pathname.startsWith(o.href));
+  const activeKey = sections.find((sec) => sec.items.some((i) => isActive(i.href)))?.key ?? null;
+  const openKey = manual && manual.forPath === pathname ? manual.key : activeKey;
 
   return (
     <Sidebar>
@@ -277,51 +267,51 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
         <SidebarGroup className="pb-1">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              <NavLink href="/" label="Trang chủ" active={pathname === "/"} />
+              <NavLink href="/" label="Hôm nay" active={pathname === "/"} />
+              {REPORT_ROLES.includes(employee.role) && (
+                <NavLink href="/reports" label="Báo cáo" active={pathname.startsWith("/reports")} />
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {sections.map((section) => (
-          <SidebarGroup key={section.key} className="py-1">
-            <SidebarGroupLabel
-              render={
-                <button
-                  type="button"
-                  onClick={() => toggle(section.key)}
-                  aria-expanded={!collapsed.has(section.key)}
-                />
-              }
-              className="h-7 w-full cursor-pointer justify-between text-[12px] font-bold tracking-[0.1em] text-sidebar-foreground/60 uppercase hover:text-sidebar-foreground"
-            >
-              {section.label}
-              <ChevronDown
-                className={`size-3.5 transition-transform ${collapsed.has(section.key) ? "-rotate-90" : ""}`}
-                aria-hidden
-              />
-            </SidebarGroupLabel>
-            {/* Nhóm đang gập vẫn hiện mục của trang đang mở để biết mình ở đâu. */}
-            <SidebarGroupContent>
+        {sections.map((section) => {
+          const sectionIcon = SECTION_ICON[section.key];
+          const SectionIcon = sectionIcon.icon;
+          const isOpen = openKey === section.key;
+          return (
+            <SidebarGroup key={section.key} className="py-0.5">
               <SidebarMenu className="gap-1">
-                {section.items
-                  .filter((item) => !collapsed.has(section.key) || pathname.startsWith(item.href))
-                  .map((item) => (
-                  <NavLink
-                    key={item.href}
-                    href={item.href}
-                    label={item.label}
-                    // Khớp tiền tố DÀI nhất: ở /website/blog chỉ sáng "Blog", không sáng "Website".
-                    active={
-                      pathname.startsWith(item.href) &&
-                      !items.some(
-                        (o) => o.href.length > item.href.length && o.href.startsWith(item.href) && pathname.startsWith(o.href),
-                      )
-                    }
-                  />
-                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setManual({ key: isOpen ? null : section.key, forPath: pathname })}
+                    aria-expanded={isOpen}
+                    className="h-11 gap-3 px-2 text-[16px] font-semibold text-sidebar-foreground/90"
+                  >
+                    <span
+                      className={`flex size-8 shrink-0 items-center justify-center rounded-md [&_svg]:size-5! ${sectionIcon.tile}`}
+                    >
+                      <SectionIcon strokeWidth={2.25} />
+                    </span>
+                    <span className="flex-1">{section.label}</span>
+                    <ChevronDown
+                      className={`size-4 text-sidebar-foreground/50 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                      aria-hidden
+                    />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+              {isOpen && (
+                <SidebarGroupContent className="pl-4">
+                  <SidebarMenu className="gap-0.5 border-l border-sidebar-border pl-2">
+                    {section.items.map((item) => (
+                      <NavLink key={item.href} href={item.href} label={item.label} active={isActive(item.href)} />
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              )}
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
       <SidebarFooter className="gap-2 px-4 py-3">
         {/* Bấm tên mở "Hồ sơ của tôi" (CEO 2026-10-05). */}

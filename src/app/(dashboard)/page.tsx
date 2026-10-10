@@ -1,187 +1,153 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { vnDayKey, vnDayStartIso } from "@/lib/vn-day";
-import { BranchComparisonSection, previousMonthOf } from "@/components/branch-comparison";
-import { isProfitPeriod, type ProfitPeriod } from "@/lib/profit-period";
-import { ROLE_LABELS, TECH_SALES_ROLES } from "@/lib/roles";
+import { AlertTriangle, CircleDollarSign, Clock, FileWarning, Globe, PackageCheck, Truck } from "lucide-react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { todayParts } from "@/lib/dashboard-reports";
-import { vnNow } from "@/lib/vn-time";
-import { computeOrdersOverview } from "@/lib/orders-overview";
-import { PeriodStatCards } from "./orders/period-stat-cards";
-import { OrdersTrendChart } from "./orders/orders-trend-chart";
+import { MANAGE_ROLES, computeMyMonthlyTrend } from "@/lib/employee-performance-charts";
 import { computeMyPerformance } from "@/lib/my-performance";
-import { getOrdersToHandle } from "@/lib/orders-to-handle";
-import {
-  computeDateRange,
-  DATE_RANGE_PRESET_OPTIONS,
-  type DateRangePreset,
-} from "@/lib/date-range-presets";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { expandRecurring } from "@/lib/recurring-expenses";
-import {
-  computeEmployeeMonthlyPerformance,
-  computeMyMonthlyTrend,
-  MANAGE_ROLES,
-} from "@/lib/employee-performance-charts";
+import { TECH_SALES_ROLES } from "@/lib/roles";
+import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { loadShortages } from "@/lib/shortage";
+import { formatVND } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import type { TaskType } from "@/types/database";
 import { MyPerformanceCard } from "./my-performance-card";
 import { MyPerformanceTrendCard } from "./my-performance-trend-card";
-import { UpcomingDeliveriesCard, PendingCollectionsCard } from "./orders-to-handle-card";
-import { OrdersToHandleRangeFilter } from "./orders-to-handle-range-filter";
-import { OrdersToHandleLateToggle } from "./orders-to-handle-late-toggle";
-import { HomeKpiCards } from "./home-kpi-cards";
 
-// Trang chủ hiện tối đa 10 đơn mỗi khối "Đơn hàng sắp tới"/"Đơn hàng sắp về"
-// (CEO chốt 2026-08-02, áp dụng cho mọi phân quyền).
-// Không cắt 10 đơn nữa (CEO 2026-10-06: "nhiều đơn quá") — khối tự cuộn
-// trong chiều cao cố định (orders-to-handle-card.tsx), hiện đủ mọi đơn.
-const HANDLE_LIMIT = undefined;
+// Trang "Hôm nay" (Grok tách gọn CRM 10/10, giai đoạn 1) thay Trang chủ cũ:
+// hàng đợi việc cần làm — số đếm + 4 danh sách, mỗi danh sách tối đa 5 dòng,
+// CHỈ hôm nay + ngày mai, 1 lần gọi DB (today_board). Biểu đồ so sánh kho +
+// Lợi nhuận gộp sang trang Báo cáo; "Thu nhập của bạn" giữ dưới cùng (CEO
+// 08/08, chốt lại 10/10) và tải sau cùng.
 
-function isDateRangePreset(value: string): value is DateRangePreset {
-  return (DATE_RANGE_PRESET_OPTIONS.map((o) => o.value) as string[]).includes(value);
-}
+type Row = {
+  id: string;
+  order_code: string;
+  customer_name: string | null;
+  branch_id: string | null;
+  at: string;
+  status?: TaskType;
+  done?: boolean;
+  no_driver?: boolean;
+  self_pickup?: boolean;
+  no_serial?: boolean;
+  no_collector?: boolean;
+  remaining?: number;
+};
+type Board = {
+  today: string;
+  counts: {
+    deliverToday: number;
+    deliverTomorrow: number;
+    deliverNoDriver: number;
+    returnToday: number;
+    returnTomorrow: number;
+    returnNoCollector: number;
+    overdue: number;
+    owingCount: number;
+    owingAmount: number;
+    invoiceLate: number;
+  };
+  deliveries: Row[];
+  returns: Row[];
+  overdue: Row[];
+  owing: Row[];
+};
 
-export default async function DashboardHomePage({
+const SHORT_BRANCH: Record<string, string> = { "Hà Nội": "HN", "TP HCM": "HCM", "Đà Nẵng": "ĐN" };
+const BRANCH_TONE: Record<string, string> = {
+  HN: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
+  HCM: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
+  ĐN: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
+};
+const timeFmt = new Intl.DateTimeFormat("vi-VN", {
+  timeZone: "Asia/Ho_Chi_Minh",
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const weekdayFmt = new Intl.DateTimeFormat("vi-VN", {
+  timeZone: "Asia/Ho_Chi_Minh",
+  weekday: "long",
+  day: "2-digit",
+  month: "2-digit",
+});
+
+export default async function TodayPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    day?: string;
-    month?: string;
-    year?: string;
-    profitPeriod?: string;
-    upcomingRange?: string;
-    returningRange?: string;
-    upcomingLate?: string;
-    returningLate?: string;
-  }>;
+  searchParams: Promise<{ branch?: string; mine?: string }>;
 }) {
   const params = await searchParams;
-  const defaults = todayParts();
-  const day = params.day || defaults.day;
-  const month = params.month || defaults.month;
-  const year = params.year || defaults.year;
-  const profitPeriod: ProfitPeriod =
-    params.profitPeriod && isProfitPeriod(params.profitPeriod) ? params.profitPeriod : "month";
-  const upcomingRangePreset: DateRangePreset =
-    params.upcomingRange && isDateRangePreset(params.upcomingRange) ? params.upcomingRange : "all";
-  const returningRangePreset: DateRangePreset =
-    params.returningRange && isDateRangePreset(params.returningRange) ? params.returningRange : "all";
-  const upcomingLateActive = params.upcomingLate === "1";
-  const returningLateActive = params.returningLate === "1";
-  const now = vnNow();
-  const upcomingDateRange = computeDateRange(upcomingRangePreset, now);
-  const returningDateRange = computeDateRange(returningRangePreset, now);
-
   const employee = await getCurrentEmployee();
   if (!employee) return null;
-
   const canManage = (MANAGE_ROLES as readonly string[]).includes(employee.role);
-  const branchId = canManage ? null : employee.branch_id;
-  // Cửa hàng trưởng thấy chỉ số ĐIỀU HÀNH của đúng chi nhánh mình (đơn hàng,
-  // kho) — không thấy số liệu toàn hệ thống, cũng không thấy báo cáo khách
-  // hàng (chỉ Giám đốc/Admin/Kế toán). Kỹ thuật/Sales không thấy gì.
   const isBranchManager = employee.role === "cua_hang_truong";
-  // CEO chốt 2026-08-05: khối "Đơn hàng sắp tới"/"sắp về" mở TOÀN HỆ THỐNG
-  // cho mọi role đăng nhập được (Cửa hàng trưởng lẫn Kỹ thuật/Sales đều có
-  // thể cần support chéo chi nhánh khác) — không còn role nào bị scope theo
-  // chi nhánh ở 2 khối này. Các khối khác (tổng quan đơn hàng chi nhánh, so
-  // sánh chi nhánh...) vẫn dùng branchId như cũ, không đổi.
-  const handleBranchId = null;
-  // Trang chủ chỉ giữ chỉ số HIỆN THỜI (CEO chốt 2026-08-01): hiệu suất cá
-  // nhân, đơn cần xử lý, so sánh chi nhánh tháng này. Các khối đếm tổng, cơ
-  // cấu khách hàng, xếp hạng sản phẩm đã trả về đúng trang Khách hàng /
-  // Thiết bị — bản cũ nạp ~50.000 dòng all-time chỉ để vẽ mấy khối đó, là
-  // thứ khiến trang chủ Giám đốc mất 15s trên Cloudflare Workers.
-  const canViewBranchComparison = canManage && employee.role !== "admin";
+  const canSeeMoney = canManage || isBranchManager;
+  const mine = params.mine === "1";
 
-  // So sánh chi nhánh chỉ đọc lại các mốc Ngày/Tuần/Tháng/Năm/Năm-trước đang
-  // chọn (lọc trong JS) — trước đây fetch NGUYÊN bảng orders all-time
-  // (10.020 dòng, 11 lượt gọi tuần tự) chỉ để dùng mấy mốc đó. Biên dưới lùi
-  // về 1/1 của NĂM TRƯỚC: nuôi tab "Năm trước", và tiện thể bao luôn tuần
-  // vắt qua đầu năm (ngày 1-3/1 có thể thuộc tuần bắt đầu cuối tháng 12).
-  const comparisonRangeStart = [`${day}`, `${month}-01`, `${Number(year) - 1}-01-01`].sort()[0];
-  const comparisonRangeEndExclusive = (() => {
-    const [y, m] = month.split("-").map(Number);
-    const nextMonthOfMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    const dayAfter = new Date(day);
-    dayAfter.setDate(dayAfter.getDate() + 1);
-    const dayAfterStr = dayAfter.toISOString().slice(0, 10);
-    return [dayAfterStr, nextMonthOfMonth, `${Number(year) + 1}-01-01`].sort().reverse()[0];
-  })();
+  const supabase = await createClient();
+  const { data: branches } = await supabase.from("branches").select("id, name").order("position");
+  const branchList = branches ?? [];
+  const branchId = branchList.some((b) => b.id === params.branch) ? params.branch! : null;
+  const shortOf = new Map(branchList.map((b) => [b.id, SHORT_BRANCH[b.name] ?? b.name]));
 
-  // Kỳ của khối Lợi nhuận gộp — Năm nay/Năm trước cộng dồn quỹ lương TỪNG
-  // THÁNG (bậc thưởng chỉ có ý nghĩa xét theo tổng khoán TRONG THÁNG); Năm
-  // hiện tại dừng ở tháng hiện tại (YTD) để khớp vế doanh thu và không cộng
-  // trước chi phí định kỳ của tháng chưa tới.
-  let profitMonths: string[] = [month];
-  if (profitPeriod === "prevMonth") {
-    profitMonths = [previousMonthOf(month)];
-  } else if (profitPeriod === "year" || profitPeriod === "prevYear") {
-    const profitYear = profitPeriod === "year" ? Number(year) : Number(year) - 1;
-    const lastMonth =
-      String(profitYear) === defaults.year ? Number(defaults.month.split("-")[1]) : 12;
-    profitMonths = Array.from(
-      { length: lastMonth },
-      (_, i) => `${profitYear}-${String(i + 1).padStart(2, "0")}`,
-    );
-  }
+  const qs = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams();
+    const merged = { branch: branchId, mine: mine ? "1" : null, ...patch };
+    for (const [k, v] of Object.entries(merged)) if (v) next.set(k, v);
+    const s = next.toString();
+    return s ? `/?${s}` : "/";
+  };
 
-  const branchListPromise = createClient().then((supabase) =>
-    supabase.from("branches").select("id, name").order("position"),
-  );
-
-  // Trang chủ STREAM theo khối (CEO 2026-10-09 "CRM vô chậm lắm" — trước chờ
-  // CẢ 9 phần, gồm tính bảng lương toàn công ty cho Lợi nhuận gộp, mới hiện
-  // trang ~3,5s): khung + từng khối tự hiện khi xong, khối chậm có khung chờ.
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Trang chủ</h1>
-        <p className="text-sm text-muted-foreground">
-          Xin chào, {employee.name} ({ROLE_LABELS[employee.role]})
-        </p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            Hôm nay <span className="font-normal text-muted-foreground">· {weekdayFmt.format(new Date())}</span>
+          </h1>
+          <p className="text-sm text-muted-foreground">Việc cần xử lý hôm nay và ngày mai — bấm số hoặc dòng để mở.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border p-0.5 text-sm">
+            {[{ id: null as string | null, name: "Tất cả" }, ...branchList].map((b) => (
+              <Link
+                key={b.id ?? "all"}
+                href={qs({ branch: b.id })}
+                className={cn(
+                  "rounded-md px-3 py-1",
+                  branchId === b.id ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                )}
+              >
+                {b.name}
+              </Link>
+            ))}
+          </div>
+          <div className="flex rounded-lg border p-0.5 text-sm">
+            <Link href={qs({ mine: "1" })} className={cn("rounded-md px-3 py-1", mine ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>
+              Của tôi
+            </Link>
+            <Link href={qs({ mine: null })} className={cn("rounded-md px-3 py-1", !mine ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>
+              Cả kho
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* CEO chốt 2026-08-08: "Thu nhập của bạn" xuống DƯỚI CÙNG trang chủ
-          cho MỌI vai trò — đơn hàng và so sánh chi nhánh mới là thứ cần thấy
-          ngay khi mở app. 4 thẻ KPI (đề xuất CRM v2) thay 2 thanh báo Đơn
-          web / Thiếu hàng cũ; người không xem số tiền thấy "Hôm nay giao". */}
-      <Suspense fallback={<BlockSkeleton className="h-28" />}>
-        <HomeKpiCards branchId={branchId} canSeeMoney={canManage || isBranchManager} />
-      </Suspense>
-
-      <Suspense fallback={<BlockSkeleton className="h-96" />}>
-        <OrdersBlock
-          handleBranchId={handleBranchId}
-          upcomingDateRange={upcomingDateRange}
-          returningDateRange={returningDateRange}
-          upcomingLateActive={upcomingLateActive}
-          returningLateActive={returningLateActive}
-          upcomingRangePreset={upcomingRangePreset}
-          returningRangePreset={returningRangePreset}
-          now={now}
-          branchOverviewId={isBranchManager && branchId ? branchId : null}
-          branchListPromise={branchListPromise}
+      <Suspense fallback={<BoardSkeleton />}>
+        <TodayBoard
+          branchId={branchId}
+          employeeId={mine ? employee.id : null}
+          canSeeMoney={canSeeMoney}
+          canSeeInvoices={canManage}
+          shortOf={Object.fromEntries(shortOf)}
         />
       </Suspense>
 
-      {canViewBranchComparison && (
-        <Suspense fallback={<BlockSkeleton className="h-96" />}>
-          <ComparisonBlock
-            day={day}
-            month={month}
-            year={year}
-            profitPeriod={profitPeriod}
-            profitMonths={profitMonths}
-            comparisonRangeStart={comparisonRangeStart}
-            comparisonRangeEndExclusive={comparisonRangeEndExclusive}
-            branchListPromise={branchListPromise}
-          />
-        </Suspense>
-      )}
-
-      <Suspense fallback={<BlockSkeleton className="h-40" />}>
+      <Suspense fallback={<div className="h-40 animate-pulse rounded-xl border bg-muted/40" />}>
         <IncomeBlock
           employeeId={employee.id}
           employeeBranchId={employee.branch_id}
@@ -193,192 +159,327 @@ export default async function DashboardHomePage({
   );
 }
 
-function BlockSkeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-xl border bg-muted/40 ${className ?? ""}`} />;
-}
-
-type BranchListPromise = Promise<{ data: { id: string; name: string }[] | null }>;
-
-// "Đơn hàng sắp tới"/"sắp về" + tổng quan đơn hàng chi nhánh (Cửa hàng trưởng).
-async function OrdersBlock({
-  handleBranchId,
-  upcomingDateRange,
-  returningDateRange,
-  upcomingLateActive,
-  returningLateActive,
-  upcomingRangePreset,
-  returningRangePreset,
-  now,
-  branchOverviewId,
-  branchListPromise,
-}: {
-  handleBranchId: string | null;
-  upcomingDateRange: ReturnType<typeof computeDateRange>;
-  returningDateRange: ReturnType<typeof computeDateRange>;
-  upcomingLateActive: boolean;
-  returningLateActive: boolean;
-  upcomingRangePreset: DateRangePreset;
-  returningRangePreset: DateRangePreset;
-  now: Date;
-  branchOverviewId: string | null;
-  branchListPromise: BranchListPromise;
-}) {
-  const [ordersToHandle, branchOrdersOverview, branchList] = await Promise.all([
-    getOrdersToHandle(handleBranchId, HANDLE_LIMIT, {
-      delivery: upcomingDateRange,
-      collection: returningDateRange,
-      lateOnly: { delivery: upcomingLateActive, collection: returningLateActive },
-    }),
-    // Tổng quan đơn hàng (Tuần/Tháng/Năm + xu hướng) của RIÊNG chi nhánh mà
-    // Cửa hàng trưởng phụ trách — Giám đốc đã có khối So sánh chi nhánh.
-    branchOverviewId ? computeOrdersOverview(branchOverviewId) : Promise.resolve(null),
-    branchListPromise,
-  ]);
+function BoardSkeleton() {
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UpcomingDeliveriesCard
-          orders={ordersToHandle.upcomingDeliveries}
-          now={now}
-          hideViewAllLink
-          rangeFilter={
-            !upcomingLateActive && (
-              <OrdersToHandleRangeFilter paramName="upcomingRange" value={upcomingRangePreset} />
-            )
-          }
-          lateToggle={
-            <OrdersToHandleLateToggle
-              paramName="upcomingLate"
-              count={ordersToHandle.lateDeliveriesCount}
-              active={upcomingLateActive}
-            />
-          }
-        />
-        <PendingCollectionsCard
-          orders={ordersToHandle.pendingCollections}
-          now={now}
-          hideViewAllLink
-          rangeFilter={
-            !returningLateActive && (
-              <OrdersToHandleRangeFilter paramName="returningRange" value={returningRangePreset} />
-            )
-          }
-          lateToggle={
-            <OrdersToHandleLateToggle
-              paramName="returningLate"
-              count={ordersToHandle.lateCollectionsCount}
-              active={returningLateActive}
-            />
-          }
-        />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        {Array.from({ length: 7 }, (_, i) => (
+          <div key={i} className="h-24 animate-pulse rounded-xl border bg-muted/40" />
+        ))}
       </div>
-
-      {/* Cửa hàng trưởng: tổng quan đơn hàng của đúng chi nhánh mình. */}
-      {branchOrdersOverview && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Đơn hàng kho {branchList.data?.find((b) => b.id === branchOverviewId)?.name ?? ""}
-            </h2>
-            <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
-              Xem tất cả đơn →
-            </Link>
-          </div>
-          <PeriodStatCards
-            week={branchOrdersOverview.week}
-            month={branchOrdersOverview.month}
-            year={branchOrdersOverview.year}
-          />
-          <OrdersTrendChart trend={branchOrdersOverview.trend} />
-        </div>
-      )}
-    </>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="h-64 animate-pulse rounded-xl border bg-muted/40" />
+        ))}
+      </div>
+    </div>
   );
 }
 
-// So sánh chi nhánh + Lợi nhuận gộp (Giám đốc/Kế toán) — phần NẶNG nhất
-// (bảng lương toàn công ty theo tháng của kỳ) nên tải riêng, không chặn trang.
-async function ComparisonBlock({
-  day,
-  month,
-  year,
-  profitPeriod,
-  profitMonths,
-  comparisonRangeStart,
-  comparisonRangeEndExclusive,
-  branchListPromise,
+const TONES = {
+  rose: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-100",
+  amber: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100",
+  sky: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-100",
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100",
+  violet: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-100",
+  calm: "border-border bg-card text-foreground",
+} as const;
+
+function Kpi({
+  href,
+  label,
+  value,
+  sub,
+  icon,
+  tone,
 }: {
-  day: string;
-  month: string;
-  year: string;
-  profitPeriod: ProfitPeriod;
-  profitMonths: string[];
-  comparisonRangeStart: string;
-  comparisonRangeEndExclusive: string;
-  branchListPromise: BranchListPromise;
+  href: string;
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ReactNode;
+  tone: keyof typeof TONES;
+}) {
+  return (
+    <Link href={href} className={cn("group rounded-xl border p-3.5 transition hover:shadow-md", TONES[tone])}>
+      <p className="flex items-center gap-1.5 text-[13px] font-medium opacity-80 [&_svg]:size-4">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+      <p className="mt-0.5 truncate text-xs opacity-75 group-hover:underline">{sub}</p>
+    </Link>
+  );
+}
+
+async function TodayBoard({
+  branchId,
+  employeeId,
+  canSeeMoney,
+  canSeeInvoices,
+  shortOf,
+}: {
+  branchId: string | null;
+  employeeId: string | null;
+  canSeeMoney: boolean;
+  canSeeInvoices: boolean;
+  shortOf: Record<string, string>;
 }) {
   const supabase = await createClient();
-  const nextMonthOf = (ym: string) => {
-    const [y, m] = ym.split("-").map(Number);
-    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-  };
-  const [branchList, orders, payrollByMonth, periodExpensesRes, recurringDefsRes] = await Promise.all([
-    branchListPromise,
-    fetchAllRows<{ pickup_branch_id: string; delivered_at: string; total_value: number }>((from, to) =>
-      supabase
-        .from("orders")
-        .select("pickup_branch_id, delivered_at, total_value")
-        // Đơn huỷ không phải doanh thu; doanh số ghi nhận khi ĐÃ GIAO HÀNG
-        // và GỒM VAT (CEO 2026-09-02), ghi vào NGÀY GIAO (CEO 2026-10-05) —
-        // order_date bên dưới là ngày giao giờ VN, giữ tên trường cho các hàm
-        // revenueFor*. Chỉ lấy khoảng 3 mốc Ngày/Tháng/Năm đang chọn.
-        .is("cancelled_at", null)
-        .not("delivered_at", "is", null)
-        .gte("delivered_at", vnDayStartIso(comparisonRangeStart))
-        .lt("delivered_at", vnDayStartIso(comparisonRangeEndExclusive))
-        .range(from, to),
-    ).then((rows) =>
-      rows.map((o) => ({
-        pickup_branch_id: o.pickup_branch_id,
-        order_date: vnDayKey(o.delivered_at),
-        total_value: Math.round(o.total_value * 1.08 * 100) / 100,
-      })),
-    ),
-    Promise.all(profitMonths.map((m) => computeEmployeeMonthlyPerformance(m))),
-    supabase
-      .from("expenses")
-      .select("branch_id, amount")
-      .gte("expense_date", `${profitMonths[0]}-01`)
-      .lt("expense_date", `${nextMonthOf(profitMonths[profitMonths.length - 1])}-01`),
-    supabase.from("recurring_expenses").select("id, branch_id, category_id, amount, frequency, start_date, end_date, note"),
+  const [{ data, error }, webRes] = await Promise.all([
+    supabase.rpc("today_board" as never, { p_branch_id: branchId, p_employee_id: employeeId, p_limit: 5 } as never),
+    (supabase as unknown as SupabaseClient).from("website_orders").select("id", { count: "exact", head: true }).eq("status", "new"),
   ]);
-
-  // Lợi nhuận gộp theo chi nhánh của KỲ đang chọn = doanh thu − chi phí vận
-  // hành (expenses + khoản định kỳ trải theo tháng) − quỹ lương.
-  const operatingByBranch = new Map<string, number>();
-  const periodOperatingRows = [
-    ...(periodExpensesRes.data ?? []),
-    ...expandRecurring(recurringDefsRes.data ?? [], profitMonths),
-  ];
-  for (const e of periodOperatingRows) {
-    operatingByBranch.set(e.branch_id, (operatingByBranch.get(e.branch_id) ?? 0) + Number(e.amount));
+  if (error || !data) {
+    return <p className="text-sm text-destructive">Không tải được dữ liệu hôm nay: {error?.message ?? "không rõ"}</p>;
   }
-  const payrollByBranch = new Map<string, number>();
-  for (const r of payrollByMonth.flat()) {
-    if (!r.branchId) continue;
-    payrollByBranch.set(r.branchId, (payrollByBranch.get(r.branchId) ?? 0) + r.totalIncome);
-  }
+  const b = data as unknown as Board;
+  const c = b.counts;
+  const webNew = webRes.count ?? 0;
+  const branchChip = (id: string | null) => {
+    const s = id ? shortOf[id] : null;
+    return s ? <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-semibold", BRANCH_TONE[s])}>{s}</span> : null;
+  };
 
   return (
-    <BranchComparisonSection
-      branches={branchList.data ?? []}
-      orders={orders}
-      day={day}
-      month={month}
-      year={year}
-      profit={{ operatingByBranch, payrollByBranch }}
-      profitPeriod={profitPeriod}
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <Kpi
+          href="/orders?view=deliver_today"
+          label="Giao hôm nay / mai"
+          value={`${c.deliverToday} / ${c.deliverTomorrow}`}
+          sub={c.deliverNoDriver ? `${c.deliverNoDriver} chưa có người giao` : "Đã có người giao"}
+          icon={<Truck />}
+          tone={c.deliverNoDriver ? "amber" : "calm"}
+        />
+        <Kpi
+          href="/orders?view=return_today"
+          label="Thu hồi hôm nay / mai"
+          value={`${c.returnToday} / ${c.returnTomorrow}`}
+          sub={c.returnNoCollector ? `${c.returnNoCollector} chưa phân công` : "Đã phân công"}
+          icon={<PackageCheck />}
+          tone={c.returnNoCollector ? "amber" : "calm"}
+        />
+        <Kpi
+          href="/orders?view=overdue"
+          label="Quá hạn trả"
+          value={String(c.overdue)}
+          sub={c.overdue ? "đơn quá giờ trả — bấm để xử lý" : "Không có đơn quá hạn"}
+          icon={<Clock />}
+          tone={c.overdue ? "rose" : "calm"}
+        />
+        <Kpi
+          href="/orders/web"
+          label="Đơn web mới"
+          value={String(webNew)}
+          sub={webNew ? "khách gửi từ thuenhanh.vn" : "Không có đơn web mới"}
+          icon={<Globe />}
+          tone={webNew ? "violet" : "calm"}
+        />
+        {canSeeMoney && (
+          <Kpi
+            href="/debts"
+            label="Hoàn tất còn nợ"
+            value={String(c.owingCount)}
+            sub={c.owingCount ? `${formatVND(c.owingAmount)} · 30 ngày qua` : "Không có"}
+            icon={<CircleDollarSign />}
+            tone={c.owingCount ? "amber" : "calm"}
+          />
+        )}
+        {canSeeInvoices && (
+          <Kpi
+            href="/invoices"
+            label="Chưa xuất HĐ > 2 ngày"
+            value={String(c.invoiceLate)}
+            sub={c.invoiceLate ? "đơn hoàn tất chờ hoá đơn đỏ" : "Đã xuất kịp"}
+            icon={<FileWarning />}
+            tone={c.invoiceLate ? "violet" : "calm"}
+          />
+        )}
+        <Suspense fallback={<div className="h-24 animate-pulse rounded-xl border bg-muted/40" />}>
+          <ShortageKpi branchId={branchId} />
+        </Suspense>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ListCard
+          title="Giao hàng · hôm nay & mai"
+          href="/orders?view=deliver_today"
+          total={c.deliverToday + c.deliverTomorrow}
+          empty="Không có đơn giao hôm nay và ngày mai."
+          rows={b.deliveries}
+          render={(r) => (
+            <>
+              <Cell className="w-24 tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
+              <OrderCell r={r} />
+              <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
+              <Cell className="w-44 text-right">
+                {r.done ? (
+                  <Chip tone="emerald">Đã giao</Chip>
+                ) : r.no_serial ? (
+                  <Chip tone="amber">Chưa gán serial</Chip>
+                ) : r.no_driver ? (
+                  <Chip tone="amber">Chưa người giao</Chip>
+                ) : r.self_pickup ? (
+                  <Chip tone="calm">Khách tự lấy</Chip>
+                ) : (
+                  <Chip tone="calm">{r.status ? TASK_TYPE_LABELS[r.status] : "—"}</Chip>
+                )}
+              </Cell>
+            </>
+          )}
+        />
+        <ListCard
+          title="Thu hồi · hôm nay & mai"
+          href="/orders?view=return_today"
+          total={c.returnToday + c.returnTomorrow}
+          empty="Không có đơn trả hôm nay và ngày mai."
+          rows={b.returns}
+          render={(r) => (
+            <>
+              <Cell className="w-24 tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
+              <OrderCell r={r} />
+              <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
+              <Cell className="w-44 text-right">
+                {r.no_collector ? (
+                  <Chip tone="amber">Chưa phân công</Chip>
+                ) : (
+                  <Chip tone="calm">{r.status ? TASK_TYPE_LABELS[r.status] : "—"}</Chip>
+                )}
+              </Cell>
+            </>
+          )}
+        />
+        <ListCard
+          title="Quá hạn trả"
+          href="/orders?view=overdue"
+          total={c.overdue}
+          empty="Không có đơn quá hạn."
+          rows={b.overdue}
+          render={(r) => {
+            // Số ngày trễ tính theo "hôm nay" của DB (giờ VN) — không gọi Date.now() lúc render.
+            const late = Math.floor((Date.parse(`${b.today}T23:59:59+07:00`) - Date.parse(r.at)) / 86_400_000);
+            return (
+              <>
+                <OrderCell r={r} />
+                <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
+                <Cell className="w-20 tabular-nums">{late > 0 ? `${late} ngày` : "hôm nay"}</Cell>
+                <Cell className="w-24 text-right">
+                  <Chip tone="rose">Quá hạn</Chip>
+                </Cell>
+              </>
+            );
+          }}
+        />
+        {canSeeMoney && (
+          <ListCard
+            title="Hoàn tất nhưng còn nợ · 30 ngày"
+            href="/debts"
+            total={c.owingCount}
+            empty="Không có đơn hoàn tất còn nợ."
+            rows={b.owing}
+            render={(r) => (
+              <>
+                <OrderCell r={r} />
+                <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
+                <Cell className="w-32 text-right font-semibold tabular-nums">{formatVND(r.remaining)}</Cell>
+              </>
+            )}
+          />
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Mỗi danh sách tối đa 5 dòng · &quot;Hoàn tất còn nợ&quot; chỉ tính đơn tạo trên CRM (mã PO) — tiền đơn Booqable
+        nằm ở Booqable · so sánh kho &amp; lợi nhuận ở trang{" "}
+        <Link href="/reports" className="text-primary hover:underline">
+          Báo cáo
+        </Link>
+        .
+      </p>
+    </div>
+  );
+}
+
+async function ShortageKpi({ branchId }: { branchId: string | null }) {
+  const shortages = await loadShortages(7, branchId);
+  const soon = shortages.filter((x) => !x.shortNow);
+  const missing = soon.reduce((s, x) => s + x.missing, 0);
+  return (
+    <Kpi
+      href="/shortages?days=7"
+      label="Thiếu hàng 7 ngày"
+      value={String(missing)}
+      sub={soon.length ? `máy · ${soon.slice(0, 2).map((x) => x.typeName).join(", ")}` : "Đủ máy cho 7 ngày tới"}
+      icon={<AlertTriangle />}
+      tone={missing ? "amber" : "calm"}
     />
+  );
+}
+
+const CHIP = {
+  emerald: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+  amber: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  rose: "bg-rose-600 text-white",
+  calm: "bg-muted text-muted-foreground",
+} as const;
+function Chip({ tone, children }: { tone: keyof typeof CHIP; children: React.ReactNode }) {
+  return <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", CHIP[tone])}>{children}</span>;
+}
+function Cell({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <td className={cn("px-3 py-2 align-middle text-sm", className)}>{children}</td>;
+}
+function OrderCell({ r }: { r: Row }) {
+  return (
+    <td className="px-3 py-2 text-sm">
+      <Link href={`/orders/${r.id}`} className="font-semibold text-primary hover:underline">
+        {r.order_code}
+      </Link>
+      <span className="block max-w-[16rem] truncate text-xs text-muted-foreground">{r.customer_name ?? "—"}</span>
+    </td>
+  );
+}
+
+function ListCard({
+  title,
+  href,
+  total,
+  empty,
+  rows,
+  render,
+}: {
+  title: string;
+  href: string;
+  total: number;
+  empty: string;
+  rows: Row[];
+  render: (r: Row) => React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex items-center justify-between border-b px-4 py-2.5">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {total > 0 && (
+          <Link href={href} className="text-xs font-medium text-primary hover:underline">
+            Xem tất cả {total} →
+          </Link>
+        )}
+      </div>
+      {rows.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <tbody className="divide-y">
+              {rows.map((r) => (
+                <tr key={r.id} className="hover:bg-muted/40">
+                  {render(r)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">{empty}</p>
+      )}
+    </section>
   );
 }
 

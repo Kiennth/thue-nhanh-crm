@@ -1165,7 +1165,7 @@ export default async function EquipmentDetailPage({
                                 <span className="font-medium">{po.suppliers?.name}</span>
                                 <span className="block text-xs text-muted-foreground">
                                   {po.code}
-                                  {inst.purchase_price ? ` · ${new Intl.NumberFormat("vi-VN").format(Number(inst.purchase_price))}đ` : ""}
+                                  {inst.purchase_price ? ` · ${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(inst.purchase_price))}đ` : ""}
                                 </span>
                               </Link>
                             ) : (

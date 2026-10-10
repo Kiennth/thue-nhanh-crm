@@ -8,7 +8,7 @@ import { ALL_ROLES } from "@/lib/roles";
 import { quoteShareToken, recordQuoteAcceptance, verifyQuoteShareToken } from "@/lib/quote-share";
 import { sendEmail } from "@/lib/email";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Đường dẫn ngắn gửi khách (nhân viên bấm "Link báo giá" ở trang đơn).
 export async function getQuoteSharePath(orderId: string): Promise<{ path?: string; error?: string }> {

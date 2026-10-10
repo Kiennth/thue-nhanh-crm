@@ -9,7 +9,7 @@ import { applyBankTransaction } from "@/lib/bank-reconcile";
 
 type ActionState = { error: string } | { success: true; message?: string };
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Gán tay giao dịch ngân hàng chưa khớp vào 1 đơn (trang /debts/bank).
 export async function assignBankTransaction(

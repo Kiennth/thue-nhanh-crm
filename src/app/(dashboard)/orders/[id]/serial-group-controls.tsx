@@ -124,7 +124,7 @@ const fold = (s: string) =>
     .replace(/Đ/g, "D")
     .toLowerCase();
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 export function ChangeProductButton({
   lineIds,

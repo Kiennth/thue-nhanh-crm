@@ -26,7 +26,7 @@ export const PAYMENT_METHOD: Record<"chuyen_khoan" | "tien_mat" | "khac", string
   khac: "Khác",
 };
 
-export const vnd = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
+export const vnd = (n: number) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.round(n)) + "đ";
 
 export function paymentState(total: number, paid: number): { label: string; className: string } {
   if (total <= 0) return { label: "—", className: "text-muted-foreground" };

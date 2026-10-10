@@ -25,7 +25,7 @@ import { ApplyRuleButton } from "./apply-rule-button";
 import { deleteRewardRule } from "@/lib/actions/rewards";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 function isRewardCategory(value: string): value is RewardCategory {
   return value in REWARD_CATEGORY_LABELS;

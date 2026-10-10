@@ -39,7 +39,7 @@ export default async function SuppliersPage({
     cur.count += 1;
     bySupplier.set(t.supplier_id, cur);
   }
-  const money = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
+  const money = (n: number) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.round(n)) + "đ";
   const all = (data ?? []) as Supplier[];
   const needle = fold(query);
   const digits = query.replace(/\D/g, "");

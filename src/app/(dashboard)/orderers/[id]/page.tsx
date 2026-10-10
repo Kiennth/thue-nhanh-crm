@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TASK_TYPE_LABELS, VAT_RATE } from "@/lib/order-labels";
 import { OrdererDialog, type OrdererRow } from "../orderer-dialog";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 type OrderRow = {
   id: string;

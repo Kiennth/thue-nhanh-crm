@@ -50,7 +50,7 @@ export type EditorLine = {
 type Payment = { id: string; amount: number; paid_on: string; method: string; note: string | null };
 
 const num = (s: string) => Number(s.replace(/[^\d]/g, "")) || 0;
-const fmt = (n: number) => (n ? new Intl.NumberFormat("vi-VN").format(n) : "");
+const fmt = (n: number) => (n ? new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(n) : "");
 // Serial dán từ Excel / máy quét: mỗi dòng 1 serial (chấp nhận cả dấu phẩy, chấm phẩy, tab).
 const splitSerials = (s: string) =>
   s

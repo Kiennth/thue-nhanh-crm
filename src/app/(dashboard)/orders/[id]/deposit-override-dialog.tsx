@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { setOrderDepositOverride } from "@/lib/actions/orders";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Sửa tay tiền cọc của đơn (CEO 2026-10-04: "khách quen cọc 5tr thay vì
 // 26tr"). Ghi vào orders.deposit_override_amount — trang đơn, chứng từ, QR

@@ -49,7 +49,7 @@ export function PaginationControls({
   return (
     <div className="flex items-center justify-between text-sm text-muted-foreground">
       <span>
-        Trang {page}/{totalPages} · {new Intl.NumberFormat("vi-VN").format(totalCount)} {itemLabel}
+        Trang {page}/{totalPages} · {new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(totalCount)} {itemLabel}
       </span>
       <div className="flex items-center gap-2">
         <Button

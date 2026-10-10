@@ -61,28 +61,28 @@ export interface NavItem {
 // Khu vực chuyên môn của sidebar (CEO 2026-10-05): nav chính chia thành các
 // nhóm theo nghiệp vụ thay vì 1 danh sách phẳng. Thứ tự hiển thị = thứ tự
 // trong NAV_SECTIONS; mục trong nhóm lấy từ NAV_ITEMS theo thứ tự `hrefs`.
-export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "nhan_su" | "quan_tri" | "khac";
-// Các mục quản trị cũ nằm trong menu "Cài đặt" (SETTINGS_ITEMS) cũng xếp
-// thẳng vào đây (CEO 2026-10-05: "cho lên luôn") — menu Cài đặt chỉ còn làm
-// lối tắt phụ ở footer.
+export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "noi_dung_web" | "nhan_su" | "cai_dat" | "khac";
+// Menu gọn (Grok tách gọn CRM 10/10, CEO duyệt): Hôm nay + Báo cáo ở trên, 6
+// nhóm gập kiểu accordion (chỉ mở 1 nhóm, tự mở nhóm của trang đang xem).
+// Website/Blog tách thành "Nội dung web"; Kho/Bảng giá mẫu/Nhật ký vào "Cài đặt".
 export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] }[] = [
-  // Hàng hoá: đơn thuê, thiết bị, lịch máy + cấu hình kho/danh mục/giá.
-  // Website ngay dưới Thiết bị (CEO 2026-10-07) — chỉ quản lý thấy (roles của mục).
-  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/website", "/website/blog", "/calendar", "/equipment-categories"] },
-  // Khách hàng: hồ sơ khách + người liên hệ đặt đơn.
+  { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/calendar", "/equipment-categories"] },
   { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
-  // Nhà cung cấp cạnh Chi phí — nơi trả tiền mua máy / dịch vụ (CEO 2026-10-07).
   { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses", "/purchases", "/suppliers"] },
+  { key: "noi_dung_web", label: "Nội dung web", hrefs: ["/website", "/website/blog"] },
   {
     key: "nhan_su",
     label: "Nhân sự",
     hrefs: ["/employees", "/schedule", "/payroll", "/commission", "/rewards", "/training"],
   },
-  // Quản trị (CEO 2026-10-05): cấu hình hệ thống, ít dùng hằng ngày.
-  { key: "quan_tri", label: "Quản trị", hrefs: ["/branches", "/pricing-templates", "/activity"] },
-  // "Khác" hiện trống — chỉ hứng mục mới chưa xếp nhóm (sidebar tự ẩn khi rỗng).
+  { key: "cai_dat", label: "Cài đặt", hrefs: ["/branches", "/pricing-templates", "/activity"] },
+  // "Khác" hứng mục mới chưa xếp nhóm (sidebar tự ẩn khi rỗng).
   { key: "khac", label: "Khác", hrefs: [] },
 ];
+
+// Báo cáo (so sánh kho + Lợi nhuận gộp): Giám đốc/Kế toán toàn hệ thống,
+// Cửa hàng trưởng xem tổng quan kho mình. Admin không xem doanh thu (như cũ).
+export const REPORT_ROLES: UserRole[] = ["giam_doc", "ke_toan", "cua_hang_truong"];
 
 // Các mục quản trị tần suất thấp — gom vào menu "Cài đặt" nhỏ ở footer
 // sidebar (xem app-sidebar.tsx) thay vì nav chính, để nav chính chỉ còn

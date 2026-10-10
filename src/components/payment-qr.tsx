@@ -1,7 +1,7 @@
 import { COMPANY_INFO } from "@/lib/company-info";
 import { transferRef, vietQrImageUrl } from "@/lib/vietqr";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Ô QR chuyển khoản có số tiền + nội dung sẵn — dùng ở trang đơn và chứng từ.
 // Khách chuyển đúng nội dung thì CRM tự ghi nhận (xem /api/bank/sepay).

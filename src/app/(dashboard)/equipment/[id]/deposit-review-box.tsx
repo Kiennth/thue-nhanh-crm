@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { reviewEquipmentDeposit } from "@/lib/actions/equipment";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 // Hộp vàng "Cọc 0đ – cần xem" (B7, Grok CRM 09/10): mã đắt tiền / nhóm giá
 // trị cao đang để cọc 0 (web hiện "Không cần cọc"). Giữ 0đ · đã xem → bỏ cờ;
