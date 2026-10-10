@@ -310,7 +310,7 @@ async function TodayBoard({
           rows={b.deliveries}
           render={(r) => (
             <>
-              <Cell className="w-24 tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
+              <Cell className="w-28 whitespace-nowrap tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
               <OrderCell r={r} />
               <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
               <Cell className="w-44 text-right">
@@ -337,7 +337,7 @@ async function TodayBoard({
           rows={b.returns}
           render={(r) => (
             <>
-              <Cell className="w-24 tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
+              <Cell className="w-28 whitespace-nowrap tabular-nums">{timeFmt.format(new Date(r.at))}</Cell>
               <OrderCell r={r} />
               <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
               <Cell className="w-44 text-right">
@@ -363,7 +363,7 @@ async function TodayBoard({
               <>
                 <OrderCell r={r} />
                 <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
-                <Cell className="w-20 tabular-nums">{late > 0 ? `${late} ngày` : "hôm nay"}</Cell>
+                <Cell className="w-24 whitespace-nowrap tabular-nums">{late > 0 ? `${late} ngày` : "hôm nay"}</Cell>
                 <Cell className="w-24 text-right">
                   <Chip tone="rose">Quá hạn</Chip>
                 </Cell>

@@ -124,7 +124,9 @@ select jsonb_build_object(
   'overdue', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (
     select id, order_code, customer_name, coalesce(return_branch_id, pickup_branch_id) as branch_id,
            rental_end_at as at, status
-    from overdue order by rental_end_at limit p_limit) x),
+    -- Mới quá hạn lên đầu: đơn BQ cũ kẹt khâu giao từ 2023–2024 (trễ hàng trăm
+    -- ngày) không che mất đơn cần xử lý ngay.
+    from overdue order by rental_end_at desc limit p_limit) x),
   'owing', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (
     select id, order_code, customer_name, pickup_branch_id as branch_id, completed_at as at, remaining
     from owing order by completed_at desc limit p_limit) x)
