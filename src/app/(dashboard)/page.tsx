@@ -4,22 +4,18 @@ import { AlertTriangle, CircleDollarSign, Clock, FileWarning, Globe, PackageChec
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentEmployee } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { MANAGE_ROLES, computeMyMonthlyTrend } from "@/lib/employee-performance-charts";
-import { computeMyPerformance } from "@/lib/my-performance";
-import { TECH_SALES_ROLES } from "@/lib/roles";
+import { MANAGE_ROLES } from "@/lib/employee-performance-charts";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { loadShortages } from "@/lib/shortage";
 import { formatVND } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { TaskType } from "@/types/database";
-import { MyPerformanceCard } from "./my-performance-card";
-import { MyPerformanceTrendCard } from "./my-performance-trend-card";
 
 // Trang "Hôm nay" (Grok tách gọn CRM 10/10, giai đoạn 1) thay Trang chủ cũ:
 // hàng đợi việc cần làm — số đếm + 4 danh sách, mỗi danh sách tối đa 5 dòng,
 // CHỈ hôm nay + ngày mai, 1 lần gọi DB (today_board). Biểu đồ so sánh kho +
-// Lợi nhuận gộp sang trang Báo cáo; "Thu nhập của bạn" giữ dưới cùng (CEO
-// 08/08, chốt lại 10/10) và tải sau cùng.
+// Lợi nhuận gộp sang trang Báo cáo. Khối "Thu nhập của bạn" CEO bỏ khỏi
+// trang này 10/10 — xem thu nhập ở Hồ sơ của tôi (/me) và Bảng lương.
 
 type Row = {
   id: string;
@@ -149,14 +145,6 @@ export default async function TodayPage({
         />
       </Suspense>
 
-      <Suspense fallback={<div className="h-40 animate-pulse rounded-xl border bg-muted/40" />}>
-        <IncomeBlock
-          employeeId={employee.id}
-          employeeBranchId={employee.branch_id}
-          baseSalary={employee.base_salary}
-          withTrend={!(canManage || TECH_SALES_ROLES.includes(employee.role))}
-        />
-      </Suspense>
     </div>
   );
 }
@@ -488,27 +476,3 @@ function ListCard({
   );
 }
 
-// "Thu nhập của bạn" + xu hướng 6 tháng (chỉ nhân viên — quản lý và Kỹ
-// thuật/Sales không tính xu hướng vì nặng).
-async function IncomeBlock({
-  employeeId,
-  employeeBranchId,
-  baseSalary,
-  withTrend,
-}: {
-  employeeId: string;
-  employeeBranchId: string | null;
-  baseSalary: number;
-  withTrend: boolean;
-}) {
-  const [myPerformance, myTrend] = await Promise.all([
-    computeMyPerformance(employeeId, employeeBranchId, baseSalary),
-    withTrend ? computeMyMonthlyTrend(employeeId) : Promise.resolve(null),
-  ]);
-  return (
-    <>
-      <MyPerformanceCard perf={myPerformance} />
-      {myTrend && <MyPerformanceTrendCard points={myTrend} />}
-    </>
-  );
-}
