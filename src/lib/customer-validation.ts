@@ -24,6 +24,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // "+84 912 345 678" / "84.912.345.678" → "0912345678".
 export function normalizePhone(value: string): string {
   let v = value.replace(/[\s.\-()]/g, "");
+  if (v.startsWith("00")) v = "+" + v.slice(2);
   if (v.startsWith("+84")) v = "0" + v.slice(3);
   else if (/^84\d{9}$/.test(v)) v = "0" + v.slice(2);
   return v;
@@ -31,8 +32,15 @@ export function normalizePhone(value: string): string {
 
 export const normalizeDigits = (value: string) => value.replace(/[\s.]/g, "");
 
-export const isValidPhone = (value: string) => /^0\d{9}$/.test(normalizePhone(value));
+// Số Việt Nam 10 số bắt đầu bằng 0 (+84 tự đổi về 0), hoặc số nước ngoài có
+// mã nước "+62…" 8–15 chữ số (CEO 10/10: khách Indonesia).
+export const isValidPhone = (value: string) => {
+  const v = normalizePhone(value);
+  return /^0\d{9}$/.test(v) || /^\+\d{8,15}$/.test(v);
+};
 export const isValidCccd = (value: string) => /^\d{12}$/.test(normalizeDigits(value));
+// Hộ chiếu / giấy tờ nước ngoài của khách lẻ — chữ + số, 5–20 ký tự.
+export const isValidPassport = (value: string) => /^[A-Za-z0-9][A-Za-z0-9 .-]{4,19}$/.test(value.trim());
 export const isValidMst = (value: string) => /^\d{10}(-\d{3})?$/.test(normalizeDigits(value));
 
 // Mã tỉnh 3 số đầu CCCD — sai chỉ CẢNH BÁO, không chặn (spec B6).
@@ -63,7 +71,7 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
   if (!input.phone.trim()) {
     if (!company) e.phone = "Nhập số điện thoại.";
   } else if (/[a-zA-Z]/.test(input.phone) || !isValidPhone(input.phone))
-    e.phone = "SĐT phải đủ 10 số, bắt đầu bằng 0 (nhập +84 cũng được).";
+    e.phone = "SĐT Việt Nam 10 số bắt đầu bằng 0; số nước ngoài ghi kèm mã nước, vd +62…";
   if (input.email.trim() && !EMAIL_RE.test(input.email.trim())) e.email = "Email không hợp lệ.";
   if (company) {
     if (input.wants_vat) {
@@ -76,7 +84,7 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
     // CCCD KHÔNG bắt buộc (CEO 10/10: thiếu CCCD chỉ nhắc khi tạo/chốt đơn,
     // không chặn tạo khách) — có nhập thì phải đúng 12 số.
     const id = input.tax_code.trim();
-    if (id && !isValidCccd(id)) e.tax_code = "Số CCCD phải đủ 12 chữ số.";
+    if (id && !isValidCccd(id) && !isValidPassport(id)) e.tax_code = "Số CCCD 12 chữ số, hoặc số hộ chiếu (chữ + số).";
   }
   return e;
 }

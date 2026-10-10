@@ -220,7 +220,7 @@ export function CustomerForm({
             id="phone"
             name="phone"
             inputMode="tel"
-            placeholder="0912345678"
+            placeholder="0912345678 · nước ngoài: +62…"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             onBlur={() => checkDup("phone", phone)}
@@ -292,13 +292,13 @@ export function CustomerForm({
         field(
           "tax_code",
           <>
-            Số CCCD <span className="font-normal text-muted-foreground">(= MST cá nhân, không bắt buộc)</span>
+            Số CCCD / hộ chiếu <span className="font-normal text-muted-foreground">(= MST cá nhân, không bắt buộc)</span>
           </>,
           <Input
             id="tax_code"
             name="tax_code"
-            inputMode="numeric"
-            maxLength={14}
+            autoCapitalize="characters"
+            maxLength={20}
             placeholder={
               hideIndividualId ? `Đã có: ${maskIdNumber(customer?.tax_code)} — để trống giữ nguyên` : "12 chữ số"
             }
