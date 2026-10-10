@@ -277,7 +277,7 @@ export function CustomerForm({
         field(
           "tax_code",
           <>
-            Số CCCD <span className="font-normal text-muted-foreground">(= MST cá nhân)</span> <Req />
+            Số CCCD <span className="font-normal text-muted-foreground">(= MST cá nhân, không bắt buộc)</span>
           </>,
           <Input
             id="tax_code"

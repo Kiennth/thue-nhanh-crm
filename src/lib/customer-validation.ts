@@ -71,9 +71,10 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
       else if (!EMAIL_RE.test(input.invoice_email.trim())) e.invoice_email = "Email nhận hoá đơn không hợp lệ.";
     }
   } else {
+    // CCCD KHÔNG bắt buộc (CEO 10/10: thiếu CCCD chỉ nhắc khi tạo/chốt đơn,
+    // không chặn tạo khách) — có nhập thì phải đúng 12 số.
     const id = input.tax_code.trim();
-    if (!id && !input.has_existing_tax_code) e.tax_code = "Nhập số CCCD (12 số).";
-    else if (id && !isValidCccd(id)) e.tax_code = "Số CCCD phải đủ 12 chữ số.";
+    if (id && !isValidCccd(id)) e.tax_code = "Số CCCD phải đủ 12 chữ số.";
   }
   return e;
 }
