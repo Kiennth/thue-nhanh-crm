@@ -67,7 +67,7 @@ export type NavSectionKey = "hang_hoa" | "khach_hang" | "tai_chinh" | "noi_dung_
 // Website/Blog tách thành "Nội dung web"; Kho/Bảng giá mẫu/Nhật ký vào "Cài đặt".
 export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] }[] = [
   { key: "hang_hoa", label: "Hàng hoá", hrefs: ["/orders", "/equipment", "/calendar", "/equipment-categories"] },
-  { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/orderers"] },
+  { key: "khach_hang", label: "Khách hàng", hrefs: ["/customers", "/customers/quality", "/orderers"] },
   { key: "tai_chinh", label: "Tài chính", hrefs: ["/debts", "/invoices", "/expenses", "/purchases", "/suppliers"] },
   { key: "noi_dung_web", label: "Nội dung web", hrefs: ["/website", "/website/blog"] },
   {
@@ -148,6 +148,12 @@ export const NAV_ITEMS: NavItem[] = [
     // (không có requireRole) — Kỹ thuật/Sales vốn đã vào được nếu gõ thẳng
     // URL, chỉ thiếu mục nav. Thêm vào cho khớp thực tế trang đã cho phép.
     roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong", "ky_thuat_sales"],
+  },
+  {
+    // Hàng đợi chất lượng dữ liệu khách + gộp trùng (giai đoạn 6, Grok 10/10).
+    href: "/customers/quality",
+    label: "Dữ liệu khách cần sửa",
+    roles: ["giam_doc", "admin", "ke_toan", "cua_hang_truong"],
   },
   {
     href: "/orderers",

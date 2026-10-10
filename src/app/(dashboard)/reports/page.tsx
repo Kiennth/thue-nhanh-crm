@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { vnDayKey, vnDayStartIso } from "@/lib/vn-day";
 import { BranchComparisonSection, previousMonthOf } from "@/components/branch-comparison";
@@ -13,6 +14,7 @@ import { MANAGE_ROLES } from "@/lib/employee-performance-charts";
 import { payrollByBranchForMonth } from "@/lib/report-cache";
 import { PeriodStatCards } from "../orders/period-stat-cards";
 import { OrdersTrendChart } from "../orders/orders-trend-chart";
+import { CATEGORY_PERIODS, CategoryRevenue, type CategoryPeriod } from "./category-revenue";
 
 // Trang "Báo cáo" (Grok tách gọn CRM 10/10, giai đoạn 1): so sánh doanh thu
 // các kho + Lợi nhuận gộp chuyển khỏi Trang chủ — chỉ tính khi mở trang này.
@@ -22,7 +24,15 @@ import { OrdersTrendChart } from "../orders/orders-trend-chart";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ day?: string; month?: string; year?: string; profitPeriod?: string }>;
+  searchParams: Promise<{
+    day?: string;
+    month?: string;
+    year?: string;
+    profitPeriod?: string;
+    tab?: string;
+    period?: string;
+    branch?: string;
+  }>;
 }) {
   const employee = await getCurrentEmployee();
   if (!employee) return null;
@@ -61,8 +71,67 @@ export default async function ReportsPage({
     profitMonths = Array.from({ length: lastMonth }, (_, i) => `${profitYear}-${String(i + 1).padStart(2, "0")}`);
   }
 
+  // Tab (giai đoạn 6, Grok 10/10 §7): Tổng quan (so sánh kho + lợi nhuận) ·
+  // Theo nhóm hàng; Hoá đơn chưa xuất và Lương & khoán mở trang riêng có sẵn.
+  const tab = params.tab === "category" ? "category" : "overview";
+  const tabs = (
+    <div className="flex flex-wrap gap-1 border-b">
+      {[
+        { href: "/reports", label: "Tổng quan", active: tab === "overview" },
+        { href: "/reports?tab=category", label: "Theo nhóm hàng", active: tab === "category" },
+        ...(canViewComparison
+          ? [
+              { href: "/invoices", label: "Hoá đơn chưa xuất ↗", active: false },
+              { href: "/payroll", label: "Lương & khoán ↗", active: false },
+            ]
+          : []),
+      ].map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          className={
+            t.active
+              ? "-mb-px border-b-2 border-primary px-3 py-2 text-sm font-semibold"
+              : "px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+          }
+        >
+          {t.label}
+        </Link>
+      ))}
+    </div>
+  );
+
+  if (tab === "category") {
+    const { data: branchRows } = await (await createClient()).from("branches").select("id, name").order("position");
+    const lockBranch = !canViewComparison;
+    const branchId = lockBranch
+      ? (employee.branch_id ?? null)
+      : (branchRows ?? []).some((b) => b.id === params.branch)
+        ? params.branch!
+        : null;
+    const period = CATEGORY_PERIODS.some((p) => p.key === params.period)
+      ? (params.period as CategoryPeriod)
+      : "month";
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Báo cáo</h1>
+        {tabs}
+        <Suspense fallback={<div className="h-80 animate-pulse rounded-xl border bg-muted/40" />}>
+          <CategoryRevenue
+            period={period}
+            today={defaults.day}
+            branchId={branchId}
+            branches={branchRows ?? []}
+            lockBranch={lockBranch}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {tabs}
       <div>
         <h1 className="text-2xl font-semibold">Báo cáo</h1>
         <p className="text-sm text-muted-foreground">

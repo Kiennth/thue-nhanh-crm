@@ -147,6 +147,7 @@ export async function updateCustomer(
   }
 
   revalidatePath("/customers");
+  revalidatePath("/customers/quality");
   revalidatePath(`/customers/${id}`);
   return { success: true };
 }
@@ -276,4 +277,25 @@ export async function deleteCustomer(id: string) {
   }
 
   revalidatePath("/customers");
+}
+
+// Gộp khách trùng (giai đoạn 6, Grok 10/10): chuyển mọi đơn / ghi chú công nợ
+// / đơn cũ của khách bị gộp sang khách giữ lại, điền ô trống, xoá khách bị
+// gộp (nhật ký hoạt động lưu bản sao). RPC merge_customers tự kiểm quyền.
+export async function mergeCustomers(
+  keepId: string,
+  dropId: string,
+): Promise<{ error: string } | { success: true; droppedName: string; moved: Record<string, number> }> {
+  await requireRole(["giam_doc", "admin", "ke_toan"]);
+  const supabase = await createClient();
+  const { data, error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient).rpc(
+    "merge_customers",
+    { p_keep: keepId, p_drop: dropId },
+  );
+  if (error) return { error: error.message };
+  revalidatePath("/customers");
+  revalidatePath("/customers/quality");
+  revalidatePath(`/customers/${keepId}`);
+  const r = data as { droppedName: string; moved: Record<string, number> };
+  return { success: true, droppedName: r.droppedName, moved: r.moved ?? {} };
 }

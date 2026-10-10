@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
-import { MANAGE_ROLES } from "@/lib/roles";
+import { MANAGE_ROLES, ORDERER_VIEW_ROLES } from "@/lib/roles";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import { SortableTableHead } from "@/components/sortable-table-head";
@@ -96,6 +96,39 @@ export default async function CustomerDetailPage({
     ? await supabase.from("branches").select("id, name").in("id", branchIds)
     : { data: [] };
   const branchNameById = new Map((branches ?? []).map((b) => [b.id, b.name]));
+
+  // Người đặt hàng của khách này (giai đoạn 6, Grok 10/10 §9): suy từ đơn —
+  // 1 khách nhiều người đặt; bấm sang hồ sơ người đặt.
+  const canViewOrderers = !!viewer && (ORDERER_VIEW_ROLES as readonly string[]).includes(viewer.role);
+  const ordererStats = new Map<string, { count: number; last: string }>();
+  // orders.orderer_id chưa có trong types/database.ts.
+  const visibleOrderIds = new Set(orderList.map((o) => o.id));
+  const { data: ordererLinks } = canViewOrderers
+    ? await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+        .from("orders")
+        .select("id, orderer_id, created_at")
+        .eq("customer_id", id)
+        .is("cancelled_at", null)
+        .not("orderer_id", "is", null)
+    : { data: [] };
+  for (const o of (ordererLinks ?? []) as { id: string; orderer_id: string; created_at: string }[]) {
+    if (!visibleOrderIds.has(o.id)) continue;
+    const cur = ordererStats.get(o.orderer_id) ?? { count: 0, last: "" };
+    ordererStats.set(o.orderer_id, {
+      count: cur.count + 1,
+      last: (o.created_at ?? "") > cur.last ? (o.created_at ?? "") : cur.last,
+    });
+  }
+  const { data: ordererRows } =
+    canViewOrderers && ordererStats.size
+      ? await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+          .from("orderers")
+          .select("id, name, phone, title")
+          .in("id", [...ordererStats.keys()])
+      : { data: [] };
+  const orderers = ((ordererRows ?? []) as { id: string; name: string; phone: string | null; title: string | null }[])
+    .map((r) => ({ ...r, ...ordererStats.get(r.id)! }))
+    .sort((a, b) => b.last.localeCompare(a.last));
 
   return (
     <div className="space-y-6">
@@ -200,6 +233,29 @@ export default async function CustomerDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {orderers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Người đặt hàng ({orderers.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {orderers.map((p) => (
+              <Link
+                key={p.id}
+                href={`/orderers/${p.id}`}
+                className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+              >
+                <span className="font-medium">{p.name}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {[p.phone, p.title].filter(Boolean).join(" · ")}
+                  {` · ${p.count} đơn · gần nhất ${dateTimeFormatter.format(new Date(p.last))}`}
+                </span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
