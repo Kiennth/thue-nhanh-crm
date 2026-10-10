@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { QuickOrderFab } from "@/components/quick-order-fab";
 import { HeaderClock } from "./header-clock";
 import { CommandPalette } from "@/components/command-palette";
+import { TaskAlertsProvider, TaskBell } from "@/components/task-alerts";
 import { NAV_ITEMS, REPORT_ROLES, SETTINGS_ITEMS } from "@/lib/roles";
 
 // Vị trí theo IP người dùng — Cloudflare edge đã tự phân giải geo-IP cho mọi
@@ -42,31 +43,40 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar employee={employee} />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
-          <span className="text-sm text-muted-foreground">
-            Xin chào, {employee.name}
-          </span>
-          <CommandPalette
-            pages={[
-              { href: "/", label: "Hôm nay" },
-              { href: "/reports", label: "Báo cáo", roles: REPORT_ROLES },
-              ...NAV_ITEMS,
-              ...SETTINGS_ITEMS,
-            ]
-              .filter((i) => !("roles" in i) || !i.roles || i.roles.includes(employee.role))
-              .map(({ href, label }) => ({ href, label }))}
-          />
-          <HeaderClock location={location} />
-        </header>
-        {/* pb-24: chừa chỗ cho nút nổi Tạo đơn nhanh không che nội dung cuối trang. */}
-        <main className="flex-1 p-4 pb-24 sm:p-6 sm:pb-24">{children}</main>
-        <QuickOrderFab branches={branches ?? []} />
-      </SidebarInset>
-    </SidebarProvider>
+    <TaskAlertsProvider>
+      <SidebarProvider>
+        <AppSidebar employee={employee} />
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="h-4" />
+            <span className="text-sm text-muted-foreground">
+              Xin chào, {employee.name}
+            </span>
+            <CommandPalette
+              pages={[
+                { href: "/", label: "Hôm nay" },
+                { href: "/my-tasks", label: "Việc của tôi" },
+                { href: "/reports", label: "Báo cáo", roles: REPORT_ROLES },
+                ...NAV_ITEMS,
+                ...SETTINGS_ITEMS,
+              ]
+                .filter(
+                  (i) =>
+                    !("roles" in i) ||
+                    !i.roles ||
+                    i.roles.includes(employee.role),
+                )
+                .map(({ href, label }) => ({ href, label }))}
+            />
+            <TaskBell />
+            <HeaderClock location={location} />
+          </header>
+          {/* pb-24: chừa chỗ cho nút nổi Tạo đơn nhanh không che nội dung cuối trang. */}
+          <main className="flex-1 p-4 pb-24 sm:p-6 sm:pb-24">{children}</main>
+          <QuickOrderFab branches={branches ?? []} />
+        </SidebarInset>
+      </SidebarProvider>
+    </TaskAlertsProvider>
   );
 }

@@ -37,6 +37,7 @@ import {
   Package,
   Wallet,
   Settings,
+  ListTodo,
 } from "lucide-react";
 import {
   Sidebar,
@@ -53,6 +54,7 @@ import { Button } from "@/components/ui/button";
 import { NAV_ITEMS, NAV_SECTIONS, REPORT_ROLES, ROLE_LABELS, SETTINGS_ITEMS, type NavSectionKey } from "@/lib/roles";
 import { logout } from "@/lib/actions/auth";
 import type { CurrentEmployee } from "@/lib/dal";
+import { useMyDueCount } from "@/components/task-alerts";
 
 // Menu trái có icon + màu riêng từng mục, chữ to/đậm hơn (CEO 2026-10-04:
 // "tô đậm, màu sắc hơn, trực quan hơn"). Class viết sẵn đủ chữ để Tailwind
@@ -62,6 +64,11 @@ const NAV_STYLE: Record<string, { icon: LucideIcon; tile: string; active: string
     icon: House,
     tile: "bg-slate-500/12 text-slate-600 dark:text-slate-300",
     active: "data-active:bg-slate-500/12 data-active:text-slate-800 dark:data-active:text-slate-100",
+  },
+  "/my-tasks": {
+    icon: ListTodo,
+    tile: "bg-teal-500/12 text-teal-600 dark:text-teal-400",
+    active: "data-active:bg-teal-500/12 data-active:text-teal-700 dark:data-active:text-teal-300",
   },
   "/reports": {
     icon: BarChart3,
@@ -186,7 +193,17 @@ const FALLBACK_STYLE = {
   active: "data-active:bg-gray-500/12",
 };
 
-function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+function NavLink({
+  href,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  badge?: number;
+}) {
   const style = NAV_STYLE[href] ?? FALLBACK_STYLE;
   const Icon = style.icon;
   return (
@@ -204,7 +221,10 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
         >
           <Icon strokeWidth={2.25} />
         </span>
-        <span>{label}</span>
+        <span className="flex-1">{label}</span>
+        {!!badge && (
+          <span className="rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white tabular-nums">{badge}</span>
+        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -223,6 +243,8 @@ const SECTION_ICON: Record<NavSectionKey, { icon: LucideIcon; tile: string }> = 
 
 export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   const pathname = usePathname();
+  // Việc của tôi đến hạn hôm nay / quá hạn (giai đoạn 4).
+  const myDue = useMyDueCount();
   // Accordion (Grok tách gọn CRM 10/10): chỉ mở 1 nhóm; mặc định mở nhóm của
   // trang đang xem, đổi trang thì tự mở theo. Bấm nhóm khác để mở/gập.
   const [manual, setManual] = useState<{ key: string | null; forPath: string } | null>(null);
@@ -268,6 +290,12 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <NavLink href="/" label="Hôm nay" active={pathname === "/"} />
+              <NavLink
+                href="/my-tasks"
+                label="Việc của tôi"
+                active={pathname.startsWith("/my-tasks")}
+                badge={myDue}
+              />
               {REPORT_ROLES.includes(employee.role) && (
                 <NavLink href="/reports" label="Báo cáo" active={pathname.startsWith("/reports")} />
               )}

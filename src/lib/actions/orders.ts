@@ -2442,6 +2442,7 @@ export async function completeOrderSteps(
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   revalidatePath("/");
+  revalidatePath("/my-tasks");
   return { success: true, warnings: checks.missingCccd ? ["Khách cá nhân chưa có CCCD — nhớ bổ sung."] : [] };
 }
 

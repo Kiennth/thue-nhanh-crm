@@ -32,7 +32,7 @@ const OWING_STEPS: TaskType[] = ["nghiem_thu", "nhap_kho_bao_tri"];
 const REASON_PRESETS = ["Công nợ công ty 30 ngày", "KH hẹn chuyển khoản", "Đã trừ cọc đơn khác", "Miễn cọc theo hồ sơ"];
 const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")}đ`;
 
-function StepCompleterBody({
+export function StepCompleterBody({
   orderId,
   steps,
   currentEmployeeId,
