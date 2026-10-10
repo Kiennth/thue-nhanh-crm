@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Merge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { mergeCustomers } from "@/lib/actions/customers";
+import { ignoreDuplicateGroup, mergeCustomers } from "@/lib/actions/customers";
 import { cn } from "@/lib/utils";
 import { CustomerDialog } from "../customer-dialog";
 
@@ -105,11 +105,13 @@ export function QualityList({ rows, canViewIdNumber }: { rows: QualityCustomer[]
 }
 
 export function DuplicateGroups({
+  kind,
   groups,
   keyLabel,
   canMerge,
   canViewIdNumber,
 }: {
+  kind: "dup_phone" | "dup_tax";
   groups: { key: string; customers: QualityCustomer[] }[];
   keyLabel: string;
   canMerge: boolean;
@@ -120,18 +122,27 @@ export function DuplicateGroups({
   return (
     <div className="space-y-3">
       {groups.map((g) => (
-        <DuplicateGroup key={g.key} group={g} keyLabel={keyLabel} canMerge={canMerge} canViewIdNumber={canViewIdNumber} />
+        <DuplicateGroup
+          key={g.key}
+          kind={kind}
+          group={g}
+          keyLabel={keyLabel}
+          canMerge={canMerge}
+          canViewIdNumber={canViewIdNumber}
+        />
       ))}
     </div>
   );
 }
 
 function DuplicateGroup({
+  kind,
   group,
   keyLabel,
   canMerge,
   canViewIdNumber,
 }: {
+  kind: "dup_phone" | "dup_tax";
   group: { key: string; customers: QualityCustomer[] };
   keyLabel: string;
   canMerge: boolean;
@@ -142,10 +153,15 @@ function DuplicateGroup({
   const keep = group.customers.find((c) => c.id === keepId);
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
-      <p className="border-b px-3 py-2 text-sm">
-        {keyLabel} <b className="tabular-nums">{group.key}</b> · {group.customers.length} khách
-        {canMerge && <span className="text-xs text-muted-foreground"> — chọn khách giữ lại, các khách khác bấm Gộp</span>}
-      </p>
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-sm">
+        <p className="flex-1">
+          {keyLabel} <b className="tabular-nums">{group.key}</b> · {group.customers.length} khách
+          {canMerge && (
+            <span className="text-xs text-muted-foreground"> — chọn khách giữ lại, các khách khác bấm Gộp</span>
+          )}
+        </p>
+        {canMerge && <NotDuplicateButton kind={kind} groupKey={group.key} />}
+      </div>
       <table className="w-full text-sm">
         <tbody className="divide-y">
           {group.customers.map((c) => (
@@ -231,5 +247,27 @@ function MergeButton({ keep, drop }: { keep: QualityCustomer; drop: QualityCusto
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Xác nhận nhóm này là các khách KHÁC nhau (vd 2 phòng ban cùng MST) — ẩn
+// khỏi danh sách trùng, không gộp.
+function NotDuplicateButton({ kind, groupKey }: { kind: "dup_phone" | "dup_tax"; groupKey: string }) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const res = await ignoreDuplicateGroup(kind, groupKey, "Xác nhận khách khác nhau");
+          if ("error" in res) toast.error(res.error);
+          else toast.success("Đã ẩn nhóm — tính là các khách khác nhau.");
+        })
+      }
+    >
+      Không phải trùng
+    </Button>
   );
 }

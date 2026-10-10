@@ -87,6 +87,7 @@ export default async function CustomerQualityPage({ searchParams }: { searchPara
       <p className="text-sm text-muted-foreground">{active.hint}</p>
       {isDup ? (
         <DuplicateGroups
+          kind={kind as "dup_phone" | "dup_tax"}
           groups={rows as { key: string; customers: QualityCustomer[] }[]}
           keyLabel={kind === "dup_phone" ? "SĐT" : "MST"}
           canMerge={canMerge}

@@ -299,3 +299,21 @@ export async function mergeCustomers(
   const r = data as { droppedName: string; moved: Record<string, number> };
   return { success: true, droppedName: r.droppedName, moved: r.moved ?? {} };
 }
+
+// "Không phải trùng": nhóm trùng SĐT / MST đã xác nhận là khách khác nhau
+// (vd 2 phòng ban cùng MST — CEO 10/10) → ẩn khỏi Dữ liệu khách cần sửa.
+export async function ignoreDuplicateGroup(
+  kind: "dup_phone" | "dup_tax",
+  key: string,
+  note: string,
+): Promise<{ error: string } | { success: true }> {
+  const employee = await requireRole(["giam_doc", "admin", "ke_toan"]);
+  if (!["dup_phone", "dup_tax"].includes(kind) || !/^[0-9-]{9,14}$/.test(key)) return { error: "Nhóm không hợp lệ." };
+  const supabase = (await createClient()) as unknown as import("@supabase/supabase-js").SupabaseClient;
+  const { error } = await supabase
+    .from("customer_dup_ignores")
+    .upsert({ kind, key, note: note.trim().slice(0, 300) || null, created_by: employee.id });
+  if (error) return { error: error.message };
+  revalidatePath("/customers/quality");
+  return { success: true };
+}
