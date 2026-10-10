@@ -67,7 +67,8 @@ export function OrderFlowBar({
   canUndo: boolean;
 }) {
   const confirmed = !!confirmedAt || delivered;
-  const current = returned ? 4 : delivered ? 3 : confirmed ? 2 : 1;
+  // Bước kế tiếp cần làm (1 = Đã báo giá luôn xong; 5 = đã xong hết).
+  const next = returned ? 5 : delivered ? 4 : confirmed ? 3 : 2;
   const [pending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<null | "pickup" | "return" | "undo">(null);
   const [at, setAt] = useState("");
@@ -101,8 +102,8 @@ export function OrderFlowBar({
     <div className="rounded-xl border bg-card p-3 sm:p-4">
       <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {steps.map((s) => {
-          const done = s.n < current || (s.n === 4 && returned);
-          const active = s.n === current && !returned;
+          const done = s.n < next;
+          const active = s.n === next;
           return (
             <li
               key={s.n}
@@ -134,7 +135,7 @@ export function OrderFlowBar({
       </ol>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {current === 1 && (
+        {next === 2 && (
           <>
             <Button
               disabled={pending}
@@ -145,20 +146,20 @@ export function OrderFlowBar({
             </Button>
           </>
         )}
-        {current === 2 && (
+        {next === 3 && (
           <Button disabled={pending} onClick={() => openFlowDialog("pickup")}>
             <Truck className="size-4" />
             Giao máy
           </Button>
         )}
-        {current === 3 && (
+        {next === 4 && (
           <Button disabled={pending} onClick={() => openFlowDialog("return")}>
             <PackageCheck className="size-4" />
             Nhận lại máy
           </Button>
         )}
-        {current === 4 && <span className="text-sm font-medium text-primary">Đơn đã hoàn tất — máy đã về kho.</span>}
-        {canUndo && current > 1 && (
+        {next === 5 && <span className="text-sm font-medium text-primary">Đơn đã hoàn tất — máy đã về kho.</span>}
+        {canUndo && next > 2 && (
           <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setDialog("undo")}>
             <Undo2 className="size-4" />
             Hoàn tác {undoLabel.toLowerCase()}
