@@ -74,7 +74,15 @@ export default async function WebsiteLeadsPage() {
                   </a>
                 </div>
               </TableCell>
-              <TableCell className="max-w-md text-sm">{lead.message ?? "—"}</TableCell>
+              <TableCell className="max-w-md text-sm whitespace-pre-wrap">
+                {/* Lead từ form "Thuê dài hạn" trên web (CEO 10/10) — có chuông báo. */}
+                {lead.message?.startsWith("[Dài hạn]") && (
+                  <span className="mb-1 inline-block rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">
+                    Thuê dài hạn — cần báo giá
+                  </span>
+                )}
+                {lead.message?.startsWith("[Dài hạn]") ? lead.message.replace(/^\[Dài hạn\][^\n]*\n?/, "") : (lead.message ?? "—")}
+              </TableCell>
               <TableCell className="text-sm">
                 {lead.product_slug ? (
                   <a

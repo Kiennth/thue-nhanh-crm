@@ -106,24 +106,34 @@ export function TaskBell() {
           alerts.slice(0, 30).map((a) => (
             <DropdownMenuItem
               key={a.key}
-              onClick={() => router.push(a.taskType === "invoice" ? "/invoices?filter=overdue" : `/orders/${a.orderId}`)}
+              onClick={() =>
+                router.push(
+                  a.taskType === "invoice" ? "/invoices?filter=overdue" : a.taskType === "lead" ? "/website/leads" : `/orders/${a.orderId}`,
+                )
+              }
               className="flex items-start gap-2 py-2"
             >
               <span
                 className={cn(
                   "mt-1.5 size-2 shrink-0 rounded-full",
-                  a.seen ? "bg-transparent" : a.kind === "soon" ? "bg-amber-500" : "bg-rose-600",
+                  a.seen ? "bg-transparent" : a.kind === "soon" ? "bg-amber-500" : a.kind === "lead_long" ? "bg-sky-600" : "bg-rose-600",
                 )}
               />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm">
                   <b>{a.orderCode}</b> ·{" "}
-                  {a.taskType === "invoice" ? "Xuất hoá đơn" : TASK_TYPE_LABELS[a.taskType as TaskType]}
+                  {a.taskType === "invoice"
+                    ? "Xuất hoá đơn"
+                    : a.taskType === "lead"
+                      ? "Thuê dài hạn — cần báo giá"
+                      : TASK_TYPE_LABELS[a.taskType as TaskType]}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {a.kind === "soon"
                     ? "Tới hạn trong 1 giờ"
-                    : a.kind === "invoice_late"
+                    : a.kind === "lead_long"
+                      ? "Khách web gửi"
+                      : a.kind === "invoice_late"
                       ? "HĐ chờ quá 3 ngày"
                       : "Quá hạn"}{" "}
                   · {dueFmt.format(new Date(a.dueAt))}

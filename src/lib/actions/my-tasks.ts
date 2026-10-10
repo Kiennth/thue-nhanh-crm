@@ -16,10 +16,12 @@ export type TaskAlert = {
   key: string;
   orderId: string;
   orderCode: string;
-  // "invoice" = nhắc xuất hoá đơn (giai đoạn 5).
-  taskType: TaskType | "invoice";
+  // "invoice" = nhắc xuất hoá đơn (giai đoạn 5); "lead" = khách web xin báo
+  // giá thuê dài hạn (CEO 10/10) — orderId = id lead, orderCode = tên khách,
+  // customerName = SĐT, dueAt = lúc khách gửi.
+  taskType: TaskType | "invoice" | "lead";
   dueAt: string;
-  kind: "soon" | "overdue" | "invoice_due" | "invoice_late";
+  kind: "soon" | "overdue" | "invoice_due" | "invoice_late" | "lead_long";
   mine: boolean;
   customerName: string | null;
   seen: boolean;
