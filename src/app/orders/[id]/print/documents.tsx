@@ -77,15 +77,36 @@ const Td = ({
   </td>
 );
 
-function NationalHeader() {
+// "en": bản tiếng Anh; "bi": song ngữ (hợp đồng) — câu Việt, dòng Anh nghiêng.
+function NationalHeader({ variant = "vi" }: { variant?: "vi" | "en" | "bi" }) {
   return (
     <div className="text-center">
-      <p className="font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-      <p className="font-bold">Độc lập - Tự do - Hạnh phúc</p>
+      {variant !== "en" && (
+        <>
+          <p className="font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+          <p className="font-bold">Độc lập - Tự do - Hạnh phúc</p>
+        </>
+      )}
+      {variant !== "vi" && (
+        <>
+          <p className={`font-bold ${variant === "bi" ? "italic" : ""}`}>SOCIALIST REPUBLIC OF VIETNAM</p>
+          <p className={`font-bold ${variant === "bi" ? "italic" : ""}`}>Independence - Freedom - Happiness</p>
+        </>
+      )}
       <p>---o0o---</p>
     </div>
   );
 }
+
+// Bản tiếng Anh (CEO 2026-10-10): đổi các chuỗi ngày/địa điểm tiếng Việt mà
+// trang in dựng sẵn ("09:00 ngày 30/09/2026", "ngày 30 tháng 09 năm 2026",
+// "Kho Thuê Nhanh …") sang dạng tiếng Anh.
+const enDateTime = (s: string) => s.replace(" ngày ", ", ");
+const enLongDate = (s: string) => s.replace(/^ngày (\S+) tháng (\S+) năm (\S+)$/, "$1/$2/$3");
+const enPlace = (s: string) =>
+  s.replace(/^Kho Thuê Nhanh /, "Thuê Nhanh store, ").replace(/^Nhận tại kho Thuê Nhanh /, "Pickup at Thuê Nhanh store, ");
+const enCity = (s: string) =>
+  ({ "TP. Hồ Chí Minh": "Ho Chi Minh City", "Hà Nội": "Hanoi", "Đà Nẵng": "Da Nang" })[s] ?? s;
 
 function RowDescription({ row, showNote = true }: { row: DocRow; showNote?: boolean }) {
   return (
@@ -685,13 +706,14 @@ export function QuoteDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "v
 // ---------------------------------------------------------------------------
 // ĐỀ NGHỊ THANH TOÁN
 // ---------------------------------------------------------------------------
-export function PaymentRequestDocument({ ctx }: { ctx: DocContext }) {
+export function PaymentRequestDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "vi" | "en" }) {
   // Số tiền đề nghị = tiền thuê (gồm VAT) còn chưa thanh toán; đơn chưa thu
   // đồng nào thì là toàn bộ tiền thuê.
   const due = ctx.totals.rentalWithVat - ctx.paid;
   const amount = due > 0 ? due : ctx.totals.rentalWithVat;
   // Ký quỹ còn phải thu = cọc của đơn trừ số đang giữ.
   const depositDue = Math.max(0, ctx.totals.deposit - ctx.depositHeld);
+  if (lang === "en") return <PaymentRequestEn ctx={ctx} amount={amount} depositDue={depositDue} />;
   const contractRef = `${ctx.docNumber} ${ctx.contractDateText}`;
   return (
     <div className="space-y-3 leading-7">
@@ -746,20 +768,74 @@ export function PaymentRequestDocument({ ctx }: { ctx: DocContext }) {
   );
 }
 
+function PaymentRequestEn({ ctx, amount, depositDue }: { ctx: DocContext; amount: number; depositDue: number }) {
+  const contractRef = `${ctx.docNumber} dated ${enLongDate(ctx.contractDateText)}`;
+  return (
+    <div className="space-y-3 leading-7">
+      <NationalHeader variant="en" />
+      <h1 className="pt-2 text-center text-xl font-bold">PAYMENT REQUEST</h1>
+      <p>
+        <b>To:</b> {ctx.customer.name}
+      </p>
+      <p className="text-justify">
+        Pursuant to the agreement between the two parties under contract No. {contractRef} between the Lessor:{" "}
+        {COMPANY_INFO.legalName} (Party A) and the Lessee: {ctx.customer.name} (Party B), Party A hereby sends the
+        contract signed as agreed by both parties.
+      </p>
+      <p className="text-justify">
+        Under the payment terms of the contract, Party B shall pay Party A the amount of <b>{fmtEn(amount)} VND</b>{" "}
+        upon receipt of the signed contract for the contract to take effect.
+      </p>
+      <p className="text-justify">
+        Accordingly, Party A kindly requests that you make the payment under contract No. {contractRef} as the
+        basis for Party A to perform the contract.
+      </p>
+      <div>
+        <p>Payment details:</p>
+        <p>Bank: {COMPANY_INFO.documentBank.bankName}.</p>
+        <p>Account number: {COMPANY_INFO.documentBank.accountNumber}</p>
+        <p>Account name: {COMPANY_INFO.documentBank.accountName}</p>
+        <p>
+          Transfer reference: {transferRef(ctx.orderCode)}
+          {depositDue > 0 && <> (rental) · {transferRef(ctx.orderCode, true)} (deposit)</>}
+        </p>
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          {amount > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={amount} label="Payment 1 — rental" size={120} lang="en" />
+          )}
+          {depositDue > 0 && (
+            <PaymentQr orderCode={ctx.orderCode} amount={depositDue} deposit label="Payment 2 — deposit" size={120} lang="en" />
+          )}
+        </div>
+      </div>
+      <p>We look forward to your cooperation. Thank you very much!</p>
+      <div className="flex justify-end pt-2">
+        <div className="w-72 text-center">
+          <p className="font-bold">CTCP TM DỊCH VỤ THUÊ NHANH</p>
+          <p className="font-bold">Director</p>
+          <div className="h-24" />
+          <p className="font-bold">{COMPANY_INFO.representativeName}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // BIÊN BẢN BÀN GIAO THIẾT BỊ THUÊ
 // ---------------------------------------------------------------------------
-function PartyLine({ label, children }: { label: string; children?: ReactNode }) {
+function PartyLine({ label, children, wide = false }: { label: ReactNode; children?: ReactNode; wide?: boolean }) {
   return (
     <p className="flex">
-      <span className="w-32 shrink-0">{label}</span>
+      <span className={`${wide ? "w-48" : "w-32"} shrink-0`}>{label}</span>
       <span className="mr-1">:</span>
       <span className="min-w-0 flex-1">{children}</span>
     </p>
   );
 }
 
-export function HandoverDocument({ ctx }: { ctx: DocContext }) {
+export function HandoverDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "vi" | "en" }) {
+  if (lang === "en") return <HandoverEn ctx={ctx} />;
   const contractRef = `${ctx.docNumber} ký ${ctx.contractDateText}`;
   // Biên bản bàn giao chỉ liệt kê thiết bị/hàng hoá — không gồm dòng phí dịch vụ.
   const rows = ctx.rows.filter((row) => !row.isService);
@@ -874,46 +950,166 @@ export function HandoverDocument({ ctx }: { ctx: DocContext }) {
   );
 }
 
+function HandoverEn({ ctx }: { ctx: DocContext }) {
+  const contractRef = `${ctx.docNumber} signed on ${enLongDate(ctx.contractDateText)}`;
+  const rows = ctx.rows.filter((row) => !row.isService);
+  const d = ctx.pickupDateParts;
+  const date = d ? `${d.day}/${d.month}/${d.year}` : "……/……/……";
+  return (
+    <div className="space-y-3">
+      <NationalHeader variant="en" />
+      <h1 className="pt-2 text-center text-xl font-bold">EQUIPMENT RENTAL HANDOVER RECORD</h1>
+      <p className="text-right italic">
+        {enCity(ctx.city)}, {date}
+      </p>
+      <p>Pursuant to contract No. {contractRef}. We, the undersigned:</p>
+
+      <div>
+        <p className="font-bold">DELIVERING PARTY: {COMPANY_INFO.legalName}</p>
+        <PartyLine wide label="Address">{COMPANY_INFO.legalAddress}</PartyLine>
+        <PartyLine wide label="Tax code">{COMPANY_INFO.taxCode}</PartyLine>
+        <PartyLine wide label="Delivered by">{DOTS}</PartyLine>
+        <PartyLine wide label="Phone">{DOTS}</PartyLine>
+        <PartyLine wide label="ID / Passport No.">
+          {DOTS} Issued on: {DOTS}
+        </PartyLine>
+        <p className="italic">(Hereinafter referred to as Party A)</p>
+      </div>
+
+      <div>
+        <p className="font-bold">RECEIVING PARTY: {ctx.customer.name}</p>
+        <PartyLine wide label="Address">{ctx.customer.address ?? ""}</PartyLine>
+        <PartyLine wide label="Tax code">{ctx.customer.taxCode ?? ""}</PartyLine>
+        {ctx.customer.budgetUnitCode && <PartyLine wide label="Budget unit code">{ctx.customer.budgetUnitCode}</PartyLine>}
+        <PartyLine wide label="Delivery address">{enPlace(ctx.deliveryAddress)}</PartyLine>
+        <PartyLine wide label="Received by">{ctx.receiverName ?? DOTS}</PartyLine>
+        <PartyLine wide label="Phone">{ctx.receiverPhone ?? DOTS}</PartyLine>
+        <PartyLine wide label="ID / Passport No.">
+          {DOTS} Issued on: {DOTS}
+        </PartyLine>
+        <p className="italic">(Hereinafter referred to as Party B)</p>
+      </div>
+
+      <p className="text-justify">
+        Today, at …… (time), on {date}, Party A hands over the equipment to Party B as detailed below:
+      </p>
+
+      <p className="font-bold">1. Equipment list:</p>
+      <table className="w-full border-collapse text-[12px]">
+        <thead>
+          <tr>
+            <Th className="w-8">No.</Th>
+            <Th>Description</Th>
+            <Th className="w-10">Unit</Th>
+            <Th className="w-10">Qty</Th>
+            <Th className="w-40">Serial Number</Th>
+            <Th className="w-32">Accessories</Th>
+            <Th className="w-24">Condition</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.key}>
+              <Td className="text-center">{index + 1}</Td>
+              <Td>
+                <RowDescription row={row} showNote={false} />
+              </Td>
+              <Td className="text-center">{row.unit}</Td>
+              <Td className="text-center">{row.quantity}</Td>
+              <Td className="font-mono text-[10.5px] break-all">
+                {row.serials.map((serial) => (
+                  <span key={serial} className="block">
+                    {serial}
+                  </span>
+                ))}
+              </Td>
+              <Td>
+                <AccessoryChecklist note={row.note} />
+              </Td>
+              <Td />
+            </tr>
+          ))}
+          {!rows.length && (
+            <tr>
+              <Td colSpan={7} className="text-center">
+                No equipment on this order yet.
+              </Td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      <p className="text-justify">
+        <b>2. Reason for handover:</b> Party A hands over the equipment agreed by both parties as recorded in
+        Contract No. {contractRef}. Party B has inspected and received the full quantity of equipment and
+        accessories in the condition stated above, and is responsible for keeping them safe and returning them
+        intact and on time as originally agreed.
+      </p>
+      <p className="text-justify">
+        This record is made in 02 copies of equal legal validity; each party keeps one copy. The parties have
+        confirmed the above contents, reached agreement and sign below.
+      </p>
+
+      <div className="grid grid-cols-2 pt-2 text-center font-bold">
+        <p>DELIVERING PARTY</p>
+        <p>RECEIVING PARTY</p>
+      </div>
+      <div className="h-24" />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // BIÊN BẢN NGHIỆM THU
 // ---------------------------------------------------------------------------
-function ValueTable({ rows, totals, withDeposit }: { rows: DocRow[]; totals: DocTotals; withDeposit: boolean }) {
+function ValueTable({
+  rows,
+  totals,
+  withDeposit,
+  en = false,
+}: {
+  rows: DocRow[];
+  totals: DocTotals;
+  withDeposit: boolean;
+  en?: boolean;
+}) {
+  const f = en ? fmtEn : fmt;
   return (
     <table className="w-full border-collapse text-[12px]">
       <thead>
         <tr>
-          <Th className="w-8">STT</Th>
-          <Th>Mô tả</Th>
-          <Th className="w-10">ĐVT</Th>
-          <Th className="w-12">Số lượng</Th>
-          <Th className="w-12">Số ngày</Th>
-          <Th>Đơn giá (VNĐ)</Th>
-          <Th>Thành tiền (VNĐ)</Th>
+          <Th className="w-8">{en ? "No." : "STT"}</Th>
+          <Th>{en ? "Description" : "Mô tả"}</Th>
+          <Th className="w-10">{en ? "Unit" : "ĐVT"}</Th>
+          <Th className="w-12">{en ? "Qty" : "Số lượng"}</Th>
+          <Th className="w-12">{en ? "Days" : "Số ngày"}</Th>
+          <Th>{en ? "Unit price (VND)" : "Đơn giá (VNĐ)"}</Th>
+          <Th>{en ? "Amount (VND)" : "Thành tiền (VNĐ)"}</Th>
           <Th>{vatLabel}</Th>
-          <Th>Tổng số tiền (VNĐ)</Th>
+          <Th>{en ? "Total (VND)" : "Tổng số tiền (VNĐ)"}</Th>
         </tr>
       </thead>
       <tbody>
-        <PriceRows rows={rows} withPackageColumn={false} />
+        <PriceRows rows={rows} withPackageColumn={false} format={f} />
         {withDeposit && (
           <tr>
             <Td />
-            <Td colSpan={7}>Tiền ký quỹ</Td>
-            <Td className="text-right">{fmt(totals.deposit)}</Td>
+            <Td colSpan={7}>{en ? "Security deposit" : "Tiền ký quỹ"}</Td>
+            <Td className="text-right">{f(totals.deposit)}</Td>
           </tr>
         )}
         <tr className="font-bold">
           <Td />
-          <Td colSpan={5}>Tổng tiền thuê</Td>
-          <Td className="text-right">{fmt(totals.rental)}</Td>
-          <Td className="text-right">{fmt(totals.vat)}</Td>
-          <Td className="text-right">{fmt(totals.rentalWithVat)}</Td>
+          <Td colSpan={5}>{en ? "Total rental" : "Tổng tiền thuê"}</Td>
+          <Td className="text-right">{f(totals.rental)}</Td>
+          <Td className="text-right">{f(totals.vat)}</Td>
+          <Td className="text-right">{f(totals.rentalWithVat)}</Td>
         </tr>
         {withDeposit && (
           <tr className="font-bold">
             <Td />
-            <Td colSpan={7}>Tiền thuê và tiền ký quỹ</Td>
-            <Td className="text-right">{fmt(totals.grand)}</Td>
+            <Td colSpan={7}>{en ? "Rental and deposit" : "Tiền thuê và tiền ký quỹ"}</Td>
+            <Td className="text-right">{f(totals.grand)}</Td>
           </tr>
         )}
       </tbody>
@@ -921,7 +1117,8 @@ function ValueTable({ rows, totals, withDeposit }: { rows: DocRow[]; totals: Doc
   );
 }
 
-export function AcceptanceDocument({ ctx }: { ctx: DocContext }) {
+export function AcceptanceDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "vi" | "en" }) {
+  if (lang === "en") return <AcceptanceEn ctx={ctx} />;
   const { totals } = ctx;
   const contractRef = `${ctx.docNumber} ký ${ctx.contractDateText}`;
   const remaining = Math.max(0, totals.rentalWithVat - ctx.paid);
@@ -1070,6 +1267,137 @@ export function AcceptanceDocument({ ctx }: { ctx: DocContext }) {
   );
 }
 
+function AcceptanceEn({ ctx }: { ctx: DocContext }) {
+  const { totals } = ctx;
+  const contractRef = `${ctx.docNumber} signed on ${enLongDate(ctx.contractDateText)}`;
+  const remaining = Math.max(0, totals.rentalWithVat - ctx.paid);
+  const depositToRefund = Math.max(0, ctx.depositHeld);
+  const settlement: [string, number][] = [
+    ["Value under the signed contract", totals.rentalWithVat],
+    ["Security deposit under the contract (if any)", totals.deposit],
+    ["Value per actual acceptance", totals.rentalWithVat],
+    ["Decrease", 0],
+    ["Increase", 0],
+    ["Paid by Party B (payment 1)", ctx.paid],
+    ["Remaining amount payable by Party B", remaining],
+    ["Deposit to be refunded by Party A", depositToRefund],
+  ];
+  return (
+    <div className="space-y-2.5">
+      <NationalHeader variant="en" />
+      <div className="pt-2 text-center">
+        <h1 className="text-xl font-bold">ACCEPTANCE RECORD</h1>
+        <p className="italic">for contract No. {contractRef}</p>
+      </div>
+      <p>Today, {enLongDate(ctx.returnDateText)}, we, the undersigned:</p>
+
+      <div>
+        <p className="font-bold">LESSOR: {COMPANY_INFO.legalName}</p>
+        <PartyLine wide label="Address">{COMPANY_INFO.legalAddress}</PartyLine>
+        <PartyLine wide label="Tax code">{COMPANY_INFO.taxCode}</PartyLine>
+        <PartyLine wide label="Represented by">Mr. {COMPANY_INFO.representativeName}. Title: Director</PartyLine>
+        <p className="italic">(Hereinafter referred to as Party A)</p>
+      </div>
+      <div>
+        <p className="font-bold">LESSEE: {ctx.customer.name}</p>
+        <PartyLine wide label="Address">{ctx.customer.address ?? ""}</PartyLine>
+        <PartyLine wide label="Tax code">{ctx.customer.taxCode ?? ""}</PartyLine>
+        {ctx.customer.budgetUnitCode && <PartyLine wide label="Budget unit code">{ctx.customer.budgetUnitCode}</PartyLine>}
+        <PartyLine wide label="Represented by">
+          {DOTS} Title: {SHORT_DOTS}
+        </PartyLine>
+        {ctx.customer.bankAccountNumber && (
+          <PartyLine wide label="Bank account">
+            {ctx.customer.bankAccountNumber}
+            {ctx.customer.bankName ? ` at ${ctx.customer.bankName}` : ""}
+          </PartyLine>
+        )}
+        <p className="italic">(Hereinafter referred to as Party B)</p>
+      </div>
+
+      <p>Party A has completed the work items requested by Party B, as detailed below:</p>
+      <p>
+        <b>Acceptance date:</b> {enDateTime(ctx.returnText)}
+      </p>
+      <div>
+        <p className="font-bold">Evaluation of the work performed:</p>
+        <p>Quality of work: Meets Party B&apos;s requirements.</p>
+        <p>Conclusion: Accepted; the contract is liquidated.</p>
+      </div>
+
+      <p className="font-bold">Contract value:</p>
+      <p>Total signed contract value (VAT included):</p>
+      <ValueTable rows={ctx.rows} totals={totals} withDeposit en />
+
+      <p>Total actual accepted value (VAT included):</p>
+      <ValueTable rows={ctx.rows} totals={totals} withDeposit={false} en />
+
+      <p>Liquidation details (VAT included):</p>
+      <table className="w-full border-collapse text-[12px]">
+        <thead>
+          <tr>
+            <Th className="w-8">No.</Th>
+            <Th>Description</Th>
+            <Th className="w-44">
+              Value
+              <br />
+              (incl. {Math.round(VAT_RATE * 100)}% VAT)
+            </Th>
+            <Th className="w-20">Currency</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {settlement.map(([label, value], index) => (
+            <tr key={label}>
+              <Td className="text-center">{index + 1}</Td>
+              <Td>{label}</Td>
+              <Td className="text-right">{fmtEn(value)}</Td>
+              <Td className="text-center">VND</Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div>
+        <p className="font-bold">Agreement of both parties:</p>
+        <p>Party B shall pay Party A the remaining amount of {fmtEn(remaining)} VND.</p>
+        <p>Party A shall refund Party B the amount of {fmtEn(depositToRefund)} VND.</p>
+        <p>
+          Party A shall issue the VAT invoice to Party B immediately after both parties sign this acceptance and
+          contract liquidation record.
+        </p>
+        <p>Both parties agree to sign this contract liquidation record, with no disputes or claims thereafter.</p>
+        <p>
+          Once both parties have fully performed the terms of the contract, contract No. {contractRef} is
+          automatically liquidated and ceases to be in effect.
+        </p>
+      </div>
+      <div>
+        <p className="font-bold">General terms:</p>
+        <p>Both parties undertake to comply with the above terms.</p>
+        <p className="text-justify">
+          Both parties take legal responsibility for this acceptance decision. This record is made in two (02)
+          originals of equal validity; Party A keeps one (01) and Party B keeps one (01) as the basis for
+          implementation.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 pt-2 text-center font-bold">
+        <div>
+          <p>LESSOR</p>
+          <p>Director</p>
+          <div className="h-20" />
+          <p>{COMPANY_INFO.representativeName}</p>
+        </div>
+        <div>
+          <p>LESSEE</p>
+          <p>Director</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // HỢP ĐỒNG DỊCH VỤ — theo file mẫu CEO gửi 2026-10-05 ("2. HỢP ĐỒNG DỊCH VỤ -
 // MẪU.docx"). Câu chữ điều khoản chép nguyên văn.
@@ -1078,91 +1406,144 @@ function Clause({ children }: { children: ReactNode }) {
   return <p className="text-justify">- {children}</p>;
 }
 
-export function ContractDocument({ ctx }: { ctx: DocContext }) {
+// Hợp đồng song ngữ (CEO 2026-10-10, ?lang=en): mỗi câu tiếng Việt kèm 1 dòng
+// tiếng Anh in nghiêng ngay dưới; bản tiếng Việt được ưu tiên (Điều 7).
+function EnLine({ children }: { children: ReactNode }) {
+  return <span className="block font-normal text-neutral-700 italic">{children}</span>;
+}
+
+export function ContractDocument({ ctx, lang = "vi" }: { ctx: DocContext; lang?: "vi" | "en" }) {
   const { totals, customer } = ctx;
+  const bi = lang === "en";
+  // Gọi hàm (không phải component lồng) — bản tiếng Việt thì không in gì.
+  const en = (node: ReactNode) => (bi ? <EnLine>{node}</EnLine> : null);
+  const lbl = (vi: string, e: string) => (bi ? <>{vi} / <i>{e}</i></> : vi);
+  const th = (vi: string, e: string) => (bi ? <>{vi}<EnLine>{e}</EnLine></> : vi);
+  const dateEn = enLongDate(ctx.contractDateText);
   return (
     <div className="space-y-2.5">
-      <NationalHeader />
+      <NationalHeader variant={bi ? "bi" : "vi"} />
       <div className="pt-2 text-center">
         <h1 className="text-xl font-bold">HỢP ĐỒNG DỊCH VỤ</h1>
-        <p>Số: {ctx.orderCode}/TN-HĐ</p>
+        {bi && <p className="text-lg font-bold italic">SERVICE CONTRACT</p>}
+        <p>
+          {bi ? "Số / No." : "Số"}: {ctx.orderCode}/TN-HĐ
+        </p>
       </div>
 
       <div className="space-y-1 italic">
         <p>
           Căn cứ Bộ luật Dân sự số 91/2015/QH13 ngày 24/11/2015 của nước Cộng Hòa Xã Hội Chủ Nghĩa Việt
           Nam và các văn bản hướng dẫn thi hành.
+          {en(
+            "Pursuant to the Civil Code No. 91/2015/QH13 dated 24/11/2015 of the Socialist Republic of Vietnam and its guiding documents.",
+          )}
         </p>
         <p>
           Căn cứ Luật thương mại số 36/2005/QH11 ngày 14/06/2005 của nước Cộng Hòa Xã Hội Chủ Nghĩa Việt
           Nam và các văn bản hướng dẫn thi hành.
+          {en(
+            "Pursuant to the Commercial Law No. 36/2005/QH11 dated 14/06/2005 of the Socialist Republic of Vietnam and its guiding documents.",
+          )}
         </p>
         <p>
           Căn cứ Luật Doanh nghiệp số 59/2020/QH14 ngày 17/06/2020 và các văn bản sửa đổi, bổ sung,
           hướng dẫn thi hành.
+          {en(
+            "Pursuant to the Law on Enterprises No. 59/2020/QH14 dated 17/06/2020 and its amending, supplementing and guiding documents.",
+          )}
         </p>
-        <p>Căn cứ vào nhu cầu, khả năng và thoả thuận của hai bên.</p>
+        <p>
+          Căn cứ vào nhu cầu, khả năng và thoả thuận của hai bên.
+          {en("Based on the needs, capabilities and agreement of both parties.")}
+        </p>
       </div>
 
-      <p>Hôm nay {ctx.contractDateText}, chúng tôi gồm:</p>
+      <p>
+        Hôm nay {ctx.contractDateText}, chúng tôi gồm:
+        {en(`Today, ${dateEn}, we, the undersigned:`)}
+      </p>
 
       <div>
-        <p className="font-bold">BÊN CHO THUÊ: {COMPANY_INFO.legalName}</p>
-        <PartyLine label="Địa chỉ">{COMPANY_INFO.legalAddress}</PartyLine>
-        <PartyLine label="Mã số thuế">{COMPANY_INFO.taxCode}</PartyLine>
-        <PartyLine label="Đại diện">
-          {COMPANY_INFO.representative}. Chức vụ: {COMPANY_INFO.representativeTitle}
+        <p className="font-bold">
+          {bi ? <>BÊN CHO THUÊ / <i>LESSOR</i></> : "BÊN CHO THUÊ"}: {COMPANY_INFO.legalName}
+        </p>
+        <PartyLine wide={bi} label={lbl("Địa chỉ", "Address")}>{COMPANY_INFO.legalAddress}</PartyLine>
+        <PartyLine wide={bi} label={lbl("Mã số thuế", "Tax code")}>{COMPANY_INFO.taxCode}</PartyLine>
+        <PartyLine wide={bi} label={lbl("Đại diện", "Represented by")}>
+          {COMPANY_INFO.representative}. {bi ? "Chức vụ / Title" : "Chức vụ"}: {COMPANY_INFO.representativeTitle}
+          {bi ? " / Director" : ""}
         </PartyLine>
-        <PartyLine label="Điện thoại">{COMPANY_INFO.phone}</PartyLine>
+        <PartyLine wide={bi} label={lbl("Điện thoại", "Phone")}>{COMPANY_INFO.phone}</PartyLine>
         <PartyLine label="Email">{COMPANY_INFO.email}</PartyLine>
-        <p className="italic">(Dưới đây gọi tắt là Bên A)</p>
+        <p className="italic">
+          (Dưới đây gọi tắt là Bên A)
+          {bi && " / (Hereinafter referred to as Party A)"}
+        </p>
       </div>
 
       <div>
-        <p className="font-bold">BÊN THUÊ: {customer.name}</p>
-        <PartyLine label="Địa chỉ">{customer.address ?? ""}</PartyLine>
-        <PartyLine label="MST">{customer.taxCode ?? ""}</PartyLine>
-        {customer.budgetUnitCode && <PartyLine label="Mã số ĐVQHNS">{customer.budgetUnitCode}</PartyLine>}
-        <PartyLine label="Đại diện">
-          {customer.representativeName ?? `Ông/ Bà ${SHORT_DOTS}`}. Chức vụ: {customer.representativeTitle ?? SHORT_DOTS}
+        <p className="font-bold">
+          {bi ? <>BÊN THUÊ / <i>LESSEE</i></> : "BÊN THUÊ"}: {customer.name}
+        </p>
+        <PartyLine wide={bi} label={lbl("Địa chỉ", "Address")}>{customer.address ?? ""}</PartyLine>
+        <PartyLine wide={bi} label={lbl("MST", "Tax code")}>{customer.taxCode ?? ""}</PartyLine>
+        {customer.budgetUnitCode && (
+          <PartyLine wide={bi} label={lbl("Mã số ĐVQHNS", "Budget unit code")}>{customer.budgetUnitCode}</PartyLine>
+        )}
+        <PartyLine wide={bi} label={lbl("Đại diện", "Represented by")}>
+          {customer.representativeName ?? (bi ? `Ông/ Bà (Mr./Ms.) ${SHORT_DOTS}` : `Ông/ Bà ${SHORT_DOTS}`)}.{" "}
+          {bi ? "Chức vụ / Title" : "Chức vụ"}: {customer.representativeTitle ?? SHORT_DOTS}
         </PartyLine>
-        <PartyLine label="Điện thoại">{customer.phone ?? ""}</PartyLine>
+        <PartyLine wide={bi} label={lbl("Điện thoại", "Phone")}>{customer.phone ?? ""}</PartyLine>
         <PartyLine label="Email">{customer.email ?? ""}</PartyLine>
-        <p className="italic">(Dưới đây gọi tắt là Bên B)</p>
+        <p className="italic">
+          (Dưới đây gọi tắt là Bên B)
+          {bi && " / (Hereinafter referred to as Party B)"}
+        </p>
       </div>
 
-      <p>Bên B chỉ định Bên A là đơn vị cung cấp dịch vụ cụ thể theo các điều khoản sau:</p>
+      <p>
+        Bên B chỉ định Bên A là đơn vị cung cấp dịch vụ cụ thể theo các điều khoản sau:
+        {en("Party B appoints Party A as the service provider under the following terms:")}
+      </p>
 
-      <p className="font-bold">ĐIỀU 1: PHẠM VI DỊCH VỤ</p>
-      <p>Bên B chỉ định Bên A cung cấp gói dịch vụ cho thuê thiết bị chi tiết như sau:</p>
+      <p className="font-bold">
+        ĐIỀU 1: PHẠM VI DỊCH VỤ
+        {en("ARTICLE 1: SCOPE OF SERVICES")}
+      </p>
+      <p>
+        Bên B chỉ định Bên A cung cấp gói dịch vụ cho thuê thiết bị chi tiết như sau:
+        {en("Party B appoints Party A to provide the equipment rental service package detailed below:")}
+      </p>
       <table className="w-full border-collapse text-[12px]">
         <thead>
           <tr>
-            <Th className="w-8">STT</Th>
-            <Th>Mô tả</Th>
-            <Th className="w-10">ĐVT</Th>
-            <Th className="w-10">SL</Th>
-            <Th className="w-12">Số ngày</Th>
-            <Th>Đơn giá/ ngày (VNĐ)</Th>
-            <Th>Thành tiền (VNĐ)</Th>
+            <Th className="w-8">{th("STT", "No.")}</Th>
+            <Th>{th("Mô tả", "Description")}</Th>
+            <Th className="w-10">{th("ĐVT", "Unit")}</Th>
+            <Th className="w-10">{th("SL", "Qty")}</Th>
+            <Th className="w-12">{th("Số ngày", "Days")}</Th>
+            <Th>{th("Đơn giá/ ngày (VNĐ)", "Price/day (VND)")}</Th>
+            <Th>{th("Thành tiền (VNĐ)", "Amount (VND)")}</Th>
             <Th>{vatLabel}</Th>
-            <Th>Tổng số tiền (VNĐ)</Th>
+            <Th>{th("Tổng số tiền (VNĐ)", "Total (VND)")}</Th>
           </tr>
         </thead>
         <tbody>
           <PriceRows rows={ctx.rows} withPackageColumn={false} />
           <tr className="font-bold">
-            <Td colSpan={6}>Tiền thuê</Td>
+            <Td colSpan={6}>{th("Tiền thuê", "Rental")}</Td>
             <Td className="text-right">{fmt(totals.rental)}</Td>
             <Td className="text-right">{fmt(totals.vat)}</Td>
             <Td className="text-right">{fmt(totals.rentalWithVat)}</Td>
           </tr>
           <tr className="font-bold">
-            <Td colSpan={8}>Tiền ký quỹ (đặt cọc thiết bị)</Td>
+            <Td colSpan={8}>{th("Tiền ký quỹ (đặt cọc thiết bị)", "Security deposit")}</Td>
             <Td className="text-right">{fmt(totals.deposit)}</Td>
           </tr>
           <tr className="font-bold">
-            <Td colSpan={8}>Tiền thuê và tiền ký quỹ</Td>
+            <Td colSpan={8}>{th("Tiền thuê và tiền ký quỹ", "Rental and deposit")}</Td>
             <Td className="text-right">{fmt(totals.grand)}</Td>
           </tr>
         </tbody>
@@ -1172,67 +1553,146 @@ export function ContractDocument({ ctx }: { ctx: DocContext }) {
       </p>
       <p>
         <b>Ngày nhận:</b> {ctx.pickupText}. <b>Ngày trả:</b> {ctx.returnText}.
+        {en(
+          <>
+            <b>Pickup:</b> {enDateTime(ctx.pickupText)}. <b>Return:</b> {enDateTime(ctx.returnText)}.
+          </>,
+        )}
       </p>
       <p>
         <b>Thời gian thuê:</b> {ctx.rentalDays ?? SHORT_DOTS} ngày. (24 giờ từ giờ nhận đến giờ trả thiết bị
         được tính là 01 ngày thuê). Số lượng thiết bị thuê, thời gian thuê có thể gia hạn nhưng không thể rút
         bớt.
+        {en(
+          <>
+            <b>Rental period:</b> {ctx.rentalDays ?? SHORT_DOTS} days (24 hours from pickup to return count as 01
+            rental day). The quantity of rented equipment and the rental period may be extended but not reduced.
+          </>,
+        )}
       </p>
       <p>
         <b>Địa điểm nhận &amp; trả:</b> {ctx.placeText}
+        {en(
+          <>
+            <b>Pickup &amp; return location:</b> {enPlace(ctx.placeText)}
+          </>,
+        )}
       </p>
-      <p>Các dịch vụ khác do yêu cầu thêm của Bên B tại báo giá/ phụ lục hợp đồng đính kèm.</p>
+      <p>
+        Các dịch vụ khác do yêu cầu thêm của Bên B tại báo giá/ phụ lục hợp đồng đính kèm.
+        {en("Other services additionally requested by Party B are set out in the attached quotation/contract appendix.")}
+      </p>
 
-      <p className="font-bold">ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG</p>
+      <p className="font-bold">
+        ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG
+        {en("ARTICLE 2: CONTRACT VALUE")}
+      </p>
       <Clause>
         Tổng giá trị (đã bao gồm VAT): {fmt(totals.rentalWithVat)} VNĐ (Bằng chữ: {vndToWords(totals.rentalWithVat)}).
+        {en(`Total value (VAT included): ${fmtEn(totals.rentalWithVat)} VND.`)}
       </Clause>
       <Clause>
         Ký quỹ (đặt cọc thiết bị): {fmt(totals.deposit)} VNĐ (Bằng chữ: {vndToWords(totals.deposit)})./.(Để tránh
         nhầm lẫn, số tiền ký quỹ này mang tính đảm bảo chất lượng của thiết bị trong suốt thời gian thuê đến
         khi Bên B trả lại thiết bị.)
+        {en(
+          `Security deposit: ${fmtEn(totals.deposit)} VND. (For the avoidance of doubt, this deposit secures the condition of the equipment throughout the rental period until Party B returns the equipment.)`,
+        )}
       </Clause>
       <Clause>
         Mọi thay đổi so với Hợp đồng về giá trị và hạng mục công việc phải được sự đồng ý giữa Bên A và Bên B
         bằng văn bản gửi qua thư điện tử hoặc gửi trực tiếp.
+        {en(
+          "Any change to the Contract value or scope of work must be agreed between Party A and Party B in writing, sent by email or delivered in person.",
+        )}
       </Clause>
 
-      <p className="font-bold">ĐIỀU 3: ĐIỀU KHOẢN THANH TOÁN</p>
-      <p className="font-bold">3.1 Thanh toán:</p>
+      <p className="font-bold">
+        ĐIỀU 3: ĐIỀU KHOẢN THANH TOÁN
+        {en("ARTICLE 3: PAYMENT TERMS")}
+      </p>
+      <p className="font-bold">
+        3.1 Thanh toán:
+        {en("3.1 Payment:")}
+      </p>
       <Clause>
         <b>Thanh toán đợt 1:</b> Bên B chuyển khoản 100% số tiền thuê thiết bị: {fmt(totals.rentalWithVat)} VNĐ
         (Bằng chữ: {vndToWords(totals.rentalWithVat)}) sau khi nhận hợp đồng để bên A có căn cứ thực hiện (hợp
         đồng điện tử ký số có giá trị như hợp đồng bản cứng).
+        {en(
+          <>
+            <b>Payment 1:</b> Party B transfers 100% of the equipment rental, {fmtEn(totals.rentalWithVat)} VND,
+            upon receiving the contract so that Party A can proceed (a digitally signed electronic contract is as
+            valid as a hard copy).
+          </>,
+        )}
       </Clause>
       <Clause>
         <b>Thanh toán đợt 2:</b> Bên B chuyển khoản 100% số tiền ký quỹ: {fmt(totals.deposit)} VNĐ (Bằng chữ:{" "}
         {vndToWords(totals.deposit)}) trong vòng 24 giờ trước ngày nhận để Bên A tiến hành xuất kho đóng gói thiết
         bị vận chuyển tới địa điểm do Bên B yêu cầu.
+        {en(
+          <>
+            <b>Payment 2:</b> Party B transfers 100% of the security deposit, {fmtEn(totals.deposit)} VND, within 24
+            hours before the pickup date so that Party A can release, pack and ship the equipment to the location
+            requested by Party B.
+          </>,
+        )}
       </Clause>
       <Clause>
         <b>Hoàn tiền ký quỹ:</b> Bên A chuyển khoản hoàn tiền ký quỹ (đã trừ chi phí thuê và chi phí phát sinh nếu
         có) sau khi Bên B trả lại thiết bị thuê và thanh toán đầy đủ cho Bên A, hai bên ký Biên bản nghiệm thu
         thanh lý. Hoá đơn GTGT được phát hành trong vòng 24 giờ sau khi hoàn thành dịch vụ.
+        {en(
+          <>
+            <b>Deposit refund:</b> Party A refunds the deposit by bank transfer (less the rental and any incurred
+            costs) after Party B returns the rented equipment, pays Party A in full and both parties sign the
+            Acceptance and Liquidation Record. The VAT invoice is issued within 24 hours after the service is
+            completed.
+          </>,
+        )}
       </Clause>
       <p>
         <b>3.2 Phương thức thanh toán:</b> Chuyển khoản, đồng tiền thanh toán: Việt Nam đồng.
+        {en(
+          <>
+            <b>3.2 Payment method:</b> Bank transfer; payment currency: Vietnamese dong (VND).
+          </>,
+        )}
       </p>
-      <p>Tên tài khoản: {COMPANY_INFO.documentBank.accountName}</p>
       <p>
-        Số tài khoản: {COMPANY_INFO.documentBank.accountNumber} tại (TECHCOMBANK) - Ngân hàng TMCP Kỹ Thương Việt
-        Nam.
+        {bi ? "Tên tài khoản / Account name" : "Tên tài khoản"}: {COMPANY_INFO.documentBank.accountName}
+      </p>
+      <p>
+        {bi ? "Số tài khoản / Account number" : "Số tài khoản"}: {COMPANY_INFO.documentBank.accountNumber} tại
+        (TECHCOMBANK) - Ngân hàng TMCP Kỹ Thương Việt Nam.
+        {en(
+          `Account number: ${COMPANY_INFO.documentBank.accountNumber} at Techcombank - Vietnam Technological and Commercial Joint Stock Bank.`,
+        )}
       </p>
 
-      <p className="font-bold">ĐIỀU 4: TRÁCH NHIỆM CỦA CÁC BÊN</p>
-      <p className="font-bold">4.1 Trách nhiệm của Bên A:</p>
+      <p className="font-bold">
+        ĐIỀU 4: TRÁCH NHIỆM CỦA CÁC BÊN
+        {en("ARTICLE 4: RESPONSIBILITIES OF THE PARTIES")}
+      </p>
+      <p className="font-bold">
+        4.1 Trách nhiệm của Bên A:
+        {en("4.1 Responsibilities of Party A:")}
+      </p>
       <Clause>
         Bên A cam kết cung cấp cho Bên B đầy đủ các thiết bị như đã nêu tại Điều 1 hoặc Phụ lục đính kèm của
         Hợp đồng này, đồng thời cam kết thực hiện đầy đủ các nghĩa vụ và trách nhiệm được nêu.
+        {en(
+          "Party A undertakes to provide Party B with all the equipment stated in Article 1 or the attached Appendix of this Contract, and to fully perform the obligations and responsibilities stated herein.",
+        )}
       </Clause>
       <Clause>
         Bên A không được đơn phương thay đổi hay chấm dứt Hợp đồng sau khi đã ký kết. Trường hợp Bên A đơn
         phương thay đổi hay chấm dứt Hợp đồng khi chưa được Bên B chấp thuận thì, Bên A phải hoàn trả toàn bộ số
         tiền mà Bên B đã tạm ứng cho hợp đồng và phải chịu phạt 30% (ba mươi phần trăm) tổng giá trị Hợp đồng.
+        {en(
+          "Party A may not unilaterally change or terminate the Contract after signing. If Party A unilaterally changes or terminates the Contract without Party B's consent, Party A shall refund all amounts advanced by Party B under the Contract and pay a penalty of 30% (thirty percent) of the total Contract value.",
+        )}
       </Clause>
       <Clause>
         Trường hợp Bên A cung cấp thiết bị trễ so với thời gian giao ước đã được thỏa thuận tại Điều 1 hoặc Phụ
@@ -1240,37 +1700,70 @@ export function ContractDocument({ ctx }: { ctx: DocContext }) {
         phải trả phí phạt đến 3% trị giá tổng giá trị hợp đồng. Bên A được miễn trừ trách nhiệm về bất cứ một sự
         chậm trễ nào trong việc giao thiết bị nếu sự chậm trễ đó là do những nguyên nhân từ sự thay đổi của Bên B
         mà không thông báo bằng văn bản cho Bên A trước 24 (hai mươi tư) giờ.
+        {en(
+          "If Party A delivers the equipment later than the time agreed in Article 1 or the attached Appendix without prior written notice to Party B and without Party B's consent, Party A shall pay a penalty of up to 3% of the total contract value. Party A is exempt from liability for any delay in delivering the equipment if the delay results from changes made by Party B without written notice to Party A at least 24 (twenty-four) hours in advance.",
+        )}
       </Clause>
       <Clause>
         Bên A được miễn trừ trách nhiệm về bất cứ một sự chậm trễ nào trong việc bàn giao thiết bị nếu sự chậm
         trễ đó là do Bên A chưa nhận được tiền thanh toán hoặc tạm ứng của Bên B vào tài khoản như đã thoả thuận.
+        {en(
+          "Party A is exempt from liability for any delay in handing over the equipment if the delay is because Party A has not received Party B's payment or advance into its account as agreed.",
+        )}
       </Clause>
       <Clause>
         Bên A có trách nhiệm kiểm tra thiết bị đầy đủ phụ kiện và hoạt động tốt khi giao hàng. (Thiết bị cần
         được vệ sinh sạch sẽ, đảm bảo tình trạng 80 – 90%).
+        {en(
+          "Party A is responsible for checking that the equipment has all its accessories and works properly upon delivery. (The equipment must be clean and in 80 – 90% condition.)",
+        )}
       </Clause>
-      <Clause>Thiết bị cho thuê phải đảm bảo nguồn gốc hợp pháp.</Clause>
+      <Clause>
+        Thiết bị cho thuê phải đảm bảo nguồn gốc hợp pháp.
+        {en("The rented equipment must be of lawful origin.")}
+      </Clause>
       <Clause>
         Bên A cam kết hỗ trợ thay thế nếu thiết bị thuê trục trặc trong vòng 24 (hai mươi tư) giờ kể từ khi
         nhận được thông báo để thời gian sử dụng thiết bị không bị gián đoạn.
+        {en(
+          "Party A undertakes to replace any malfunctioning rented equipment within 24 (twenty-four) hours of receiving notice so that use of the equipment is not interrupted.",
+        )}
       </Clause>
-      <Clause>Bên A có trách nhiệm xuất hoá đơn GTGT ngay sau khi nhận được thanh toán đầy đủ từ Bên B.</Clause>
+      <Clause>
+        Bên A có trách nhiệm xuất hoá đơn GTGT ngay sau khi nhận được thanh toán đầy đủ từ Bên B.
+        {en("Party A is responsible for issuing the VAT invoice immediately after receiving full payment from Party B.")}
+      </Clause>
       <Clause>
         Bên A được quyền đơn phương chấm dứt hợp đồng với Bên B, và thu hồi thiết bị thuê nếu Bên B không thực
         hiện đầy đủ nghĩa vụ thanh toán đối với bên B như Điều 3 của Hợp Đồng này.
+        {en(
+          "Party A may unilaterally terminate the contract with Party B and recover the rented equipment if Party B fails to fully perform its payment obligations under Article 3 of this Contract.",
+        )}
       </Clause>
       <Clause>
         Bên A có trách nhiệm chuyển khoản hoàn tiền ký quỹ (đã trừ chi phí phát sinh nếu có) sau khi hai bên ký
         Biên bản nghiệm thu thanh lý.
+        {en(
+          "Party A is responsible for refunding the deposit by bank transfer (less any incurred costs) after both parties sign the Acceptance and Liquidation Record.",
+        )}
       </Clause>
-      <p className="font-bold">4.2 Trách nhiệm của Bên B:</p>
+      <p className="font-bold">
+        4.2 Trách nhiệm của Bên B:
+        {en("4.2 Responsibilities of Party B:")}
+      </p>
       <Clause>
         Bên B có trách nhiệm cử người đại diện kiểm tra thiết bị đầy đủ phụ kiện và hoạt động tốt khi nhận bàn
         giao từ đại diện của Bên A.
+        {en(
+          "Party B is responsible for appointing a representative to check that the equipment has all its accessories and works properly when receiving it from Party A's representative.",
+        )}
       </Clause>
       <Clause>
         Trường hợp Bên B đơn phương chấm dứt hợp đồng đã ký sẽ chịu phạt 30% giá trị hợp đồng. Bên A không phải
         chuyển lại số tiền đã nhận tạm ứng từ Bên B.
+        {en(
+          "If Party B unilaterally terminates the signed contract, Party B shall pay a penalty of 30% of the contract value. Party A is not required to return the advance received from Party B.",
+        )}
       </Clause>
       <Clause>
         Bên B có trách nhiệm cử người đại diện nhận bàn giao theo thời gian đã thoả thuận trong Phụ lục hợp đồng,
@@ -1279,59 +1772,101 @@ export function ContractDocument({ ctx }: { ctx: DocContext }) {
         bản trước ít nhất 24 (hai mươi tư) giờ thì toàn bộ phí trả trễ thiết bị, phí vận chuyển phát sinh và chi
         phí lương làm thêm giờ cho người lao động phát sinh khi nhận bàn giao trễ do Bên B chi trả cho Bên vận
         chuyển và người lao động.
+        {en(
+          "Party B is responsible for appointing a representative to receive the equipment at the time agreed in the Contract Appendix. Any change to the handover time must be notified to Party A in advance by email or in writing so that the delivery can be rescheduled with the carrier. If Party B fails to give written notice at least 24 (twenty-four) hours in advance, all late-return fees, additional transport costs and overtime wages incurred due to the late handover shall be paid by Party B to the carrier and the workers.",
+        )}
       </Clause>
       <Clause>
         Bên B có nghĩa vụ thanh toán đúng theo Điều 3 của hợp đồng. Trường hợp Bên B thanh toán trễ hơn so với
         thời gian giao ước đã được thỏa thuận tại Điều 3 thì Bên B phải trả phí phạt trả chậm là 1% tổng giá trị
         hợp đồng và lãi suất 0,06%/ngày trên số tiền chậm trả.
+        {en(
+          "Party B shall pay in accordance with Article 3 of the contract. If Party B pays later than the time agreed in Article 3, Party B shall pay a late-payment penalty of 1% of the total contract value plus interest of 0.06% per day on the overdue amount.",
+        )}
       </Clause>
       <Clause>
         Bên B không được tự ý tháo, mở, sửa chữa, thay thế phụ kiện của máy móc thiết bị của Bên A. Trong trường
         hợp Bên B tự ý tháo mở sửa chữa, thay thế, Bên A có quyền từ chối nhận lại sản phẩm và Bên B phải bồi
         thường theo giá trị của máy móc thiết bị do Bên A yêu cầu.
+        {en(
+          "Party B may not disassemble, open, repair or replace accessories of Party A's equipment without permission. If Party B does so, Party A has the right to refuse to take back the product, and Party B shall compensate Party A for the value of the equipment as requested by Party A.",
+        )}
       </Clause>
       <Clause>
         Nếu xảy ra hư hại một phần xuất phát từ Bên B trong thời gian thuê, Bên B phải có trách nhiệm sửa chữa
         hoặc chi trả toàn bộ chi phí sửa chữa tại trung tâm do Bên A yêu cầu.
+        {en(
+          "If partial damage caused by Party B occurs during the rental period, Party B is responsible for repairing it or paying all repair costs at a service centre designated by Party A.",
+        )}
       </Clause>
       <Clause>
         Nếu xảy ra trầy xước, móp, méo, đứt, vỡ xuất phát từ Bên B trong thời gian thuê, Bên B phải có trách
         nhiệm bồi thường cho Bên A theo giá trị của máy móc thiết bị do Bên A yêu cầu dựa trên định giá thị
         trường.
+        {en(
+          "If scratches, dents, deformation, breaks or cracks caused by Party B occur during the rental period, Party B is responsible for compensating Party A for the value of the equipment as requested by Party A based on the market valuation.",
+        )}
       </Clause>
       <Clause>
         Nếu xảy ra hư hại toàn phần xuất phát từ Bên B trong thời gian thuê, Bên B phải có trách nhiệm bồi thường
         cho Bên A theo giá trị của máy móc thiết bị do Bên A yêu cầu dựa trên định giá thị trường.
+        {en(
+          "If total damage caused by Party B occurs during the rental period, Party B is responsible for compensating Party A for the value of the equipment as requested by Party A based on the market valuation.",
+        )}
       </Clause>
       <Clause>
         Bên B có trách nhiệm bảo quản thiết bị, đầy đủ phụ kiện và sử dụng cẩn thận khi nhận bàn giao. Bên A
         không chịu trách nhiệm về mất mát, thiếu sót phụ kiện hoặc sản phẩm không hoạt động sau khi Bên B nhận
         bàn giao và sử dụng.
+        {en(
+          "Party B is responsible for keeping the equipment and all accessories safe and using them carefully after handover. Party A is not responsible for loss, missing accessories or products not working after Party B has received and used them.",
+        )}
       </Clause>
       <Clause>
         Bên B cam kết hoàn trả đầy đủ phụ kiện, dây cáp, sạc, bao đựng, ốp bảo vệ, túi bảo vệ và đồng thời đăng
         xuất mọi tài khoản, email, iCloud khỏi thiết bị trước khi trả hàng để Bên A nghiệm thu thiết bị.
+        {en(
+          "Party B undertakes to return all accessories, cables, chargers, cases, protective covers and bags, and to sign out of all accounts, email and iCloud on the equipment before returning it so that Party A can inspect and accept the equipment.",
+        )}
       </Clause>
-      <Clause>Nếu không làm đúng cam kết Bên B chịu mọi chi phí phát sinh đảm bảo cho việc hoàn trả thiết bị cho Bên A.</Clause>
+      <Clause>
+        Nếu không làm đúng cam kết Bên B chịu mọi chi phí phát sinh đảm bảo cho việc hoàn trả thiết bị cho Bên A.
+        {en("If Party B fails to comply with these undertakings, Party B shall bear all costs incurred to ensure the equipment is returned to Party A.")}
+      </Clause>
 
-      <p className="font-bold">ĐIỀU 5: TRANH CHẤP VÀ XỬ LÝ TRANH CHẤP</p>
+      <p className="font-bold">
+        ĐIỀU 5: TRANH CHẤP VÀ XỬ LÝ TRANH CHẤP
+        {en("ARTICLE 5: DISPUTES AND DISPUTE RESOLUTION")}
+      </p>
       <Clause>
         Trong trường hợp xảy ra tranh chấp, Hai Bên cố gắng gặp gỡ hòa giải trên tinh thần thiện chí và hợp tác.
         Nếu vẫn không thống nhất cách giải quyết thì Hai Bên có quyền sẽ khởi kiện tại Tòa án có thẩm quyền tại
         TP.HCM xem xét giải quyết. Toàn bộ chi phí liên quan do Bên thua kiện chịu;
+        {en(
+          "In the event of a dispute, the Parties shall try to meet and settle it amicably in good faith and cooperation. If no agreement is reached, either Party may bring the case before a competent court in Ho Chi Minh City for resolution. All related costs shall be borne by the losing Party;",
+        )}
       </Clause>
       <Clause>
         Trong thời gian Tòa án thụ lý và chưa đưa ra phán quyết, các Bên vẫn phải tiếp tục thi hành nghĩa vụ và
         trách nhiệm của mình theo quy định của Hợp Đồng này.
+        {en(
+          "While the court is handling the case and has not yet issued a judgment, the Parties shall continue to perform their obligations and responsibilities under this Contract.",
+        )}
       </Clause>
 
-      <p className="font-bold">ĐIỀU 6: CÁC TRƯỜNG HỢP BẤT KHẢ KHÁNG</p>
+      <p className="font-bold">
+        ĐIỀU 6: CÁC TRƯỜNG HỢP BẤT KHẢ KHÁNG
+        {en("ARTICLE 6: FORCE MAJEURE")}
+      </p>
       <Clause>
         Không Bên nào phải chịu trách nhiệm về việc chậm trễ hoặc không thể hoàn thành các nghĩa vụ được quy định
         trong Hợp đồng này nếu nguyên nhân gây ra sự chậm trễ hoặc không thực hiện đó là các tình huống bất khả
         kháng như đình công, hỏa hoạn, lũ lụt, thiên tai, động đất, dịch bệnh theo văn bản thông báo của cơ quan
         Nhà nước có thẩm quyền hoặc bất cứ các quy định, điều luật của cơ quan nhà nước có thẩm quyền hoặc các
         tình huống khác nằm ngoài khả năng kiểm soát của bên tham gia Hợp đồng mà không thể dự báo trước.
+        {en(
+          "Neither Party shall be liable for any delay in or failure to perform its obligations under this Contract if caused by force majeure events such as strikes, fire, floods, natural disasters, earthquakes or epidemics as announced in writing by competent State authorities, any regulations or laws of competent State authorities, or other unforeseeable circumstances beyond the control of the contracting party.",
+        )}
       </Clause>
       <Clause>
         Bên gặp Sự kiện bất khả kháng như quy định ở khoản 1 điều này cần thông báo cho Bên còn lại bằng văn bản
@@ -1342,30 +1877,59 @@ export function ContractDocument({ ctx }: { ctx: DocContext }) {
         khi thực hiện nghĩa vụ khắc phục hậu quả và thông báo được miễn trách nhiệm do hành vi vi phạm Hợp đồng
         của mình phát sinh từ Sự kiện bất khả kháng. Nếu có đề nghị bất thường, hai bên sẽ thỏa thuận thông qua
         đàm phán.
+        {en(
+          "The Party affected by a force majeure event as specified in clause 1 of this Article shall notify the other Party in writing within 03 days from the occurrence of the event of (i) the force majeure event and the measures taken to mitigate its consequences, and/or (ii) its inability to perform its obligations under the Contract or a corresponding extension of the Contract term. A Party that fails to perform, or does not fully perform, its obligations under the Contract due to a force majeure event, after taking remedial measures and giving notice, is exempt from liability for the breach arising from the force majeure event. Any unusual requests shall be settled by the two parties through negotiation.",
+        )}
       </Clause>
       <Clause>
         Trong trường hợp xảy ra sự kiện bất khả kháng, thời gian thực hiện Hợp đồng sẽ được kéo dài bằng thời
         gian diễn ra sự kiện bất khả kháng mà Bên bị ảnh hưởng không thể thực hiện các nghĩa vụ theo Hợp Đồng mà
         Hai Bên đã ký.
+        {en(
+          "In the event of force majeure, the Contract term shall be extended by the period during which the affected Party is unable to perform its obligations under the Contract signed by both Parties.",
+        )}
       </Clause>
 
-      <p className="font-bold">ĐIỀU 7: ĐIỀU KHOẢN CHUNG</p>
-      <Clause>Các bên không được chuyển nhượng Hợp đồng này dưới bất kỳ hình thức nào.</Clause>
+      <p className="font-bold">
+        ĐIỀU 7: ĐIỀU KHOẢN CHUNG
+        {en("ARTICLE 7: GENERAL PROVISIONS")}
+      </p>
+      <Clause>
+        Các bên không được chuyển nhượng Hợp đồng này dưới bất kỳ hình thức nào.
+        {en("Neither Party may assign this Contract in any form.")}
+      </Clause>
       <Clause>
         Hợp đồng này có hiệu lực từ ngày ký và được lập thành 02 bản, mỗi bên giữ 01 bản có giá trị pháp lý như
         nhau. Hợp đồng sẽ tự thanh lý ngay khi kết thúc thời gian thuê máy và thiết bị nếu không có phát sinh
         thêm.
+        {en(
+          "This Contract takes effect from the date of signing and is made in 02 copies; each party keeps 01 copy of equal legal validity. The Contract is automatically liquidated at the end of the equipment rental period if nothing further arises.",
+        )}
       </Clause>
+      {bi && (
+        <Clause>
+          Hợp đồng này được lập bằng tiếng Việt và tiếng Anh. Trường hợp có sự khác biệt giữa hai ngôn ngữ, bản
+          tiếng Việt được ưu tiên áp dụng.
+          {en(
+            "This Contract is made in Vietnamese and English. In case of any discrepancy between the two languages, the Vietnamese version shall prevail.",
+          )}
+        </Clause>
+      )}
 
       <div className="grid grid-cols-2 pt-4 text-center font-bold">
         <div>
           <p>ĐẠI DIỆN BÊN CHO THUÊ</p>
-          <p>{COMPANY_INFO.representativeTitle}</p>
+          {bi && <p className="italic">ON BEHALF OF THE LESSOR</p>}
+          <p>
+            {COMPANY_INFO.representativeTitle}
+            {bi ? " / Director" : ""}
+          </p>
           <div className="h-24" />
           <p>{COMPANY_INFO.representativeName}</p>
         </div>
         <div>
           <p>ĐẠI DIỆN BÊN THUÊ</p>
+          {bi && <p className="italic">ON BEHALF OF THE LESSEE</p>}
           <p>{customer.representativeTitle ?? ""}</p>
           <div className="h-24" />
           <p>{customer.representativeName?.replace(/^(Ông|Bà)\/?\s*(Bà)?\s*/i, "").toUpperCase() ?? ""}</p>

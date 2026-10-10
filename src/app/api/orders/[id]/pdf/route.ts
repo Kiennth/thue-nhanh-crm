@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const lang = request.nextUrl.searchParams.get("lang") === "en" ? "en" : "vi";
     const pdf = await renderOrderDocumentPdf(id, docType, lang);
-    const fileName = `${lang === "en" && docType === "quote" ? `QUOTATION ${order.order_code}` : printDocFileName(docType, order.order_code)}.pdf`;
+    const fileName = `${printDocFileName(docType, order.order_code, lang)}.pdf`;
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

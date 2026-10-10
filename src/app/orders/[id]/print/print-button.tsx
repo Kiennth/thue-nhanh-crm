@@ -64,7 +64,9 @@ export function PrintButton({
   return (
     <div data-no-export className="mb-6 space-y-2 print:hidden">
       <div className="flex flex-wrap justify-end gap-2">
-        {google?.canUse && google.configured && google.connected && (
+        {/* Google Docs dựng lại bản tiếng Việt từ server — bản tiếng Anh dùng
+            Tải file Word / Tải PDF (ra đúng nội dung đang xem). */}
+        {lang !== "en" && google?.canUse && google.configured && google.connected && (
           <>
             <Button variant="outline" disabled={pending} onClick={() => handleGoogleDocs(false)}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <FileEdit className="size-4" />}
@@ -87,7 +89,7 @@ export function PrintButton({
             )}
           </>
         )}
-        {google?.canConnect && google.configured && !google.connected && (
+        {lang !== "en" && google?.canConnect && google.configured && !google.connected && (
           <Button variant="outline" nativeButton={false} render={<a href={google.connectHref} />}>
             <FileEdit className="size-4" />
             Kết nối Google Drive

@@ -5,10 +5,23 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PRINT_DOC_MENU_LABELS, PRINT_DOC_TYPES } from "@/lib/print-docs";
+import { PRINT_DOC_MENU_LABELS, PRINT_DOC_TYPES, PRINT_DOC_TYPES_EN, type PrintDocType } from "@/lib/print-docs";
+
+// Bản tiếng Anh cho khách nước ngoài: báo giá (CEO 2026-10-09), các chứng từ
+// còn lại (CEO 2026-10-10) — hợp đồng in song ngữ Việt–Anh.
+const EN_MENU_LABELS: Partial<Record<PrintDocType, string>> = {
+  quote: "Báo giá",
+  contract: "Hợp đồng (song ngữ Việt–Anh)",
+  payment_request: "Đề nghị thanh toán",
+  handover: "Biên bản bàn giao",
+  acceptance: "Biên bản nghiệm thu",
+};
 
 function openInNewTab(href: string) {
   const a = document.createElement("a");
@@ -46,10 +59,18 @@ export function PrintMenu({ orderId }: { orderId: string }) {
             {PRINT_DOC_MENU_LABELS[docType]}
           </DropdownMenuItem>
         ))}
-        {/* Báo giá tiếng Anh cho khách nước ngoài (CEO 2026-10-09). */}
-        <DropdownMenuItem onClick={() => openInNewTab(`/orders/${orderId}/print?type=quote&lang=en`)}>
-          Tạo báo giá (English)
-        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>English</DropdownMenuLabel>
+          {PRINT_DOC_TYPES_EN.map((docType) => (
+            <DropdownMenuItem
+              key={docType}
+              onClick={() => openInNewTab(`/orders/${orderId}/print?type=${docType}&lang=en`)}
+            >
+              {EN_MENU_LABELS[docType]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

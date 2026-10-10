@@ -90,12 +90,14 @@ export async function generateMetadata({
   searchParams: Promise<{ type?: string; google?: string; share?: string; lang?: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const { type, share } = await searchParams;
+  const { type, share, lang } = await searchParams;
   const shareMode = (await verifyQuoteShareToken(share)) === id;
   const docType: PrintDocType = shareMode ? "quote" : isPrintDocType(type) ? type : "contract";
   const supabase = shareMode ? createAdminClient() : await createClient();
   const { data: order } = await supabase.from("orders").select("order_code").eq("id", id).single();
-  return { title: order ? printDocFileName(docType, order.order_code) : PRINT_DOC_TITLES[docType] };
+  return {
+    title: order ? printDocFileName(docType, order.order_code, lang === "en" ? "en" : "vi") : PRINT_DOC_TITLES[docType],
+  };
 }
 
 export default async function OrderPrintPage({
@@ -107,7 +109,8 @@ export default async function OrderPrintPage({
 }) {
   const { id } = await params;
   const { type, google: googleNotice, share, lang: langParam } = await searchParams;
-  // Báo giá tiếng Anh (CEO 2026-10-09): ?lang=en — chỉ áp cho báo giá.
+  // Bản tiếng Anh (?lang=en): báo giá (CEO 2026-10-09), đề nghị thanh toán,
+  // bàn giao, nghiệm thu, hợp đồng song ngữ (CEO 2026-10-10).
   const lang: "vi" | "en" = langParam === "en" ? "en" : "vi";
   // Chế độ khách (CEO 2026-10-04): link báo giá có mã ký đúng đơn → không
   // cần đăng nhập, chỉ xem báo giá + nút Đồng ý (đọc dữ liệu bằng admin
@@ -241,7 +244,7 @@ export default async function OrderPrintPage({
     });
     // Bản tiếng Anh: tên hàng lấy tên EN của sản phẩm web (cùng mã hàng),
     // đơn vị tính dịch sang tiếng Anh.
-    if (docType === "quote" && lang === "en") {
+    if (lang === "en") {
       const typeIds = [...new Set(rows.map((r) => r.equipmentTypeId).filter((v): v is string => !!v))];
       const { data: webNames } = typeIds.length
         ? await supabase.from("website_products").select("equipment_type_id, name_en").in("equipment_type_id", typeIds)
@@ -397,11 +400,11 @@ export default async function OrderPrintPage({
           style={{ fontFamily: `${docFont.style.fontFamily}, "Times New Roman", Times, serif` }}
         >
           {printButton}
-          {docType === "contract" && <ContractDocument ctx={ctx} />}
+          {docType === "contract" && <ContractDocument ctx={ctx} lang={lang} />}
           {docType === "quote" && <QuoteDocument ctx={ctx} lang={lang} />}
-          {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} />}
-          {docType === "handover" && <HandoverDocument ctx={ctx} />}
-          {docType === "acceptance" && <AcceptanceDocument ctx={ctx} />}
+          {docType === "payment_request" && <PaymentRequestDocument ctx={ctx} lang={lang} />}
+          {docType === "handover" && <HandoverDocument ctx={ctx} lang={lang} />}
+          {docType === "acceptance" && <AcceptanceDocument ctx={ctx} lang={lang} />}
         </div>
       </div>
     );

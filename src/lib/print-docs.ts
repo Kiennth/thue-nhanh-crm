@@ -40,7 +40,21 @@ export const PRINT_DOC_FILE_PREFIX: Record<PrintDocType, string> = {
   acceptance: "BIEN BAN NGHIEM THU",
 };
 
-export function printDocFileName(docType: PrintDocType, orderCode: string): string {
+// Bản tiếng Anh (CEO 2026-10-10, ?lang=en): tên file tiếng Anh + mã đơn.
+export const PRINT_DOC_FILE_PREFIX_EN: Record<PrintDocType, string> = {
+  contract: "SERVICE CONTRACT",
+  quote: "QUOTATION",
+  payment_request: "PAYMENT REQUEST",
+  handover: "HANDOVER RECORD",
+  collection: "RETURN RECORD",
+  acceptance: "ACCEPTANCE RECORD",
+};
+
+// Chứng từ có bản tiếng Anh (biên bản trả hàng chưa có).
+export const PRINT_DOC_TYPES_EN: PrintDocType[] = ["quote", "contract", "payment_request", "handover", "acceptance"];
+
+export function printDocFileName(docType: PrintDocType, orderCode: string, lang: "vi" | "en" = "vi"): string {
+  if (lang === "en" && PRINT_DOC_TYPES_EN.includes(docType)) return `${PRINT_DOC_FILE_PREFIX_EN[docType]} ${orderCode}`;
   // Mã mới đã có sẵn "PO" (PO13111 — CEO 2026-10-05) thì không chèn thêm.
   const code = /^PO\d/.test(orderCode) ? orderCode : `PO ${orderCode}`;
   return `${PRINT_DOC_FILE_PREFIX[docType]} ${code}`;
