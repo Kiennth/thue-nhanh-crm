@@ -158,3 +158,32 @@ end;
 $mig$;
 
 notify pgrst, 'reload schema';
+
+-- ============ 6. Khách trả tiền = Chốt đơn ============
+-- CEO 2026-10-11: "khách thanh toán (VietQR) là đơn tự nhảy từ Đã báo giá →
+-- Chốt đơn". Mọi khoản THU (tiền thuê / tiền cọc) — QR tự ghi nhận, đối soát
+-- ngân hàng, nhân viên ghi tay — đều chốt đơn đang "Đã báo giá". Hoàn cọc
+-- không tính. Khâu khoán "Chốt đơn" không tự tick (ghi khoán sau).
+create or replace function public.order_payments_confirm_order()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.payment_type in ('invoice', 'deposit_collect') then
+    update public.orders
+    set confirmed_at = now()
+    where id = new.order_id
+      and confirmed_at is null
+      and cancelled_at is null
+      and completed_at is null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists order_payments_confirm_order on public.order_payments;
+create trigger order_payments_confirm_order
+  after insert on public.order_payments
+  for each row execute function public.order_payments_confirm_order();
