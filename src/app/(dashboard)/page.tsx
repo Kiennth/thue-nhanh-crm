@@ -34,6 +34,8 @@ type Row = {
   no_serial?: boolean;
   no_collector?: boolean;
   remaining?: number;
+  // Lý do chốt khâu dù còn nợ (step_overrides) — "Ghi chú" ở danh sách nợ.
+  reason?: string | null;
 };
 type Board = {
   today: string;
@@ -382,6 +384,9 @@ async function TodayBoard({
               <>
                 <OrderCell r={r} />
                 <Cell className="w-12">{branchChip(r.branch_id)}</Cell>
+                <Cell className="hidden max-w-[12rem] truncate text-xs text-amber-800 sm:table-cell dark:text-amber-200">
+                  {r.reason ? <span title={r.reason}>{r.reason}</span> : null}
+                </Cell>
                 <Cell className="w-32 text-right font-semibold tabular-nums">{formatVND(r.remaining)}</Cell>
               </>
             )}

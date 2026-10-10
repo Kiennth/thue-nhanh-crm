@@ -6,7 +6,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee, requireRole } from "@/lib/dal";
 import { computeOrderLinePrice, computeRentalDurationInUnit, type PricingTierInput } from "@/lib/rental-pricing";
-import { OPTIONAL_TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { OPTIONAL_TASK_TYPES, PAYMENT_METHOD_OPTIONS, TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE } from "@/lib/order-labels";
+import { getOrderStepChecks } from "@/lib/order-step-checks";
 import { ALL_ROLES, BRANCH_SCOPED_ROLES, EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { TRANSPORT_LINE_CATEGORY_BY_TYPE_ID } from "@/lib/commission";
 import { formatVNDate, vnNow, vnTodayString } from "@/lib/vn-time";
@@ -2241,40 +2242,19 @@ export async function upsertOrderTask(
   const supabase = await createClient();
 
   if (parsed.data.completed) {
-    const sequenceIndex = TASK_TYPE_SEQUENCE.indexOf(parsed.data.task_type);
-    const earlierStages = TASK_TYPE_SEQUENCE.slice(0, sequenceIndex).filter((t) => !OPTIONAL_TASK_TYPES.has(t));
-    if (earlierStages.length > 0) {
-      const { data: doneTasks } = await supabase
-        .from("order_tasks")
-        .select("task_type")
-        .eq("order_id", parsed.data.order_id)
-        .not("completed_date", "is", null);
-
-      const doneSet = new Set((doneTasks ?? []).map((t) => t.task_type));
-      const missing = earlierStages.find((stage) => !doneSet.has(stage));
-      if (missing) {
-        return { error: `Phải hoàn thành khâu "${TASK_TYPE_LABELS[missing]}" trước khi hoàn thành khâu này.` };
-      }
-    }
-  }
-
-  // Giao hàng phải gán đủ serial (kiểu Booqable: "Start" đòi chỉ định máy).
-  if (parsed.data.completed && parsed.data.task_type === "giao_hang_ban_giao") {
-    const { data: unassigned } = await supabase
-      .from("order_equipment")
-      .select("equipment_types!inner(name, product_type, tracking_type)")
-      .eq("order_id", parsed.data.order_id)
-      .is("equipment_instance_id", null)
-      .eq("equipment_types.product_type", "rental")
-      .eq("equipment_types.tracking_type", "individual");
-    if (unassigned?.length) {
-      const count = new Map<string, number>();
-      for (const r of unassigned as unknown as { equipment_types: { name: string } }[]) {
-        count.set(r.equipment_types.name, (count.get(r.equipment_types.name) ?? 0) + 1);
-      }
-      const list = [...count].map(([name, n]) => `${name} × ${n}`).join(", ");
-      return { error: `Còn ${unassigned.length} máy chưa gán serial (${list}) — gán serial trước khi giao.` };
-    }
+    // Giai đoạn 3 (Grok tách gọn CRM 10/10): khâu xong PHẢI có người làm —
+    // không thì khoán khâu đó không ghi cho ai.
+    if (!parsed.data.employee_id) return { error: "Chọn người làm khâu này (để tính khoán)." };
+    const err = await completeTaskCore(
+      supabase,
+      parsed.data.order_id,
+      parsed.data.task_type,
+      parsed.data.employee_id,
+      parsed.data.note ?? null,
+      parsed.data.has_issue ?? false,
+    );
+    revalidatePath(`/orders/${parsed.data.order_id}`);
+    return err ? { error: err } : { success: true };
   }
 
   const { error } = await supabase.from("order_tasks").upsert(
@@ -2284,52 +2264,185 @@ export async function upsertOrderTask(
       employee_id: parsed.data.employee_id ?? null,
       note: parsed.data.note ?? null,
       has_issue: parsed.data.has_issue ?? false,
-      completed_date: parsed.data.completed ? vnTodayString() : null,
+      completed_date: null,
     },
     { onConflict: "order_id,task_type" },
   );
-
-  if (error) {
-    return { error: "Không thể cập nhật khâu: " + error.message };
-  }
-
-  // Tồn kho phản ánh vật lý theo khâu: hoàn thành Giao hàng & bàn giao thì
-  // chuyển hàng của đơn từ "trong kho" sang "ở khách" (sản phẩm riêng lẻ sang
-  // Đang cho thuê); hoàn thành Nhập kho & bảo trì thì trả về "trong kho" tại
-  // chi nhánh thu hồi (kèm chuyển kho + lịch sử nếu khác chi nhánh giao). Cả
-  // 2 function đều idempotent qua timestamp trên orders — khâu bị mở lại rồi
-  // hoàn thành lại không cộng/trừ kho lần nữa.
-  //
-  // Lỗi ở đây KHÔNG được nuốt im lặng nữa — trước đây throw ra bị bỏ qua nên
-  // khâu vẫn báo lưu thành công dù tồn kho không hề nhúc nhích (đã gặp thật ở
-  // BQ11779/BQ32, xem migration 20260801060000_fix_stuck_return_stock.sql).
-  // Khâu vẫn giữ nguyên completed_date (đúng thực tế đã xảy ra), chỉ báo lỗi
-  // để người dùng biết mà kiểm tra tay thay vì tưởng đã trả/trừ kho xong.
-  if (parsed.data.completed && parsed.data.task_type === "giao_hang_ban_giao") {
-    const { error: deliverError } = await supabase.rpc("deliver_order_stock", {
-      p_order_id: parsed.data.order_id,
-    });
-    if (deliverError) {
-      revalidatePath(`/orders/${parsed.data.order_id}`);
-      return {
-        error: "Đã lưu khâu, nhưng trừ tồn kho thất bại: " + deliverError.message + " — cần kiểm tra tay.",
-      };
-    }
-  }
-  if (parsed.data.completed && parsed.data.task_type === "nhap_kho_bao_tri") {
-    const { error: returnError } = await supabase.rpc("return_order_stock", {
-      p_order_id: parsed.data.order_id,
-    });
-    if (returnError) {
-      revalidatePath(`/orders/${parsed.data.order_id}`);
-      return {
-        error: "Đã lưu khâu, nhưng trả tồn kho thất bại: " + returnError.message + " — cần kiểm tra tay.",
-      };
-    }
-  }
-
+  if (error) return { error: "Không thể cập nhật khâu: " + error.message };
   revalidatePath(`/orders/${parsed.data.order_id}`);
   return { success: true };
+}
+
+// Hoàn thành 1 khâu: kiểm tra tuần tự + đủ serial (khâu Giao), ghi khâu, rồi
+// trừ/trả tồn kho theo khâu. Trả thông báo lỗi (null = ổn). Dùng chung cho
+// upsertOrderTask và completeOrderSteps (nhóm thao tác giai đoạn 3).
+async function completeTaskCore(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  taskType: TaskType,
+  employeeId: string,
+  note: string | null,
+  hasIssue: boolean,
+): Promise<string | null> {
+  const sequenceIndex = TASK_TYPE_SEQUENCE.indexOf(taskType);
+  const earlierStages = TASK_TYPE_SEQUENCE.slice(0, sequenceIndex).filter((t) => !OPTIONAL_TASK_TYPES.has(t));
+  if (earlierStages.length > 0) {
+    const { data: doneTasks } = await supabase
+      .from("order_tasks")
+      .select("task_type")
+      .eq("order_id", orderId)
+      .not("completed_date", "is", null);
+    const doneSet = new Set((doneTasks ?? []).map((t) => t.task_type));
+    const missing = earlierStages.find((stage) => !doneSet.has(stage));
+    if (missing) return `Phải hoàn thành khâu "${TASK_TYPE_LABELS[missing]}" trước khi hoàn thành khâu này.`;
+  }
+
+  // Giao hàng phải gán đủ serial (kiểu Booqable: "Start" đòi chỉ định máy) —
+  // GIỮ chặn cứng (giai đoạn 3): không có serial thì tồn kho không biết máy
+  // nào đã ra khỏi kho. Không phải chặn theo tồn kho.
+  if (taskType === "giao_hang_ban_giao") {
+    const { data: unassigned } = await supabase
+      .from("order_equipment")
+      .select("equipment_types!inner(name, product_type, tracking_type)")
+      .eq("order_id", orderId)
+      .is("equipment_instance_id", null)
+      .eq("equipment_types.product_type", "rental")
+      .eq("equipment_types.tracking_type", "individual");
+    if (unassigned?.length) {
+      const count = new Map<string, number>();
+      for (const r of unassigned as unknown as { equipment_types: { name: string } }[]) {
+        count.set(r.equipment_types.name, (count.get(r.equipment_types.name) ?? 0) + 1);
+      }
+      const list = [...count].map(([name, n]) => `${name} × ${n}`).join(", ");
+      return `Còn ${unassigned.length} máy chưa gán serial (${list}) — gán serial trước khi giao.`;
+    }
+  }
+
+  const { error } = await supabase.from("order_tasks").upsert(
+    {
+      order_id: orderId,
+      task_type: taskType,
+      employee_id: employeeId,
+      note,
+      has_issue: hasIssue,
+      completed_date: vnTodayString(),
+    },
+    { onConflict: "order_id,task_type" },
+  );
+  if (error) return "Không thể cập nhật khâu: " + error.message;
+
+  // Tồn kho phản ánh vật lý theo khâu: hoàn thành Giao hàng & bàn giao thì
+  // chuyển hàng của đơn từ "trong kho" sang "ở khách"; hoàn thành Nhập kho &
+  // bảo trì thì trả về "trong kho" tại kho thu hồi. Cả 2 function idempotent.
+  // Lỗi KHÔNG được nuốt im lặng (xem migration 20260801060000).
+  if (taskType === "giao_hang_ban_giao") {
+    const { error: deliverError } = await supabase.rpc("deliver_order_stock", { p_order_id: orderId });
+    if (deliverError) return "Đã lưu khâu, nhưng trừ tồn kho thất bại: " + deliverError.message + " — cần kiểm tra tay.";
+  }
+  if (taskType === "nhap_kho_bao_tri") {
+    const { error: returnError } = await supabase.rpc("return_order_stock", { p_order_id: orderId });
+    if (returnError) return "Đã lưu khâu, nhưng trả tồn kho thất bại: " + returnError.message + " — cần kiểm tra tay.";
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Giai đoạn 3 (Grok tách gọn CRM 10/10): hoàn thành 1 hoặc NHÓM khâu một lần
+// ("Chốt & ký", "Giao xong", "Thu về xong", "Đóng đơn"). Mỗi khâu vẫn ghi
+// người làm riêng → khoán không đổi. Thu tiền ngay trong hộp thoại (tuỳ chọn).
+// Nghiệm thu / Nhập kho khi khách còn nợ hoặc chưa thu cọc → CẢNH BÁO, phải
+// nhập lý do (lưu step_overrides), không chặn. Thiếu CCCD chỉ nhắc.
+// ---------------------------------------------------------------------------
+const OWING_RULE_STEPS: TaskType[] = ["nghiem_thu", "nhap_kho_bao_tri"];
+
+const CompleteStepsSchema = z.object({
+  orderId: z.string().uuid(),
+  steps: z
+    .array(z.object({ taskType: z.enum(TASK_TYPE_SEQUENCE), employeeId: z.string().uuid({ message: "Chọn người làm cho từng khâu." }) }))
+    .min(1)
+    .max(4),
+  note: z.string().trim().max(500).optional(),
+  payment: z
+    .object({
+      amount: z.number().positive().max(10_000_000_000),
+      method: z.enum(PAYMENT_METHOD_OPTIONS),
+      type: z.enum(["invoice", "deposit_collect"]),
+    })
+    .optional(),
+  reason: z.string().trim().max(300).optional(),
+});
+export type CompleteStepsInput = z.infer<typeof CompleteStepsSchema>;
+
+export async function completeOrderSteps(
+  input: CompleteStepsInput,
+): Promise<{ error: string } | { needReason: string[] } | { success: true; warnings: string[] }> {
+  const employee = await requireRole([...ALL_ROLES]);
+  const parsed = CompleteStepsSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  const { orderId, steps, note, payment, reason } = parsed.data;
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("cancelled_at, completed_at")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { error: "Không tìm thấy đơn." };
+  if (order.cancelled_at) return { error: "Đơn đã huỷ." };
+
+  // Cảnh báo có lý do — tính TRƯỚC khi ghi gì (kể cả khoản thu) để bấm lại
+  // không ghi trùng tiền. Số tiền thu ngay được trừ trước khi xét.
+  const checks = await getOrderStepChecks(supabase, orderId);
+  const remainingAfter = Math.max(0, checks.remaining - (payment?.type === "invoice" ? payment.amount : 0));
+  const depositAfter = Math.max(0, checks.depositDue - (payment?.type === "deposit_collect" ? payment.amount : 0));
+  const owingStep = steps.find((st) => OWING_RULE_STEPS.includes(st.taskType));
+  const owingIssues: string[] = [];
+  if (owingStep && !checks.hasOwingOverride) {
+    if (remainingAfter >= 1000) owingIssues.push(`Khách còn nợ ${Math.round(remainingAfter).toLocaleString("vi-VN")}đ`);
+    if (depositAfter >= 1000) owingIssues.push(`Cọc ${Math.round(depositAfter).toLocaleString("vi-VN")}đ chưa thu`);
+  }
+  if (owingIssues.length && (!reason || reason.length < 3)) return { needReason: owingIssues };
+
+  if (payment) {
+    const { error } = await supabase.from("order_payments").insert({
+      order_id: orderId,
+      amount: payment.amount,
+      method: payment.method,
+      payment_type: payment.type,
+      paid_at: vnTodayString(),
+      note: `Thu khi chốt khâu ${steps.map((st) => TASK_TYPE_LABELS[st.taskType]).join(" + ")}`,
+      created_by: employee.id,
+    });
+    if (error) return { error: "Không ghi được khoản thu: " + error.message };
+  }
+
+  for (const st of steps) {
+    const err = await completeTaskCore(supabase, orderId, st.taskType, st.employeeId, note ?? null, false);
+    if (err) {
+      revalidatePath(`/orders/${orderId}`);
+      return { error: `${TASK_TYPE_LABELS[st.taskType]}: ${err}` };
+    }
+  }
+
+  if (owingIssues.length && owingStep) {
+    const { error } = await (supabase as unknown as UntypedSupabaseClient).from("step_overrides").insert({
+      order_id: orderId,
+      task_type: owingStep.taskType,
+      rule: "owing",
+      reason: reason!,
+      detail: owingIssues.join(" · "),
+      employee_id: employee.id,
+    });
+    if (error) {
+      revalidatePath(`/orders/${orderId}`);
+      return { error: "Đã chốt khâu nhưng không lưu được lý do: " + error.message };
+    }
+  }
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  revalidatePath("/");
+  return { success: true, warnings: checks.missingCccd ? ["Khách cá nhân chưa có CCCD — nhớ bổ sung."] : [] };
 }
 
 // Bỏ tick 1 khâu đã hoàn thành — VD khách đổi ý sau khi đã chốt đơn/thu cọc,

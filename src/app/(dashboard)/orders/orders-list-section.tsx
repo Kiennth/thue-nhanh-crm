@@ -99,6 +99,8 @@ interface OrderRow {
   no_serial: boolean;
   no_driver: boolean;
   invoice_pending: boolean;
+  // Lý do chốt khâu dù còn nợ / chưa thu cọc (bảng step_overrides).
+  override_reason?: string | null;
 }
 
 interface OrdersPageListStats {
@@ -378,6 +380,11 @@ export async function OrdersListSection({
     if (o.no_driver) out.push({ label: "Chưa người giao", tone: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" });
     if (o.delivered_at && o.remaining >= 1000)
       out.push({ label: `Còn nợ ${currencyFormatter.format(Math.round(o.remaining))}đ`, tone: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200" });
+    if (o.override_reason)
+      out.push({
+        label: `Lý do: ${o.override_reason.length > 40 ? `${o.override_reason.slice(0, 40)}…` : o.override_reason}`,
+        tone: "bg-amber-50 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-800",
+      });
     if (o.invoice_pending) out.push({ label: "Chờ HĐ", tone: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200" });
     return out;
   };

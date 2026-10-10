@@ -4,17 +4,6 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { reassignOrderTask, upsertOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
+import { reassignOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
+import { StepCompleterInline, type StepChecks } from "./step-completer";
 import type { TaskType } from "@/types/database";
 
 interface EmployeeOption {
@@ -56,6 +46,13 @@ interface OrderTaskRowProps {
   // Giám đốc/Admin/Kế toán: đổi người hoàn thành khâu đã xong ngay tại chỗ,
   // không phải Bỏ hoàn thành (CEO 2026-10-05).
   canReassign?: boolean;
+  // Khâu đang tới lượt: người đang đăng nhập (mặc định người làm), số liệu
+  // cảnh báo nợ/cọc và gợi ý thu tiền (giai đoạn 3 tách gọn CRM).
+  completer: {
+    currentEmployeeId: string | null;
+    checks: StepChecks;
+    paymentDefault: { type: "invoice" | "deposit_collect"; amount: number } | null;
+  };
 }
 
 function UncompleteTaskButton({
@@ -128,19 +125,9 @@ export function OrderTaskRow({
   status,
   canUncomplete,
   canReassign,
+  completer,
 }: OrderTaskRowProps) {
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  function handleSubmit(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      const result = await upsertOrderTask(undefined, formData);
-      if (result && "error" in result) {
-        setError(result.error);
-      }
-    });
-  }
 
   if (status === "done") {
     return (
@@ -189,66 +176,14 @@ export function OrderTaskRow({
     );
   }
 
-  const rowKey = `${task?.employee_id ?? ""}-${task?.note ?? ""}`;
-
   return (
-    <form
-      key={rowKey}
-      action={handleSubmit}
-      className="space-y-2 rounded-lg border border-primary/25 bg-primary/[0.03] p-3 shadow-sm"
-    >
-      <input type="hidden" name="order_id" value={orderId} />
-      <input type="hidden" name="task_type" value={taskType} />
-      <input type="hidden" name="completed" value="on" />
-
-      <p className="text-sm font-medium">{label}</p>
-
-      <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <Select name="employee_id" defaultValue={task?.employee_id ?? undefined}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Người phụ trách">
-              {(value: string) => employees.find((e) => e.id === value)?.name}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {priorityCount > 0 && priorityCount < employees.length ? (
-              <>
-                <SelectGroup>
-                  <SelectLabel>{priorityLabel}</SelectLabel>
-                  {employees.slice(0, priorityCount).map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectSeparator />
-                <SelectGroup>
-                  <SelectLabel>Kho khác</SelectLabel>
-                  {employees.slice(priorityCount).map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </>
-            ) : (
-              employees.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.name}
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-
-        <Input name="note" placeholder="Ghi chú" defaultValue={task?.note ?? ""} />
-
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "..." : "Hoàn thành"}
-        </Button>
-      </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </form>
+    <StepCompleterInline
+      orderId={orderId}
+      label={label}
+      step={{ taskType, employees, priorityCount, priorityLabel, assignedId: task?.employee_id ?? null }}
+      currentEmployeeId={completer.currentEmployeeId}
+      checks={completer.checks}
+      paymentDefault={completer.paymentDefault}
+    />
   );
 }

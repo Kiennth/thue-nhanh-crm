@@ -60,6 +60,7 @@ import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
+import { StepGroupButton } from "./step-completer";
 import { CloseDealButton } from "./close-deal-button";
 import { CompleteAllTasksButton } from "./complete-all-tasks-button";
 import { CollectAllButton } from "./collect-all-button";
@@ -124,6 +125,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     { data: comboComponents },
     { data: comboAlternatives },
     { data: commentRows },
+    { data: stepOverrideRows },
   ] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_equipment").select("*").eq("order_id", id).order("position"),
@@ -176,6 +178,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       .select("id, parent_id, body, created_at, employees(name)")
       .eq("order_id", id)
       .order("created_at"),
+    // Lý do bỏ qua cảnh báo khi chốt khâu (giai đoạn 3) — bảng mới, chưa có
+    // trong types/database.ts.
+    (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+      .from("step_overrides")
+      .select("id, task_type, rule, reason, detail, employee_id, created_at")
+      .eq("order_id", id)
+      .order("created_at") as unknown as Promise<{
+      data:
+        | { id: string; task_type: TaskType; rule: string; reason: string; detail: string | null; employee_id: string | null; created_at: string }[]
+        | null;
+    }>,
   ]);
 
   if (!order) {
@@ -272,6 +285,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // Giám đốc/Admin/Kế toán/Cửa hàng trưởng xem; Kỹ thuật/Sales không thấy.
   const canSeeCommission =
     canManage || (!!employee && employee.role === "cua_hang_truong");
+  // Nút gộp khâu (giai đoạn 3): "Giao xong" = Chuẩn bị + Giao hàng, "Thu về
+  // xong" = Thu hồi + Nghiệm thu (bỏ qua khâu Vận hành không bắt buộc). Mỗi
+  // khâu vẫn ghi người làm riêng — 10 dòng khoán giữ nguyên.
+  const isTaskDone = (t: TaskType) => !!taskByType.get(t)?.completed_date;
+  const requiredBefore = (t: TaskType) =>
+    TASK_TYPE_SEQUENCE.slice(0, TASK_TYPE_SEQUENCE.indexOf(t))
+      .filter((x) => !OPTIONAL_TASK_TYPES.has(x))
+      .every(isTaskDone);
+  const stepGroup: { label: string; types: TaskType[] } | null =
+    order.cancelled_at || order.completed_at
+      ? null
+      : !isTaskDone("chuan_bi") && requiredBefore("chuan_bi")
+        ? { label: "Giao xong", types: ["chuan_bi", "giao_hang_ban_giao"] }
+        : !isTaskDone("thu_hoi") && requiredBefore("thu_hoi")
+          ? { label: "Thu về xong", types: ["thu_hoi", "nghiem_thu"] }
+          : null;
   let lastDoneTaskType: TaskType | null = null;
   for (let i = TASK_TYPE_SEQUENCE.length - 1; i >= 0; i--) {
     if (taskByType.get(TASK_TYPE_SEQUENCE[i])?.completed_date) {
@@ -373,6 +402,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // QR chuyển khoản tách 2 mục như báo giá (CEO 2026-10-05): tiền thuê còn
   // thiếu ("THANH TOAN …") + cọc chưa thu ("DAT COC …").
   const depositDue = totalDeposit > 0 && depositRefunded === 0 ? Math.max(0, totalDeposit - depositCollected) : 0;
+  // Hoàn thành khâu (giai đoạn 3): cảnh báo còn nợ / chưa thu cọc khi Nghiệm
+  // thu / Nhập kho — có lý do thì đi tiếp, không chặn.
+  const stepChecks = {
+    remaining: Math.round(remaining),
+    depositDue: Math.round(depositDue),
+    missingCccd: orderCustomer?.customer_type === "individual" && !orderCustomer.tax_code,
+    hasOwingOverride: (stepOverrideRows ?? []).some((o) => o.rule === "owing"),
+  };
+  const stepPaymentDefault = (taskType: TaskType) =>
+    taskType === "ky_hop_dong_thu_coc"
+      ? { type: "deposit_collect" as const, amount: Math.round(depositDue) }
+      : (["giao_hang_ban_giao", "thu_hoi", "nghiem_thu", "nhap_kho_bao_tri"] as TaskType[]).includes(taskType)
+        ? { type: "invoice" as const, amount: Math.round(remaining) }
+        : null;
   const qrRental = order.cancelled_at ? 0 : Math.round(remaining);
   const qrDeposit = order.cancelled_at ? 0 : Math.round(depositDue);
 
@@ -1502,6 +1545,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       <CompleteAllTasksButton orderId={order.id} remaining={TASK_TYPE_SEQUENCE.length - doneCount} />
                     </span>
                   )}
+                  {stepGroup && (
+                    <span data-requires-saved className="contents">
+                      <StepGroupButton
+                        orderId={order.id}
+                        label={stepGroup.label}
+                        steps={stepGroup.types.map((t) => ({
+                          taskType: t,
+                          ...taskEmployeeOptions(t, taskByType.get(t)?.employee_id),
+                          assignedId: taskByType.get(t)?.employee_id ?? null,
+                        }))}
+                        currentEmployeeId={employee?.id ?? null}
+                        checks={stepChecks}
+                        paymentDefault={stepPaymentDefault(stepGroup.types[1])}
+                      />
+                    </span>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div>
@@ -1585,6 +1644,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     status={status}
                                     canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}
                                     canReassign={canManage}
+                                    completer={{
+                                      currentEmployeeId: employee?.id ?? null,
+                                      checks: stepChecks,
+                                      paymentDefault: stepPaymentDefault(taskType),
+                                    }}
                                   />
                                 </div>
                                 {scanType && status === "current" && (
@@ -1610,6 +1674,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       );
                     })}
                   </div>
+                  {(stepOverrideRows ?? []).length > 0 && (
+                    <div className="mt-4 space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                      <p className="font-semibold">Chốt khâu dù có cảnh báo</p>
+                      {(stepOverrideRows ?? []).map((o) => (
+                        <p key={o.id}>
+                          <span className="font-medium">{TASK_TYPE_LABELS[o.task_type] ?? o.task_type}</span>
+                          {o.detail ? ` (${o.detail})` : ""}: “{o.reason}” —{" "}
+                          {(o.employee_id && employeeNameById.get(o.employee_id)) || "—"},{" "}
+                          {new Date(o.created_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
