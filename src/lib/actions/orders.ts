@@ -1169,7 +1169,9 @@ async function pickAvailableInstances(
 
   const { data: busyRows } = await supabase
     .from("order_equipment")
-    .select("equipment_instance_id, orders!inner(completed_at, cancelled_at, rental_start_at, rental_end_at)")
+    .select(
+      "equipment_instance_id, orders!inner(completed_at, cancelled_at, rental_start_at, rental_end_at, confirmed_at, delivery_stock_moved_at)",
+    )
     .in("equipment_instance_id", candidateIds)
     .is("orders.completed_at", null)
     .is("orders.cancelled_at", null);
@@ -1180,10 +1182,18 @@ async function pickAvailableInstances(
     (
       (busyRows ?? []) as unknown as {
         equipment_instance_id: string | null;
-        orders: { rental_start_at: string | null; rental_end_at: string | null };
+        orders: {
+          rental_start_at: string | null;
+          rental_end_at: string | null;
+          confirmed_at: string | null;
+          delivery_stock_moved_at: string | null;
+        };
       }[]
     )
       .filter((r) => {
+        // Chỉ đơn ĐÃ CHỐT (hoặc đã giao) mới giữ máy — đơn "Đã báo giá (chưa
+        // chốt)" không chặn (CEO 2026-10-11, BQ13023 kẹt vì báo giá BQ13098).
+        if (!r.orders.confirmed_at && !r.orders.delivery_stock_moved_at) return false;
         if (!byPeriod) return true;
         const s = r.orders.rental_start_at ? Date.parse(r.orders.rental_start_at) : -Infinity;
         // Đơn chưa đóng mà đã quá giờ trả → máy chưa về, bận tới hiện tại.
@@ -3087,7 +3097,7 @@ async function loadSwapContext(
     supabase
       .from("order_equipment")
       .select(
-        "equipment_instance_id, order_id, orders!inner(order_code, rental_start_at, rental_end_at, return_stock_transferred_at)",
+        "equipment_instance_id, order_id, orders!inner(order_code, rental_start_at, rental_end_at, return_stock_transferred_at, confirmed_at, delivery_stock_moved_at)",
       )
       .eq("equipment_type_id", line.equipment_type_id)
       .not("equipment_instance_id", "is", null)
@@ -3112,9 +3122,13 @@ async function loadSwapContext(
       rental_start_at: string | null;
       rental_end_at: string | null;
       return_stock_transferred_at: string | null;
+      confirmed_at: string | null;
+      delivery_stock_moved_at: string | null;
     };
   }[]) {
     if (clash.has(r.equipment_instance_id)) continue;
+    // Báo giá chưa chốt không giữ máy (CEO 2026-10-11).
+    if (r.order_id !== order.id && !r.orders.confirmed_at && !r.orders.delivery_stock_moved_at) continue;
     if (r.order_id === order.id) {
       clash.set(r.equipment_instance_id, "Đã có trong đơn này");
       continue;
