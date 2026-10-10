@@ -26,7 +26,7 @@ export interface WebOrderRow {
   // Công ty: MST · khách lẻ: số CCCD (CEO: "CCCD chính là MST").
   tax_code: string;
   pickup_key: "hcm" | "hn" | "dn" | "ship";
-  ship_city: "hcm" | "hn" | "dn" | null;
+  ship_city: "hcm" | "hn" | "dn" | "tinh" | null;
   address: string | null;
   rental_start_at: string;
   rental_end_at: string;
@@ -48,7 +48,7 @@ const STATUS_LABEL: Record<WebOrderStatus, string> = {
   cancelled: "Đã huỷ",
 };
 const PLACE_LABEL: Record<string, string> = { hcm: "Kho TP HCM", hn: "Kho Hà Nội", dn: "Kho Đà Nẵng" };
-const CITY_LABEL: Record<string, string> = { hcm: "TP HCM", hn: "Hà Nội", dn: "Đà Nẵng" };
+const CITY_LABEL: Record<string, string> = { hcm: "TP HCM", hn: "Hà Nội", dn: "Đà Nẵng", tinh: "Ngoại tỉnh" };
 
 const dt = (iso: string) =>
   new Date(iso).toLocaleString("vi-VN", {
