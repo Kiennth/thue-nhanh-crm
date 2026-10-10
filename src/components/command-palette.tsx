@@ -60,14 +60,22 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
 
   return (
     <>
+      {/* CEO 10/10: "to thật là to để ai cũng biết mà ấn vô, màu sắc rực rỡ" —
+          nút chiếm giữa thanh trên cùng, nền chuyển màu cam → hồng → tím,
+          hiện cả trên điện thoại. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="ml-auto hidden items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-muted sm:flex"
+        className="mx-auto flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-3 text-left text-white shadow-lg shadow-rose-500/30 ring-2 ring-white/40 transition hover:brightness-110 hover:shadow-xl focus-visible:ring-4 focus-visible:ring-rose-300 focus-visible:outline-none sm:h-12 sm:max-w-2xl sm:px-4"
       >
-        <Search className="size-4" />
-        Tìm nhanh…
-        <kbd className="rounded border bg-muted px-1.5 font-mono text-[11px]">Ctrl K</kbd>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/25 sm:size-8">
+          <Search className="size-4 sm:size-5" strokeWidth={2.75} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide sm:text-base">
+          TÌM NHANH
+          <span className="hidden font-medium opacity-90 md:inline"> — mã đơn, tên khách, hàng hoá, trang…</span>
+        </span>
+        <kbd className="hidden shrink-0 rounded-md bg-white/25 px-2 py-0.5 font-mono text-xs font-semibold sm:block">Ctrl K</kbd>
       </button>
       <Dialog
         open={open}

@@ -29,7 +29,7 @@ export function HeaderClock({ location }: { location: string | null }) {
   if (!now) return null;
 
   return (
-    <span className="text-muted-foreground font-mono text-xs">
+    <span className="text-muted-foreground hidden shrink-0 font-mono text-xs md:inline">
       {timeFormatter.format(now)}
       {location ? ` · ${location}` : ""}
     </span>
