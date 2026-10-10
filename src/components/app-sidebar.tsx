@@ -39,6 +39,7 @@ import {
   Settings,
   ListTodo,
   UserCheck,
+  Ghost,
 } from "lucide-react";
 import {
   Sidebar,
@@ -278,8 +279,10 @@ export function AppSidebar({ employee }: { employee: CurrentEmployee }) {
   return (
     <Sidebar>
       <SidebarHeader className="px-4 py-3">
-        <Link href="/" className="text-base font-bold">
+        <Link href="/" className="flex items-center gap-1.5 text-base font-bold">
           Thuê Nhanh CRM
+          {/* Halloween (tự tắt 01/11 — lib/season.ts). */}
+          <Ghost className="season-only size-4 text-primary" aria-hidden />
         </Link>
         <div className="mt-1 flex items-center gap-2">
           <span

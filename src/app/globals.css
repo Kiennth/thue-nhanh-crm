@@ -235,3 +235,18 @@
 .prose-lesson pre { background: var(--muted); padding: 0.6rem 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.6rem 0; }
 .prose-lesson pre code { background: none; padding: 0; }
 .prose-lesson hr { margin: 1rem 0; border-color: var(--border); }
+
+/* Theme Halloween (CEO 10/10, tự tắt 01/11 — lib/season.ts). Vừa phải: màu nhấn
+   đỏ → cam bí ngô (nút chính, viền chọn, menu đang mở), viền dưới thanh trên
+   cùng cam → tím, icon con ma nhỏ cạnh tên CRM. Không đổi bố cục. */
+.season-only { display: none; }
+html[data-season="halloween"] {
+  --primary: #ea580c;
+  --ring: #ea580c;
+  --sidebar-primary: #ea580c;
+}
+html[data-season="halloween"] .season-only { display: inline-flex; }
+html[data-season="halloween"] [data-slot="sidebar-inset"] > header {
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg, #ea580c, #7c3aed) 1;
+}

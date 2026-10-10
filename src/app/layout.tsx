@@ -3,6 +3,7 @@ import { Roboto, JetBrains_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "@/components/ui/sonner";
 import { ChunkReload } from "@/components/chunk-reload";
+import { SEASON_SCRIPT } from "@/lib/season";
 import "./globals.css";
 
 // CEO chốt 2026-08-06: đổi sang Roboto — đúng font fallback Booqable đang
@@ -36,7 +37,12 @@ export default function RootLayout({
     <html
       lang="vi"
       className={`${robotoSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      // data-season do script theo mùa gắn trước khi React chạy (lib/season.ts).
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SEASON_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <NextTopLoader
           color="linear-gradient(to right, #f97316, #eab308, #22c55e, #06b6d4, #8b5cf6)"
