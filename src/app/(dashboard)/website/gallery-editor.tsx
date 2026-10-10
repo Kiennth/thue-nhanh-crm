@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { uploadWebsiteProductImage } from "@/lib/actions/website";
+import { normalizeProductImage } from "@/lib/normalize-image";
 
 // Quản lý gallery ảnh sản phẩm web (CEO 2026-08-17): upload từ máy (nhiều
 // file), xoá, mũi tên đổi thứ tự — ảnh ĐẦU TIÊN là ảnh đại diện trên thẻ sản
@@ -67,7 +68,8 @@ export function GalleryEditor({
     startUpload(async () => {
       for (const file of list) {
         const formData = new FormData();
-        formData.set("image", file);
+        // Chuẩn ảnh (11/10): nền trắng, cắt sát, vuông, ≤1024, WebP — ảnh chụp giữ khung.
+        formData.set("image", await normalizeProductImage(file));
         const result = await uploadWebsiteProductImage(slug, formData);
         if ("error" in result) {
           toast.error(`${file.name}: ${result.error}`);
@@ -198,7 +200,7 @@ export function GalleryEditor({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Ảnh đầu tiên là ảnh đại diện. Tối đa 10 ảnh, mỗi ảnh ≤ 5MB. Xoá/đổi thứ tự/alt chỉ ăn khi bấm Lưu.
+        Ảnh đầu tiên là ảnh đại diện. Tối đa 10 ảnh, mỗi ảnh ≤ 5MB — tự chuẩn hoá nền trắng, vuông, tối đa 1024px. Xoá/đổi thứ tự/alt chỉ ăn khi bấm Lưu.
         {missingCount > 0 && (
           <span className="text-amber-700 dark:text-amber-300"> · {missingCount} ảnh chưa có alt.</span>
         )}

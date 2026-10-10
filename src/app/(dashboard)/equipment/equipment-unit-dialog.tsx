@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { normalizeFileInput } from "@/lib/normalize-image";
 import { Pencil, Plus } from "lucide-react";
 import {
   Dialog,
@@ -143,8 +144,9 @@ export function EquipmentUnitDialog({
               name="image"
               type="file"
               accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
+              onChange={async (e) => {
+                // Chuẩn ảnh (11/10): nền trắng, cắt sát, vuông, ≤1024, WebP.
+                const file = await normalizeFileInput(e.currentTarget);
                 if (file) setImagePreview(URL.createObjectURL(file));
               }}
             />
