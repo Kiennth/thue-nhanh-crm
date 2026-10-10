@@ -61,13 +61,14 @@ export function CustomerForm({
   const [name, setName] = useState(customer?.name ?? defaultName ?? "");
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [email, setEmail] = useState(customer?.email ?? "");
-  const [contactName, setContactName] = useState(customer?.contact_name ?? "");
+  const [contactName] = useState(customer?.contact_name ?? "");
   // 1 ô tax_code (CEO 09/10): công ty = MST; cá nhân = CCCD (= MST cá nhân).
   // Cá nhân mà người sửa không được xem số đủ → ô trống, để trống = giữ số cũ.
   const hideIndividualId = customer?.customer_type === "individual" && !!customer?.tax_code && !canViewIdNumber;
   const [taxCode, setTaxCode] = useState(hideIndividualId ? "" : (customer?.tax_code ?? ""));
   const [wantsVat, setWantsVat] = useState(customer?.wants_vat ?? false);
   const [invoiceEmail, setInvoiceEmail] = useState(customer?.invoice_email ?? "");
+  const [contactOpen, setContactOpen] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showAll, setShowAll] = useState(false);
   const [dup, setDup] = useState<{ field: string; id: string; name: string } | null>(null);
@@ -195,22 +196,12 @@ export function CustomerForm({
         />,
       )}
 
-      {company &&
-        field(
-          "contact_name",
-          "Người liên hệ",
-          <Input
-            id="contact_name"
-            name="contact_name"
-            placeholder="Họ tên người liên hệ"
-            value={contactName}
-            onChange={(e) => setContactName(e.target.value)}
-            onBlur={() => touch("contact_name")}
-            className={invalid("contact_name")}
-          />,
-        )}
+      {/* Bỏ ô Người liên hệ (CEO 2026-10-11) — giữ giá trị cũ (dùng điền sẵn
+          người đặt khi lên đơn) để lưu không xoá mất. */}
+      <input type="hidden" name="contact_name" value={contactName} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {!company && (
+        <div className="grid gap-4 sm:grid-cols-2">
         {field(
           "phone",
           <>
@@ -240,54 +231,43 @@ export function CustomerForm({
             className={invalid("email")}
           />,
         )}
-      </div>
+        </div>
+      )}
 
       {company ? (
-        <div className="space-y-3 rounded-lg border p-3">
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox"
-              name="wants_vat"
-              checked={wantsVat}
-              onChange={(e) => setWantsVat(e.target.checked)}
-              className="size-4"
-            />
-            Khách lấy hoá đơn VAT
-          </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {field(
-              "tax_code",
-              <>
-                Mã số thuế (MST) {wantsVat && <Req />}
-              </>,
-              <Input
-                id="tax_code"
-                name="tax_code"
-                inputMode="numeric"
-                placeholder="0312345678"
-                value={taxCode}
-                onChange={(e) => setTaxCode(e.target.value)}
-                onBlur={() => checkDup("tax_code", taxCode)}
-                className={invalid("tax_code")}
-              />,
-            )}
-            {field(
-              "invoice_email",
-              <>
-                Email nhận hoá đơn {wantsVat && <Req />}
-              </>,
-              <Input
-                id="invoice_email"
-                name="invoice_email"
-                type="email"
-                value={invoiceEmail}
-                onChange={(e) => setInvoiceEmail(e.target.value)}
-                onBlur={() => touch("invoice_email")}
-                className={invalid("invoice_email")}
-              />,
-            )}
-          </div>
-        </div>
+        <>
+          {/* Thứ tự khách công ty (CEO 2026-10-11): Tên → MST → Email → Địa chỉ
+              → Người đại diện → Chức vụ → Số TK → ĐVQHNS → Tiền cọc → Ghi chú. */}
+          {field(
+            "tax_code",
+            <>
+              MST {wantsVat && <Req />}
+            </>,
+            <Input
+              id="tax_code"
+              name="tax_code"
+              inputMode="numeric"
+              placeholder="0312345678"
+              value={taxCode}
+              onChange={(e) => setTaxCode(e.target.value)}
+              onBlur={() => checkDup("tax_code", taxCode)}
+              className={invalid("tax_code")}
+            />,
+          )}
+          {field(
+          "email",
+          "Email",
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => touch("email")}
+            className={invalid("email")}
+          />,
+        )}
+        </>
       ) : (
         field(
           "tax_code",
@@ -331,32 +311,107 @@ export function CustomerForm({
         <Input id="address" name="address" placeholder="Địa chỉ giao mặc định / xuất hoá đơn" defaultValue={customer?.address ?? ""} />
       </div>
 
-      {company && (
+      {company ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="representative_name">Người đại diện (ký hợp đồng)</Label>
+              <Input id="representative_name" name="representative_name" placeholder="Ông/Bà ..." defaultValue={customer?.representative_name ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="representative_title">Chức vụ</Label>
+              <Input id="representative_title" name="representative_title" placeholder="Giám đốc..." defaultValue={customer?.representative_title ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank_account_number">Số tài khoản</Label>
+              <Input id="bank_account_number" name="bank_account_number" inputMode="numeric" defaultValue={customer?.bank_account_number ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank_name">Tại ngân hàng</Label>
+              <Input id="bank_name" name="bank_name" placeholder="Vietcombank - CN Hà Nội..." defaultValue={customer?.bank_name ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="budget_unit_code">Mã số ĐVQHNS</Label>
+              <Input id="budget_unit_code" name="budget_unit_code" placeholder="Không bắt buộc" defaultValue={customer?.budget_unit_code ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+            <Label htmlFor="deposit_percentage">Tiền cọc</Label>
+            <select
+              id="deposit_percentage"
+              name="deposit_percentage"
+              defaultValue={String(customer?.deposit_percentage ?? 100)}
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="100">100% (mặc định)</option>
+              <option value="50">50%</option>
+              <option value="0">0% — khách thân thiết, miễn cọc</option>
+            </select>
+          </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Ghi chú</Label>
+            <Input id="notes" name="notes" defaultValue={customer?.notes ?? ""} />
+          </div>
+          {/* SĐT + hoá đơn VAT gom ở cuối, bấm mới mở (CEO 2026-10-11) — tự mở
+              khi có lỗi ở các ô này. */}
+          <details
+            open={contactOpen || (showAll && !!(errors.phone || errors.invoice_email || errors.tax_code))}
+            onToggle={(e) => setContactOpen(e.currentTarget.open)}
+            className="rounded-lg border px-3 py-2"
+          >
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+              Liên hệ và hoá đơn
+              {phone || wantsVat ? (
+                <span className="ml-2 font-normal">
+                  {[phone, wantsVat ? "lấy VAT" : ""].filter(Boolean).join(" · ")}
+                </span>
+              ) : null}
+            </summary>
+            <div className="mt-3 space-y-3">
+              {field(
+                "phone",
+                "Số điện thoại",
+                <Input
+                  id="phone"
+                  name="phone"
+                  inputMode="tel"
+                  placeholder="0912345678 · nước ngoài: +62…"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => checkDup("phone", phone)}
+                  className={invalid("phone")}
+                />,
+              )}
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  name="wants_vat"
+                  checked={wantsVat}
+                  onChange={(e) => setWantsVat(e.target.checked)}
+                  className="size-4"
+                />
+                Khách lấy hoá đơn VAT
+              </label>
+              {field(
+                "invoice_email",
+                <>
+                  Email nhận hoá đơn {wantsVat && <Req />}
+                </>,
+                <Input
+                  id="invoice_email"
+                  name="invoice_email"
+                  type="email"
+                  value={invoiceEmail}
+                  onChange={(e) => setInvoiceEmail(e.target.value)}
+                  onBlur={() => touch("invoice_email")}
+                  className={invalid("invoice_email")}
+                />,
+              )}
+            </div>
+          </details>
+        </>
+      ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="representative_name">Người đại diện (ký hợp đồng)</Label>
-            <Input id="representative_name" name="representative_name" placeholder="Ông/Bà ..." defaultValue={customer?.representative_name ?? ""} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="representative_title">Chức vụ</Label>
-            <Input id="representative_title" name="representative_title" placeholder="Giám đốc..." defaultValue={customer?.representative_title ?? ""} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="budget_unit_code">Mã số ĐVQHNS</Label>
-            <Input id="budget_unit_code" name="budget_unit_code" placeholder="Không bắt buộc" defaultValue={customer?.budget_unit_code ?? ""} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="bank_account_number">Số tài khoản</Label>
-            <Input id="bank_account_number" name="bank_account_number" inputMode="numeric" defaultValue={customer?.bank_account_number ?? ""} />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="bank_name">Tại ngân hàng</Label>
-            <Input id="bank_name" name="bank_name" placeholder="Vietcombank - CN Hà Nội..." defaultValue={customer?.bank_name ?? ""} />
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="deposit_percentage">Tiền cọc</Label>
           <select
@@ -375,6 +430,7 @@ export function CustomerForm({
           <Input id="notes" name="notes" defaultValue={customer?.notes ?? ""} />
         </div>
       </div>
+      )}
 
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

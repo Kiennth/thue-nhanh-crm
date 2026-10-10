@@ -145,6 +145,59 @@ export default async function CustomerDetailPage({
           <CardTitle className="text-base">Thông tin khách hàng</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {customer.customer_type === "company" ? (
+            <>
+              {/* Thứ tự khách công ty (CEO 2026-10-11): Tên → MST → Email →
+                  Địa chỉ → Người đại diện → Chức vụ → Số TK → ĐVQHNS → Tiền
+                  cọc → Ghi chú; SĐT + hoá đơn VAT ở cuối. Bỏ Người liên hệ. */}
+              {(
+                [
+                  ["Tên công ty", customer.name],
+                  ["MST", customer.tax_code],
+                  ["Email", customer.email],
+                  ["Địa chỉ", customer.address],
+                  ["Người đại diện", customer.representative_name],
+                  ["Chức vụ", customer.representative_title],
+                  [
+                    "Số tài khoản",
+                    customer.bank_account_number
+                      ? `${customer.bank_account_number}${customer.bank_name ? ` · ${customer.bank_name}` : ""}`
+                      : null,
+                  ],
+                  ["Mã số ĐVQHNS", customer.budget_unit_code],
+                  ["Tiền cọc", DEPOSIT_PERCENTAGE_LABELS[customer.deposit_percentage]],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="font-medium">{value ?? "—"}</p>
+                </div>
+              ))}
+              <div className="col-span-full">
+                <p className="text-xs text-muted-foreground">Ghi chú</p>
+                <p className="font-medium">{customer.notes ?? "—"}</p>
+              </div>
+              {customer.needs_review && (
+                <div className="col-span-full">
+                  <p className="text-xs text-muted-foreground">Cần bổ sung</p>
+                  <p className="text-sm font-medium text-destructive">
+                    MST/CCCD cũ không khớp mẫu{customer.legacy_tax_or_id ? ` (đang ghi "${customer.legacy_tax_or_id}")` : ""} — bấm Sửa, chọn đúng loại khách và lưu lại.
+                  </p>
+                </div>
+              )}
+              <div className="col-span-full grid grid-cols-2 gap-4 border-t pt-3 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Điện thoại</p>
+                  <p>{customer.phone ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Hoá đơn VAT</p>
+                  <p>{customer.wants_vat ? `Có${customer.invoice_email ? ` · ${customer.invoice_email}` : ""}` : "Không"}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
           <div>
             <p className="text-xs text-muted-foreground">Loại khách hàng</p>
             <p className="font-medium">
@@ -159,24 +212,6 @@ export default async function CustomerDetailPage({
             <p className="text-xs text-muted-foreground">Email</p>
             <p className="font-medium">{customer.email ?? "—"}</p>
           </div>
-          {customer.customer_type === "company" ? (
-            <>
-              <div>
-                <p className="text-xs text-muted-foreground">Người liên hệ</p>
-                <p className="font-medium">{customer.contact_name ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">MST</p>
-                <p className="font-medium">{customer.tax_code ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Hoá đơn VAT</p>
-                <p className="font-medium">
-                  {customer.wants_vat ? `Có${customer.invoice_email ? ` · ${customer.invoice_email}` : ""}` : "Không"}
-                </p>
-              </div>
-            </>
-          ) : (
             <div>
               <p className="text-xs text-muted-foreground">Số CCCD (= MST cá nhân)</p>
               <p className="font-medium">
@@ -187,7 +222,6 @@ export default async function CustomerDetailPage({
                 )}
               </p>
             </div>
-          )}
           {customer.needs_review && (
             <div>
               <p className="text-xs text-muted-foreground">Cần bổ sung</p>
@@ -230,6 +264,8 @@ export default async function CustomerDetailPage({
               <p className="text-xs text-muted-foreground">Ghi chú</p>
               <p className="font-medium">{customer.notes}</p>
             </div>
+          )}
+            </>
           )}
         </CardContent>
       </Card>
