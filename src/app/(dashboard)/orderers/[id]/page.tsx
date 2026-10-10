@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireRole } from "@/lib/dal";
 import { ORDERER_VIEW_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
-import { TASK_TYPE_LABELS, VAT_RATE } from "@/lib/order-labels";
+import { ORDER_FLOW_LABELS, orderFlowStage, TASK_TYPE_LABELS, VAT_RATE } from "@/lib/order-labels";
 import { OrdererDialog, type OrdererRow } from "../orderer-dialog";
 
 const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
@@ -145,7 +145,7 @@ export default async function OrdererDetailPage({ params }: { params: Promise<{ 
                     ) : o.completed_at ? (
                       <Badge>Hoàn tất</Badge>
                     ) : (
-                      <Badge variant="outline">{TASK_TYPE_LABELS[o.status]}</Badge>
+                      <Badge variant="outline">{ORDER_FLOW_LABELS[orderFlowStage(o.status)]}</Badge>
                     )}
                   </TableCell>
                 </TableRow>

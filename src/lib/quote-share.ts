@@ -59,7 +59,13 @@ export async function recordQuoteAcceptance(
   const total = Math.round(Number(order.total_value) * (1 + VAT_RATE) * 100) / 100;
   const { error } = await db
     .from("orders")
-    .update({ quote_accepted_at: new Date().toISOString(), quote_accepted_name: name, quote_accepted_total: total })
+    // Khách Đồng ý = Chốt đơn (luồng 3 bước, 2026-10-11): giữ máy cho đơn.
+    .update({
+      quote_accepted_at: new Date().toISOString(),
+      quote_accepted_name: name,
+      quote_accepted_total: total,
+      confirmed_at: new Date().toISOString(),
+    })
     .eq("id", orderId)
     .is("quote_accepted_at", null);
   if (error) return { error: "Không lưu được: " + error.message };

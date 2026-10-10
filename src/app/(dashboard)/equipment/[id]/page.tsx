@@ -35,7 +35,7 @@ import {
   RENTAL_PERIOD_UNIT_LABELS,
   TRACKING_TYPE_LABELS,
 } from "@/lib/equipment-labels";
-import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { ORDER_FLOW_LABELS, orderFlowStage } from "@/lib/order-labels";
 import { EQUIPMENT_WRITE_ROLES, MANAGE_ROLES } from "@/lib/roles";
 import { EquipmentTypeDialog } from "../equipment-type-dialog";
 import { ProductActionBar } from "./product-action-bar";
@@ -406,7 +406,7 @@ export default async function EquipmentDetailPage({
   function rentalStatusLabel(o: { status: TaskType; completed_at: string | null; cancelled_at: string | null }) {
     if (o.cancelled_at) return "Đã huỷ";
     if (o.completed_at) return "Hoàn tất";
-    return TASK_TYPE_LABELS[o.status];
+    return ORDER_FLOW_LABELS[orderFlowStage(o.status)];
   }
 
   const branchList = branches ?? [];

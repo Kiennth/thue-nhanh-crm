@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CalendarClock, Check, Clock, Coins, ListChecks, Lock, Package, UserRound, Wallet } from "lucide-react";
+import { CalendarClock, Check, Clock, Coins, ListChecks, Package, UserRound, Wallet } from "lucide-react";
 import type { TaskType } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { AccentTitle, accentCard, accentHeader } from "@/components/section-accent";
@@ -21,14 +21,7 @@ import { getCurrentEmployee } from "@/lib/dal";
 import { deleteOrderEquipmentLine, deleteOrderEquipmentLines } from "@/lib/actions/orders";
 import { deleteOrderPayment } from "@/lib/actions/order-payments";
 import { deleteOvertimeEntry } from "@/lib/actions/overtime";
-import {
-  ORDER_PAYMENT_TYPE_LABELS,
-  PAYMENT_METHOD_LABELS,
-  TASK_TYPE_LABELS,
-  OPTIONAL_TASK_TYPES,
-  TASK_TYPE_SEQUENCE,
-  VAT_RATE,
-} from "@/lib/order-labels";
+import { OPTIONAL_TASK_TYPES, ORDER_FLOW_LABELS, ORDER_PAYMENT_TYPE_LABELS, orderFlowStage, PAYMENT_METHOD_LABELS, TASK_TYPE_LABELS, TASK_TYPE_SEQUENCE, VAT_RATE } from "@/lib/order-labels";
 import {
   equipmentDetailLabel,
   equipmentInstanceLabel,
@@ -60,9 +53,8 @@ import { AddOrderLineDialog } from "./add-order-line-dialog";
 import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
-import { StepGroupButton } from "./step-completer";
 import { InvoicePanel } from "./invoice-panel";
-import { CloseDealButton } from "./close-deal-button";
+import { OrderFlowBar } from "./order-flow-bar";
 import { CompleteAllTasksButton } from "./complete-all-tasks-button";
 import { CollectAllButton } from "./collect-all-button";
 import { OrderDiscountForm } from "./order-discount-form";
@@ -74,7 +66,6 @@ import { suggestDeliveryContact } from "@/lib/delivery-contact";
 import { OrderInfoForm } from "./order-info-form";
 import { CancelOrderButton } from "./cancel-order-button";
 import { DuplicateOrderButton } from "./duplicate-order-button";
-import { ReopenOrderButton } from "./reopen-order-button";
 import { OrderPaymentDialog } from "./order-payment-dialog";
 import { RfidScanDialog } from "./rfid-scan-dialog";
 import { OvertimeDialog } from "./overtime-dialog";
@@ -277,39 +268,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const taskByType = new Map((tasks ?? []).map((t) => [t.task_type, t]));
   const doneCount = (tasks ?? []).filter((t) => t.completed_date).length;
-  // Bỏ tick khâu đã hoàn thành — CEO chốt 2026-08-06, hẹp hơn canManage (thêm
-  // Cửa hàng trưởng, xem uncompleteOrderTask trong actions/orders.ts). Chỉ
-  // khâu CUỐI CÙNG đã hoàn thành mới cho bỏ, để giữ đúng tính tuần tự.
+  // Bỏ tick khâu khoán / Hoàn tác bước luồng đơn — Giám đốc/Admin/Kế toán +
+  // Cửa hàng trưởng (CEO 2026-08-06). Từ 2026-10-11 bỏ được khâu bất kỳ.
   const canUncompleteTask =
     canManage || (!!employee && employee.role === "cua_hang_truong");
   // Tiền khoán (quỹ khoán đơn + % từng khâu) — CEO chốt 2026-09-25 chỉ
   // Giám đốc/Admin/Kế toán/Cửa hàng trưởng xem; Kỹ thuật/Sales không thấy.
   const canSeeCommission =
     canManage || (!!employee && employee.role === "cua_hang_truong");
-  // Nút gộp khâu (giai đoạn 3): "Giao xong" = Chuẩn bị + Giao hàng, "Thu về
-  // xong" = Thu hồi + Nghiệm thu (bỏ qua khâu Vận hành không bắt buộc). Mỗi
-  // khâu vẫn ghi người làm riêng — 10 dòng khoán giữ nguyên.
-  const isTaskDone = (t: TaskType) => !!taskByType.get(t)?.completed_date;
-  const requiredBefore = (t: TaskType) =>
-    TASK_TYPE_SEQUENCE.slice(0, TASK_TYPE_SEQUENCE.indexOf(t))
-      .filter((x) => !OPTIONAL_TASK_TYPES.has(x))
-      .every(isTaskDone);
-  const stepGroup: { label: string; types: TaskType[] } | null =
-    order.cancelled_at || order.completed_at
-      ? null
-      : !isTaskDone("chuan_bi") && requiredBefore("chuan_bi")
-        ? { label: "Giao xong", types: ["chuan_bi", "giao_hang_ban_giao"] }
-        : !isTaskDone("thu_hoi") && requiredBefore("thu_hoi")
-          ? { label: "Thu về xong", types: ["thu_hoi", "nghiem_thu"] }
-          : null;
-  let lastDoneTaskType: TaskType | null = null;
-  for (let i = TASK_TYPE_SEQUENCE.length - 1; i >= 0; i--) {
-    if (taskByType.get(TASK_TYPE_SEQUENCE[i])?.completed_date) {
-      lastDoneTaskType = TASK_TYPE_SEQUENCE[i];
-      break;
-    }
-  }
-
   // Doanh số các dòng dịch vụ trả khoán trực tiếp (Lắp đặt/Tháo dỡ/Hỗ trợ kỹ
   // thuật...) loại khỏi giá trị dùng để tra bậc %hoa hồng/tính quỹ khoán
   // theo khâu — tránh tính khoán 2 lần cho cùng 1 đồng doanh số.
@@ -775,7 +741,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           ) : order.completed_at ? (
             <Badge>Hoàn tất</Badge>
           ) : (
-            <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+            <Badge variant="outline">{ORDER_FLOW_LABELS[orderFlowStage(order.status)]}</Badge>
           )}
           {parentExt && (
             <Link
@@ -833,14 +799,34 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             rentalStartAt={order.rental_start_at}
             rentalEndAt={order.rental_end_at}
           />
-          {/* Không còn nút "Hoàn tất đơn" — đơn tự hoàn tất khi đủ 10 khâu
-              (trigger auto_complete_order). */}
+          {/* Đơn hoàn tất khi bấm "Nhận lại máy" (luồng 4 bước bên dưới); mở
+              lại = "Hoàn tác nhận lại máy" trên thanh luồng đơn. */}
           {!order.completed_at && !order.cancelled_at && (
             <CancelOrderButton orderId={order.id} />
           )}
-          {order.completed_at && canManage && <ReopenOrderButton orderId={order.id} />}
         </div>
       </div>
+
+      {!order.cancelled_at && (
+        <div data-requires-saved>
+          <OrderFlowBar
+            orderId={order.id}
+            createdAt={order.created_at}
+            confirmedAt={(order as typeof order & { confirmed_at?: string | null }).confirmed_at ?? null}
+            deliveredAt={order.delivered_at}
+            returnedAt={order.completed_at}
+            delivered={!!order.delivery_stock_moved_at}
+            returned={!!order.return_stock_transferred_at || !!order.completed_at}
+            plannedStart={order.rental_start_at}
+            plannedEnd={order.rental_end_at}
+            canUndo={canUncompleteTask}
+            dealEmployees={taskEmployeeOptions("chot_don", employee?.id).employees}
+            pickupEmployees={taskEmployeeOptions("giao_hang_ban_giao", employee?.id).employees}
+            returnEmployees={taskEmployeeOptions("thu_hoi", employee?.id).employees}
+            currentEmployeeId={employee?.id ?? null}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card className={accentCard("indigo")}>
@@ -1523,7 +1509,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <CardHeader className={accentHeader("violet")}>
                   <CardTitle className="text-base">
                     <AccentTitle accent="violet" icon={ListChecks}>
-                      10 khâu tính khoán ({doneCount}/{TASK_TYPE_SEQUENCE.length})
+                      10 khâu tính lương ({doneCount}/{TASK_TYPE_SEQUENCE.length})
                     </AccentTitle>
                   </CardTitle>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -1532,52 +1518,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       style={{ width: `${(doneCount / TASK_TYPE_SEQUENCE.length) * 100}%` }}
                     />
                   </div>
-                  {!order.cancelled_at && !order.completed_at && !taskByType.get("chot_don")?.completed_date && (
-                    <span data-requires-saved className="contents">
-                      <CloseDealButton
-                        orderId={order.id}
-                        employees={taskEmployeeOptions("chot_don", employee?.id).employees}
-                        defaultEmployeeId={employee?.id ?? null}
-                      />
-                    </span>
-                  )}
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Chỉ để tính khoán — tick lúc nào cũng được, không cần theo thứ tự, không ảnh hưởng kho hay trạng thái đơn.
+                  </p>
                   {canManage && !order.cancelled_at && !order.completed_at && doneCount < TASK_TYPE_SEQUENCE.length && (
                     <span data-requires-saved className="contents">
                       <CompleteAllTasksButton orderId={order.id} remaining={TASK_TYPE_SEQUENCE.length - doneCount} />
-                    </span>
-                  )}
-                  {stepGroup && (
-                    <span data-requires-saved className="contents">
-                      <StepGroupButton
-                        orderId={order.id}
-                        label={stepGroup.label}
-                        steps={stepGroup.types.map((t) => ({
-                          taskType: t,
-                          ...taskEmployeeOptions(t, taskByType.get(t)?.employee_id),
-                          assignedId: taskByType.get(t)?.employee_id ?? null,
-                        }))}
-                        currentEmployeeId={employee?.id ?? null}
-                        checks={stepChecks}
-                        paymentDefault={stepPaymentDefault(stepGroup.types[1])}
-                      />
                     </span>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div>
                     {TASK_TYPE_SEQUENCE.map((taskType, index) => {
-                      const earlier = TASK_TYPE_SEQUENCE.slice(0, index);
                       const task = taskByType.get(taskType);
-                      const isDone = !!task?.completed_date;
-                      // Khâu tuỳ chọn (Vận hành / xử lý sự cố) không chặn khâu sau.
-                      const canComplete = earlier
-                        .filter((t) => !OPTIONAL_TASK_TYPES.has(t))
-                        .every((t) => taskByType.get(t)?.completed_date);
-                      const status: "done" | "current" | "locked" = isDone
-                        ? "done"
-                        : canComplete
-                          ? "current"
-                          : "locked";
+                      // Không còn khoá tuần tự (2026-10-11): khâu chưa xong nào
+                      // cũng tick được ngay.
+                      const status: "done" | "current" = task?.completed_date ? "done" : "current";
                       const weight = canManage ? findTaskWeight(taskWeights ?? [], taskType) : 0;
                       const isLast = index === TASK_TYPE_SEQUENCE.length - 1;
                       // Nhóm 10 khâu theo 3 giai đoạn nghiệp vụ thật (bán hàng →
@@ -1617,17 +1573,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               className={cn(
                                 "relative z-10 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
                                 status === "done" && "border-primary bg-primary text-primary-foreground",
-                                status === "current" && "border-primary text-primary ring-4 ring-primary/10",
-                                status === "locked" && "border-muted-foreground/30 text-muted-foreground/40",
+                                status === "current" && "border-muted-foreground/40 text-muted-foreground",
                               )}
                             >
-                              {status === "done" ? (
-                                <Check className="size-3.5" />
-                              ) : status === "locked" ? (
-                                <Lock className="size-3" />
-                              ) : (
-                                index + 1
-                              )}
+                              {status === "done" ? <Check className="size-3.5" /> : index + 1}
                             </div>
                             <div className="min-w-0 flex-1 pb-5 last:pb-0">
                               <div className="flex items-center gap-2">
@@ -1643,7 +1592,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     {...taskEmployeeOptions(taskType, task?.employee_id)}
                                     task={task}
                                     status={status}
-                                    canUncomplete={canUncompleteTask && taskType === lastDoneTaskType}
+                                    canUncomplete={canUncompleteTask}
                                     canReassign={canManage}
                                     completer={{
                                       currentEmployeeId: employee?.id ?? null,

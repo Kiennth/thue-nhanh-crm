@@ -59,12 +59,38 @@ export const ORDER_PAYMENT_TYPE_LABELS: Record<OrderPaymentType, string> = {
   deposit_refund: "Hoàn tiền cọc",
 };
 
+// Luồng đơn (CEO 2026-10-11): Đã báo giá → Chốt đơn → Giao máy → Nhận lại
+// máy. orders.status (trigger orders_flow_status) chỉ còn 4 giá trị khi đơn
+// chưa kết thúc: bao_gia / giao_hang_ban_giao / thu_hoi (+ nhap_kho_bao_tri khi
+// đã nhận lại). Đơn cũ còn giá trị khâu khác thì quy về nhãn gần nhất.
+export const ORDER_FLOW_LABELS = {
+  quoted: "Đã báo giá (chưa chốt)",
+  confirmed: "Đã chốt · chờ giao",
+  out: "Đang thuê",
+  returned: "Đã nhận lại",
+} as const;
+
+export function orderFlowStage(status: TaskType): keyof typeof ORDER_FLOW_LABELS {
+  const i = TASK_TYPE_SEQUENCE.indexOf(status);
+  if (i <= TASK_TYPE_SEQUENCE.indexOf("chot_don")) return "quoted";
+  if (i <= TASK_TYPE_SEQUENCE.indexOf("giao_hang_ban_giao")) return "confirmed";
+  if (i <= TASK_TYPE_SEQUENCE.indexOf("thu_hoi")) return "out";
+  return "returned";
+}
+
+export function orderStatusLabel(o: { status: TaskType; completed_at: string | null; cancelled_at: string | null }): string {
+  if (o.cancelled_at) return "Đã huỷ";
+  if (o.completed_at) return "Hoàn tất";
+  return ORDER_FLOW_LABELS[orderFlowStage(o.status)];
+}
+
 // Trạng thái hiển thị/lọc cho danh sách đơn hàng — "completed"/"cancelled" là
-// 2 mốc kết thúc (orders.completed_at / cancelled_at), các giá trị còn lại là
-// khâu hiện tại (orders.status) khi đơn chưa kết thúc.
+// 2 mốc kết thúc (orders.completed_at / cancelled_at), còn lại là orders.status.
 export const ORDER_STATUS_FILTER_OPTIONS = [
   { value: "all", label: "Tất cả trạng thái" },
-  ...TASK_TYPE_SEQUENCE.map((t) => ({ value: t as string, label: TASK_TYPE_LABELS[t] })),
+  { value: "bao_gia", label: ORDER_FLOW_LABELS.quoted },
+  { value: "giao_hang_ban_giao", label: ORDER_FLOW_LABELS.confirmed },
+  { value: "thu_hoi", label: ORDER_FLOW_LABELS.out },
   { value: "completed", label: "Hoàn tất" },
   { value: "cancelled", label: "Đã huỷ" },
 ];

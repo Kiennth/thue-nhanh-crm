@@ -28,7 +28,10 @@ export type StepDef = {
 };
 export type StepChecks = { remaining: number; depositDue: number; missingCccd: boolean; hasOwingOverride: boolean };
 
-const OWING_STEPS: TaskType[] = ["nghiem_thu", "nhap_kho_bao_tri"];
+// Cảnh báo nợ/cọc khi Nghiệm thu / Nhập kho bỏ từ 2026-10-11 (luồng 3 bước):
+// khâu chỉ để tính lương, đơn hoàn tất ở bước "Nhận lại máy", nợ/cọc xem ở
+// Công nợ. Để rỗng → hộp tick khâu không còn đòi lý do.
+const OWING_STEPS: TaskType[] = [];
 const REASON_PRESETS = ["Công nợ công ty 30 ngày", "KH hẹn chuyển khoản", "Đã trừ cọc đơn khác", "Miễn cọc theo hồ sơ"];
 const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")}đ`;
 

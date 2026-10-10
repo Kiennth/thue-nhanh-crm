@@ -506,6 +506,7 @@ export interface Database {
           // Đóng dấu khi khâu giao hàng hoàn thành (trigger sync_order_status
           // duy trì) — mốc ghi nhận doanh số từ 2026-09-02.
           delivered_at: string | null;
+          confirmed_at: string | null;
           // Theo dõi hoá đơn đỏ (CEO 2026-09-02): chờ xuất = hoàn tất mà chưa
           // có invoice_issued_at và không bị đánh "không cần".
           invoice_issued_at: string | null;
@@ -541,6 +542,7 @@ export interface Database {
           return_stock_transferred_at?: string | null;
           deposit_override_amount?: number | null;
           delivered_at?: string | null;
+          confirmed_at?: string | null;
           invoice_issued_at?: string | null;
           invoice_number?: string | null;
           invoice_not_needed?: boolean;

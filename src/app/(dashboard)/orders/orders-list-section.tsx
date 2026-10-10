@@ -18,7 +18,7 @@ import { SortableTableHead } from "@/components/sortable-table-head";
 import { createClient } from "@/lib/supabase/server";
 import { deleteOrder } from "@/lib/actions/orders";
 import { vnNow } from "@/lib/vn-time";
-import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { ORDER_FLOW_LABELS, orderFlowStage } from "@/lib/order-labels";
 import {
   computeDateRange,
   DATE_RANGE_PRESET_OPTIONS,
@@ -394,7 +394,7 @@ export async function OrdersListSection({
     ) : order.completed_at ? (
       <Badge>Hoàn tất</Badge>
     ) : (
-      <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+      <Badge variant="outline">{ORDER_FLOW_LABELS[orderFlowStage(order.status)]}</Badge>
     );
 
   return (

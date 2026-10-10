@@ -13,7 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentEmployee } from "@/lib/dal";
 import { MANAGE_ROLES, ORDERER_VIEW_ROLES } from "@/lib/roles";
-import { TASK_TYPE_LABELS } from "@/lib/order-labels";
+import { ORDER_FLOW_LABELS, orderFlowStage } from "@/lib/order-labels";
 import { VN_TIME_ZONE } from "@/lib/date-format";
 import { SortableTableHead } from "@/components/sortable-table-head";
 import { CustomerDialog } from "../customer-dialog";
@@ -301,7 +301,7 @@ export default async function CustomerDetailPage({
                     ) : order.completed_at ? (
                       <Badge>Hoàn tất</Badge>
                     ) : (
-                      <Badge variant="outline">{TASK_TYPE_LABELS[order.status]}</Badge>
+                      <Badge variant="outline">{ORDER_FLOW_LABELS[orderFlowStage(order.status)]}</Badge>
                     )}
                   </TableCell>
                 </TableRow>

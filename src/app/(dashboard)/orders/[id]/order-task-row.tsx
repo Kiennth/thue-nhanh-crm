@@ -66,9 +66,6 @@ function UncompleteTaskButton({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  // "Giao hàng & bàn giao"/"Nhập kho & bảo trì" đụng tồn kho thật — cảnh báo
-  // rõ hơn 2 khâu còn lại (chỉ xoá completed_date).
-  const touchesStock = taskType === "giao_hang_ban_giao" || taskType === "nhap_kho_bao_tri";
 
   function handleConfirm() {
     startTransition(async () => {
@@ -97,9 +94,8 @@ function UncompleteTaskButton({
           <DialogTitle>Bỏ hoàn thành khâu &quot;{label}&quot;</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Đơn sẽ lùi về đang chờ ở khâu này, phần khoán của khâu này sẽ mất khỏi bảng lương.
-          {touchesStock &&
-            " Khâu này đã trừ/trả tồn kho thật — bỏ hoàn thành sẽ tự hoàn tác đúng phần tồn kho đó."}
+          Phần khoán của khâu này sẽ mất khỏi bảng lương. Kho và trạng thái đơn giữ nguyên (muốn lùi
+          đơn thì dùng nút Hoàn tác trên thanh luồng đơn).
         </p>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
