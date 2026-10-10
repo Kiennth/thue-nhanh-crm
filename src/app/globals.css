@@ -247,6 +247,14 @@ html[data-season="halloween"] {
 }
 html[data-season="halloween"] .season-only { display: inline-flex; }
 html[data-season="halloween"] [data-slot="sidebar-inset"] > header {
-  border-bottom: 3px solid transparent;
+  border-bottom: 4px solid transparent;
   border-image: linear-gradient(90deg, #ea580c, #7c3aed) 1;
 }
+
+/* Halloween đậm hơn (CEO 10/10): đầu menu trái nền tím đêm, chữ cam nhạt. */
+html[data-season="halloween"] [data-sidebar="header"] {
+  background: linear-gradient(135deg, #1c1326, #4c1d95);
+  color: #fed7aa;
+}
+html[data-season="halloween"] [data-sidebar="header"] a { color: #fed7aa; }
+html[data-season="halloween"] [data-sidebar="header"] .text-muted-foreground { color: #fdba74; }
