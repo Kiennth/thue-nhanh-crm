@@ -187,6 +187,9 @@ export interface CustomerOrderDefaults {
   ordererPhone: string;
   ordererEmail: string;
   deliveryAddress: string;
+  // Khách công ty: không tự điền người đặt (agency — mấy chục người cùng đặt
+  // cho 1 công ty, CEO 2026-10-11), chỉ gợi ý "Người đặt gần đây".
+  isCompany: boolean;
   contacts: { name: string; phone: string; email: string }[];
 }
 
@@ -217,24 +220,24 @@ export async function getCustomerOrderDefaults(id: string): Promise<CustomerOrde
     if (seen.has(key)) continue;
     seen.add(key);
     contacts.push({ name, phone: o.orderer_phone ?? "", email: o.orderer_email ?? "" });
-    if (contacts.length >= 6) break;
+    if (contacts.length >= 10) break;
   }
   const individual = c.customer_type === "individual";
-  // Công ty: người liên hệ trong hồ sơ, không có thì người đặt gần nhất.
-  // Cá nhân: chính khách.
+  // Cá nhân: người đặt = chính khách. Công ty: để trống, nhân viên chọn trong
+  // "Người đặt gần đây" hoặc gõ tìm (CEO 2026-10-11: agency nhiều người đặt,
+  // không dùng 1 "người liên hệ" cố định / người đặt gần nhất).
   const primary = individual
     ? { name: c.name, phone: c.phone ?? "", email: c.email ?? "" }
-    : c.contact_name?.trim()
-      ? { name: c.contact_name.trim(), phone: c.phone ?? "", email: c.email ?? "" }
-      : (contacts[0] ?? { name: "", phone: c.phone ?? "", email: c.email ?? "" });
+    : { name: "", phone: "", email: "" };
   const lastAddress = (recent ?? []).find((o) => o.delivery_address?.trim())?.delivery_address ?? "";
   return {
     missingCccd: individual && !c.tax_code,
     depositPercentage: c.deposit_percentage ?? 100,
     ordererName: primary.name,
-    ordererPhone: primary.phone || c.phone || "",
-    ordererEmail: primary.email || c.email || "",
+    ordererPhone: individual ? primary.phone || c.phone || "" : "",
+    ordererEmail: individual ? primary.email || c.email || "" : "",
     deliveryAddress: c.address?.trim() || lastAddress,
+    isCompany: !individual,
     contacts: contacts.filter((x) => x.name !== primary.name || x.phone !== primary.phone),
   };
 }

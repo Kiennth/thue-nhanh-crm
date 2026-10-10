@@ -74,12 +74,12 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
     e.phone = "SĐT Việt Nam 10 số bắt đầu bằng 0; số nước ngoài ghi kèm mã nước, vd +62…";
   if (input.email.trim() && !EMAIL_RE.test(input.email.trim())) e.email = "Email không hợp lệ.";
   if (company) {
-    if (input.wants_vat) {
-      if (!input.tax_code.trim()) e.tax_code = "Khách lấy hoá đơn VAT thì phải có MST.";
-      else if (!isValidMst(input.tax_code)) e.tax_code = "MST phải là 10 số hoặc 10 số-3 số.";
-      if (!input.invoice_email.trim()) e.invoice_email = "Nhập email nhận hoá đơn.";
-      else if (!EMAIL_RE.test(input.invoice_email.trim())) e.invoice_email = "Email nhận hoá đơn không hợp lệ.";
-    }
+    // Đơn nào cũng xuất hoá đơn (CEO 2026-10-11) — bỏ ô "lấy VAT"; MST /
+    // email nhận HĐ không bắt buộc (thiếu MST thì xuất về cá nhân), có nhập
+    // thì phải đúng mẫu.
+    if (input.tax_code.trim() && !isValidMst(input.tax_code)) e.tax_code = "MST phải là 10 số hoặc 10 số-3 số.";
+    if (input.invoice_email.trim() && !EMAIL_RE.test(input.invoice_email.trim()))
+      e.invoice_email = "Email nhận hoá đơn không hợp lệ.";
   } else {
     // CCCD KHÔNG bắt buộc (CEO 10/10: thiếu CCCD chỉ nhắc khi tạo/chốt đơn,
     // không chặn tạo khách) — có nhập thì phải đúng 12 số.
@@ -93,8 +93,8 @@ export function validateCustomer(input: CustomerFormInput): Record<string, strin
 export function customerWarnings(input: CustomerFormInput): Record<string, string> {
   const w: Record<string, string> = {};
   if (input.customer_type === "company") {
-    if (!input.contact_name.trim()) w.contact_name = "Chưa có người liên hệ — nên bổ sung (vẫn lưu được).";
     if (!input.phone.trim()) w.phone = "Chưa có SĐT — nên bổ sung (vẫn lưu được).";
+    if (!input.tax_code.trim()) w.tax_code = "Chưa có MST — hoá đơn sẽ xuất về cá nhân (vẫn lưu được).";
   }
   return w;
 }

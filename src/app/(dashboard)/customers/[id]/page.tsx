@@ -191,8 +191,8 @@ export default async function CustomerDetailPage({
                   <p>{customer.phone ?? "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Hoá đơn VAT</p>
-                  <p>{customer.wants_vat ? `Có${customer.invoice_email ? ` · ${customer.invoice_email}` : ""}` : "Không"}</p>
+                  <p className="text-xs text-muted-foreground">Email nhận hoá đơn</p>
+                  <p>{customer.invoice_email ?? "—"}</p>
                 </div>
               </div>
             </>

@@ -638,7 +638,9 @@ export function QuickOrderDialog({
   const showContactFields =
     editContact ||
     (!!prefill && !customerDefaults) ||
-    (!!customerDefaults && !ordererName.trim() && !ordererPhone.trim() && !deliveryAddress.trim());
+    (!!customerDefaults && !ordererName.trim() && !ordererPhone.trim() && !deliveryAddress.trim()) ||
+    // Khách công ty chưa chọn người đặt → mở sẵn ô + "Người đặt gần đây".
+    (!!customerDefaults?.isCompany && !ordererName.trim());
   const detailsSummary = [
     orderCode.trim() ? `Mã đơn ${orderCode.trim()}` : "Mã đơn tự sinh",
     orderDate === datePart(new Date()) ? "Ngày đơn hôm nay" : `Ngày đơn ${orderDate.split("-").reverse().join("/")}`,
@@ -818,7 +820,9 @@ export function QuickOrderDialog({
                   </div>
                   {!!customerDefaults?.contacts.length && (
                     <div className="flex flex-wrap items-center gap-1.5 sm:col-span-2">
-                      <span className="text-xs text-muted-foreground">Người liên hệ khác:</span>
+                      <span className="text-xs text-muted-foreground">
+                        {customerDefaults.isCompany ? "Người đặt gần đây:" : "Người liên hệ khác:"}
+                      </span>
                       {customerDefaults.contacts.map((c) => (
                         <button
                           key={`${c.name}|${c.phone}`}

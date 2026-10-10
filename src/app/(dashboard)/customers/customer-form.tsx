@@ -66,7 +66,6 @@ export function CustomerForm({
   // Cá nhân mà người sửa không được xem số đủ → ô trống, để trống = giữ số cũ.
   const hideIndividualId = customer?.customer_type === "individual" && !!customer?.tax_code && !canViewIdNumber;
   const [taxCode, setTaxCode] = useState(hideIndividualId ? "" : (customer?.tax_code ?? ""));
-  const [wantsVat, setWantsVat] = useState(customer?.wants_vat ?? false);
   const [invoiceEmail, setInvoiceEmail] = useState(customer?.invoice_email ?? "");
   const [contactOpen, setContactOpen] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -84,11 +83,11 @@ export function CustomerForm({
         email,
         contact_name: contactName,
         tax_code: taxCode,
-        wants_vat: wantsVat,
+        wants_vat: true,
         invoice_email: invoiceEmail,
         has_existing_tax_code: hideIndividualId && kind === "individual",
       }),
-    [kind, name, phone, email, contactName, taxCode, wantsVat, invoiceEmail, hideIndividualId],
+    [kind, name, phone, email, contactName, taxCode, invoiceEmail, hideIndividualId],
   );
   const warnings = customerWarnings({
     customer_type: kind,
@@ -97,7 +96,7 @@ export function CustomerForm({
     email,
     contact_name: contactName,
     tax_code: taxCode,
-    wants_vat: wantsVat,
+    wants_vat: true,
     invoice_email: invoiceEmail,
   });
   const errorCount = Object.keys(errors).length;
@@ -199,6 +198,8 @@ export function CustomerForm({
       {/* Bỏ ô Người liên hệ (CEO 2026-10-11) — giữ giá trị cũ (dùng điền sẵn
           người đặt khi lên đơn) để lưu không xoá mất. */}
       <input type="hidden" name="contact_name" value={contactName} />
+      {/* Đơn nào cũng xuất hoá đơn (CEO 2026-10-11) — mọi khách lưu wants_vat. */}
+      <input type="hidden" name="wants_vat" value="true" />
 
       {!company && (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -240,9 +241,7 @@ export function CustomerForm({
               → Người đại diện → Chức vụ → Số TK → ĐVQHNS → Tiền cọc → Ghi chú. */}
           {field(
             "tax_code",
-            <>
-              MST {wantsVat && <Req />}
-            </>,
+            "MST",
             <Input
               id="tax_code"
               name="tax_code"
@@ -352,8 +351,8 @@ export function CustomerForm({
             <Label htmlFor="notes">Ghi chú</Label>
             <Input id="notes" name="notes" defaultValue={customer?.notes ?? ""} />
           </div>
-          {/* SĐT + hoá đơn VAT gom ở cuối, bấm mới mở (CEO 2026-10-11) — tự mở
-              khi có lỗi ở các ô này. */}
+          {/* SĐT + email nhận HĐ gom ở cuối, bấm mới mở (CEO 2026-10-11) — tự
+              mở khi có lỗi. Không còn ô "lấy VAT": đơn nào cũng xuất hoá đơn. */}
           <details
             open={contactOpen || (showAll && !!(errors.phone || errors.invoice_email || errors.tax_code))}
             onToggle={(e) => setContactOpen(e.currentTarget.open)}
@@ -361,10 +360,8 @@ export function CustomerForm({
           >
             <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
               Liên hệ và hoá đơn
-              {phone || wantsVat ? (
-                <span className="ml-2 font-normal">
-                  {[phone, wantsVat ? "lấy VAT" : ""].filter(Boolean).join(" · ")}
-                </span>
+              {phone || invoiceEmail ? (
+                <span className="ml-2 font-normal">{[phone, invoiceEmail].filter(Boolean).join(" · ")}</span>
               ) : null}
             </summary>
             <div className="mt-3 space-y-3">
@@ -382,21 +379,9 @@ export function CustomerForm({
                   className={invalid("phone")}
                 />,
               )}
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  name="wants_vat"
-                  checked={wantsVat}
-                  onChange={(e) => setWantsVat(e.target.checked)}
-                  className="size-4"
-                />
-                Khách lấy hoá đơn VAT
-              </label>
               {field(
                 "invoice_email",
-                <>
-                  Email nhận hoá đơn {wantsVat && <Req />}
-                </>,
+                "Email nhận hoá đơn",
                 <Input
                   id="invoice_email"
                   name="invoice_email"
