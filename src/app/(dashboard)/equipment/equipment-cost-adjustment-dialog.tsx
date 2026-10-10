@@ -85,10 +85,10 @@ export function EquipmentCostAdjustmentDialog({
           </p>
 
           <div className="space-y-2">
-            <Label htmlFor="branch_id">Chi nhánh</Label>
+            <Label htmlFor="branch_id">Kho</Label>
             <Select name="branch_id">
               <SelectTrigger id="branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh">
+                <SelectValue placeholder="Chọn kho">
                   {(value: string) => {
                     const b = branchStocks.find((b) => b.branch_id === value);
                     return b ? `${b.branch_name} (${b.quantity_in_stock} đang có)` : undefined;

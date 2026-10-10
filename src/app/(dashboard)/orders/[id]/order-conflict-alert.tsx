@@ -61,7 +61,7 @@ export async function OrderConflictAlert({ orderId }: { orderId: string }) {
         })}
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
-        Xử lý: giảm số lượng, đổi khoảng thuê, hoặc chuyển kho bổ sung từ chi nhánh khác trước
+        Xử lý: giảm số lượng, đổi khoảng thuê, hoặc chuyển kho bổ sung từ kho khác trước
         ngày giao. Cảnh báo không chặn lưu đơn.
       </p>
     </div>

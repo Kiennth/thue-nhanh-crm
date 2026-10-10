@@ -10,7 +10,7 @@ export const ACTIVITY_TABLE_LABELS: Record<string, string> = {
   order_payments: "Thanh toán",
   customers: "Khách hàng",
   employees: "Nhân viên",
-  branches: "Chi nhánh",
+  branches: "Kho",
   equipment_types: "Loại hàng hoá",
   equipment_instances: "Sản phẩm (theo dõi riêng lẻ)",
   equipment_stock: "Tồn kho",

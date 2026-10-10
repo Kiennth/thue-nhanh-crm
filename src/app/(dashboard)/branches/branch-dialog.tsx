@@ -34,7 +34,7 @@ export function BranchDialog({ branch }: BranchDialogProps) {
       <span className="sr-only">Sửa</span>
     </Button>
   ) : (
-    <CreateButton label="Thêm chi nhánh" />
+    <CreateButton label="Thêm kho" />
   );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +65,11 @@ export function BranchDialog({ branch }: BranchDialogProps) {
       <DialogContent>
         <form action={handleSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>{branch ? "Sửa chi nhánh" : "Thêm chi nhánh"}</DialogTitle>
+            <DialogTitle>{branch ? "Sửa kho" : "Thêm kho"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Tên chi nhánh</Label>
+            <Label htmlFor="name">Tên kho</Label>
             <Input id="name" name="name" defaultValue={branch?.name} required />
           </div>
 

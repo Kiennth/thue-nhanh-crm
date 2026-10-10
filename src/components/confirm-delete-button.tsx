@@ -88,7 +88,7 @@ export function ConfirmDeleteButton<T>({
         <p className="text-sm text-muted-foreground">{confirmMessage}</p>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-            Huỷ
+            Đóng
           </Button>
           <Button variant="destructive" onClick={handleConfirm} disabled={pending}>
             {pending ? "Đang xoá..." : "Xoá"}

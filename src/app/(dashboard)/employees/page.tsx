@@ -87,7 +87,7 @@ export default async function EmployeesPage() {
           <TableRow>
             <TableHead>Tên</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>Chi nhánh</TableHead>
+            <TableHead>Kho</TableHead>
             <TableHead>Vai trò</TableHead>
             {isHr && <TableHead>Lương cứng</TableHead>}
             <TableHead>Trạng thái</TableHead>

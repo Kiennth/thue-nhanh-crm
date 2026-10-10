@@ -98,10 +98,10 @@ export function ExpenseDialog({
         <form action={handleSubmit} className="space-y-4">
           {!lockedBranchId && (
             <div className="space-y-1">
-              <label className="text-sm font-medium">Chi nhánh</label>
+              <label className="text-sm font-medium">Kho</label>
               <Select value={branchId} onValueChange={(v) => setBranchId(v ?? "")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn chi nhánh">
+                  <SelectValue placeholder="Chọn kho">
                     {(v: string) => branchNameById.get(v)}
                   </SelectValue>
                 </SelectTrigger>
@@ -178,7 +178,7 @@ export function ExpenseDialog({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Huỷ
+              Đóng
             </Button>
             <Button type="submit" disabled={pending || !categoryId || (!lockedBranchId && !branchId)}>
               {pending ? "Đang lưu..." : "Lưu"}

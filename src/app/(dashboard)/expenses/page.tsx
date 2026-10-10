@@ -271,7 +271,7 @@ export default async function ExpensesPage({
 
         {!isBranchManager && (
           <StatCard
-            label="Chi nhánh tốn nhất"
+            label="Kho tốn nhất"
             value={topBranch ? (branchNameById.get(topBranch[0]) ?? "—") : "—"}
           >
             {topBranch && (
@@ -298,9 +298,9 @@ export default async function ExpensesPage({
       {!isBranchManager && branchPoints.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">So sánh chi phí giữa các chi nhánh</CardTitle>
+            <CardTitle className="text-base">So sánh chi phí giữa các kho</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Tổng chi {data.range.label} của từng chi nhánh, tách theo hạng mục
+              Tổng chi {data.range.label} của từng kho, tách theo hạng mục
               {includesPayroll && " — đã gộp quỹ lương tự tính từ Bảng lương"}.
             </p>
           </CardHeader>
@@ -341,7 +341,7 @@ export default async function ExpensesPage({
             <TableHeader>
               <TableRow>
                 <SortableTableHead sortKey="expense_date" label="Ngày" />
-                <TableHead>Chi nhánh</TableHead>
+                <TableHead>Kho</TableHead>
                 <TableHead>Hạng mục</TableHead>
                 <TableHead>Ghi chú</TableHead>
                 <SortableTableHead sortKey="amount" label="Số tiền" align="right" />

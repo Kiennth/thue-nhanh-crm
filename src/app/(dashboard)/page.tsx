@@ -278,7 +278,7 @@ async function OrdersBlock({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Đơn hàng chi nhánh {branchList.data?.find((b) => b.id === branchOverviewId)?.name ?? ""}
+              Đơn hàng kho {branchList.data?.find((b) => b.id === branchOverviewId)?.name ?? ""}
             </h2>
             <Link href="/orders" className="text-xs text-muted-foreground hover:underline">
               Xem tất cả đơn →

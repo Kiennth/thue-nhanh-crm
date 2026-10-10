@@ -85,7 +85,7 @@ export async function loadScanScope(
 ): Promise<{ machines: ScanMachine[]; rentedCount: number } | { error: string }> {
   const employee = await requireRole([...EQUIPMENT_WRITE_ROLES]);
   if (employee.role === "cua_hang_truong" && branchId !== employee.branch_id) {
-    return { error: "Bạn chỉ kiểm kho của chi nhánh mình." };
+    return { error: "Bạn chỉ kiểm được kho của mình." };
   }
   const supabase = await createClient();
   let typeQuery = supabase.from("equipment_types").select("id, name").eq("product_type", "rental").eq("tracking_type", "individual");

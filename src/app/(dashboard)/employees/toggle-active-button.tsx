@@ -60,7 +60,7 @@ export function ToggleActiveButton({
         </p>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-            Huỷ
+            Đóng
           </Button>
           <Button
             variant={isActive ? "destructive" : "default"}

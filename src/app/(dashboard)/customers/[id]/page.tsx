@@ -212,9 +212,9 @@ export default async function CustomerDetailPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Mã đơn</TableHead>
-                <TableHead>Chi nhánh</TableHead>
-                <SortableTableHead sortKey="rental_start_at" label="Ngày bắt đầu" />
-                <SortableTableHead sortKey="rental_end_at" label="Ngày kết thúc" />
+                <TableHead>Kho</TableHead>
+                <SortableTableHead sortKey="rental_start_at" label="Nhận" />
+                <SortableTableHead sortKey="rental_end_at" label="Trả" />
                 <SortableTableHead sortKey="total_value" label="Doanh số" />
                 <TableHead>Trạng thái</TableHead>
               </TableRow>

@@ -43,7 +43,7 @@ export function CompleteAllTasksButton({ orderId, remaining }: { orderId: string
           </ul>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-              Huỷ
+              Đóng
             </Button>
             <Button onClick={run} disabled={pending}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <CheckCheck className="size-4" />}

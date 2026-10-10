@@ -154,10 +154,10 @@ export function EquipmentInstanceDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="branch_id">Chi nhánh</Label>
+            <Label htmlFor="branch_id">Kho</Label>
             <Select name="branch_id" defaultValue={instance?.branch_id ?? undefined}>
               <SelectTrigger id="branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh">
+                <SelectValue placeholder="Chọn kho">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
                 </SelectValue>
               </SelectTrigger>

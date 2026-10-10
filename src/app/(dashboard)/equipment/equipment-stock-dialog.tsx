@@ -86,12 +86,12 @@ export function EquipmentStockDialog({
           <input type="hidden" name="equipment_unit_id" value={equipmentUnitId} />
           <DialogHeader>
             <DialogTitle>
-              {stock ? "Sửa tồn kho theo chi nhánh" : "Thêm tồn kho theo chi nhánh"}
+              {stock ? "Sửa tồn kho" : "Thêm tồn kho"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="branch_id">Chi nhánh</Label>
+            <Label htmlFor="branch_id">Kho</Label>
             {stock ? (
               <>
                 <input type="hidden" name="branch_id" value={stock.branch_id} />
@@ -102,7 +102,7 @@ export function EquipmentStockDialog({
             ) : (
               <Select name="branch_id">
                 <SelectTrigger id="branch_id" className="w-full">
-                  <SelectValue placeholder="Chọn chi nhánh">
+                  <SelectValue placeholder="Chọn kho">
                     {(value: string) => branches.find((b) => b.id === value)?.name}
                   </SelectValue>
                 </SelectTrigger>

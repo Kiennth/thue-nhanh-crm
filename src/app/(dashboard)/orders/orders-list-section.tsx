@@ -484,10 +484,10 @@ export async function OrdersListSection({
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">Mã đơn</TableHead>
-            <TableHead className="w-28">Chi nhánh</TableHead>
+            <TableHead className="w-28">Kho</TableHead>
             <SortableTableHead sortKey="customer" label="Khách hàng" />
-            <SortableTableHead sortKey="rental_start_at" label="Ngày bắt đầu" />
-            <SortableTableHead sortKey="rental_end_at" label="Ngày kết thúc" />
+            <SortableTableHead sortKey="rental_start_at" label="Nhận" />
+            <SortableTableHead sortKey="rental_end_at" label="Trả" />
             <SortableTableHead sortKey="total_value" label="Doanh số" />
             <SortableTableHead sortKey="status" label="Trạng thái" />
             {canDelete && <TableHead className="w-16"></TableHead>}

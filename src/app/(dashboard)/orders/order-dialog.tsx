@@ -96,7 +96,7 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
   function handleSubmit(formData: FormData) {
     setError(null);
     if (!pickupId) {
-      setError("Chọn chi nhánh giao.");
+      setError("Chọn kho giao.");
       return;
     }
     startTransition(async () => {
@@ -147,7 +147,7 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
           {/* Chi nhánh bấm 1 chạm (CEO 2026-10-04): kho nào giao thì mặc định
               kho đó thu hồi; chỉ khi trả về kho khác mới mở chọn riêng. */}
           <div className="space-y-2">
-            <Label>Chi nhánh</Label>
+            <Label>Kho</Label>
             <BranchPills branches={branches} value={pickupId} onChange={setPickupId} />
             <input type="hidden" name="pickup_branch_id" value={pickupId} />
             <input type="hidden" name="return_branch_id" value={separateReturn ? returnId : pickupId} />
@@ -160,11 +160,11 @@ export function OrderDialog({ branches, order }: OrderDialogProps) {
                   if (e.target.checked && !returnId) setReturnId(pickupId);
                 }}
               />
-              Thu hồi về chi nhánh khác
+              Thu hồi về kho khác
             </label>
             {separateReturn && (
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">Chi nhánh thu hồi</p>
+                <p className="text-xs text-muted-foreground">Kho thu hồi</p>
                 <BranchPills branches={branches} value={returnId} onChange={setReturnId} />
               </div>
             )}

@@ -43,13 +43,13 @@ export function OrderBranchScopeFilter({
       <SelectTrigger className="w-56">
         {/* Select ở dự án này nhận hàm render nhãn (giống OrderStatusFilter);
             thiếu nó thì trigger hiện thẳng giá trị thô "branch"/"all". */}
-        <SelectValue placeholder="Phạm vi chi nhánh">
-          {(v: string) => (v === "all" ? "Tất cả chi nhánh" : `Kho ${branchName}`)}
+        <SelectValue placeholder="Phạm vi kho">
+          {(v: string) => (v === "all" ? "Tất cả kho" : `Kho ${branchName}`)}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="branch">Kho {branchName}</SelectItem>
-        <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+        <SelectItem value="all">Tất cả kho</SelectItem>
       </SelectContent>
     </Select>
   );

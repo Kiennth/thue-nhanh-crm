@@ -78,10 +78,10 @@ export function TransferStockDialog({
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="from_branch_id">Từ chi nhánh</Label>
+            <Label htmlFor="from_branch_id">Từ kho</Label>
             <Select name="from_branch_id">
               <SelectTrigger id="from_branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh nguồn">
+                <SelectValue placeholder="Chọn kho nguồn">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
                 </SelectValue>
               </SelectTrigger>
@@ -96,10 +96,10 @@ export function TransferStockDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="to_branch_id">Đến chi nhánh</Label>
+            <Label htmlFor="to_branch_id">Đến kho</Label>
             <Select name="to_branch_id">
               <SelectTrigger id="to_branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh đích">
+                <SelectValue placeholder="Chọn kho đích">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
                 </SelectValue>
               </SelectTrigger>

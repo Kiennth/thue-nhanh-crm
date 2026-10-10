@@ -234,7 +234,7 @@ export function ChangeProductButton({
           </label>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-              Huỷ
+              Đóng
             </Button>
             <Button onClick={submit} disabled={!picked || pending}>
               {pending && picked ? "Đang đổi…" : picked ? `Đổi sang ${picked.label}` : "Chọn sản phẩm"}

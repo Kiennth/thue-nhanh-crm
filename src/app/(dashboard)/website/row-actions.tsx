@@ -110,7 +110,7 @@ export function RefreshWebsiteButton() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-            Huỷ
+            Đóng
           </Button>
           <Button
             disabled={pending}

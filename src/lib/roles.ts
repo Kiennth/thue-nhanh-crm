@@ -90,7 +90,7 @@ export const NAV_SECTIONS: { key: NavSectionKey; label: string; hrefs: string[] 
 export const SETTINGS_ITEMS: NavItem[] = [
   {
     href: "/branches",
-    label: "Chi nhánh",
+    label: "Kho",
     roles: [...DIRECTOR_ONLY],
   },
   // Ba mục dưới đây động tới nhân sự, tiền công và giá bán — CEO chốt

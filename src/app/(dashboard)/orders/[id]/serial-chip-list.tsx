@@ -291,7 +291,7 @@ export function SerialChipList({
               onClick={() => setRemoving(null)}
               disabled={pending}
             >
-              Huỷ
+              Đóng
             </Button>
             <Button
               variant="destructive"

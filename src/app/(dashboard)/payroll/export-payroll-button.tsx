@@ -22,7 +22,7 @@ export interface PayrollExportRow {
 
 const COLUMNS: { header: string; key: keyof PayrollExportRow; money?: boolean }[] = [
   { header: "Nhân viên", key: "name" },
-  { header: "Chi nhánh", key: "branchName" },
+  { header: "Kho", key: "branchName" },
   { header: "Lương cứng", key: "baseSalary", money: true },
   { header: "Tổng khoán", key: "totalCommission", money: true },
   { header: "Lắp đặt", key: "installationPayout", money: true },

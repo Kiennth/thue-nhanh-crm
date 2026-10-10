@@ -32,7 +32,7 @@ const OrderSchema = z
   .object({
     // Để trống khi tạo = tự đánh số nối tiếp Booqable (next_order_code).
     order_code: z.string().trim().optional(),
-    pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh giao." }),
+    pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn kho giao." }),
     // Bỏ trống = thu hồi tại chính chi nhánh giao (tình huống phổ biến).
     return_branch_id: z.string().uuid().optional(),
     customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
@@ -113,7 +113,7 @@ export async function updateOrder(
     .single();
   if (current?.delivery_stock_moved_at && current.pickup_branch_id !== parsed.data.pickup_branch_id) {
     return {
-      error: "Đơn đã xuất kho nên không đổi được chi nhánh giao (sẽ lệch tồn). Chi nhánh thu hồi thì vẫn đổi được.",
+      error: "Đơn đã xuất kho nên không đổi được kho giao (sẽ lệch tồn). Kho thu hồi thì vẫn đổi được.",
     };
   }
   const { error } = await supabase.from("orders").update(parsed.data).eq("id", id);
@@ -137,7 +137,7 @@ export async function updateOrderBranches(
   await requireRole([...ALL_ROLES]);
   const uuid = z.string().uuid();
   if (!uuid.safeParse(orderId).success || !uuid.safeParse(pickupBranchId).success || !uuid.safeParse(returnBranchId).success) {
-    return { error: "Chi nhánh không hợp lệ." };
+    return { error: "Kho không hợp lệ." };
   }
   const supabase = await createClient();
   const { data: current } = await supabase
@@ -148,14 +148,14 @@ export async function updateOrderBranches(
   if (!current) return { error: "Không tìm thấy đơn." };
   if (current.delivery_stock_moved_at && current.pickup_branch_id !== pickupBranchId) {
     return {
-      error: "Đơn đã xuất kho nên không đổi được chi nhánh giao (sẽ lệch tồn). Chi nhánh thu hồi thì vẫn đổi được.",
+      error: "Đơn đã xuất kho nên không đổi được kho giao (sẽ lệch tồn). Kho thu hồi thì vẫn đổi được.",
     };
   }
   const { error } = await supabase
     .from("orders")
     .update({ pickup_branch_id: pickupBranchId, return_branch_id: returnBranchId })
     .eq("id", orderId);
-  if (error) return { error: "Không đổi được chi nhánh: " + error.message };
+  if (error) return { error: "Không đổi được kho: " + error.message };
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
   return { success: true };
@@ -563,8 +563,8 @@ export async function updateOrderLineExtraInfo(
 }
 
 const RentalPeriodSchema = z.object({
-  rental_start_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ bắt đầu thuê." }),
-  rental_end_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ kết thúc thuê." }),
+  rental_start_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ nhận." }),
+  rental_end_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ trả." }),
 });
 
 // Sửa thời gian thuê của đơn (áp dụng chung mọi dòng hàng cho thuê trong đơn —
@@ -885,7 +885,7 @@ export async function duplicateOrder(id: string, newStartAt?: string): Promise<A
   let rentalEndAt = source.rental_end_at;
   if (newStartAt && rentalStartAt) {
     const shift = Date.parse(newStartAt) - Date.parse(rentalStartAt);
-    if (Number.isNaN(shift)) return { error: "Giờ bắt đầu mới không hợp lệ." };
+    if (Number.isNaN(shift)) return { error: "Giờ nhận mới không hợp lệ." };
     rentalStartAt = new Date(Date.parse(rentalStartAt) + shift).toISOString();
     rentalEndAt = rentalEndAt ? new Date(Date.parse(rentalEndAt) + shift).toISOString() : null;
   }
@@ -1612,7 +1612,7 @@ async function insertEquipmentLine(
   }
 
   if (equipmentType.product_type === "rental" && (!order?.rental_start_at || !order?.rental_end_at)) {
-    return 'Đơn chưa có thời gian thuê — điền "Bắt đầu thuê / Kết thúc thuê" và bấm "Lưu thời gian thuê" trước, rồi thêm hàng.';
+    return 'Đơn chưa có thời gian thuê — điền "Nhận / Trả" ở khối Thời gian thuê và bấm "Lưu thay đổi" trước, rồi thêm hàng.';
   }
 
   if (equipmentType.tracking_type === "combo") {
@@ -2580,8 +2580,8 @@ const QuickOrderSchema = z.object({
   customer_id: z.string().uuid({ message: "Vui lòng chọn khách hàng." }),
   pickup_branch_id: z.string().uuid({ message: "Vui lòng chọn kho giao." }),
   return_branch_id: z.string().uuid().nullable().optional(),
-  rental_start_at: z.string().min(1, { message: "Vui lòng chọn thời gian bắt đầu thuê." }),
-  rental_end_at: z.string().min(1, { message: "Vui lòng chọn thời gian kết thúc thuê." }),
+  rental_start_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ nhận." }),
+  rental_end_at: z.string().min(1, { message: "Vui lòng chọn ngày giờ trả." }),
   // Trống = tự đánh số nối tiếp.
   order_code: z.string().trim().nullable().optional(),
   order_date: z.string().min(1),
@@ -2627,7 +2627,7 @@ export async function quickCreateOrder(
   }
   const d = parsed.data;
   if (new Date(d.rental_end_at) <= new Date(d.rental_start_at)) {
-    return { error: "Thời gian kết thúc phải sau thời gian bắt đầu." };
+    return { error: "Trả phải sau Nhận." };
   }
 
   const supabase = await createClient();

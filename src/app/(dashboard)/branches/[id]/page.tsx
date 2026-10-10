@@ -85,7 +85,7 @@ export default async function BranchDashboardPage({
     notFound();
   }
   if (reportError) {
-    throw new Error("Không tải được báo cáo thiết bị chi nhánh: " + reportError.message);
+    throw new Error("Không tải được báo cáo thiết bị của kho: " + reportError.message);
   }
 
   const orderList = orders;

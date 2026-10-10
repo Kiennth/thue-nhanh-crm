@@ -27,7 +27,7 @@ export default async function BranchesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Chi nhánh</h1>
+        <h1 className="text-2xl font-semibold">Kho</h1>
         {isDirector && (
           <BranchDialog />
         )}
@@ -36,7 +36,7 @@ export default async function BranchesPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Tên chi nhánh</TableHead>
+            <TableHead>Tên kho</TableHead>
             <TableHead>Vùng lương tối thiểu</TableHead>
             <TableHead>Trạng thái</TableHead>
             {isDirector && <TableHead className="w-24"></TableHead>}
@@ -69,7 +69,7 @@ export default async function BranchesPage() {
           {!branches?.length && (
             <TableRow>
               <TableCell colSpan={isDirector ? 4 : 3} className="text-center text-muted-foreground">
-                Chưa có chi nhánh nào.
+                Chưa có kho nào.
               </TableCell>
             </TableRow>
           )}

@@ -29,7 +29,7 @@ export function BranchQuickSwitch({
     startTransition(async () => {
       const result = await updateOrderBranches(orderId, pickup, ret);
       if (result && "error" in result) toast.error(result.error);
-      else toast.success("Đã đổi chi nhánh");
+      else toast.success("Đã đổi kho");
     });
   }
 

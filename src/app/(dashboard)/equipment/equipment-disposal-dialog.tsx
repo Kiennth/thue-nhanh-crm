@@ -78,10 +78,10 @@ export function EquipmentDisposalDialog({
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="branch_id">Chi nhánh xuất kho</Label>
+            <Label htmlFor="branch_id">Xuất từ kho</Label>
             <Select name="branch_id">
               <SelectTrigger id="branch_id" className="w-full">
-                <SelectValue placeholder="Chọn chi nhánh">
+                <SelectValue placeholder="Chọn kho">
                   {(value: string) => branches.find((b) => b.id === value)?.name}
                 </SelectValue>
               </SelectTrigger>

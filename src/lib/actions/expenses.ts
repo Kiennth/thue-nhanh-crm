@@ -10,7 +10,7 @@ import { coveredPairsInMonth } from "@/lib/recurring-expenses";
 export type ActionState = { error: string } | { success: true } | undefined;
 
 const ExpenseSchema = z.object({
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
   category_id: z.string().uuid({ message: "Vui lòng chọn hạng mục." }),
   amount: z.coerce.number().positive({ message: "Số tiền phải lớn hơn 0." }),
   expense_date: z.string().min(1, { message: "Vui lòng chọn ngày." }),
@@ -111,7 +111,7 @@ export async function deleteExpense(id: string): Promise<void> {
 
 const RecurringExpenseSchema = z
   .object({
-    branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+    branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
     category_id: z.string().uuid({ message: "Vui lòng chọn hạng mục." }),
     amount: z.coerce.number().positive({ message: "Số tiền phải lớn hơn 0." }),
     frequency: z.enum(["monthly", "quarterly", "yearly"]),

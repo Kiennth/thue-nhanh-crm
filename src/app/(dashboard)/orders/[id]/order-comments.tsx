@@ -78,7 +78,7 @@ function CommentForm({
       <div className="flex justify-end gap-2">
         {onDone && parentId && (
           <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={pending}>
-            Huỷ
+            Đóng
           </Button>
         )}
         <Button type="submit" size="sm" disabled={pending}>

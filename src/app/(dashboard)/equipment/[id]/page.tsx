@@ -917,7 +917,7 @@ export default async function EquipmentDetailPage({
                   <Table className="mt-2">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Chi nhánh</TableHead>
+                        <TableHead>Kho</TableHead>
                         <TableHead>Tổng</TableHead>
                         <TableHead>Trong kho</TableHead>
                         <TableHead>Đang cho thuê</TableHead>
@@ -956,7 +956,7 @@ export default async function EquipmentDetailPage({
                             colSpan={canManageStock ? 5 : 4}
                             className="text-center text-muted-foreground"
                           >
-                            Chưa có tồn kho ở chi nhánh nào.
+                            Chưa có tồn ở kho nào.
                           </TableCell>
                         </TableRow>
                       )}
@@ -1076,7 +1076,7 @@ export default async function EquipmentDetailPage({
                   <TableRow>
                     <TableHead>Mã định danh</TableHead>
                     {showInstanceUnitColumn && <TableHead>Biến thể</TableHead>}
-                    <SortableTableHead sortKey="branch" label="Chi nhánh" />
+                    <SortableTableHead sortKey="branch" label="Kho" />
                     <SortableTableHead sortKey="status" label="Trạng thái" />
                     <TableHead>Bảo hành đến</TableHead>
                     <TableHead>Mua từ</TableHead>
@@ -1305,8 +1305,8 @@ export default async function EquipmentDetailPage({
                   <SortableTableHead sortKey="order_code" label="Mã đơn" />
                   <SortableTableHead sortKey="customer" label="Khách hàng" />
                   {showRentalProductColumn && <TableHead>Sản phẩm</TableHead>}
-                  <SortableTableHead sortKey="start" label="Ngày bắt đầu" />
-                  <SortableTableHead sortKey="end" label="Ngày kết thúc" />
+                  <SortableTableHead sortKey="start" label="Nhận" />
+                  <SortableTableHead sortKey="end" label="Trả" />
                   <SortableTableHead sortKey="quantity" label="Số lượng" />
                   <SortableTableHead sortKey="revenue" label="Doanh thu" />
                   <SortableTableHead sortKey="status" label="Trạng thái" />

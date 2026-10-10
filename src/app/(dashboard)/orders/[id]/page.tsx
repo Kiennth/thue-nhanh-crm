@@ -807,7 +807,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">Chi nhánh</p>
+              <p className="text-xs text-muted-foreground">Kho</p>
               <BranchQuickSwitch
                 orderId={order.id}
                 branches={branchList}
@@ -1427,7 +1427,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               {stockShortages.length > 0 && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                   <p className="font-medium">
-                    ⚠ Thiếu hàng tại {branchNameById.get(order.pickup_branch_id) ?? "chi nhánh"}
+                    ⚠ Thiếu hàng tại {branchNameById.get(order.pickup_branch_id) ?? "kho"}
                   </p>
                   <ul className="mt-1 list-inside list-disc space-y-1">
                     {stockShortages.map((s) => (

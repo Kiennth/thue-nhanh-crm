@@ -191,7 +191,7 @@ export function WebOrderCard({
               </Button>
             )}
             <Button variant="ghost" size="sm" disabled={pending} onClick={() => setStatus("cancelled")}>
-              Huỷ
+              Huỷ đơn
             </Button>
             <QuickOrderDialog
               branches={branches}

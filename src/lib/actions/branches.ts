@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/dal";
 import { DIRECTOR_ONLY } from "@/lib/roles";
 
 const BranchSchema = z.object({
-  name: z.string().trim().min(1, { message: "Tên chi nhánh không được để trống." }),
+  name: z.string().trim().min(1, { message: "Tên kho không được để trống." }),
   min_wage_region: z.string().trim().optional(),
   is_active: z.coerce.boolean(),
 });
@@ -34,7 +34,7 @@ export async function createBranch(
   const { error } = await supabase.from("branches").insert(parsed.data);
 
   if (error) {
-    return { error: "Không thể tạo chi nhánh: " + error.message };
+    return { error: "Không thể tạo kho: " + error.message };
   }
 
   revalidatePath("/branches");
@@ -62,7 +62,7 @@ export async function updateBranch(
   const { error } = await supabase.from("branches").update(parsed.data).eq("id", id);
 
   if (error) {
-    return { error: "Không thể cập nhật chi nhánh: " + error.message };
+    return { error: "Không thể cập nhật kho: " + error.message };
   }
 
   revalidatePath("/branches");
@@ -76,7 +76,7 @@ export async function deleteBranch(id: string) {
   const { error } = await supabase.from("branches").delete().eq("id", id);
 
   if (error) {
-    throw new Error("Không thể xoá chi nhánh: " + error.message);
+    throw new Error("Không thể xoá kho: " + error.message);
   }
 
   revalidatePath("/branches");

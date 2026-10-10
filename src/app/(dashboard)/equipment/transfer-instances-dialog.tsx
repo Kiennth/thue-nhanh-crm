@@ -89,7 +89,7 @@ export function TransferInstancesDialog({
 
   function handleSubmit() {
     if (!toBranchId) {
-      setError("Vui lòng chọn chi nhánh đích.");
+      setError("Vui lòng chọn kho đích.");
       return;
     }
     if (selectedIds.size === 0) {
@@ -131,10 +131,10 @@ export function TransferInstancesDialog({
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="to_branch_id">Đến chi nhánh</Label>
+          <Label htmlFor="to_branch_id">Đến kho</Label>
           <Select name="to_branch_id" value={toBranchId} onValueChange={handleTargetChange}>
             <SelectTrigger id="to_branch_id" className="w-full">
-              <SelectValue placeholder="Chọn chi nhánh đích">
+              <SelectValue placeholder="Chọn kho đích">
                 {(value: string) => branches.find((b) => b.id === value)?.name}
               </SelectValue>
             </SelectTrigger>
@@ -185,7 +185,7 @@ export function TransferInstancesDialog({
                       />
                       <span className="font-medium">{inst.identifier_code}</span>
                       <span className="ml-auto text-xs text-muted-foreground">
-                        {disabled ? "đã ở chi nhánh đích" : inst.branchName}
+                        {disabled ? "đã ở kho đích" : inst.branchName}
                       </span>
                     </label>
                   </li>

@@ -21,7 +21,7 @@ function assertOwnBranch(
 ): string | null {
   if (employee.role !== "cua_hang_truong") return null;
   if (!branchId || branchId !== employee.branch_id) {
-    return "Bạn chỉ được thao tác thiết bị trong chi nhánh của mình.";
+    return "Bạn chỉ được thao tác thiết bị trong kho của mình.";
   }
   return null;
 }
@@ -560,7 +560,7 @@ export async function deleteEquipmentUnit(id: string) {
 
 const EquipmentStockSchema = z.object({
   equipment_unit_id: z.string().uuid(),
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
   quantity_in_stock: z.coerce.number().int().min(0, { message: "Số lượng trong kho không được âm." }),
   quantity_picked_up: z.coerce.number().int().min(0, { message: "Số lượng đang cho thuê không được âm." }),
 });
@@ -614,13 +614,13 @@ export async function deleteEquipmentStock(id: string) {
 const TransferStockSchema = z
   .object({
     equipment_unit_id: z.string().uuid(),
-    from_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh nguồn." }),
-    to_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh đích." }),
+    from_branch_id: z.string().uuid({ message: "Vui lòng chọn kho nguồn." }),
+    to_branch_id: z.string().uuid({ message: "Vui lòng chọn kho đích." }),
     quantity: z.coerce.number().int().min(1, { message: "Số lượng chuyển phải lớn hơn 0." }),
     note: z.string().trim().optional(),
   })
   .refine((data) => data.from_branch_id !== data.to_branch_id, {
-    message: "Chi nhánh nguồn và đích phải khác nhau.",
+    message: "Kho nguồn và đích phải khác nhau.",
     path: ["to_branch_id"],
   });
 
@@ -647,7 +647,7 @@ export async function transferEquipmentStock(
     parsed.data.from_branch_id !== employee.branch_id &&
     parsed.data.to_branch_id !== employee.branch_id
   ) {
-    return { error: "Bạn chỉ được chuyển kho liên quan đến chi nhánh của mình." };
+    return { error: "Bạn chỉ được chuyển kho liên quan đến kho của mình." };
   }
 
   const supabase = await createClient();
@@ -669,7 +669,7 @@ export async function transferEquipmentStock(
 
 const TransferInstancesSchema = z.object({
   equipment_type_id: z.string().uuid(),
-  to_branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh đích." }),
+  to_branch_id: z.string().uuid({ message: "Vui lòng chọn kho đích." }),
   instance_ids: z.array(z.string().uuid()).min(1, { message: "Chọn ít nhất 1 sản phẩm để chuyển." }),
 });
 
@@ -722,7 +722,7 @@ export async function transferEquipmentInstances(
       return { error: `Máy "${inst.identifier_code}" đã thanh lý, không thể chuyển kho.` };
     }
     if (inst.branch_id === parsed.data.to_branch_id) {
-      return { error: `Máy "${inst.identifier_code}" đã ở chi nhánh đích rồi.` };
+      return { error: `Máy "${inst.identifier_code}" đã ở kho đích rồi.` };
     }
   }
 
@@ -917,7 +917,7 @@ const EquipmentPurchaseSchema = z.object({
   // Mua hàng) → gửi equipment_type_id, server tự tạo biến thể mặc định.
   equipment_unit_id: z.string().uuid().optional(),
   equipment_type_id: z.string().uuid().optional(),
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
   quantity: z.coerce.number().int().min(1, { message: "Số lượng mua phải lớn hơn 0." }),
   unit_cost: z.coerce.number().min(0, { message: "Giá mua không được âm." }),
   purchase_date: z.string().min(1, { message: "Vui lòng chọn ngày mua." }),
@@ -981,7 +981,7 @@ export async function createEquipmentPurchase(
 // khi ấn "Mua hàng" sẽ biến 1 sản phẩm thành 2 một cách sai lệch.
 const EquipmentCostAdjustmentSchema = z.object({
   equipment_unit_id: z.string().uuid(),
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
   unit_cost: z.coerce.number().min(0, { message: "Giá vốn không được âm." }),
   note: z.string().trim().optional(),
 });
@@ -1024,7 +1024,7 @@ export async function adjustEquipmentUnitCost(
 
 const EquipmentDisposalSchema = z.object({
   equipment_unit_id: z.string().uuid(),
-  branch_id: z.string().uuid({ message: "Vui lòng chọn chi nhánh." }),
+  branch_id: z.string().uuid({ message: "Vui lòng chọn kho." }),
   quantity: z.coerce.number().int().min(1, { message: "Số lượng bán phải lớn hơn 0." }),
   unit_price: z.coerce.number().min(0, { message: "Giá bán không được âm." }),
   disposal_date: z.string().min(1, { message: "Vui lòng chọn ngày bán." }),

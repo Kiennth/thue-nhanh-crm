@@ -146,9 +146,9 @@ export function PayrollOverview({
         <Card>
           <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base">Quỹ lương theo chi nhánh</CardTitle>
+              <CardTitle className="text-base">Quỹ lương theo kho</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Tổng chi lương từng chi nhánh — di chuột để xem kèm số nhân viên.
+                Tổng chi lương từng kho — di chuột để xem kèm số nhân viên.
               </p>
             </div>
             <PayrollBranchPeriodToggle value={payrollScope} customMonth={customMonth} />

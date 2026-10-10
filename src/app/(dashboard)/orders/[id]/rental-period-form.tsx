@@ -142,7 +142,7 @@ export function RentalPeriodForm({
           variant={mode === "manual" ? "default" : "outline"}
           onClick={() => setMode("manual")}
         >
-          Chọn ngày giờ kết thúc
+          Chọn ngày giờ trả
         </Button>
         <Button
           type="button"
@@ -155,7 +155,7 @@ export function RentalPeriodForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="rental_start_date">Bắt đầu thuê</Label>
+        <Label htmlFor="rental_start_date">Nhận</Label>
         <div className="flex gap-2">
           <DateInput
             id="rental_start_date"
@@ -180,7 +180,7 @@ export function RentalPeriodForm({
 
       {mode === "manual" ? (
         <div className="space-y-2">
-          <Label htmlFor="rental_end_date">Kết thúc thuê</Label>
+          <Label htmlFor="rental_end_date">Trả</Label>
           <div className="flex gap-2">
             <DateInput
               id="rental_end_date"
@@ -223,7 +223,7 @@ export function RentalPeriodForm({
           </div>
           {presetEnd && (
             <p className="text-sm text-muted-foreground">
-              Kết thúc thuê: {datePart(presetEnd)} {hourPart(presetEnd)}:00
+              Trả: {datePart(presetEnd)} {hourPart(presetEnd)}:00
             </p>
           )}
         </div>

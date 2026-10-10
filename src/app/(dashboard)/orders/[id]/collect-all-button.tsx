@@ -80,7 +80,7 @@ export function CollectAllButton({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-              Huỷ
+              Đóng
             </Button>
             <Button onClick={run} disabled={pending}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <BadgeDollarSign className="size-4" />}
