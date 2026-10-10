@@ -61,6 +61,7 @@ import { QuickAddProductSearch } from "./quick-add-product-search";
 import { OrderLinesSortableTable } from "./order-lines-sortable";
 import { OrderTaskRow } from "./order-task-row";
 import { StepGroupButton } from "./step-completer";
+import { InvoicePanel } from "./invoice-panel";
 import { CloseDealButton } from "./close-deal-button";
 import { CompleteAllTasksButton } from "./complete-all-tasks-button";
 import { CollectAllButton } from "./collect-all-button";
@@ -205,7 +206,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ data: orderCustomer }, { data: reservationRows }] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, email, phone, deposit_percentage, customer_type, tax_code")
+      .select("id, name, email, phone, deposit_percentage, customer_type, tax_code, address, invoice_email, wants_vat")
       .eq("id", order.customer_id)
       .maybeSingle(),
     relevantUnitIds.length > 0
@@ -1957,6 +1958,43 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 )}
               </CardContent>
             </Card>
+
+            <InvoicePanel
+              orderId={order.id}
+              completedAt={order.completed_at}
+              cancelled={!!order.cancelled_at}
+              invoice={(() => {
+                // Cột hoá đơn mới (migration 20261010200000) chưa có trong types.
+                const o = order as typeof order & {
+                  invoice_needed?: boolean | null;
+                  invoice_not_needed_reason?: string | null;
+                  invoice_draft_at?: string | null;
+                };
+                return {
+                  needed: o.invoice_needed ?? null,
+                  issuedAt: o.invoice_issued_at ?? null,
+                  number: o.invoice_number ?? null,
+                  notNeeded: !!o.invoice_not_needed,
+                  notNeededReason: o.invoice_not_needed_reason ?? null,
+                  draftAt: o.invoice_draft_at ?? null,
+                };
+              })()}
+              customer={
+                orderCustomer
+                  ? {
+                      id: orderCustomer.id,
+                      name: orderCustomer.name,
+                      customer_type: orderCustomer.customer_type,
+                      wants_vat: !!(orderCustomer as { wants_vat?: boolean }).wants_vat,
+                      tax_code: orderCustomer.tax_code,
+                      address: (orderCustomer as { address?: string | null }).address ?? null,
+                      email: orderCustomer.email,
+                      invoice_email: (orderCustomer as { invoice_email?: string | null }).invoice_email ?? null,
+                    }
+                  : null
+              }
+              canManage={canManage}
+            />
           </div>
 
       <OrderComments

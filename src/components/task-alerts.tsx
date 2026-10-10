@@ -15,6 +15,7 @@ import {
 import { getTaskAlerts, markTaskAlertsSeen, type TaskAlert } from "@/lib/actions/my-tasks";
 import { TASK_TYPE_LABELS } from "@/lib/order-labels";
 import { cn } from "@/lib/utils";
+import type { TaskType } from "@/types/database";
 
 // Chuông thông báo trong CRM (Grok tách gọn CRM 10/10, giai đoạn 4) — không
 // email/Zalo (CEO ở trên CRM suốt). Tải sau khi trang hiện (không chặn trang),
@@ -105,21 +106,27 @@ export function TaskBell() {
           alerts.slice(0, 30).map((a) => (
             <DropdownMenuItem
               key={a.key}
-              onClick={() => router.push(`/orders/${a.orderId}`)}
+              onClick={() => router.push(a.taskType === "invoice" ? "/invoices?filter=overdue" : `/orders/${a.orderId}`)}
               className="flex items-start gap-2 py-2"
             >
               <span
                 className={cn(
                   "mt-1.5 size-2 shrink-0 rounded-full",
-                  a.seen ? "bg-transparent" : a.kind === "overdue" ? "bg-rose-600" : "bg-amber-500",
+                  a.seen ? "bg-transparent" : a.kind === "soon" ? "bg-amber-500" : "bg-rose-600",
                 )}
               />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm">
-                  <b>{a.orderCode}</b> · {TASK_TYPE_LABELS[a.taskType]}
+                  <b>{a.orderCode}</b> ·{" "}
+                  {a.taskType === "invoice" ? "Xuất hoá đơn" : TASK_TYPE_LABELS[a.taskType as TaskType]}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {a.kind === "overdue" ? "Quá hạn" : "Tới hạn trong 1 giờ"} · {dueFmt.format(new Date(a.dueAt))}
+                  {a.kind === "soon"
+                    ? "Tới hạn trong 1 giờ"
+                    : a.kind === "invoice_late"
+                      ? "HĐ chờ quá 3 ngày"
+                      : "Quá hạn"}{" "}
+                  · {dueFmt.format(new Date(a.dueAt))}
                   {!a.mine && " · việc của kho"}
                   {a.customerName ? ` · ${a.customerName}` : ""}
                 </span>

@@ -16,9 +16,10 @@ export type TaskAlert = {
   key: string;
   orderId: string;
   orderCode: string;
-  taskType: TaskType;
+  // "invoice" = nhắc xuất hoá đơn (giai đoạn 5).
+  taskType: TaskType | "invoice";
   dueAt: string;
-  kind: "soon" | "overdue";
+  kind: "soon" | "overdue" | "invoice_due" | "invoice_late";
   mine: boolean;
   customerName: string | null;
   seen: boolean;
