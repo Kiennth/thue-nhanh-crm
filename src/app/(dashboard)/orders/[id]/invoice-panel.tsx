@@ -1,12 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { AlertTriangle, ReceiptText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccentTitle, accentCard, accentHeader } from "@/components/section-accent";
-import { setOrderInvoiceNeeded } from "@/lib/actions/invoices";
 import { InvoiceRowActions } from "../../invoices/row-actions";
 import { StatusChip } from "../../invoices/invoice-queue-table";
 
@@ -55,10 +52,9 @@ export function InvoicePanel({
   } | null;
   canManage: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
   if (cancelled) return null;
-  const defaultNeeded = customer ? customer.customer_type === "company" || customer.wants_vat : true;
-  const effectiveNeeded = invoice.needed ?? defaultNeeded;
+  // Đơn nào cũng xuất hoá đơn (CEO 2026-10-11) — không còn chọn "Không cần".
+  const effectiveNeeded = true;
   const state = invoice.issuedAt
     ? "issued"
     : invoice.notNeeded
@@ -76,12 +72,6 @@ export function InvoicePanel({
   }
   const due = completedAt ? new Date(new Date(completedAt).getTime() + 86_400_000) : null;
 
-  const setNeeded = (v: string) =>
-    startTransition(async () => {
-      const res = await setOrderInvoiceNeeded(orderId, v === "auto" ? null : v === "yes");
-      if (res && "error" in res) toast.error(res.error);
-    });
-
   return (
     <Card className={accentCard("violet")}>
       <CardHeader className={accentHeader("violet", "flex-row items-center justify-between")}>
@@ -94,27 +84,11 @@ export function InvoicePanel({
           <StatusChip state={state} />
         ) : (
           <span className="text-xs text-muted-foreground">
-            {effectiveNeeded ? "Cần HĐ — vào hàng chờ khi hoàn tất" : "Không cần HĐ"}
+            Cần HĐ — vào hàng chờ khi hoàn tất
           </span>
         )}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {!completedAt && (
-          <label className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground">Đơn này cần hoá đơn?</span>
-            <select
-              value={invoice.needed === null ? "auto" : invoice.needed ? "yes" : "no"}
-              onChange={(e) => setNeeded(e.target.value)}
-              disabled={pending}
-              className="h-8 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="auto">Theo khách ({defaultNeeded ? "cần" : "không cần"})</option>
-              <option value="yes">Cần</option>
-              <option value="no">Không cần</option>
-            </select>
-          </label>
-        )}
-
         {effectiveNeeded && customer && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-muted-foreground">Bên mua</dt>

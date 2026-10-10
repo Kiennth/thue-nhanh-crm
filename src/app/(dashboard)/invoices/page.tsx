@@ -211,7 +211,7 @@ export default async function InvoicesPage({
       <InvoiceQueueTable key={`${view}-${branchId ?? ""}`} rows={rows} view={view} />
 
       <p className="text-xs text-muted-foreground">
-        Khách cá nhân không lấy VAT tự chuyển &quot;Không cần&quot; khi đơn hoàn tất (bấm Mở lại nếu khách đổi ý). Kế toán
+        Đơn nào cũng xuất hoá đơn — không về công ty thì về cá nhân. Kế toán
         nhận chuông khi đơn quá hạn 24h, Giám đốc khi quá 3 ngày. Đơn hoàn tất trước 01/10/2026 đã đánh dấu hàng loạt.
       </p>
     </div>

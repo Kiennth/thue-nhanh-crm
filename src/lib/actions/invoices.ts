@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/dal";
-import { ALL_ROLES, MANAGE_ROLES } from "@/lib/roles";
+import { MANAGE_ROLES } from "@/lib/roles";
 import { VAT_RATE } from "@/lib/order-labels";
 
 export type ActionState = { error: string } | { success: true } | undefined;
@@ -97,18 +97,6 @@ export async function markInvoicesDraft(orderIds: string[]): Promise<BulkResult>
 }
 
 // "Không cần" bắt buộc lý do (Grok 10/10 §8.1) — 1 lý do chung khi chọn nhiều.
-export async function markInvoicesNotNeeded(orderIds: string[], reason: string): Promise<BulkResult | { error: string }> {
-  await requireRole([...MANAGE_ROLES]);
-  const r = reason.trim();
-  if (r.length < 3) return { error: "Nhập lý do (ít nhất 3 ký tự)." };
-  return bulkUpdate(
-    orderIds,
-    { invoice_not_needed: true, invoice_not_needed_reason: r.slice(0, 300), invoice_draft_at: null },
-    true,
-  );
-}
-
-// Đưa đơn quay lại danh sách chờ (bấm nhầm, hoặc cần xuất bù đơn cũ).
 export async function resetInvoiceStatus(orderId: string) {
   await requireRole([...MANAGE_ROLES]);
   const { error } = await (await db())
@@ -129,15 +117,6 @@ export async function resetInvoiceStatus(orderId: string) {
 
 // Đơn cần hoá đơn hay không — null = theo khách (Công ty / lấy VAT = cần).
 // Chỉ tác dụng lúc đơn hoàn tất (trigger orders_auto_invoice_not_needed).
-export async function setOrderInvoiceNeeded(orderId: string, needed: boolean | null): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
-  const { error } = await (await db()).from("orders").update({ invoice_needed: needed }).eq("id", orderId);
-  if (error) return { error: error.message };
-  revalidatePath(`/orders/${orderId}`);
-  return { success: true };
-}
-
-// Thông tin xuất HĐ để dán sang MISA (chưa nối API — CEO 10/10 để sau).
 export async function getInvoiceCopyText(orderId: string): Promise<string> {
   await requireRole([...MANAGE_ROLES]);
   const supabase = await createClient();

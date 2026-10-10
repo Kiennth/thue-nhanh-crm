@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ClipboardCopy, FilePen, ReceiptText, Undo2, XCircle } from "lucide-react";
+import { ClipboardCopy, FilePen, ReceiptText, Undo2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +18,10 @@ import {
   getInvoiceCopyText,
   markInvoiceIssued,
   markInvoicesDraft,
-  markInvoicesNotNeeded,
   resetInvoiceStatus,
   type BulkResult,
 } from "@/lib/actions/invoices";
 import { DateInput } from "@/components/date-input";
-
-export const NOT_NEEDED_PRESETS = [
-  "Khách cá nhân không lấy hoá đơn",
-  "Đã xuất gộp vào đơn khác",
-  "Hoá đơn xuất bên Booqable / sổ cũ",
-  "Đơn nội bộ / không thu tiền",
-];
 
 // Báo kết quả từng đơn của thao tác hàng loạt (Grok 10/10 §8.3).
 export function reportBulk(label: string, res: BulkResult | { error: string }) {
@@ -40,69 +32,9 @@ export function reportBulk(label: string, res: BulkResult | { error: string }) {
   for (const r of bad) toast.error(`${r.orderCode}: ${r.error ?? "lỗi"}`);
 }
 
-// Hộp "Không cần" — bắt buộc lý do, dùng cho 1 đơn hoặc nhiều đơn.
-export function NotNeededDialog({
-  orderIds,
-  trigger,
-  onDone,
-}: {
-  orderIds: string[];
-  trigger: React.ReactElement;
-  onDone?: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [pending, startTransition] = useTransition();
-  const submit = () =>
-    startTransition(async () => {
-      const res = await markInvoicesNotNeeded(orderIds, reason);
-      reportBulk("Đã chuyển Không cần", res);
-      if (!("error" in res)) {
-        setOpen(false);
-        onDone?.();
-      }
-    });
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger} />
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Không cần hoá đơn {orderIds.length > 1 ? `(${orderIds.length} đơn)` : ""}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="nn-reason">Lý do *</Label>
-          <Input
-            id="nn-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={300}
-            autoFocus
-          />
-          <div className="flex flex-wrap gap-1.5">
-            {NOT_NEEDED_PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setReason(p)}
-                className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button onClick={submit} disabled={pending || reason.trim().length < 3}>
-            {pending ? "Đang lưu..." : "Xác nhận Không cần"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // Thao tác từng đơn: Sao chép thông tin HĐ (dán sang MISA) · Nháp · Đã xuất
-// (số HĐ + ngày) · Không cần (lý do) · Mở lại.
+// (số HĐ + ngày) · Mở lại. Bỏ "Không cần" (CEO 2026-10-11: đơn nào cũng
+// xuất hoá đơn); đơn "Không cần" cũ vẫn có Mở lại.
 export function InvoiceRowActions({
   orderId,
   state,
@@ -212,15 +144,6 @@ export function InvoiceRowActions({
           </form>
         </DialogContent>
       </Dialog>
-      <NotNeededDialog
-        orderIds={[orderId]}
-        trigger={
-          <Button variant="ghost" size="sm">
-            <XCircle className="size-4" />
-            {!compact && "Không cần"}
-          </Button>
-        }
-      />
     </div>
   );
 }

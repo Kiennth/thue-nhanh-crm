@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, FilePen, XCircle } from "lucide-react";
+import { AlertTriangle, FilePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { markInvoicesDraft } from "@/lib/actions/invoices";
 import { formatVND } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { InvoiceRowActions, NotNeededDialog, reportBulk } from "./row-actions";
+import { InvoiceRowActions, reportBulk } from "./row-actions";
 
 export type InvoiceRow = {
   id: string;
@@ -74,16 +74,6 @@ export function InvoiceQueueTable({ rows, view }: { rows: InvoiceRow[]; view: st
             <FilePen className="size-4" />
             Đánh dấu Nháp ({selected.size})
           </Button>
-          <NotNeededDialog
-            orderIds={ids}
-            onDone={() => setSelected(new Set())}
-            trigger={
-              <Button size="sm" variant="outline">
-                <XCircle className="size-4" />
-                Không cần… ({selected.size})
-              </Button>
-            }
-          />
           <button type="button" onClick={() => setSelected(new Set())} className="ml-auto text-xs underline">
             Bỏ chọn
           </button>
