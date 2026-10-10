@@ -2360,8 +2360,6 @@ const FlowActionSchema = z.object({
   orderId: z.string().uuid(),
   // Giờ giao / nhận lại thực tế (ISO) — mặc định bây giờ, không quá 1 giờ tới.
   at: z.string().datetime({ offset: true }).optional(),
-  // Người giao / người thu hồi — có thì ghi luôn khâu khoán tương ứng.
-  employeeId: z.string().uuid().optional(),
 });
 export type FlowActionInput = z.infer<typeof FlowActionSchema>;
 
@@ -2399,15 +2397,17 @@ function revalidateFlow(orderId: string) {
 }
 
 export async function pickupOrder(input: FlowActionInput): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
+  const employee = await requireRole([...ALL_ROLES]);
   const parsed = FlowActionSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   const at = flowTime(parsed.data.at);
   if (typeof at !== "string") return at;
   const supabase = await createClient();
   const err = await pickupCore(supabase, parsed.data.orderId, at);
-  if (!err && parsed.data.employeeId) {
-    const tickErr = await tickFlowTask(supabase, parsed.data.orderId, "giao_hang_ban_giao", parsed.data.employeeId, at);
+  // Ai bấm thì người đó được ghi khoán khâu này (CEO 2026-10-11); quản lý
+  // hậu kiểm đổi người sau nếu cần.
+  if (!err) {
+    const tickErr = await tickFlowTask(supabase, parsed.data.orderId, "giao_hang_ban_giao", employee.id, at);
     if (tickErr) {
       revalidateFlow(parsed.data.orderId);
       return { error: tickErr };
@@ -2418,15 +2418,17 @@ export async function pickupOrder(input: FlowActionInput): Promise<ActionState> 
 }
 
 export async function returnOrder(input: FlowActionInput): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
+  const employee = await requireRole([...ALL_ROLES]);
   const parsed = FlowActionSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   const at = flowTime(parsed.data.at);
   if (typeof at !== "string") return at;
   const supabase = await createClient();
   const err = await returnCore(supabase, parsed.data.orderId, at);
-  if (!err && parsed.data.employeeId) {
-    const tickErr = await tickFlowTask(supabase, parsed.data.orderId, "thu_hoi", parsed.data.employeeId, at);
+  // Ai bấm thì người đó được ghi khoán khâu này (CEO 2026-10-11); quản lý
+  // hậu kiểm đổi người sau nếu cần.
+  if (!err) {
+    const tickErr = await tickFlowTask(supabase, parsed.data.orderId, "thu_hoi", employee.id, at);
     if (tickErr) {
       revalidateFlow(parsed.data.orderId);
       return { error: tickErr };
@@ -2586,6 +2588,27 @@ export async function reassignOrderTask(
   if (!data?.length) return { error: "Khâu này chưa hoàn thành." };
   revalidatePath(`/orders/${orderId}`);
   return { success: true };
+}
+
+// "Tôi làm" ở 10 khâu tính lương (CEO 2026-10-11): ai bấm thì khâu ghi cho
+// người đó, ngày hôm nay. Giám đốc/Admin/Kế toán hậu kiểm: đổi người
+// (reassignOrderTask) hoặc bỏ tick (uncompleteOrderTask).
+export async function completeMyStep(orderId: string, taskType: TaskType): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
+  if (!z.string().uuid().safeParse(orderId).success || !TASK_TYPE_SEQUENCE.includes(taskType)) {
+    return { error: "Dữ liệu không hợp lệ." };
+  }
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("order_tasks")
+    .select("completed_date")
+    .eq("order_id", orderId)
+    .eq("task_type", taskType)
+    .maybeSingle();
+  if (existing?.completed_date) return { error: "Khâu này đã có người làm." };
+  const err = await completeTaskCore(supabase, orderId, taskType, employee.id, null, false);
+  revalidateFlow(orderId);
+  return err ? { error: err } : { success: true };
 }
 
 // Bỏ tick 1 khâu khoán đã hoàn thành (CEO 2026-08-06; từ 2026-10-11 bỏ được
@@ -2790,7 +2813,7 @@ const QuickOrderSchema = z.object({
   return_address: z.string().trim().nullable().optional(),
   return_contact_name: z.string().trim().nullable().optional(),
   return_contact_phone: z.string().trim().nullable().optional(),
-  employee_id: z.string().uuid({ message: "Vui lòng chọn người phụ trách." }),
+  // Ai bấm tạo đơn thì người đó được ghi khoán các khâu đầu (CEO 2026-10-11).
   // "quote" = Tiếp nhận + Báo giá; "deal" = thêm Chốt đơn.
   stage: z.enum(["quote", "deal"]),
   // Lên đơn từ 1 đơn web (giỏ hàng thuenhanh.vn) — gắn link + đánh dấu đã lên đơn.
@@ -2864,7 +2887,7 @@ export async function quickCreateOrder(
     if (lineError) warnings.push(lineError);
   }
 
-  const taskError = await completeEarlyTasks(supabase, order.id, d.employee_id, d.stage === "deal" ? "chot_don" : "bao_gia");
+  const taskError = await completeEarlyTasks(supabase, order.id, employee.id, d.stage === "deal" ? "chot_don" : "bao_gia");
   if (taskError) warnings.push(taskError);
 
   if (d.web_order_id) {
@@ -2983,16 +3006,15 @@ export async function completeAllOrderTasks(orderId: string): Promise<ActionStat
   return { success: true };
 }
 
-// Nút "Chốt đơn" trên trang đơn (phương án C): hoàn thành Tiếp nhận + Báo giá
-// + Chốt đơn còn dở trong 1 click.
-export async function closeOrderDeal(orderId: string, employeeId: string): Promise<ActionState> {
-  await requireRole([...ALL_ROLES]);
-  if (!z.string().uuid().safeParse(employeeId).success) {
-    return { error: "Vui lòng chọn người phụ trách." };
-  }
+// Nút "Chốt đơn" trên thanh luồng đơn: hoàn thành Tiếp nhận + Báo giá + Chốt
+// đơn còn dở cho NGƯỜI BẤM (CEO 2026-10-11: ai click thì người đó làm) + ghi
+// mốc chốt đơn (giữ máy).
+export async function closeOrderDeal(orderId: string): Promise<ActionState> {
+  const employee = await requireRole([...ALL_ROLES]);
   const supabase = await createClient();
-  const error = await completeEarlyTasks(supabase, orderId, employeeId, "chot_don");
+  const error = await completeEarlyTasks(supabase, orderId, employee.id, "chot_don");
   revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
   return error ? { error } : { success: true };
 }
 

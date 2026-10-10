@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Undo2 } from "lucide-react";
+import { Hand, Loader2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { reassignOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
-import { StepCompleterInline, type StepChecks } from "./step-completer";
+import { completeMyStep, reassignOrderTask, uncompleteOrderTask } from "@/lib/actions/orders";
 import type { TaskType } from "@/types/database";
 
 interface EmployeeOption {
@@ -36,23 +35,15 @@ interface OrderTaskRowProps {
     has_issue: boolean;
     completed_date: string | null;
   };
-  // done: đã hoàn thành, chỉ hiện tóm tắt. current: khâu đang tới lượt — do
-  // gating tuần tự nên chỉ có đúng 1 khâu ở trạng thái này cùng lúc, hiện
-  // form đầy đủ. locked: chưa tới lượt, hiện mờ, không có form/nút bấm.
+  // done: đã có người làm (hiện tên + ngày). current: chưa ai làm — nút "Tôi
+  // làm" (ai bấm thì ghi cho người đó, CEO 2026-10-11). "locked" giữ cho
+  // tương thích, không còn dùng (bỏ khoá tuần tự).
   status: "done" | "current" | "locked";
-  // Chỉ true cho ĐÚNG khâu "done" cuối cùng (page.tsx tự tính) — bỏ tick khâu
-  // giữa chừng trong khi khâu sau vẫn "done" sẽ phá tính tuần tự bắt buộc.
+  // Bỏ tick khâu (Giám đốc/Admin/Kế toán/Cửa hàng trưởng — hậu kiểm).
   canUncomplete?: boolean;
-  // Giám đốc/Admin/Kế toán: đổi người hoàn thành khâu đã xong ngay tại chỗ,
-  // không phải Bỏ hoàn thành (CEO 2026-10-05).
+  // Giám đốc/Admin/Kế toán: đổi người hoàn thành khâu đã xong ngay tại chỗ
+  // (hậu kiểm, CEO 2026-10-05 / 2026-10-11).
   canReassign?: boolean;
-  // Khâu đang tới lượt: người đang đăng nhập (mặc định người làm), số liệu
-  // cảnh báo nợ/cọc và gợi ý thu tiền (giai đoạn 3 tách gọn CRM).
-  completer: {
-    currentEmployeeId: string | null;
-    checks: StepChecks;
-    paymentDefault: { type: "invoice" | "deposit_collect"; amount: number } | null;
-  };
 }
 
 function UncompleteTaskButton({
@@ -115,13 +106,10 @@ export function OrderTaskRow({
   taskType,
   label,
   employees,
-  priorityCount = 0,
-  priorityLabel,
   task,
   status,
   canUncomplete,
   canReassign,
-  completer,
 }: OrderTaskRowProps) {
   const [pending, startTransition] = useTransition();
 
@@ -155,6 +143,11 @@ export function OrderTaskRow({
               ))}
             </select>
           )}
+          {!canReassign && (
+            <span className="text-xs font-medium">
+              {employees.find((e) => e.id === task?.employee_id)?.name ?? "—"}
+            </span>
+          )}
           {task?.completed_date && (
             <span className="text-xs text-muted-foreground">{task.completed_date}</span>
           )}
@@ -173,13 +166,24 @@ export function OrderTaskRow({
   }
 
   return (
-    <StepCompleterInline
-      orderId={orderId}
-      label={label}
-      step={{ taskType, employees, priorityCount, priorityLabel, assignedId: task?.employee_id ?? null }}
-      currentEmployeeId={completer.currentEmployeeId}
-      checks={completer.checks}
-      paymentDefault={completer.paymentDefault}
-    />
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="text-sm">{label}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await completeMyStep(orderId, taskType);
+            if (result && "error" in result) toast.error(result.error);
+            else toast.success(`Đã ghi khâu "${label}" cho bạn.`);
+          })
+        }
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Hand className="size-3.5" />}
+        Tôi làm
+      </Button>
+    </div>
   );
 }

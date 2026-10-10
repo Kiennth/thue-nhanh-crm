@@ -23,10 +23,9 @@ import { cn } from "@/lib/utils";
 
 // Luồng đơn 4 bước kiểu Booqable (CEO 2026-10-11): Đã báo giá → Chốt đơn →
 // Giao máy → Nhận lại máy. Mỗi lúc chỉ 1 nút cho bước kế tiếp; bước vừa làm
-// có "Hoàn tác" (quản lý + Cửa hàng trưởng). 10 khâu tính lương nằm riêng
-// bên dưới, tick lúc nào cũng được — không chặn luồng này.
-
-type Employee = { id: string; name: string };
+// có "Hoàn tác" (quản lý + Cửa hàng trưởng). Ai bấm thì người đó được ghi
+// khoán khâu tương ứng (CEO 2026-10-11) — quản lý hậu kiểm đổi người sau.
+// 10 khâu tính lương nằm riêng bên dưới, không chặn luồng này.
 
 const fmt = new Intl.DateTimeFormat("vi-VN", {
   timeZone: "Asia/Ho_Chi_Minh",
@@ -55,10 +54,6 @@ export function OrderFlowBar({
   plannedStart,
   plannedEnd,
   canUndo,
-  dealEmployees,
-  pickupEmployees,
-  returnEmployees,
-  currentEmployeeId,
 }: {
   orderId: string;
   createdAt: string;
@@ -70,18 +65,12 @@ export function OrderFlowBar({
   plannedStart: string | null;
   plannedEnd: string | null;
   canUndo: boolean;
-  dealEmployees: Employee[];
-  pickupEmployees: Employee[];
-  returnEmployees: Employee[];
-  currentEmployeeId: string | null;
 }) {
   const confirmed = !!confirmedAt || delivered;
   const current = returned ? 4 : delivered ? 3 : confirmed ? 2 : 1;
   const [pending, startTransition] = useTransition();
-  const [dealEmployee, setDealEmployee] = useState(currentEmployeeId ?? dealEmployees[0]?.id ?? "");
   const [dialog, setDialog] = useState<null | "pickup" | "return" | "undo">(null);
   const [at, setAt] = useState("");
-  const [who, setWho] = useState("");
 
   const steps = [
     { n: 1, title: "Đã báo giá", sub: "chưa chốt", date: when(createdAt) },
@@ -103,12 +92,10 @@ export function OrderFlowBar({
 
   function openFlowDialog(kind: "pickup" | "return") {
     setAt(localInputNow());
-    setWho(currentEmployeeId ?? "");
     setDialog(kind);
   }
 
   const undoLabel = returned ? "Nhận lại máy" : delivered ? "Giao máy" : "Chốt đơn";
-  const flowEmployees = dialog === "return" ? returnEmployees : pickupEmployees;
 
   return (
     <div className="rounded-xl border bg-card p-3 sm:p-4">
@@ -149,21 +136,9 @@ export function OrderFlowBar({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {current === 1 && (
           <>
-            <select
-              value={dealEmployee}
-              onChange={(e) => setDealEmployee(e.target.value)}
-              className="h-9 min-w-0 rounded-md border bg-background px-2 text-sm"
-              aria-label="Người chốt đơn (ghi khoán 3 khâu đầu)"
-            >
-              {dealEmployees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
             <Button
-              disabled={pending || !dealEmployee}
-              onClick={() => run(() => closeOrderDeal(orderId, dealEmployee), "Đã chốt đơn — máy được giữ cho đơn")}
+              disabled={pending}
+              onClick={() => run(() => closeOrderDeal(orderId), "Đã chốt đơn — máy được giữ cho đơn")}
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Handshake className="size-4" />}
               Chốt đơn
@@ -210,24 +185,9 @@ export function OrderFlowBar({
               className="mt-1 h-9 w-full rounded-md border bg-background px-2"
             />
           </label>
-          <label className="block text-sm">
-            <span className="font-medium">{dialog === "return" ? "Người thu hồi" : "Người giao"}</span>
-            <select
-              value={who}
-              onChange={(e) => setWho(e.target.value)}
-              className="mt-1 h-9 w-full rounded-md border bg-background px-2"
-            >
-              <option value="">— Ghi khoán sau —</option>
-              {flowEmployees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Chọn người thì tick luôn khâu “{dialog === "return" ? "Thu hồi" : "Giao hàng & bàn giao"}” để tính khoán.
-            </span>
-          </label>
+          <p className="text-xs text-muted-foreground">
+            Khoán khâu “{dialog === "return" ? "Thu hồi" : "Giao hàng & bàn giao"}” ghi cho bạn (người bấm).
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)} disabled={pending}>
               Thôi
@@ -235,7 +195,7 @@ export function OrderFlowBar({
             <Button
               disabled={pending || !at}
               onClick={() => {
-                const input = { orderId, at: new Date(at).toISOString(), employeeId: who || undefined };
+                const input = { orderId, at: new Date(at).toISOString() };
                 if (dialog === "return") run(() => returnOrder(input), "Đã nhận lại máy — đơn hoàn tất");
                 else run(() => pickupOrder(input), "Đã giao máy");
               }}

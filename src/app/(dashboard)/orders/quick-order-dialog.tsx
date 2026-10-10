@@ -319,7 +319,6 @@ export function QuickOrderDialog({
   const [showResults, setShowResults] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
-  const [employeeId, setEmployeeId] = useState("");
   // "Thêm chi tiết" — đóng sẵn, để trống = server dùng mặc định (§C3).
   const [detailsOpen, setDetailsOpen] = useState(false);
   // Trống = server tự đánh số nối tiếp Booqable (PO13111…); gõ tay vẫn được.
@@ -420,7 +419,6 @@ export function QuickOrderDialog({
     const applyCatalog = (c: QuickOrderCatalog, first: boolean) => {
       setCatalog(c);
       if (!first) return;
-      setEmployeeId((v) => v || c.currentEmployeeId);
       // Kho giao mặc định = kho của người đang đăng nhập (§C1, đã chốt);
       // người không gắn kho thì để trống, bắt chọn.
       setBranchId((v) => v || c.defaultBranchId || "");
@@ -604,7 +602,6 @@ export function QuickOrderDialog({
           return_address: otherReceiver && returnDiffers ? returnAddress || null : null,
           return_contact_name: otherReceiver && returnDiffers ? returnName || null : null,
           return_contact_phone: otherReceiver && returnDiffers ? returnPhone || null : null,
-          employee_id: employeeId,
           stage,
           web_order_id: prefill?.webOrderId ?? null,
           items: allLines.map((l) => ({
@@ -636,11 +633,6 @@ export function QuickOrderDialog({
     });
   }
 
-  const employees = catalog?.employees ?? [];
-  const sortedEmployees = [
-    ...employees.filter((e) => e.branch_id === branchId),
-    ...employees.filter((e) => e.branch_id !== branchId),
-  ];
   const branchName = (id: string) => branches.find((b) => b.id === id)?.name ?? "";
   // Dải "Tự điền từ hồ sơ khách" hay các ô sửa người đặt / địa chỉ giao.
   const showContactFields =
@@ -1418,21 +1410,6 @@ export function QuickOrderDialog({
                 Đóng
               </Button>
               <div className="ml-auto flex flex-wrap items-start gap-2">
-                <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
-                  Người phụ trách
-                  <select
-                    id="quick_employee"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    className="h-9 rounded-md border bg-transparent px-2 text-sm text-foreground"
-                  >
-                    {sortedEmployees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.id === catalog?.currentEmployeeId ? `${e.name} (tôi)` : e.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <div className="flex flex-col items-center gap-0.5">
                   <Button type="button" variant="outline" className="h-10" disabled={saving || !catalog} onClick={() => submit("quote")}>
                     <FileText className="size-4" />

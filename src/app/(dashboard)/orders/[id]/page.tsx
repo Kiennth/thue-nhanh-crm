@@ -369,20 +369,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // QR chuyển khoản tách 2 mục như báo giá (CEO 2026-10-05): tiền thuê còn
   // thiếu ("THANH TOAN …") + cọc chưa thu ("DAT COC …").
   const depositDue = totalDeposit > 0 && depositRefunded === 0 ? Math.max(0, totalDeposit - depositCollected) : 0;
-  // Hoàn thành khâu (giai đoạn 3): cảnh báo còn nợ / chưa thu cọc khi Nghiệm
-  // thu / Nhập kho — có lý do thì đi tiếp, không chặn.
-  const stepChecks = {
-    remaining: Math.round(remaining),
-    depositDue: Math.round(depositDue),
-    missingCccd: orderCustomer?.customer_type === "individual" && !orderCustomer.tax_code,
-    hasOwingOverride: (stepOverrideRows ?? []).some((o) => o.rule === "owing"),
-  };
-  const stepPaymentDefault = (taskType: TaskType) =>
-    taskType === "ky_hop_dong_thu_coc"
-      ? { type: "deposit_collect" as const, amount: Math.round(depositDue) }
-      : (["giao_hang_ban_giao", "thu_hoi", "nghiem_thu", "nhap_kho_bao_tri"] as TaskType[]).includes(taskType)
-        ? { type: "invoice" as const, amount: Math.round(remaining) }
-        : null;
   const qrRental = order.cancelled_at ? 0 : Math.round(remaining);
   const qrDeposit = order.cancelled_at ? 0 : Math.round(depositDue);
 
@@ -820,10 +806,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             plannedStart={order.rental_start_at}
             plannedEnd={order.rental_end_at}
             canUndo={canUncompleteTask}
-            dealEmployees={taskEmployeeOptions("chot_don", employee?.id).employees}
-            pickupEmployees={taskEmployeeOptions("giao_hang_ban_giao", employee?.id).employees}
-            returnEmployees={taskEmployeeOptions("thu_hoi", employee?.id).employees}
-            currentEmployeeId={employee?.id ?? null}
           />
         </div>
       )}
@@ -1594,11 +1576,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                                     status={status}
                                     canUncomplete={canUncompleteTask}
                                     canReassign={canManage}
-                                    completer={{
-                                      currentEmployeeId: employee?.id ?? null,
-                                      checks: stepChecks,
-                                      paymentDefault: stepPaymentDefault(taskType),
-                                    }}
                                   />
                                 </div>
                                 {scanType && status === "current" && (
