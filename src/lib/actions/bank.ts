@@ -30,7 +30,15 @@ export async function assignBankTransaction(
   if (tx.status === "matched") return { error: "Giao dịch này đã ghi vào đơn rồi." };
 
   const code = orderCode.trim().toUpperCase();
-  const { data: order } = await db.from("orders").select("id, order_code").eq("order_code", code).maybeSingle();
+  // Mã chỉ có số (đơn mới từ 10/10) hoặc PO + số (đơn cũ) — gõ kiểu nào cũng
+  // tìm được, cùng 1 dãy số nên không trùng.
+  const digits = /^(PO)?(\d{5,7})$/.exec(code)?.[2];
+  const { data: order } = await db
+    .from("orders")
+    .select("id, order_code")
+    .in("order_code", digits ? [digits, `PO${digits}`] : [code])
+    .limit(1)
+    .maybeSingle();
   if (!order) return { error: `Không có đơn mã "${code}".` };
 
   const paidAt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(

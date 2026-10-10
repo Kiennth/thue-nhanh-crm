@@ -394,7 +394,7 @@ async function TodayBoard({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Mỗi danh sách tối đa 5 dòng · &quot;Hoàn tất còn nợ&quot; chỉ tính đơn tạo trên CRM (mã PO) — tiền đơn Booqable
+        Mỗi danh sách tối đa 5 dòng · &quot;Hoàn tất còn nợ&quot; chỉ tính đơn tạo trên CRM (mã PO hoặc mã số) — tiền đơn Booqable
         nằm ở Booqable · so sánh kho &amp; lợi nhuận ở trang{" "}
         <Link href="/reports" className="text-primary hover:underline">
           Báo cáo

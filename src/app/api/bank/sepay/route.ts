@@ -75,7 +75,8 @@ export async function POST(request: Request) {
   const { data: order } = await db
     .from("orders")
     .select("id, cancelled_at")
-    .eq("order_code", parsed.orderCode)
+    .in("order_code", [parsed.orderCode, ...parsed.altCodes])
+    .limit(1)
     .maybeSingle();
   // Đơn đã huỷ: để chờ người xem (có thể khách chuyển nhầm mã).
   if (!order || order.cancelled_at) return ok({ matched: false });
